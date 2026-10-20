@@ -134,6 +134,9 @@ pub struct ExpTracking {
     /// the ground a death took back. It goes once the bar is past it again, the level is
     /// up, or another character's bar is read.
     pub lost_from_hundredths: Option<u32>,
+    /// Unreadable because the EXP figures had nowhere to be read: the Status Bar isn't found,
+    /// and wasn't since the client area last changed size (ADR 0017).
+    pub no_status_bar: bool,
 }
 
 /// The Pace Trace: the Session's EXP over the 5 minutes of active play up to its last
@@ -209,7 +212,7 @@ pub struct ExpRate {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TrackingState {
-    /// No EXP Bar Region to read: tracking is off, or there is no game window.
+    /// The Grind Tracker is off.
     #[default]
     Off,
     /// Tracking is on, but the EXP hasn't changed yet: the Session starts when it does.
@@ -221,8 +224,8 @@ pub enum TrackingState {
     /// No EXP change for more than [`IDLE_MS`]: the rates hold until the next change.
     Paused,
     /// The EXP bar hasn't read whole for [`UNREADABLE_MS`]: something covers it, or the
-    /// region no longer frames its figures. Whatever the Session was doing, its figures
-    /// hold until the bar reads again.
+    /// Status Bar isn't found. Whatever the Session was doing, its figures hold until the
+    /// bar reads again.
     Unreadable,
 }
 
@@ -1175,6 +1178,7 @@ impl Session {
             pace: None,
             forecast: Vec::new(),
             lost_from_hundredths: None,
+            no_status_bar: false,
         }
     }
 }

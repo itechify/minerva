@@ -18,7 +18,7 @@ mod common;
 use common::{FakeSource, ItemSetAnswer};
 use common::items::{ItemWorld, cash, equip, etc, item_world, scroll, setup, use_item, weapon};
 use minerva_core::{
-    Action, Minerva, ExpBarRegion, Foreground, GameWindow, Hotkey, ItemCard, ItemHit, ItemCardChoice, ItemCardView, ItemLookup, ItemTooltip,
+    Action, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, Hotkey, ItemCard, ItemHit, ItemCardChoice, ItemCardView, ItemLookup, ItemTooltip,
     ItemTooltipReading, MarketEdit, MarketImport, MarketPrice, NameProblem, OurWindow, PanelSizes, PanelState, Rect, Request, ScreenPoint, ScreenRect, Settings, ShopPrice,
     Recognition, Size, SourceError, TitleRegion, meowdb,
 };
@@ -105,10 +105,10 @@ fn ctrl_shift_i_over_an_item_shows_its_card_with_what_a_shop_pays_for_it() {
     assert_eq!(card.shop, ShopPrice::Sells { mesos: 450 });
 }
 
-/// The game window's Title Region and EXP Bar Region, on screen: the core captures more
-/// than was marked around each, wide enough for the longest name and figures.
+/// The game window's Title Region on screen (the core captures more than was marked, wide
+/// enough for the longest name), and where the EXP figures were found in its Status Bar.
 const TITLE_REGION: ScreenRect = ScreenRect { x: 882, y: 150, width: 620, height: 48 };
-const EXP_BAR_REGION: ScreenRect = ScreenRect { x: 1817, y: 1254, width: 384, height: 32 };
+const EXP_FIGURES: ScreenRect = ScreenRect { x: 1817, y: 1254, width: 384, height: 32 };
 
 /// The Item Tooltip by `pointer` read as `name`, after the player pressed Ctrl+Shift+I.
 fn press_at(minerva: &mut Minerva, pointer: ScreenPoint, name: &str) -> PanelState {
@@ -145,13 +145,11 @@ fn by_the_game_windows_bottom_edge_the_card_goes_above_the_pointer() {
 }
 
 #[test]
-fn the_card_goes_to_the_pointers_other_side_rather_than_cover_the_exp_bar_region() {
+fn the_card_goes_to_the_pointers_other_side_rather_than_cover_the_exp_figures() {
     let mut minerva = started();
-    minerva.restore(Settings {
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 1005, y: 1144, width: 240, height: 32 }, client: CLIENT }),
-        ..settings()
-    });
-    assert_eq!(minerva.panel_state().exp_bar_region, Some(EXP_BAR_REGION));
+    let place = Some(ExpBarPlace { area: EXP_FIGURES, remembered: false });
+    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place });
+    assert_eq!(minerva.panel_state().exp_figures.and_then(|figures| figures.last_found), Some(EXP_FIGURES));
 
     let state = press_at(&mut minerva, ScreenPoint { x: 1800, y: 1100 }, "Bronze Ore");
 

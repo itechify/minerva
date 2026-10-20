@@ -23,12 +23,14 @@ const MIN: u64 = 60 * S;
 /// The EXP bar read as `exp [percent_hundredths / 100 %]` at `at_ms`.
 fn read(minerva: &mut Minerva, at_ms: u64, exp: u64, percent_hundredths: u32) -> PanelState {
     let bar = Some(ExpBar { exp, percent_hundredths });
-    minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms }).clone()
+    minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place: None }).clone()
 }
 
 #[test]
-fn without_an_exp_bar_region_tracking_is_off() {
-    let minerva = Minerva::new(FakeSource::osms());
+fn with_the_grind_tracker_turned_off_tracking_is_off() {
+    let mut minerva = tracking();
+
+    minerva.act(Action::SetGrindTracker { on: false });
 
     assert_eq!(minerva.panel_state().exp_tracking.state, TrackingState::Off);
 }
@@ -653,6 +655,7 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
             "pace": null,
             "forecast": [],
             "lostFromHundredths": null,
+            "noStatusBar": false,
         })
     );
 
@@ -685,6 +688,7 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
                 { "afterS": 1800, "percentHundredths": 5727 },
             ],
             "lostFromHundredths": null,
+            "noStatusBar": false,
         })
     );
     let died = serde_json::to_value(read(&mut minerva, 75 * S, 266, 633)).unwrap();
@@ -838,7 +842,7 @@ fn there_is_no_share_of_the_ceiling_at_a_zero_or_negative_rate_on_the_map() {
 
 #[test]
 fn replaying_the_2026_10_07_recording_waits_warms_up_and_then_shows_its_rates() {
-    // 150 s of hunting at Lv 15, one EXP Bar Region crop a second, named by capture ms.
+    // 150 s of hunting at Lv 15, one crop of the EXP figures a second, named by capture ms.
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/exp-bar/recording-2026-10-07");
     let mut files: Vec<String> = std::fs::read_dir(&dir)
         .expect("recording")
@@ -893,7 +897,7 @@ fn held(tracking: &ExpTracking) -> ExpTracking {
 
 /// A frame of the EXP bar at `at_ms` whose figures don't read whole.
 fn unread(minerva: &mut Minerva, at_ms: u64) -> PanelState {
-    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms }).clone()
+    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms, place: None }).clone()
 }
 
 #[test]

@@ -411,13 +411,6 @@ button.link:focus-visible {
   border-radius: 2px;
 }
 
-/* The EXP figures read, as the EXP bar writes them. */
-.test-read .figures {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 22px;
-  color: var(--ink);
-}
 
 .test-read {
   overflow-wrap: anywhere;

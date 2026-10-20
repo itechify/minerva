@@ -17,12 +17,14 @@ pub struct ClientOffset {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GrindTrackerWindow {
+    /// The Grind Tracker is on (the settings view's switch): the EXP figures are read.
+    pub on: bool,
     /// The player wants it open: the panel's Grind Tracker button shows as on.
     pub open: bool,
-    /// Where it goes on screen; `None` while it is hidden: closed, with Grind Tracker
-    /// off (no EXP Bar Region, or no game window), while setup is open, or while another
-    /// app is in front (see [`crate::Layer`]). Never over the Title Region or the EXP Bar
-    /// Region: it shows in screen captures, ours included.
+    /// Where it goes on screen; `None` while it is hidden: closed, with the Grind Tracker
+    /// off, with no game window, while setup is open, or while another app is in front
+    /// (see [`crate::Layer`]). Never over the Title Region, the Status Bar's Character or
+    /// its EXP figures: it shows in screen captures, ours included.
     pub placement: Option<ScreenRect>,
     /// Some map has a Personal Best, the Visit under way's included: the window bar's
     /// button that opens the Personal Bests window shows.

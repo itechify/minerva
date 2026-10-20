@@ -128,7 +128,7 @@ The hunting figures for a map as a whole, such as the EXP-per-hour ceiling and m
 ### Tracking
 
 **Grind Tracker**:
-The window beside the panel, turned on at setup by marking the EXP Bar Region, that measures a Session from the EXP bar: Time to Level, the Rolling Rate and Session rates, how the Rolling Rate compares with the Personal Best, the Pace Trace, deaths, and where the EXP bar will be at the Rolling Rate. Its window bar opens the Personal Bests window. The player closes it with its ×, and opens it again from the panel; closing it doesn't stop the Session.
+The window beside the panel, on unless the player turns it off in Settings, that measures a Session from the EXP bar: Time to Level, the Rolling Rate and Session rates, how the Rolling Rate compares with the Personal Best, the Pace Trace, deaths, and where the EXP bar will be at the Rolling Rate. Its window bar opens the Personal Bests window. The player closes it with its ×, and opens it again from the panel; closing it doesn't stop the Session, but turning it off stops reading the EXP figures, and the Session with it.
 _Avoid_: EXP tracking, EXP tracker
 
 **Session**:
@@ -140,12 +140,8 @@ Who is playing: one of the player's characters in the game, known by the name th
 _Avoid_: player (the person, who may have many), account, toon
 
 **Status Bar**:
-The game's bar pinned to the bottom of the client area: the Character's level in orange tiles after "LV.", their job and name, then HP, MP and the EXP bar. The game's, not ours. Minerva finds it by itself, with no setup step, and reads the Character from it every second.
-_Avoid_: HUD, bottom bar, EXP bar (the gauge in it)
-
-**EXP Bar Region**:
-The rectangle the player marks around the EXP figures on the in-game EXP bar (e.g. "EXP 266 [6.33%]"), saved relative to the game window.
-_Avoid_: status bar region, EXP region
+The game's bar pinned to the bottom of the client area: the Character's level in orange tiles after "LV.", their job and name, then HP, MP and the EXP bar with its figures ("EXP 266 [6.33%]"). The game's, not ours. Minerva finds it by itself, with no setup step, and reads the Character and the EXP figures from it every second.
+_Avoid_: HUD, bottom bar, EXP bar (the gauge in it), EXP Bar Region (the mark there once was around the figures)
 
 **Rolling Rate**:
 A rate measured over the last few minutes of active play in a session, as opposed to the average over the whole session.

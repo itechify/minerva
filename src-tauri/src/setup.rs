@@ -1,6 +1,6 @@
 //! First-run setup windows. The overlay never takes focus on a click and has no room
 //! for setup, so setup has its own normal window, plus a "region" window laid over the
-//! game's client area where the player marks the Title Region or the EXP Bar Region.
+//! game's client area where the player marks the Title Region.
 //! Both are declared hidden in `tauri.conf.json`: creating windows inside commands can
 //! deadlock on Windows. Every decision is the core's; this only shows windows and
 //! relays.
@@ -56,6 +56,8 @@ struct SetupView<'a> {
     invalid_hotkeys: &'a [String],
     /// Every Map Mark, which a recognised test read's map names its own by.
     map_marks: &'a BTreeMap<String, MapMark>,
+    /// The Grind Tracker is on (the settings view's switch): setup says how to change it.
+    grind_tracker_on: bool,
 }
 
 #[derive(Serialize)]
@@ -162,6 +164,7 @@ impl SetupWindows {
             unavailable_hotkeys: &state.unavailable_hotkeys,
             invalid_hotkeys: &state.invalid_hotkeys,
             map_marks: &state.map_marks,
+            grind_tracker_on: state.grind_tracker.on,
         };
         if self.view.send(&self.app, &view, &self.app.state::<SetupPageView>().0) {
             let selection = SelectionView { selection: state.setup.selection, target: state.setup.selection_target };
@@ -196,8 +199,8 @@ pub async fn pick_game_window(bridge: State<'_, Bridge>) -> Result<String, Strin
     Ok(title)
 }
 
-/// Begin marking the Title Region or the EXP Bar Region; sync lays the window over the
-/// game client area. Its CSS px times the device pixel ratio are then client px.
+/// Begin marking the Title Region; sync lays the window over the game client area. Its
+/// CSS px times the device pixel ratio are then client px.
 #[tauri::command]
 pub async fn start_marking(bridge: State<'_, Bridge>, target: MarkTarget) -> Result<(), String> {
     (*bridge.game.lock().unwrap()).ok_or("The game window isn't showing. Bring it back, then try again.")?;
@@ -219,8 +222,7 @@ pub async fn confirm_selection(app: AppHandle, bridge: State<'_, Bridge>, target
     app.emit_to(SETUP, marked_event(target), ()).map_err(|e| e.to_string())
 }
 
-/// The player dragged the Title Region or the EXP Bar Region (physical px, relative to
-/// the client area).
+/// The player dragged the Title Region (physical px, relative to the client area).
 #[tauri::command]
 pub async fn mark_region(
     app: AppHandle,
@@ -236,7 +238,6 @@ pub async fn mark_region(
     let marked = Rect { x, y, width, height };
     let action = match target {
         MarkTarget::Title => Action::MarkTitleRegion(marked),
-        MarkTarget::ExpBar => Action::MarkExpBarRegion(marked),
     };
     bridge.commands.send(Command::Act(action)).map_err(|e| e.to_string())?;
     // The setup window moves on to the test read.
@@ -247,20 +248,7 @@ pub async fn mark_region(
 fn marked_event(target: MarkTarget) -> &'static str {
     match target {
         MarkTarget::Title => "title-marked",
-        MarkTarget::ExpBar => "exp-bar-marked",
     }
-}
-
-/// Drop the EXP Bar Region being marked (the player skips it, or keeps the one before).
-#[tauri::command]
-pub async fn discard_exp_bar_mark(bridge: State<'_, Bridge>) -> Result<(), String> {
-    bridge.commands.send(Command::Act(Action::DiscardExpBarMark)).map_err(|e| e.to_string())
-}
-
-/// Turn EXP tracking off: forget the EXP Bar Region.
-#[tauri::command]
-pub async fn clear_exp_bar_region(bridge: State<'_, Bridge>) -> Result<(), String> {
-    bridge.commands.send(Command::Act(Action::ClearExpBarRegion)).map_err(|e| e.to_string())
 }
 
 /// The player pressed Esc on the region window.

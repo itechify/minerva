@@ -4,7 +4,7 @@
 use crate::grind_tracker::ClientOffset;
 use crate::leaderboards::LeaderboardCharacter;
 use crate::panel::{CollapsedSections, InsideOffset, PlacementMode, ScreenPoint};
-use crate::setup::{ExpBarRegion, TitleRegion};
+use crate::setup::TitleRegion;
 use crate::world::Travel;
 use serde::{Deserialize, Serialize};
 
@@ -13,9 +13,10 @@ use serde::{Deserialize, Serialize};
 /// [`crate::Minerva::restore`] replaces all of them with the defaults. Version 4's Item
 /// Lookup key is the Item Card's from version 5 on ([`Hotkeys::give_item_lookup_to_card`]).
 /// Version 6 brought the Deal Finder's hotkey, off for an older file whose hotkeys have its
-/// default ([`Hotkeys::free_deal_finder`]). Files without an EXP Bar Region (all before
-/// version 3) start with EXP tracking off. Version 7 brought [`Settings::map_leaderboards_met`],
-/// which an older file doesn't have, so none of the Characters it knew starts shared.
+/// default ([`Hotkeys::free_deal_finder`]). The EXP Bar Region files from before ADR 0017
+/// hold (`expBarRegion`) is ignored: the Grind Tracker is on for every file without
+/// `grindTrackerOn`. Version 7 brought [`Settings::map_leaderboards_met`], which an older
+/// file doesn't have, so none of the Characters it knew starts shared.
 pub(crate) const VERSION: u32 = 7;
 
 /// The player's settings. Missing fields (an older or empty file) take their defaults.
@@ -40,8 +41,9 @@ pub struct Settings {
     pub hotkeys: Hotkeys,
     /// The Title Region marked at setup; `None` until setup is first finished.
     pub title_region: Option<TitleRegion>,
-    /// The EXP Bar Region marked at setup; `None` while EXP tracking is off.
-    pub exp_bar_region: Option<ExpBarRegion>,
+    /// The Grind Tracker is on (Settings' switch): the EXP figures are read from the Status
+    /// Bar, and the Session runs. Files from before it have it on.
+    pub grind_tracker_on: bool,
     /// The title of the game window the player picked by hand; `None` to look for the
     /// "MapleStory" window.
     pub game_window_title: Option<String>,
@@ -86,7 +88,7 @@ impl Default for Settings {
             panel_width: None,
             hotkeys: Hotkeys::default(),
             title_region: None,
-            exp_bar_region: None,
+            grind_tracker_on: true,
             game_window_title: None,
             travel: Travel::default(),
             collapsed_sections: CollapsedSections::default(),

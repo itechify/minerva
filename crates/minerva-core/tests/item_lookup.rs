@@ -16,7 +16,7 @@ mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    Action, BESTS_VERSION, Minerva, ExpBarRegion, Foreground, GameWindow, ItemChoice, ItemHit, ItemLookup, ItemTooltip,
+    Action, BESTS_VERSION, Minerva, Foreground, GameWindow, ItemChoice, ItemHit, ItemLookup, ItemTooltip,
     ItemTooltipReading, MapBests, OurWindow, PanelControl, PanelSizes, PanelState, Rect, Request, SavedBests,
     ScreenPoint, ScreenRect, Settings, Size, SourceError, TitleRegion, VisitBest, meowdb,
 };
@@ -521,7 +521,6 @@ fn our_panel_over_the_name_says_so_and_nothing_is_looked_up() {
 #[test]
 fn the_grind_tracker_over_the_name_says_so() {
     let tracking = Settings {
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 1005, y: 1144, width: 240, height: 32 }, client: CLIENT }),
         ..settings()
     };
     let mut minerva = started_with(FakeSource::osms_offline(), tracking);

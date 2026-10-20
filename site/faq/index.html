@@ -280,7 +280,7 @@
           <section class="faq-group stop" id="setup" data-about="setup and hotkeys" aria-labelledby="setup-title">
             <div class="faq-group-head">
               <h2 id="setup-title">Setup &amp; hotkeys</h2>
-              <p>The first run, marking the minimap title and the EXP bar, and changing the hotkeys.</p>
+              <p>The first run, marking the minimap title, and changing the hotkeys.</p>
             </div>
             <div class="faq-group-body">
               <h3>Setup</h3>
@@ -293,7 +293,7 @@
                     <li>Finding the game window, or picking it by hand.</li>
                     <li>Setting up the game: windowed or borderless, with the minimap open and its title showing.</li>
                     <li><a href="#mark-title">Marking the minimap title</a>, then a test read of it.</li>
-                    <li>If you like, <a href="#exp-bar">marking the EXP bar</a>, then a test read of it.</li>
+                    <li>The <a href="/#grind-tracker">Grind Tracker</a>, which <a href="#exp-bar">needs nothing marked</a>.</li>
                   </ol>
                   <p>Finish starts the overlay. Closing setup on its first run quits.</p>
                 </details>
@@ -316,8 +316,10 @@
                 <details class="qa" id="exp-bar">
                   <summary>Do I have to mark the EXP bar?</summary>
                   <p>
-                    No: only for the <a href="/#grind-tracker">Grind Tracker</a>. To mark it later, open setup with
-                    <kbd>Ctrl+Shift+S</kbd>, keep the current title, and choose <strong>Mark the EXP bar</strong>.
+                    No. Minerva finds the EXP bar in the game's bar at the bottom of the window by itself, and reads the
+                    <a href="/#grind-tracker">Grind Tracker</a>'s figures from it, wherever the game window is and whatever
+                    its size. A mark you made in an earlier version isn't used any more. To turn the Grind Tracker off, or
+                    on again, use its switch in <a href="#tracker-on">Settings</a>.
                   </p>
                 </details>
                 <details class="qa" id="setup-again">
@@ -736,9 +738,10 @@
                 <details class="qa" id="tracker-on">
                   <summary>How do I turn the Grind Tracker on?</summary>
                   <p>
-                    <a href="#exp-bar">Mark your EXP bar</a>, and it opens in a window of its own beside the panel.
-                    <kbd>Ctrl+Shift+G</kbd> or the panel's button shows or hides it. Its × closes the window while the
-                    Session carries on.
+                    It's on from the start, in a window of its own beside the panel: Minerva finds your EXP bar by itself.
+                    <kbd>Ctrl+Shift+G</kbd> or the panel's button shows or hides it, and its × closes the window while the
+                    Session carries on. To turn it off, click the gear at the top of the panel and untick
+                    <strong>Grind Tracker</strong>: Minerva then doesn't read your EXP at all, until you tick it again.
                   </p>
                 </details>
                 <details class="qa" id="reset-session">
@@ -1185,7 +1188,10 @@
                 </details>
                 <details class="qa" id="changed-size">
                   <summary>Why does the panel say "The game window changed size"?</summary>
-                  <p>The minimap title and the EXP bar have moved with it, so setup opens by itself: mark them again.</p>
+                  <p>
+                    The minimap title has moved with it, so setup opens by itself: mark it again. The EXP bar needs no mark:
+                    Minerva finds it wherever it is.
+                  </p>
                 </details>
                 <details class="qa" id="recognition-unavailable">
                   <summary>What does "Map recognition unavailable" mean?</summary>
@@ -1205,9 +1211,10 @@
                 <details class="qa" id="cant-read-bar">
                   <summary>Why does the Grind Tracker say "Can't read the EXP bar"?</summary>
                   <p>
-                    Something has covered the bar for ten seconds, or the mark no longer frames it; it says so rather than
-                    count the time as a break. Move whatever covers the bar. If nothing does, open setup with
-                    <kbd>Ctrl+Shift+S</kbd>, keep the current title, and choose <strong>Mark the EXP bar</strong>.
+                    Something has covered the bar for ten seconds; it says so rather than count the time as a break. Move
+                    whatever covers the bar. If it says it can't find the game's bar at the bottom of the window, though the
+                    bar shows, Minerva doesn't know the game at that window size yet:
+                    <a href="#bug-reports">send a Bug Report</a>.
                   </p>
                 </details>
                 <details class="qa" id="bests-gone">
@@ -1247,7 +1254,8 @@
                   <p>What Minerva read and made of it since you started it, up to a day back:</p>
                   <ul>
                     <li>
-                      Each reading of the minimap title and the EXP bar, with pictures of the two boxes you marked, and the
+                      Each reading of the minimap title, the EXP bar and the game's bar at the bottom of the window, with
+                      pictures of the title box you marked, the EXP figures, and the level, job and name on that bar; and the
                       name of each item you looked up or opened a card for, with a picture of the game around the pointer
                       (your inventory, say, and whatever is beside it). Nothing else on your screen.
                     </li>

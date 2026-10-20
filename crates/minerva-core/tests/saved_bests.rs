@@ -199,7 +199,7 @@ fn the_next_launch_shows_the_best_row_on_arriving_before_the_sessions_first_gain
     // The bar read twice, the same: nothing gained yet.
     for at_ms in [0, 10 * S] {
         let bar = Some(ExpBar { exp: 1000, percent_hundredths: 500 });
-        minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms });
+        minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place: None });
     }
 
     common::arrive(&mut minerva, SUNSET, 20 * S);

@@ -22,6 +22,8 @@
 //!    there are tiles, a 1 on each tile whose glyph is narrow and on no other, from 1 to
 //!    [`MAX_LEVEL`]; the job one of [`JOBS`], as the game spells it; the name letters and
 //!    digits, as the game allows. Anything else is unreadable.
+//! 5. The EXP figures are at a set distance from the box, as the job and name are (ADR
+//!    0017): [`StatusBar::exp_figures`] says where, for the EXP bar reader.
 
 use crate::Frame;
 use crate::panel::{ScreenPoint, ScreenRect};
@@ -63,6 +65,10 @@ pub struct StatusBar {
     /// The Character's name; `None`: unreadable or covered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// Where the EXP figures ("EXP. 160 [3.81%]") are on screen (ADR 0017), found from the LV
+    /// box; `None` if they would be outside the capture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exp_figures: Option<ScreenRect>,
 }
 
 /// The jobs as the game names them, which a job read must be one of, exactly. Only
@@ -154,6 +160,12 @@ const NAME_ROWS: (i32, i32) = (10, 32);
 const AREA_LEFT: u32 = 125;
 const AREA_RIGHT: u32 = 206;
 const AREA_ROWS: (i32, i32) = (-18, 37);
+/// The EXP figures (ADR 0017): from a little left of the "EXP." label, 563 px right of the
+/// box's right edge, to just short of the Cash Shop button, 213 px right of the label; and
+/// from 12 rows above the brackets' top, 7 above the tiles', to 20 below it. The same on
+/// every sample, and where the EXP Bar Region players marked before ADR 0017 had them.
+const EXP_FIGURES_COLUMNS: (u32, u32) = (549, 773);
+const EXP_FIGURES_ROWS: (i32, i32) = (-19, 13);
 /// A glyph on a tile at most this many columns wide is a 1's (5, with its flag): every other
 /// digit is wider (the 3 is 10).
 const NARROW: usize = 6;
@@ -209,7 +221,15 @@ impl StatusBarReader {
             width: right - left,
             height: bottom - top,
         };
-        Some(StatusBar { area, level, job, name })
+        let (fx0, fx1) = (found.box_right + EXP_FIGURES_COLUMNS.0, found.box_right + EXP_FIGURES_COLUMNS.1);
+        let (fy0, fy1) = (found.top as i32 + EXP_FIGURES_ROWS.0, found.top as i32 + EXP_FIGURES_ROWS.1);
+        let exp_figures = (fx1 <= w && fy0 >= 0 && fy1 <= h as i32).then(|| ScreenRect {
+            x: origin.x + fx0 as i32,
+            y: origin.y + fy0,
+            width: fx1 - fx0,
+            height: (fy1 - fy0) as u32,
+        });
+        Some(StatusBar { area, level, job, name, exp_figures })
     }
 }
 

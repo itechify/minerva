@@ -104,6 +104,10 @@ function render(view: TrackerView) {
   tracking.classList.toggle("held", t.state !== "active");
 
   unreadable.hidden = t.state !== "unreadable";
+  const why = t.noStatusBar
+    ? "Can't find the game's bar at the bottom of the window. If it shows, send a Bug Report from the owl's menu by the clock."
+    : "Can't read the EXP bar. Move whatever covers it.";
+  if (unreadable.textContent !== why) unreadable.textContent = why;
   switched.hidden = !t.characterSwitched;
   resetNote.hidden = !t.resetUndoable;
   waiting.hidden = started || t.state === "unreadable";

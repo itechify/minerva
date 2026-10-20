@@ -150,11 +150,11 @@ type PanelState = {
   /** The settings view, which takes over the panel; null while it is closed. */
   settingsView: SettingsView | null;
   gameWindowTitle: string;
-  expBarRegion: { x: number; y: number; width: number; height: number } | null;
   expBar: ExpBar | null;
   expTracking: ExpTracking;
-  /** Mirror of `minerva_core::GrindTrackerWindow`: the player wants it open. */
-  grindTracker: { open: boolean };
+  /** Mirror of `minerva_core::GrindTrackerWindow`: it is on (the settings view's switch),
+   * and the player wants it open. */
+  grindTracker: { on: boolean; open: boolean };
   search: SearchState;
   /** Mirror of `minerva_core::DealFinderView`. */
   dealFinder: { on: boolean; dealLine: string | null; marginPercent: number; shopFound: boolean };
@@ -230,6 +230,7 @@ const dealFinderEl = byId("deal-finder");
 const dealState = byId("deal-state");
 const dealDetail = byId("deal-detail");
 const dealMargin = byId("deal-margin") as HTMLInputElement;
+const grindTrackerOn = byId("grind-tracker-on") as HTMLInputElement;
 const iconArt = byId("icon-art") as HTMLImageElement;
 const resultsHeader = resultsHead();
 resultsTable.append(resultsHeader);
@@ -783,6 +784,7 @@ function renderSettingsView(panel: PanelState) {
   }
   // The Deal Margin as saved, unless the player is typing one.
   if (document.activeElement !== dealMargin) dealMargin.value = String(panel.dealFinder.marginPercent);
+  grindTrackerOn.checked = panel.grindTracker.on;
   settingsNotice.textContent = view.notice ? settingsNoticeText(view.notice, hotkeys) : "";
   hotkeysUndo.hidden = view.notice?.kind !== "restored";
   // Nothing to restore, or a row waiting: one change at a time.
@@ -1417,6 +1419,7 @@ dealMargin.addEventListener("change", () => {
 dealMargin.addEventListener("keydown", (e) => {
   if (e.key === "Enter") dealMargin.blur();
 });
+grindTrackerOn.addEventListener("change", () => invoke("grind_tracker_set", { on: grindTrackerOn.checked }));
 hotkeysReset.addEventListener("click", () => invoke("hotkeys_reset"));
 hotkeysUndo.addEventListener("click", () => invoke("hotkeys_undo_reset"));
 // A row's Change button waits for its new combination; while it waits, it cancels.

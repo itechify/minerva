@@ -40,6 +40,9 @@ export type ExpTracking = {
   forecast: Forecast[];
   /** The bar's percentage before the last death in this level, while it reads less. */
   lostFromHundredths: number | null;
+  /** Unreadable because the game's Status Bar isn't found, so there is nowhere to read the
+   *  EXP figures. */
+  noStatusBar: boolean;
 };
 
 /** Mirror of `minerva_core::PacePoint`: active time before the last EXP change, and the

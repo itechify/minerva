@@ -1,5 +1,11 @@
-//! Every EXP bar sample, fed through the core's public inputs as an EXP Bar Region
-//! frame, reads as what it shows, or as unreadable; never as a wrong number.
+//! Every EXP bar sample, fed through the core's public inputs, reads as what it shows, or as
+//! unreadable; never as a wrong number. Two layers (ADR 0017):
+//!
+//! - The samples here are the EXP figures alone, fed as a frame of them
+//!   ([`Minerva::on_exp_bar_frame`]): they test reading the figures.
+//! - The `--window` samples in `samples/minimap` are whole game windows: the bottom of their
+//!   client area, captured as the shell captures it for the Status Bar, tests finding the
+//!   figures there too.
 //!
 //! - Single samples are named for their reading: `<exp>__<percent>[--variant].png`
 //!   ("160__3.81--kerning-city-window"), or `unreadable[--variant].png`. The
@@ -8,7 +14,8 @@
 //!   what they show and how it went wrong ("unreadable--68012-71.07-seven-as-two"):
 //!   a Bug Report's EXP Bar Region crops (2026-10-11, client (1010, 1143) 396x33 of a
 //!   1920x1200 client), each of a misread that ended the Session as a character
-//!   switch, or could have.
+//!   switch, or could have. Those are crops of the EXP Bar Region players once marked
+//!   (ADR 0005), from before the figures were found in the Status Bar.
 //! - `recording-*` folders are the probe's record mode (one crop a second, named by
 //!   capture time in ms) with their readings in `readings.json` (`null`: unreadable).
 //!   2026-10-07: 150 s of hunting at Lv 15, client (1005,1144) 240x32 of a 1920x1200
@@ -19,7 +26,8 @@ mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    Minerva, ExpBar, ExpBarRegion, Frame, GameWindow, Rect, ScreenRect, Settings, Size, TitleRegion,
+    ExpBar, Frame, GameWindow, Minerva, PanelState, Rect, ScreenPoint, ScreenRect, Settings, Size, StatusBarCapture,
+    TitleRegion,
 };
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -34,19 +42,53 @@ fn frame(path: &Path) -> Frame {
     common::frame(&img, 0)
 }
 
-/// What the panel shows for one EXP Bar Region frame, read by a core set up with EXP
-/// tracking on (a fresh one, so no earlier reading lingers).
-fn read(frame: Frame) -> Option<ExpBar> {
-    let client = Size { width: 1920, height: 1200 };
+/// A fresh core (so no earlier reading lingers), set up as a player's is, over a game window
+/// with this client area at the screen's origin: the Grind Tracker is on.
+fn started(width: u32, height: u32) -> Minerva {
+    let client = Size { width, height };
     let mut minerva = Minerva::new(FakeSource::osms_offline());
     minerva.restore(Settings {
         title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 1005, y: 1144, width: 240, height: 32 }, client }),
         ..Settings::default()
     });
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
+    let screen = ScreenRect { x: 0, y: 0, width, height };
     minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
-    minerva.on_exp_bar_frame(frame).exp_bar
+    minerva
+}
+
+/// What the panel shows for a frame of the EXP figures alone.
+fn read(frame: Frame) -> Option<ExpBar> {
+    started(1920, 1200).on_exp_bar_frame(frame).exp_bar
+}
+
+/// The capture the core asks for of a client area for the Status Bar, at the screen's origin.
+fn status_bar_capture(state: &PanelState, client: &image::RgbaImage, at_ms: u64) -> StatusBarCapture {
+    let strip = state.status_bar_capture.expect("the Status Bar is captured with the game in front");
+    let crop = image::imageops::crop_imm(client, strip.x as u32, strip.y as u32, strip.width, strip.height).to_image();
+    StatusBarCapture { frame: common::frame(&crop, at_ms), origin: ScreenPoint { x: strip.x, y: strip.y } }
+}
+
+/// The minimap samples that are whole game windows, and what their EXP bars show.
+const WINDOWS: [(&str, ExpBar); 4] = [
+    ("hidden-street__northern-top-of-construction-site--window", ExpBar { exp: 335, percent_hundredths: 798 }),
+    ("victoria-road__construction-site-north-of-kerning-city--window", ExpBar { exp: 266, percent_hundredths: 633 }),
+    ("victoria-road__kerning-city--window", ExpBar { exp: 160, percent_hundredths: 381 }),
+    ("victoria-road__sunset-sky--window", ExpBar { exp: 160, percent_hundredths: 381 }),
+];
+
+#[test]
+fn every_window_samples_figures_are_found_in_its_status_bar_and_read() {
+    let mut wrong = Vec::new();
+    for (window, shows) in WINDOWS {
+        let client = common::client_of(&common::load(window));
+        let mut minerva = started(client.width(), client.height());
+        let capture = status_bar_capture(minerva.panel_state(), &client, 0);
+        let read = minerva.on_status_bar_capture(capture).exp_bar;
+        if read != Some(shows) {
+            wrong.push(format!("{window}: panel shows {read:?}"));
+        }
+    }
+    assert!(wrong.is_empty(), "wrong or unread:\n{}", wrong.join("\n"));
 }
 
 /// "160__3.81" -> 160 EXP at 381 hundredths; "unreadable" -> `None`.
