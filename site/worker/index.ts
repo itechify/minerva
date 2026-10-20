@@ -6,17 +6,17 @@ import { optOut, readBand, readMap, readMaps, upload } from "./leaderboards";
 import { deleteEntry, readReports, reassign, report } from "./moderation";
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
-    const answer = await route(request, url, env);
+    const answer = await route(request, url, env, ctx);
     // Public reads may be cached a minute; nothing else, the maintainer's reads included.
     const isPublicRead = request.method === "GET" && !url.pathname.startsWith("/api/admin/");
     return json(answer, isPublicRead ? "public, max-age=60" : "no-store");
   },
 } satisfies ExportedHandler<Env>;
 
-async function route(request: Request, url: URL, env: Env): Promise<Answer> {
+async function route(request: Request, url: URL, env: Env, ctx: ExecutionContext): Promise<Answer> {
   let path: string[];
   try {
     path = url.pathname.split("/").slice(2).map(decodeURIComponent);
@@ -30,7 +30,7 @@ async function route(request: Request, url: URL, env: Env): Promise<Answer> {
   }
   switch (true) {
     case path.length === 3 && path[0] === "characters" && path[2] === "entries" && method === "PUT":
-      return upload(env, request, path[1]);
+      return upload(env, request, path[1], ctx);
     case path.length === 3 && path[0] === "characters" && path[2] === "entries" && method === "DELETE":
       return optOut(env, request, path[1]);
     case path.length === 1 && path[0] === "maps" && method === "GET":

@@ -14,6 +14,9 @@ export default defineConfig(async () => {
           bindings: {
             TEST_MIGRATIONS: migrations,
             ADMIN_TOKEN: "made-up-maintainer-token",
+            // A made-up Discord webhook. The tests take the posts to it off the global
+            // fetch (test/announce.test.ts); nothing leaves the test.
+            DISCORD_WEBHOOK_URL: "https://discord.invalid/api/webhooks/made-up/webhook",
             // Made-up maps' solo ceilings, in place of osms-ceilings.json.
             TEST_CEILINGS: { "100000000": 100_000, "100000001": 2_000_000 },
           },

@@ -1,0 +1,229 @@
+// A new #1 on a Map Leaderboard is posted to Discord, and only when a Character really took
+// the spot from another (ADR 0017): a first entry in an empty band, a Character beating its
+// own best, a re-upload of the same set and an opt-out that hands the spot on all stay quiet.
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MOST_TOLD, type Taken, type Top, postFor, takenTops, tell } from "../announce";
+import { entry, key, optOut, upload } from "./api";
+
+/** The made-up webhook the test config sets (vitest.config.ts). */
+const WEBHOOK = "https://discord.invalid/api/webhooks/made-up/webhook";
+
+/** Maps of their own, so no other test's entries are in their bands. Henesys Hunting Ground I
+ *  is a real map, to show a post names a map as the site does. */
+const HUNTING_GROUND = "010001010";
+const QUIET = "100000050";
+const CROWNED = "100000051";
+
+interface Post {
+  content: string;
+}
+
+let posts: Post[];
+let realFetch: typeof globalThis.fetch;
+
+beforeEach(() => {
+  posts = [];
+  realFetch = globalThis.fetch;
+  // Only the webhook is taken off: D1 and the rest of the runtime keep the real fetch.
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (!url.startsWith(WEBHOOK)) return realFetch(input as RequestInfo, init);
+    posts.push(JSON.parse(String(init?.body)) as Post);
+    return Promise.resolve(new Response(null, { status: 204 }));
+  }) as typeof globalThis.fetch;
+});
+
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
+
+/** The posts made once the Worker has finished with them: a post is sent after the upload is
+ *  answered, so a count is waited for rather than read straight away. */
+function postsSettle(count: number): Promise<void> {
+  return vi.waitFor(() => expect(posts).toHaveLength(count));
+}
+
+function top(map: string, band: number, name: string, expPerHour: number): Top {
+  return { map, band, nameKey: name.toLowerCase(), name, expPerHour };
+}
+
+function taken(map: string, band: number, expPerHour = 90_000): Taken {
+  return { map, band, name: "Hakuo", expPerHour, from: "Egbert", fromExpPerHour: 80_000 };
+}
+
+describe("taken top spots", () => {
+  it("is a spot another Character held", () => {
+    const before = [top(QUIET, 20, "Egbert", 80_000)];
+    const after = [top(QUIET, 20, "Hakuo", 90_000)];
+
+    expect(takenTops(before, after, "hakuo")).toEqual([
+      { map: QUIET, band: 20, name: "Hakuo", expPerHour: 90_000, from: "Egbert", fromExpPerHour: 80_000 },
+    ]);
+  });
+
+  it("is not a band nobody held", () => {
+    expect(takenTops([], [top(QUIET, 20, "Hakuo", 90_000)], "hakuo")).toEqual([]);
+  });
+
+  it("is not a Character beating its own best", () => {
+    const before = [top(QUIET, 20, "Hakuo", 80_000)];
+    const after = [top(QUIET, 20, "Hakuo", 90_000)];
+
+    expect(takenTops(before, after, "hakuo")).toEqual([]);
+  });
+
+  it("is not a spot another Character took", () => {
+    const before = [top(QUIET, 20, "Egbert", 80_000)];
+    const after = [top(QUIET, 20, "Berta", 90_000)];
+
+    expect(takenTops(before, after, "hakuo")).toEqual([]);
+  });
+
+  it("names the best first", () => {
+    const before = [top(QUIET, 20, "Egbert", 10_000), top(CROWNED, 30, "Egbert", 10_000)];
+    const after = [top(QUIET, 20, "Hakuo", 20_000), top(CROWNED, 30, "Hakuo", 500_000)];
+
+    expect(takenTops(before, after, "hakuo").map((t) => t.map)).toEqual([CROWNED, QUIET]);
+  });
+});
+
+describe("the post", () => {
+  it("is nothing with no spot taken", () => {
+    expect(postFor([])).toBeNull();
+  });
+
+  it("names the map as the site does, the levels, the rate and who it was taken from", () => {
+    const post = postFor([taken(HUNTING_GROUND, 20, 153_216)])!;
+
+    expect(post.content).toBe(
+      "**Hakuo** took #1 on [Henesys Hunting Ground I]" +
+        `(https://owlofminerva.app/leaderboards/map/?map=${HUNTING_GROUND}&band=20&name=Hakuo), ` +
+        "levels 20–29, with 153,000 EXP/h, past Egbert's 80,000.",
+    );
+  });
+
+  it("names a map the fixture doesn't by its ID", () => {
+    expect(postFor([taken(QUIET, 20)])!.content).toContain(`[Map ${QUIET}]`);
+  });
+
+  it("escapes a map name that would read as Discord formatting", () => {
+    // "G* Coconut Season" (090040203) is one in the map names fixture.
+    expect(postFor([taken("090040203", 20)])!.content).toContain("[G\\* Coconut Season]");
+  });
+
+  it("pings nobody", () => {
+    expect(postFor([taken(QUIET, 20)])!.allowed_mentions).toEqual({ parse: [] });
+  });
+
+  it("counts the rest once an upload takes more than it names", () => {
+    const many = Array.from({ length: MOST_TOLD + 2 }, (_, at) => taken(QUIET, (at + 2) * 10));
+
+    const lines = postFor(many)!.content.split("\n");
+
+    expect(lines).toHaveLength(MOST_TOLD + 1);
+    expect(lines.at(-1)).toBe("…and 2 more top spots in the same upload.");
+  });
+
+  it("counts one left over as a spot", () => {
+    const many = Array.from({ length: MOST_TOLD + 1 }, (_, at) => taken(QUIET, (at + 2) * 10));
+
+    expect(postFor(many)!.content.split("\n").at(-1)).toBe("…and 1 more top spot in the same upload.");
+  });
+});
+
+describe("telling Discord", () => {
+  it("posts nothing with no webhook set up", async () => {
+    await tell({} as Env, [taken(QUIET, 20)]);
+
+    expect(posts).toHaveLength(0);
+  });
+
+  it("lets a webhook that fails pass", async () => {
+    globalThis.fetch = (() => Promise.reject(new Error("no webhook"))) as typeof globalThis.fetch;
+
+    await expect(tell({ DISCORD_WEBHOOK_URL: WEBHOOK } as Env, [taken(QUIET, 20)])).resolves.toBeUndefined();
+  });
+});
+
+describe("an upload", () => {
+  it("posts when it takes a top spot", async () => {
+    await upload("Egbert", key("egbert"), [entry(CROWNED, 25, 80_000)]);
+    await upload("Hakuo", key("hakuo"), [entry(CROWNED, 23, 90_000)]);
+
+    await postsSettle(1);
+    expect(posts[0].content).toContain("**Hakuo** took #1");
+    expect(posts[0].content).toContain("past Egbert's 80,000");
+    expect(posts[0].content).toContain(`map=${CROWNED}&band=20&name=Hakuo`);
+  });
+
+  it("posts nothing for the same set uploaded again", async () => {
+    const set = [entry(QUIET, 25, 80_000)];
+    await upload("Dora", key("dora"), set);
+    await upload("Emil", key("emil"), [entry(QUIET, 22, 90_000)]);
+    await postsSettle(1);
+
+    // The app uploads a Character's whole set as each Visit ends, so this is almost every
+    // upload: nothing changed, so nothing is posted.
+    await upload("Emil", key("emil"), [entry(QUIET, 22, 90_000)]);
+    await upload("Dora", key("dora"), set);
+
+    // Only a real take is posted, so the next one proves the two above posted nothing.
+    await upload("Fritz", key("fritz"), [entry(QUIET, 27, 95_000)]);
+    await postsSettle(2);
+    expect(posts[1].content).toContain("**Fritz** took #1");
+  });
+
+  it("posts nothing for the first entry in a band", async () => {
+    await upload("Greta", key("greta"), [entry("100000052", 25, 80_000)]);
+
+    await upload("Horst", key("horst"), [entry("100000053", 25, 10_000)]);
+    await upload("Ilse", key("ilse"), [entry("100000053", 25, 20_000)]);
+    await postsSettle(1);
+    expect(posts[0].content).toContain("**Ilse** took #1");
+  });
+
+  it("posts nothing when a Character beats its own best", async () => {
+    await upload("Jonas", key("jonas"), [entry("100000054", 25, 10_000)]);
+    await upload("Klara", key("klara"), [entry("100000054", 25, 20_000)]);
+    await postsSettle(1);
+
+    await upload("Klara", key("klara"), [entry("100000054", 25, 60_000)]);
+
+    await upload("Lena", key("lena"), [entry("100000054", 25, 70_000)]);
+    await postsSettle(2);
+    expect(posts[1].content).toContain("**Lena** took #1");
+  });
+
+  it("posts nothing when a top spot falls to someone because an entry went", async () => {
+    await upload("Mara", key("mara"), [entry("100000055", 25, 10_000)]);
+    await upload("Nils", key("nils"), [entry("100000055", 25, 90_000)]);
+    await postsSettle(1);
+
+    // Nils opting out leaves Mara on top, which Mara never took.
+    await optOut("Nils", key("nils"));
+
+    await upload("Olga", key("olga"), [entry("100000055", 25, 95_000)]);
+    await postsSettle(2);
+    expect(posts[1].content).toContain("**Olga** took #1");
+  });
+
+  it("posts nothing for an entry the cap rejects", async () => {
+    // 100000000's made-up ceiling is 100,000, so its cap is 500,000.
+    await upload("Pia", key("pia"), [entry("100000000", 25, 400_000)]);
+    await upload("Rolf", key("rolf"), [entry("100000000", 25, 900_000)]);
+
+    await upload("Sven", key("sven"), [entry("100000000", 25, 450_000)]);
+    await postsSettle(1);
+    expect(posts[0].content).toContain("**Sven** took #1");
+  });
+
+  it("posts one message for several spots taken at once", async () => {
+    const held = [entry("100000056", 25, 10_000), entry("100000057", 25, 10_000)];
+    await upload("Tina", key("tina"), held);
+
+    await upload("Udo", key("udo"), [entry("100000056", 25, 20_000), entry("100000057", 25, 30_000)]);
+
+    await postsSettle(1);
+    expect(posts[0].content.split("\n")).toHaveLength(2);
+  });
+});

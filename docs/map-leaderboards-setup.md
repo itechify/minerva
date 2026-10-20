@@ -24,7 +24,19 @@ pnpm exec wrangler secret put ADMIN_TOKEN --config site/wrangler.jsonc
 
 Paste a long random string (say `openssl rand -hex 32`) and keep it in a password manager. It stays across deploys. Without it, the maintainer's routes refuse everyone. For `wrangler dev`, put `ADMIN_TOKEN=...` in `site/.dev.vars`, which is gitignored.
 
-## 4. Deploy the API before any app that uploads
+## 4. Set the Discord webhook (optional)
+
+A new #1 on a Map Leaderboard is posted to a Discord webhook (ADR 0017). It is optional: with no secret set, nothing is posted and uploads are unchanged.
+
+In Discord, on the Minerva server: **#personal-bests → Edit Channel → Integrations → Webhooks → New Webhook**, name it (say "Map Leaderboards"), then **Copy Webhook URL**. The URL is a secret — anyone holding it can post to that channel — so it is never committed; keep it in a password manager beside `ADMIN_TOKEN`.
+
+```bash
+pnpm exec wrangler secret put DISCORD_WEBHOOK_URL --config site/wrangler.jsonc
+```
+
+Paste the URL. For `wrangler dev`, put `DISCORD_WEBHOOK_URL=...` in `site/.dev.vars`, which is gitignored; leave it out and nothing is posted. To stop the posts, delete the webhook in Discord or `pnpm exec wrangler secret delete DISCORD_WEBHOOK_URL --config site/wrangler.jsonc`.
+
+## 5. Deploy the API before any app that uploads
 
 The API must be live before any Minerva version that uploads to it (#110) is released. Once this is on `main`, publish the site from `main`:
 
