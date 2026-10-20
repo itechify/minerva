@@ -14,8 +14,9 @@ use serde::{Deserialize, Serialize};
 /// Lookup key is the Item Card's from version 5 on ([`Hotkeys::give_item_lookup_to_card`]).
 /// Version 6 brought the Deal Finder's hotkey, off for an older file whose hotkeys have its
 /// default ([`Hotkeys::free_deal_finder`]). Files without an EXP Bar Region (all before
-/// version 3) start with EXP tracking off.
-pub(crate) const VERSION: u32 = 6;
+/// version 3) start with EXP tracking off. Version 7 brought [`Settings::map_leaderboards_met`],
+/// which an older file doesn't have, so none of the Characters it knew starts shared.
+pub(crate) const VERSION: u32 = 7;
 
 /// The player's settings. Missing fields (an older or empty file) take their defaults.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +68,11 @@ pub struct Settings {
     /// whose entries the site hasn't yet deleted. Not the Leaderboard Key: the shell keeps it
     /// apart, since everything here goes into a Bug Report.
     pub map_leaderboards: Vec<LeaderboardCharacter>,
+    /// Every Character met with a best that can go on the Map Leaderboards: one met for the
+    /// first time starts shared there. `None` in a file from before version 7, until the bests
+    /// read at a launch: everyone in them counts as met then, so none of them starts shared.
+    #[serde(default)]
+    pub map_leaderboards_met: Option<Vec<String>>,
 }
 
 impl Default for Settings {
@@ -89,6 +95,7 @@ impl Default for Settings {
             personal_bests_at: None,
             deal_margin_percent: 0,
             map_leaderboards: Vec::new(),
+            map_leaderboards_met: Some(Vec::new()),
         }
     }
 }

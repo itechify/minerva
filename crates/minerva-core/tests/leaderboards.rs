@@ -1,6 +1,7 @@
-//! Uploading (#110): a player shows a Character on the Map Leaderboards from the Personal Bests
-//! window, and the core says what the site should hold of them: each opted-in Character's best
-//! Visit on each map in each Level Band, as the shell is to upload it. The shell does the HTTP and
+//! Uploading (#110): a Character met for the first time is shown on the Map Leaderboards, and a
+//! player turns one on or off from the Personal Bests window. The core says what the site should
+//! hold of them: each shown Character's best Visit on each map in each Level Band, as the shell
+//! is to upload it. The shell does the HTTP and
 //! tells the core each answer, which changes what the toggle says.
 
 mod common;
@@ -69,8 +70,10 @@ fn unassigned_visit() -> VisitBest {
 }
 
 /// A core at launch, the bests restored, the wall clock told and the Personal Bests window open.
+/// Egbert and Bob were met at earlier launches, and neither is shown.
 fn launched() -> Minerva {
     let mut minerva = tracking();
+    minerva.restore(Settings { map_leaderboards_met: Some(vec!["Egbert".to_string(), "Bob".to_string()]), ..minerva.settings() });
     minerva.restore_bests(saved_bests());
     minerva.on_wall_clock(WALL);
     minerva.press(PanelControl::TogglePersonalBests);
@@ -95,7 +98,7 @@ fn egberts_entries() -> Vec<LeaderboardEntry> {
 }
 
 #[test]
-fn opting_a_character_in_asks_with_the_count_of_maps_then_uploads_their_best_in_each_level_band() {
+fn turning_a_character_on_uploads_their_best_in_each_level_band() {
     let mut minerva = launched();
     let off = LeaderboardToggle {
         on: false,
@@ -385,6 +388,8 @@ fn an_answer_to_an_upload_no_longer_under_way_changes_nothing() {
 fn characters_not_shown_and_the_unassigned_bests_never_leave_the_machine() {
     let mut player = Player::clocked(tracking());
     player.minerva.show_on_leaderboards("Egbert", true);
+    // Bob was turned off before he had a best: he stays off.
+    player.minerva.show_on_leaderboards("Bob", false);
     let mut uploads: Vec<LeaderboardUpload> = Vec::new();
     let mut play = |player: &mut Player, name: Option<&str>, level: u32, exp: u64| {
         player.status(name, level);
@@ -408,6 +413,99 @@ fn characters_not_shown_and_the_unassigned_bests_never_leave_the_machine() {
     assert!(uploads.iter().all(|u| u.name == "Egbert"), "{uploads:?}");
     let entries: Vec<(u32, u64)> = uploads.iter().flat_map(|u| u.entries.iter().flatten()).map(|e| (e.level, e.exp_per_hour)).collect();
     assert_eq!(entries, [(13, 7200)]);
+}
+
+/// Egbert plays a Visit to Sunset Sky at level 13 and moves on to the Construction Site, which
+/// ends it, and the shell's loop ticks: the uploads asked for then.
+fn a_visit_ends(player: &mut Player) -> Vec<(String, Option<Vec<LeaderboardEntry>>)> {
+    player.status(Some("Egbert"), 13);
+    player.arrive(SUNSET);
+    player.hunt(6 * MIN, 20);
+    let at = player.at;
+    assert_eq!(sent(player.minerva.tick(at)), [], "nothing while the Visit is under way");
+    player.arrive(CONSTRUCTION_SITE);
+    let at = player.at;
+    sent(player.minerva.tick(at))
+}
+
+#[test]
+fn a_character_met_for_the_first_time_is_shared_once_they_have_a_best_that_can_go_up() {
+    let mut player = Player::clocked(tracking());
+    let sent = a_visit_ends(&mut player);
+    player.press(PanelControl::TogglePersonalBests);
+    assert_eq!(sent, [egbert(vec![egberts_new_entry(&player)])]);
+    let on = toggle(player.minerva.panel_state(), "Egbert");
+    assert_eq!((on.on, on.offered, on.status), (true, true, LeaderboardStatus::Sending));
+    assert_eq!(player.minerva.settings().map_leaderboards_met, Some(vec!["Egbert".to_string()]));
+}
+
+#[test]
+fn a_character_turned_off_stays_off_after_the_site_deleted_them_and_at_the_next_launch() {
+    let mut player = Player::clocked(tracking());
+    a_visit_ends(&mut player);
+    player.press(PanelControl::TogglePersonalBests);
+    let at = player.at;
+    all_taken(&mut player.minerva, at);
+    player.minerva.show_on_leaderboards("Egbert", false);
+    player.minerva.tick(at + S);
+    // The site deletes them, and they are kept no more but as met.
+    all_taken(&mut player.minerva, at + 2 * S);
+    assert_eq!(player.minerva.settings().map_leaderboards, []);
+
+    assert_eq!(a_visit_ends(&mut player), []);
+    assert!(!toggle(player.minerva.panel_state(), "Egbert").on);
+
+    let mut again = tracking();
+    again.restore(player.minerva.settings());
+    again.restore_bests(player.minerva.bests());
+    again.on_wall_clock(WALL + DAY);
+    again.press(PanelControl::TogglePersonalBests);
+    let state = again.tick(0).clone();
+    assert_eq!(sent(&state), []);
+    assert!(!toggle(&state, "Egbert").on);
+}
+
+#[test]
+fn characters_in_the_bests_of_settings_from_before_the_default_stay_off_and_new_ones_are_shared() {
+    let mut minerva = tracking();
+    // A file from before version 7: no Characters met.
+    let old: Settings = serde_json::from_str(r#"{"version":6}"#).unwrap();
+    minerva.restore(Settings { version: 6, map_leaderboards_met: old.map_leaderboards_met, ..minerva.settings() });
+    minerva.restore_bests(saved_bests());
+    minerva.on_wall_clock(WALL);
+    minerva.press(PanelControl::TogglePersonalBests);
+    let state = minerva.tick(0).clone();
+    assert_eq!(sent(&state), []);
+    assert_eq!((toggle(&state, "Egbert").on, toggle(&state, "Bob").on), (false, false));
+    assert_eq!(minerva.settings().map_leaderboards_met, Some(vec!["Egbert".to_string(), "Bob".to_string()]));
+
+    // A Character met since is new.
+    let mut player = Player::clocked(minerva);
+    player.status(Some("Carol"), 13);
+    player.arrive(SUNSET);
+    player.hunt(6 * MIN, 20);
+    player.arrive(CONSTRUCTION_SITE);
+    let at = player.at;
+    let names: Vec<String> = player.minerva.tick(at).leaderboard_uploads.iter().map(|u| u.name.clone()).collect();
+    assert_eq!(names, ["Carol"]);
+}
+
+#[test]
+fn with_settings_from_before_the_default_and_bests_that_couldnt_be_read_no_one_is_shared_until_they_read() {
+    let mut minerva = tracking();
+    minerva.restore(Settings { version: 6, map_leaderboards_met: None, ..minerva.settings() });
+    minerva.restore_bests(SavedBests::default());
+    minerva.bests_lost();
+    let mut player = Player::clocked(minerva);
+    assert_eq!(a_visit_ends(&mut player), []);
+    assert_eq!(player.minerva.settings().map_leaderboards_met, None);
+
+    // The next launch's bests read: everyone in them was met before.
+    let mut again = tracking();
+    again.restore(player.minerva.settings());
+    again.restore_bests(saved_bests());
+    again.on_wall_clock(WALL + DAY);
+    assert_eq!(sent(again.tick(0)), []);
 }
 
 /// The Map Leaderboard link of the row for `map` among `name`'s (`None`: the Unassigned
