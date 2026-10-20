@@ -106,6 +106,11 @@ describe("the post", () => {
     expect(postFor([taken(QUIET, 20)])!.content).toContain(`[Map ${QUIET}]`);
   });
 
+  it("escapes a map name that would read as Discord formatting", () => {
+    // "G* Coconut Season" (090040203) is one in the map names fixture.
+    expect(postFor([taken("090040203", 20)])!.content).toContain("[G\\* Coconut Season]");
+  });
+
   it("pings nobody", () => {
     expect(postFor([taken(QUIET, 20)])!.allowed_mentions).toEqual({ parse: [] });
   });

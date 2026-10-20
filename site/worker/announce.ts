@@ -66,13 +66,21 @@ export function linkTo(taken: Taken): string {
   return `https://owlofminerva.app/leaderboards/map/?${query}`;
 }
 
+/** A map's name as Discord markdown, so a name holding one of its characters is read as the
+ *  name and not as formatting: "G* Coconut Season" is one in the map names fixture, and a
+ *  "]" would end the link early. A Character's name is letters and digits only (ADR 0015),
+ *  so it never needs this. */
+function escaped(name: string): string {
+  return name.replace(/[\\*_~`[\]|]/g, "\\$&");
+}
+
 /** One taken spot as a line of the post. The map's name is the link, so Discord shows no
  *  preview under a post that names several. */
 function lineFor(taken: Taken): string {
   const place = placeOf(PLACES, taken.map);
   const [first, last] = levelsOf(taken.band);
   return (
-    `**${taken.name}** took #1 on [${place.name}](${linkTo(taken)}), levels ${first}–${last}, ` +
+    `**${taken.name}** took #1 on [${escaped(place.name)}](${linkTo(taken)}), levels ${first}–${last}, ` +
     `with ${rate(taken.expPerHour)} EXP/h, past ${taken.from}'s ${rate(taken.fromExpPerHour)}.`
   );
 }

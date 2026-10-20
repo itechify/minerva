@@ -25,7 +25,7 @@ A post reads:
 **Hakuo** took #1 on [Henesys Hunting Ground I](https://owlofminerva.app/leaderboards/map/?map=010001010&band=20&name=Hakuo), levels 20–29, with 153,000 EXP/h, past Egbert's 150,000.
 ```
 
-The map is named from the map names fixture (ADR 0008) through `site/map-names.ts`, which the Worker and the Map Leaderboards' pages now share as they share `site/level-bands.ts`, so a map is named the same wherever it shows. EXP/h is written by `src/figures.ts`'s `rate`, as the panel and the site write rates.
+The map is named from the map names fixture (ADR 0008) through `site/map-names.ts`, which the Worker and the Map Leaderboards' pages now share as they share `site/level-bands.ts`, so a map is named the same wherever it shows. EXP/h is written by `src/figures.ts`'s `rate`, as the panel and the site write rates. A map's name is escaped for Discord's markdown before it goes in the link, since the fixture holds one with a `*` in it ("G\* Coconut Season"); a Character's name is letters and digits only (ADR 0015), so it never needs it.
 
 **Release posts** need no code: a GitHub repo webhook delivering only the *Releases* event to `<discord-webhook>/github` lets Discord render the release itself. It is set up on the repository, not in it.
 
