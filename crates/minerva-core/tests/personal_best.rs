@@ -326,7 +326,7 @@ fn a_session_reset_or_a_character_switch_leaves_the_bests_as_they_were() {
     for _ in 0..3 {
         player.at += 10 * S;
         let bar = Some(ExpBar { exp: 157, percent_hundredths: 94 });
-        player.minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms: player.at });
+        player.minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms: player.at, place: None });
     }
     let switched = player.minerva.panel_state().clone();
     assert!(switched.exp_tracking.character_switched);

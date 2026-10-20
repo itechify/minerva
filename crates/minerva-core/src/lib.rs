@@ -1,6 +1,6 @@
 //! Minerva core: the single test seam.
 //!
-//! Inputs are plain data (captured Title Region and EXP Bar Region frames or their
+//! Inputs are plain data (captured Title Region frames and Status Bar captures or their
 //! readings, the game window, the clock, the player's actions and hotkeys); the output
 //! is a [`PanelState`] holding everything the overlay renders. No OS or UI dependencies
 //! live here.
@@ -48,7 +48,7 @@ mod world;
 pub use bests_window::{PersonalBestsCharacter, PersonalBestsMap, PersonalBestsVisit, PersonalBestsWindow};
 pub use bug_report::{BugReport, ReportAbout};
 pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, GREAT_BELOW, STEAL_BELOW, Verdict};
-pub use exp_bar::{ExpBar, ExpBarReader, ExpBarReading};
+pub use exp_bar::{ExpBar, ExpBarPlace, ExpBarReader, ExpBarReading, ExpFigures};
 pub use grind_tracker::{ClientOffset, GrindTrackerWindow};
 pub use hotkey_settings::{KeyPress, RebindProblem, SettingsNotice, SettingsView};
 pub use item_card::{
@@ -84,7 +84,7 @@ pub use search::{
 pub use session::{Character, Deaths, ExpRate, ExpTracking, Forecast, PacePoint, PaceTrace, TrackingState};
 pub use settings::{Hotkey, Hotkeys, Settings};
 pub use setup::{
-    ExpBarRegion, ExpBarTestRead, MarkTarget, SelectionDirection, SetupReason, SetupState, TestRead,
+    MarkTarget, SelectionDirection, SetupReason, SetupState, TestRead,
     TitleRegion,
 };
 pub use shown_map::{Candidate, Candidates, FIRST_MOBS, LevelRange, Outline};
@@ -116,7 +116,7 @@ use osms::MapSet;
 use std::collections::{BTreeMap, VecDeque};
 use std::task::Poll;
 
-/// A captured Title Region or EXP Bar Region image, or the game's whole client area for
+/// A captured Title Region or Status Bar image, or the game's whole client area for
 /// Item Lookup: tightly packed RGBA, top-down rows.
 #[derive(Debug, Clone)]
 pub struct Frame {
@@ -252,8 +252,9 @@ pub struct PanelState {
     /// a bottom corner: never under [`MIN_PANEL_WIDTH`]. The shell sizes the window to it.
     pub panel_width: u32,
     /// Where the overlay goes on screen; `None` while there is no game window, unless
-    /// the panel is detached. Inside the game it never covers `title_region` or
-    /// `exp_bar_region`: the overlay shows in screen captures, ours included.
+    /// the panel is detached. Inside the game it never covers `title_region`, the Status
+    /// Bar's Character or its EXP figures: the overlay shows in screen captures, ours
+    /// included.
     pub placement: Option<ScreenRect>,
     /// Whether the overlay shows, on top of everything, or is hidden: it shows only with
     /// the game, while the game or one of our windows is in front.
@@ -266,11 +267,11 @@ pub struct PanelState {
     /// Where on screen to capture the Title Region (physical px); `None` while there
     /// is no game window or the region isn't known to fit it.
     pub title_region: Option<ScreenRect>,
-    /// Where on screen to capture the EXP Bar Region (physical px); `None` while EXP
-    /// tracking is off, there is no game window, or the region isn't known to fit it.
-    pub exp_bar_region: Option<ScreenRect>,
-    /// What the EXP bar showed when its figures last read whole; `None` while there is
-    /// no `exp_bar_region` or nothing has read yet.
+    /// Read the EXP figures in each capture of `status_bar_capture` (ADR 0017), and where
+    /// they were last found; `None` while the Grind Tracker is off.
+    pub exp_figures: Option<ExpFigures>,
+    /// What the EXP bar showed when its figures last read whole; `None` while the Grind
+    /// Tracker is off or nothing has read yet.
     pub exp_bar: Option<ExpBar>,
     /// EXP tracking: the Session's state, Time to Level, rates and deaths.
     pub exp_tracking: ExpTracking,
@@ -443,10 +444,16 @@ pub struct Minerva {
     /// Reads frames fed to [`Minerva::on_frame`]; loaded on the first one, so a shell
     /// that reads on its own thread never loads it twice.
     reader: Option<TitleReader>,
-    /// Reads frames fed to [`Minerva::on_exp_bar_frame`]; loaded on the first one.
+    /// Reads frames fed to [`Minerva::on_exp_bar_frame`], and the EXP figures in captures fed
+    /// to [`Minerva::on_status_bar_capture`]; loaded on the first one.
     exp_bar_reader: Option<ExpBarReader>,
     /// What the EXP bar showed when its figures last read whole.
     exp_bar: Option<ExpBar>,
+    /// Where the EXP figures were last read in a Status Bar capture (found there, or where
+    /// they had been), relative to the game's client area, and that area's size then:
+    /// where to read them while the Status Bar can't be found, until the client area
+    /// changes size, and what our windows keep clear of.
+    exp_figures_at: Option<(Size, Rect)>,
     /// The Session measured from the EXP bar's readings.
     session: Session,
     /// The Grind Tracker's window.
@@ -540,6 +547,7 @@ impl Minerva {
             reader: None,
             exp_bar_reader: None,
             exp_bar: None,
+            exp_figures_at: None,
             session: Session::default(),
             grind_tracker: GrindTracker::default(),
             bests_window: BestsWindow::default(),
@@ -664,32 +672,36 @@ impl Minerva {
         self.sync_panel()
     }
 
-    /// Read a captured EXP Bar Region frame and update the panel state: the same as
-    /// [`Minerva::on_exp_bar_frame_read`] with what an [`ExpBarReader`] reads in it, here.
+    /// Read a frame of the EXP figures alone, as if they had been found there, and update
+    /// the panel state, as [`Minerva::on_exp_bar_reading`] does with what an
+    /// [`ExpBarReader`] reads in it. The figures the shell reads are in its Status Bar
+    /// captures ([`Minerva::on_status_bar_read`]).
     pub fn on_exp_bar_frame(&mut self, frame: Frame) -> &PanelState {
         let reading = self.exp_bar_reader.get_or_insert_with(ExpBarReader::bundled).read(&frame);
-        self.on_exp_bar_frame_read(frame, reading)
-    }
-
-    /// As [`Minerva::on_exp_bar_reading`], with the frame read, whose crop a Bug Report
-    /// may keep.
-    pub fn on_exp_bar_frame_read(&mut self, frame: Frame, reading: ExpBarReading) -> &PanelState {
-        let event = Event::ExpBar { at_ms: reading.at_ms, bar: reading.bar };
+        let event = Event::ExpBar { at_ms: reading.at_ms, bar: reading.bar, place: reading.place };
         self.record_input(event, Some(reading.at_ms), Some((Region::ExpBar, frame)));
         self.take_exp_bar_reading(reading)
     }
 
-    /// Take what an EXP Bar Region frame read as (read by an [`ExpBarReader`], possibly
-    /// on another thread) and update the panel state. A frame whose figures don't read
-    /// whole keeps the last reading; time still passes for the Session, which says so
-    /// once the bar has gone unread for a while.
+    /// Take what the EXP figures read as (read by an [`ExpBarReader`], possibly on another
+    /// thread) and update the panel state. A reading whose figures don't read whole keeps
+    /// the last one; time still passes for the Session, which says so once the bar has gone
+    /// unread for a while.
     pub fn on_exp_bar_reading(&mut self, reading: ExpBarReading) -> &PanelState {
-        self.record_input(Event::ExpBar { at_ms: reading.at_ms, bar: reading.bar }, Some(reading.at_ms), None);
+        let event = Event::ExpBar { at_ms: reading.at_ms, bar: reading.bar, place: reading.place };
+        self.record_input(event, Some(reading.at_ms), None);
         self.take_exp_bar_reading(reading)
     }
 
     fn take_exp_bar_reading(&mut self, reading: ExpBarReading) -> &PanelState {
-        self.setup.on_exp_bar_read(reading.bar);
+        if let Some(game) = &self.panel.game {
+            let client = game.client;
+            if let Some(place) = reading.place {
+                let a = place.area;
+                let at = Rect { x: (a.x - client.x).max(0) as u32, y: (a.y - client.y).max(0) as u32, width: a.width, height: a.height };
+                self.exp_figures_at = Some((Size { width: client.width, height: client.height }, at));
+            }
+        }
         match reading.bar {
             Some(bar) if self.tracking_on() => self.session.on_bar(bar, reading.at_ms),
             None if self.tracking_on() => self.session.on_unread(reading.at_ms),
@@ -852,29 +864,15 @@ impl Minerva {
                 self.sync_shown_map();
             }
             Action::MarkTitleRegion(marked) => self.setup.mark(marked),
-            Action::MarkExpBarRegion(marked) => {
-                // The reading of the region marked before doesn't belong to this one.
-                self.exp_bar = None;
-                self.setup.mark_exp_bar(marked);
-            }
-            Action::DiscardExpBarMark => self.setup.discard_exp_bar_mark(),
-            Action::ClearExpBarRegion => self.setup.clear_exp_bar(),
             Action::BeginSelection(target) => self.setup.begin_selection(target),
             Action::AdjustSelection { direction, resize, coarse } => {
                 self.setup.adjust_selection(direction, resize, coarse);
             }
             Action::ConfirmSelection => {
-                if self.setup.confirm_selection() == Some(MarkTarget::ExpBar) {
-                    self.exp_bar = None;
-                }
+                self.setup.confirm_selection();
             }
             Action::CancelSelection => self.setup.cancel_selection(),
-            Action::FinishSetup => {
-                // A newly marked EXP bar: the player wants to see what it measures.
-                if self.setup.finish() {
-                    self.grind_tracker.open = true;
-                }
-            }
+            Action::FinishSetup => self.setup.finish(),
             Action::RequestSetup => self.setup.request(),
             Action::LaunchedAgain => {
                 if self.setup.state().window_open {
@@ -1016,6 +1014,7 @@ impl Minerva {
             }
             Action::ToggleDealFinder => self.deal_finder.toggle(),
             Action::SetDealMargin { percent } => self.settings.deal_margin_percent = percent.min(MAX_DEAL_MARGIN),
+            Action::SetGrindTracker { on } => self.settings.grind_tracker_on = on,
             Action::OpenDealItem { row } => self.open_deal_item(row),
         }
         self.sync_panel()
@@ -1394,20 +1393,33 @@ impl Minerva {
 
     /// Read a capture of [`PanelState::status_bar_capture`] and update the panel state: the
     /// same as [`Minerva::on_status_bar_read`] with what a [`StatusBarReader`] reads in it,
-    /// here.
+    /// and an [`ExpBarReader`] reads of its EXP figures while [`PanelState::exp_figures`]
+    /// asks for them, here.
     pub fn on_status_bar_capture(&mut self, capture: StatusBarCapture) -> &PanelState {
         let reading = self.status_bar_reader.get_or_insert_with(StatusBarReader::bundled).read(&capture);
-        self.on_status_bar_read(capture, reading)
+        let exp = self.state.exp_figures.map(|figures| {
+            let reader = self.exp_bar_reader.get_or_insert_with(ExpBarReader::bundled);
+            reader.read_status_bar(&capture, reading.bar.as_ref(), figures)
+        });
+        self.on_status_bar_read(capture, reading, exp)
     }
 
     /// As [`Minerva::on_status_bar_reading`], with the capture it was read from (by a
     /// [`StatusBarReader`], possibly on another thread), whose level, job and name a Bug
-    /// Report keeps (ADR 0009).
-    pub fn on_status_bar_read(&mut self, capture: StatusBarCapture, reading: StatusBarReading) -> &PanelState {
+    /// Report keeps (ADR 0009); then as [`Minerva::on_exp_bar_reading`] with what its EXP
+    /// figures read as (by [`ExpBarReader::read_status_bar`] with
+    /// [`PanelState::exp_figures`]), whose crop of them it keeps too. `exp` is `None` while
+    /// the figures weren't asked for.
+    pub fn on_status_bar_read(&mut self, capture: StatusBarCapture, reading: StatusBarReading, exp: Option<ExpBarReading>) -> &PanelState {
         let crop = bug_report::status_bar_crop(&capture, reading.bar.as_ref());
         let event = Event::StatusBar { at_ms: reading.at_ms, bar: reading.bar.clone(), same: false };
         self.record_input(event, Some(reading.at_ms), crop);
-        self.take_status_bar_reading(reading)
+        self.take_status_bar_reading(reading);
+        let Some(exp) = exp else { return self.sync_panel() };
+        let crop = exp.place.and_then(|place| exp_bar::figures_frame(&capture, place)).map(|frame| (Region::ExpBar, frame));
+        let event = Event::ExpBar { at_ms: exp.at_ms, bar: exp.bar, place: exp.place };
+        self.record_input(event, Some(exp.at_ms), crop);
+        self.take_exp_bar_reading(exp)
     }
 
     /// Take what a Status Bar capture read as (read by a [`StatusBarReader`], possibly on
@@ -1609,8 +1621,8 @@ impl Minerva {
     /// Pick up settings saved by an earlier session. Hotkeys from before version 4
     /// (version 1's Ctrl+Shift letters, versions 2 and 3's Win+Alt) are replaced by the
     /// defaults, version 4's Item Lookup key goes to the Item Card, and the Deal Finder's
-    /// default is off in a file from before it that gives it to another hotkey; files
-    /// without an EXP Bar Region (all before version 3) start with EXP tracking off.
+    /// default is off in a file from before it that gives it to another hotkey. The EXP Bar
+    /// Region older files hold is ignored (ADR 0017).
     pub fn restore(&mut self, mut settings: Settings) -> &PanelState {
         self.record(Event::Restore { settings: Box::new(settings.clone()) });
         // Version 4 brought the Ctrl+Shift defaults, and version 5 the Item Card; a later
@@ -1632,7 +1644,6 @@ impl Minerva {
         self.panel.detached_at = settings.detached_at;
         self.panel.resized_to(settings.panel_width.unwrap_or(DEFAULT_PANEL_WIDTH));
         self.setup.saved = settings.title_region;
-        self.setup.saved_exp_bar = settings.exp_bar_region;
         self.grind_tracker.open = settings.grind_tracker_open;
         self.grind_tracker.at = settings.grind_tracker_at;
         self.bests_window.at = settings.personal_bests_at;
@@ -1660,7 +1671,6 @@ impl Minerva {
             detached_at: self.panel.detached_at,
             panel_width: (self.panel.width != DEFAULT_PANEL_WIDTH).then_some(self.panel.width),
             title_region: self.setup.saved,
-            exp_bar_region: self.setup.saved_exp_bar,
             grind_tracker_open: self.grind_tracker.open,
             grind_tracker_at: self.grind_tracker.at,
             personal_bests_at: self.bests_window.at,
@@ -1884,11 +1894,12 @@ impl Minerva {
         }
         self.sync_setup();
         self.sync_status_bar();
-        // Never over a captured region, nor the Status Bar's Character: the capture would read
-        // the panel.
+        // Never over a captured region, nor the Status Bar's Character or its EXP figures: the
+        // capture would read the panel.
         let client = self.panel.game.as_ref().map(|game| game.client);
         let status_bar = self.status_bar_area.filter(|&(at, _)| Some(at) == client).map(|(_, area)| area);
-        self.panel.avoid = [self.state.title_region, self.state.exp_bar_region, status_bar].into_iter().flatten().collect();
+        let exp_figures = self.state.exp_figures.and_then(|figures| figures.last_found);
+        self.panel.avoid = [self.state.title_region, status_bar, exp_figures].into_iter().flatten().collect();
         self.state.expanded = self.panel.expanded;
         self.state.collapsed_sections = self.settings.collapsed_sections;
         self.state.game_found = self.panel.game.is_some();
@@ -1999,23 +2010,37 @@ impl Minerva {
         self.setup.follow_needed();
         self.state.setup = self.setup.state();
         self.state.title_region = self.setup.title_region(self.matcher.as_ref().map(Matcher::longest_name));
-        self.state.exp_bar_region = self.setup.exp_bar_region();
+        let last_found = self.exp_figures_last_found();
+        self.state.exp_figures = self.tracking_on().then_some(ExpFigures { last_found });
         if !self.tracking_on() {
             self.exp_bar = None;
         }
         self.state.exp_bar = self.exp_bar;
-        // Off while there is no region to read; the Session itself carries on.
+        // Off while the Grind Tracker is; the Session itself carries on.
         self.state.exp_tracking = if self.tracking_on() {
             let ceiling = self.state.data.solo_exp_ceiling();
-            self.session.tracking(ceiling, bests_map(&self.state), self.wall_clock)
+            let tracking = self.session.tracking(ceiling, bests_map(&self.state), self.wall_clock);
+            // Nowhere to read the figures: no Status Bar in the last capture, nor found before
+            // at this size.
+            let lost = self.state.status_bar.is_none() && last_found.is_none();
+            let no_status_bar = tracking.state == TrackingState::Unreadable && lost;
+            ExpTracking { no_status_bar, ..tracking }
         } else {
             ExpTracking::default()
         };
     }
 
-    /// The Grind Tracker's window shows while the player wants it and there is something
-    /// to track, but not while setup is open (it may be marking the EXP bar), and only
-    /// while the overlay can show (see [`Layer`]).
+    /// Where on screen the EXP figures were last read, while the game's client area is the
+    /// size it was then.
+    fn exp_figures_last_found(&self) -> Option<ScreenRect> {
+        let client = self.panel.game.as_ref()?.client;
+        let (size, at) = self.exp_figures_at?;
+        let fits = (size.width, size.height) == (client.width, client.height);
+        fits.then(|| ScreenRect { x: client.x + at.x as i32, y: client.y + at.y as i32, width: at.width, height: at.height })
+    }
+
+    /// The Grind Tracker's window shows while the player wants it and the Grind Tracker is
+    /// on, but not while setup is open, and only while the overlay can show (see [`Layer`]).
     fn sync_grind_tracker(&mut self) {
         let shows = self.grind_tracker.open
             && self.tracking_on()
@@ -2028,6 +2053,7 @@ impl Minerva {
             _ => None,
         };
         self.state.grind_tracker = GrindTrackerWindow {
+            on: self.settings.grind_tracker_on,
             open: self.grind_tracker.open,
             placement,
             personal_bests: self.session.bests().any(),
@@ -2064,10 +2090,10 @@ impl Minerva {
         self.state.personal_bests = PersonalBestsWindow { open: window.open, placement, characters };
     }
 
-    /// Whether EXP tracking is on: there is an EXP Bar Region to read, kept and fitting
-    /// the game window.
+    /// Whether EXP tracking is on: the Grind Tracker is (the settings view's switch), and
+    /// there is a game window to read the EXP figures in.
     fn tracking_on(&self) -> bool {
-        self.setup.exp_bar_region().is_some()
+        self.settings.grind_tracker_on && self.panel.game.is_some()
     }
 }
 

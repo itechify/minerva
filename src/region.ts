@@ -6,12 +6,11 @@ import { listen } from "@tauri-apps/api/event";
 // CSS px times the device pixel ratio is the same point in client px.
 
 /** What the player marks: mirror of `minerva_core::MarkTarget`. */
-type Target = "title" | "expBar";
+type Target = "title";
 
 /** The window's heading for each. */
 const TITLES: Record<Target, string> = {
   title: "Mark both lines of the minimap title",
-  expBar: "Mark the EXP figures on the EXP bar, like EXP. 160 [3.81%]",
 };
 
 const box = document.getElementById("box")!;
@@ -41,13 +40,11 @@ function update(next: Rect | null) {
   if (beginning) hint.focus();
 }
 
-/** What the window is marking: its heading, and where the instructions go (the EXP
- *  figures are at the bottom of the game, where the instructions would cover them). */
+/** What the window is marking: its heading. */
 function markingTarget(next: Target | null) {
   if (!next) return;
   target = next;
   heading.textContent = TITLES[target];
-  hint.classList.toggle("top", target === "expBar");
 }
 
 function draw(r: { left: number; top: number; width: number; height: number }) {

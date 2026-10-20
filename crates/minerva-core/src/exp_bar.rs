@@ -1,5 +1,6 @@
-//! The EXP bar (ADR 0005): the figures on the in-game EXP bar, "EXP. 160 [3.81%]",
-//! read from the EXP Bar Region the player marks.
+//! The EXP bar (ADR 0005): the figures on the in-game EXP bar, "EXP. 160 [3.81%]", read
+//! from the Status Bar (ADR 0017): where the Status Bar reader found them in its capture, or
+//! where they were last found while it can't find the bar.
 //!
 //! 1. Find the brackets: the only yellow-green glyphs in the figures, a pair of narrow
 //!    upright components with the same top and bottom. The bar's fill below is the same
@@ -18,9 +19,11 @@
 //!    under the pointer breaks it), and a 2 read wherever the mask has a 2's flat foot,
 //!    and nowhere else (ocrs has read the 7 of "71.07%" as a 2).
 
-use crate::Frame;
+use crate::bug_report::cut_on_screen;
+use crate::panel::ScreenRect;
 use crate::prep::{PAD, Rect};
 use crate::recogniser::{Recogniser, frame_to_rgb};
+use crate::{Frame, StatusBar, StatusBarCapture};
 use image::{GrayImage, Luma, RgbImage};
 use serde::{Deserialize, Serialize};
 
@@ -34,17 +37,42 @@ pub struct ExpBar {
     pub percent_hundredths: u32,
 }
 
-/// What one EXP Bar Region frame reads as.
+/// What the EXP figures read as in one capture.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpBarReading {
-    /// `None` when the figures can't be read whole (covered, or not in the region).
+    /// `None` when the figures can't be read whole (covered, or not where they were looked
+    /// for).
     pub bar: Option<ExpBar>,
     /// When the frame was captured, as in [`Frame::at_ms`].
     pub at_ms: u64,
+    /// Where on screen the figures were read; `None` for a frame of the figures alone, and
+    /// when there was nowhere to read them (no Status Bar found, none remembered).
+    pub place: Option<ExpBarPlace>,
 }
 
-/// Reads EXP Bar Region frames with the bundled recogniser (ADR 0002), which it shares
-/// with the [`crate::TitleReader`]s.
+/// Where the EXP figures were read in a Status Bar capture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpBarPlace {
+    /// On screen, physical px.
+    pub area: ScreenRect,
+    /// Where they were last found, as the Status Bar couldn't be found in this capture.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub remembered: bool,
+}
+
+/// What the shell reads the EXP figures with in each Status Bar capture, while the Grind
+/// Tracker is on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpFigures {
+    /// Where the figures were last found on screen, if the client area hasn't changed size
+    /// since: where to read them while the Status Bar can't be found.
+    pub last_found: Option<ScreenRect>,
+}
+
+/// Reads the EXP figures with the bundled recogniser (ADR 0002), which it shares with the
+/// [`crate::TitleReader`]s.
 pub struct ExpBarReader {
     recogniser: Recogniser,
 }
@@ -54,9 +82,23 @@ impl ExpBarReader {
         Self { recogniser: Recogniser::bundled() }
     }
 
+    /// Read a frame of the figures alone, as if they had been found there.
     pub fn read(&self, frame: &Frame) -> ExpBarReading {
         let bar = frame_to_rgb(frame).and_then(|img| self.read_rgb(&img));
-        ExpBarReading { bar, at_ms: frame.at_ms }
+        ExpBarReading { bar, at_ms: frame.at_ms, place: None }
+    }
+
+    /// Read the figures in a Status Bar capture: where the Status Bar read in it (`bar`)
+    /// found them, or else where `figures` says they were last found.
+    pub fn read_status_bar(&self, capture: &StatusBarCapture, bar: Option<&StatusBar>, figures: ExpFigures) -> ExpBarReading {
+        let found = bar.and_then(|bar| bar.exp_figures).map(|area| ExpBarPlace { area, remembered: false });
+        let place = found.or(figures.last_found.map(|area| ExpBarPlace { area, remembered: true }));
+        let at_ms = capture.frame.at_ms;
+        let bar = place
+            .and_then(|place| figures_frame(capture, place))
+            .and_then(|frame| frame_to_rgb(&frame))
+            .and_then(|img| self.read_rgb(&img));
+        ExpBarReading { bar, at_ms, place }
     }
 
     fn read_rgb(&self, img: &RgbImage) -> Option<ExpBar> {
@@ -71,6 +113,12 @@ impl ExpBarReader {
         let bar = ExpBar { exp: thousands(&exp_text)?, percent_hundredths: percent(&percent_text)? };
         consistent(bar).then_some(bar)
     }
+}
+
+/// The figures at `place` in a Status Bar capture; `None` if the capture doesn't hold them.
+pub(crate) fn figures_frame(capture: &StatusBarCapture, place: ExpBarPlace) -> Option<Frame> {
+    let a = place.area;
+    cut_on_screen(&capture.frame, capture.origin, (a.x, a.y), (a.x + a.width as i32, a.y + a.height as i32))
 }
 
 /// A reading that could be on an EXP bar: under 100%, and no EXP at 0.00% unless the

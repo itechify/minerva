@@ -88,13 +88,13 @@ impl Player {
         }
         if let Some((name, level)) = &self.status {
             let area = ScreenRect { x: 334, y: 1145, width: 331, height: 55 };
-            let bar = StatusBar { area, level: Some(*level), job: Some("Magician".to_string()), name: name.clone() };
+            let bar = StatusBar { area, level: Some(*level), job: Some("Magician".to_string()), name: name.clone(), exp_figures: None };
             // Captured just before the EXP bar, so the refresh at a half minute takes in both.
             let at_ms = self.at.saturating_sub(500);
             self.minerva.on_status_bar_reading(StatusBarReading { bar: Some(bar), at_ms });
         }
         let bar = Some(ExpBar { exp: self.exp, percent_hundredths: percent(self.exp) });
-        self.minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms: self.at });
+        self.minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms: self.at, place: None });
         self.shell_loop("a reading")
     }
 
@@ -122,7 +122,7 @@ impl Player {
         let mut state = self.minerva.panel_state().clone();
         for _ in 0..ms / (10 * S) {
             self.at += 10 * S;
-            self.minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: self.at });
+            self.minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: self.at, place: None });
             state = self.shell_loop("the bar unread");
         }
         state

@@ -11,7 +11,7 @@ use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame};
 use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES};
 use minerva_core::{
     ListedPrice, ShopCapture, ShopList, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
-    Action, BESTS_VERSION, Minerva, ExpBar, ExpBarReading, ExpBarRegion, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
+    Action, BESTS_VERSION, Minerva, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, Rect, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TitleRegion, TrackingState, VisitBest,
 };
@@ -60,7 +60,6 @@ impl Shell {
         let mut minerva = Minerva::new(source);
         minerva.restore(Settings {
             title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
-            exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 1005, y: 1144, width: 240, height: 32 }, client }),
             ..Settings::default()
         });
         minerva.restore_bests(SavedBests::default());
@@ -89,7 +88,7 @@ impl Shell {
                 self.minerva.on_reading(TitleReading { lines, at_ms: self.at });
             }
             if self.at % S == 0 {
-                self.minerva.on_exp_bar_reading(ExpBarReading { bar: exp(self.at), at_ms: self.at });
+                self.minerva.on_exp_bar_reading(ExpBarReading { bar: exp(self.at), at_ms: self.at, place: None });
             }
             self.step();
         }
@@ -415,10 +414,20 @@ fn the_wall_clock_is_written_down_again_only_when_it_strays() {
     assert_eq!(wall_clocks, [WALL_AT_START, WALL_AT_START + MIN + 10 * S]);
 }
 
-/// An EXP Bar Region frame captured at `at_ms`, its pixels telling `exp` apart.
+/// The EXP figures captured at `at_ms`, their pixels telling `exp` apart.
 fn exp_bar_frame(exp: u64, at_ms: u64) -> Frame {
     let shade = (exp % 251) as u8;
-    frame(&image::RgbaImage::from_pixel(240, 32, image::Rgba([shade, shade, shade, 255])), at_ms)
+    frame(&image::RgbaImage::from_pixel(224, 32, image::Rgba([shade, shade, shade, 255])), at_ms)
+}
+
+/// A Status Bar capture of `figures` alone, at (1000,1100) on screen, read as Egbert's Status
+/// Bar (found elsewhere) with the EXP figures in it read as `bar`.
+fn read_figures(shell: &mut Shell, figures: Frame, bar: ExpBar) {
+    let at_ms = figures.at_ms;
+    let area = ScreenRect { x: 1000, y: 1100, width: figures.width, height: figures.height };
+    let capture = StatusBarCapture { frame: figures, origin: ScreenPoint { x: area.x, y: area.y } };
+    let exp = ExpBarReading { bar: Some(bar), at_ms, place: Some(ExpBarPlace { area, remembered: false }) };
+    shell.minerva.on_status_bar_read(capture, status_bar_reading(Some("Egbert"), at_ms), Some(exp));
 }
 
 /// Read the EXP bar from a frame every second from `from` to `until` as `exp` says.
@@ -426,8 +435,7 @@ fn read_frames(shell: &mut Shell, until: u64, exp: impl Fn(u64) -> ExpBar) {
     while shell.at < until {
         shell.at += S;
         let bar = exp(shell.at);
-        let reading = ExpBarReading { bar: Some(bar), at_ms: shell.at };
-        shell.minerva.on_exp_bar_frame_read(exp_bar_frame(bar.exp, shell.at), reading);
+        read_figures(shell, exp_bar_frame(bar.exp, shell.at), bar);
         shell.step();
     }
 }
@@ -469,11 +477,35 @@ fn noise_frame(seed: u64, at_ms: u64) -> Frame {
 }
 
 #[test]
+fn the_exp_figures_read_in_a_status_bar_capture_are_written_with_where_they_were_read_and_replay() {
+    let mut shell = Shell::new(FakeSource::osms());
+    let exp = |at: u64| {
+        let exp = 1000 + 5 * (at / (4 * S));
+        ExpBar { exp, percent_hundredths: percent(exp, 20_000) }
+    };
+    read_frames(&mut shell, 30 * S, exp);
+
+    let (report, recording) = shell.report();
+
+    let area = ScreenRect { x: 1000, y: 1100, width: 224, height: 32 };
+    let places: Vec<_> = recording.lines.iter().filter_map(|line| match line.event {
+        Event::ExpBar { place, .. } => Some(place),
+        _ => None,
+    }).collect();
+    assert!(!places.is_empty());
+    assert!(places.iter().all(|&place| place == Some(ExpBarPlace { area, remembered: false })), "{places:?}");
+    let crop = recording.crops.iter().find(|name| name.starts_with("crops/exp-bar-")).expect("a crop of the figures");
+    let png = image::load_from_memory(&zip_bytes(&report.zip, crop)).expect("a PNG").to_rgba8();
+    assert_eq!(png.dimensions(), (224, 32), "the figures, cut from the capture");
+    assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
+}
+
+#[test]
 fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
     let mut shell = Shell::new(FakeSource::osms());
     // The level learned, then 20 crops of noise a minute apart, the first a misread.
     let first = ExpBar { exp: 1000, percent_hundredths: 500 };
-    shell.minerva.on_exp_bar_reading(ExpBarReading { bar: Some(first), at_ms: 30 * S });
+    shell.minerva.on_exp_bar_reading(ExpBarReading { bar: Some(first), at_ms: 30 * S, place: None });
     for n in 0..20 {
         shell.at += MIN;
         let bar = if n == 0 {
@@ -481,7 +513,8 @@ fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
         } else {
             ExpBar { exp: 1000 + n, percent_hundredths: percent(1000 + n, 20_000) }
         };
-        shell.minerva.on_exp_bar_frame_read(noise_frame(n, shell.at), ExpBarReading { bar: Some(bar), at_ms: shell.at });
+        let figures = noise_frame(n, shell.at);
+        read_figures(&mut shell, figures, bar);
         shell.step();
     }
 
@@ -907,7 +940,7 @@ fn status_bar_capture(at_ms: u64) -> StatusBarCapture {
 fn status_bar_reading(name: Option<&str>, at_ms: u64) -> StatusBarReading {
     let area = ScreenRect { x: 334, y: 1145, width: 331, height: 55 };
     StatusBarReading {
-        bar: Some(StatusBar { area, level: Some(13), job: Some("Magician".into()), name: name.map(String::from) }),
+        bar: Some(StatusBar { area, level: Some(13), job: Some("Magician".into()), name: name.map(String::from), exp_figures: None }),
         at_ms,
     }
 }
@@ -919,13 +952,13 @@ fn run_with_characters() -> Shell {
     for second in 1..=10 {
         shell.play(second * S, CONSTRUCTION_SITE, grind);
         let name = if second == 5 { None } else { Some("Egbert") };
-        shell.minerva.on_status_bar_read(status_bar_capture(second * S), status_bar_reading(name, second * S));
+        shell.minerva.on_status_bar_read(status_bar_capture(second * S), status_bar_reading(name, second * S), None);
     }
     for second in 11..=15 {
         shell.play(second * S, CONSTRUCTION_SITE, |_| None);
         shell.minerva.on_status_bar_reading(StatusBarReading { bar: None, at_ms: second * S });
     }
-    shell.minerva.on_status_bar_read(status_bar_capture(16 * S), status_bar_reading(Some("Bob"), 16 * S));
+    shell.minerva.on_status_bar_read(status_bar_capture(16 * S), status_bar_reading(Some("Bob"), 16 * S), None);
     shell.play(30 * S, CONSTRUCTION_SITE, grind);
     shell
 }

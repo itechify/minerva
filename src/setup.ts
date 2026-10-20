@@ -13,11 +13,6 @@ type TestRead =
   | { status: "recognised"; map: { id: string; streetName: string; mapName: string; mark: string | null } }
   | { status: "failed" };
 
-/** Mirror of `minerva_core::ExpBarTestRead`. */
-type ExpBarTestRead =
-  | { status: "reading" }
-  | { status: "read"; bar: { exp: number; percentHundredths: number } }
-  | { status: "failed" };
 
 type SetupReason = "firstRun" | "resolutionChanged" | "requested";
 
@@ -27,9 +22,9 @@ type SetupView = {
     needed: SetupReason | null;
     testRead: TestRead | null;
     credit: string | null;
-    expBarTestRead: ExpBarTestRead | null;
-    expBarKept: boolean;
   };
+  /** The Grind Tracker is on (the panel's Settings). */
+  grindTrackerOn: boolean;
   unavailableHotkeys: string[];
   /** Those of them that don't name a key combination; the rest another app has. */
   invalidHotkeys: string[];
@@ -41,7 +36,7 @@ type SetupView = {
   mapMarks: MapMarks;
 };
 
-const STEPS = ["warning", "window", "requirements", "mark", "test", "exp", "expTest"] as const;
+const STEPS = ["warning", "window", "requirements", "mark", "test", "exp"] as const;
 /** Pages opened from the window bar, outside the walk-through: back returns to the step left. */
 const ASIDES = ["guide", "about"] as const;
 type Aside = (typeof ASIDES)[number];
@@ -89,10 +84,8 @@ function shortcut(name: keyof Hotkeys): string {
 
 const NOTICES: Record<SetupReason, string> = {
   firstRun: "",
-  resolutionChanged:
-    "The game window changed size since setup, so the minimap title and the EXP bar have probably moved. Mark them again.",
-  requested:
-    "Mark the minimap title again, or keep it and change the Grind Tracker. Until you finish, Minerva keeps reading the old spots.",
+  resolutionChanged: "The game window changed size since setup, so the minimap title has probably moved. Mark it again.",
+  requested: "Mark the minimap title again, or keep it as it is. Until you finish, Minerva keeps reading the old spot.",
 };
 
 function render() {
@@ -111,7 +104,7 @@ function render() {
   if ($("window-status").textContent !== windowStatus) $("window-status").textContent = windowStatus;
   ($("window-next") as HTMLButtonElement).disabled = !game;
   ($("pick") as HTMLButtonElement).disabled = picking;
-  for (const button of document.querySelectorAll<HTMLButtonElement>(".mark, .mark-exp")) {
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".mark")) {
     button.disabled = !game;
   }
   // On a requested setup the saved title still fits, and can be kept as it is.
@@ -157,34 +150,10 @@ function render() {
   ($("title-next") as HTMLButtonElement).disabled = read?.status !== "recognised";
   $("test-credit").textContent = setup.credit ?? "";
 
-  // The Grind Tracker: kept from before, it can be marked again, kept as it is or turned off.
-  const kept = setup.expBarKept;
-  $("exp-status").textContent = kept
-    ? "The Grind Tracker is on. Mark the EXP bar again, keep it as it is, or turn it off."
-    : "You can skip this and turn it on later.";
-  $("exp-off").hidden = !kept;
-  $("exp-skip").textContent = kept ? "Keep and finish" : "Skip";
-  $("exp-test-skip").textContent = kept ? "Keep the one before" : "Skip";
-
-  const expRead = setup.expBarTestRead;
-  const expBox = $("exp-test-read");
-  expBox.className = `test-read ${expRead?.status === "read" ? "recognised" : expRead?.status === "failed" ? "problem" : "reading"}`;
-  if (!expRead || expRead.status === "reading") {
-    expBox.textContent = "Reading the EXP bar…";
-  } else if (expRead.status === "read") {
-    const { exp, percentHundredths } = expRead.bar;
-    const title = document.createElement("div");
-    title.className = "title";
-    const line = document.createElement("p");
-    line.className = "figures";
-    line.textContent = `EXP ${exp.toLocaleString("en-US")} [${(percentHundredths / 100).toFixed(2)}%]`;
-    title.append(line);
-    expBox.replaceChildren(title, tag("Read"));
-  } else {
-    expBox.textContent =
-      "Couldn't read the EXP figures in the marked box. Check that the EXP bar is showing, then mark a box around the EXP number and the percentage in brackets.";
-  }
-  ($("finish") as HTMLButtonElement).disabled = expRead?.status !== "read";
+  // The Grind Tracker needs no mark: it is on, or the player turned it off in Settings.
+  $("exp-status").textContent = view.grindTrackerOn
+    ? "It's on. To turn it off, open Settings, the gear at the top of the panel."
+    : "It's off. To turn it on, open Settings, the gear at the top of the panel.";
 
   $("handoff").hidden = read?.status !== "recognised";
   $("resetup-hint").textContent = hotkeyAvailable(view.hotkeys.setup, view.unavailableHotkeys)
@@ -203,7 +172,7 @@ function render() {
   $("hotkey-problem").hidden = $("hotkey-problem").textContent === "";
 }
 
-/** "Recognised" or "Read", in the overlay's tag vocabulary. */
+/** "Recognised", in the overlay's tag vocabulary. */
 function tag(text: string): HTMLSpanElement {
   const el = document.createElement("span");
   el.className = "tag";
@@ -257,8 +226,7 @@ invoke<SetupView | null>("setup_view").then((v) => {
 });
 
 listen("title-marked", () => show("test"));
-listen("exp-bar-marked", () => show("expTest"));
-listen("marking-cancelled", () => document.querySelector<HTMLElement>(`[data-step="${step}"] .mark, [data-step="${step}"] .mark-exp`)?.focus());
+listen("marking-cancelled", () => document.querySelector<HTMLElement>(`[data-step="${step}"] .mark`)?.focus());
 listen<string>("marking-error", (e) => actionError(e.payload));
 $("guide-open").addEventListener("click", () => show("guide"));
 // The panel's settings view comes in front with the keyboard, its first Change focused.
@@ -304,32 +272,10 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(".mark")) {
   });
 }
 
-for (const button of document.querySelectorAll<HTMLButtonElement>(".mark-exp")) {
-  button.addEventListener("click", () => {
-    $("action-error").hidden = true;
-    invoke("start_marking", { target: "expBar" }).catch(actionError);
-  });
-}
 
 $("keep-title").addEventListener("click", () => show("exp"));
 $("title-next").addEventListener("click", () => show("exp"));
 
-/** Finish without a new EXP Bar Region: the one kept before (if any) stays. */
-async function finishWithoutExpMark() {
-  await invoke("discard_exp_bar_mark");
-  await invoke("finish_setup");
-}
-
-$("exp-skip").addEventListener("click", () => finishWithoutExpMark().catch(actionError));
-$("exp-test-skip").addEventListener("click", () => finishWithoutExpMark().catch(actionError));
-$("exp-off").addEventListener("click", async () => {
-  try {
-    await invoke("clear_exp_bar_region");
-    await invoke("finish_setup");
-  } catch (error) {
-    actionError(error);
-  }
-});
 $("finish").addEventListener("click", () => invoke("finish_setup").catch(actionError));
 
 // Picking by hand: the player has a few seconds to put the mouse over the game window.

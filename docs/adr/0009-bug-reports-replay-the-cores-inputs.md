@@ -23,7 +23,7 @@ The core holds no clock, and all the logic is in it, so feeding the same inputs 
 
   That leaves about four lines a second while playing, about 1 MB an hour. The trace reaches back to launch, but no more than a day; the lines that set the run up (the settings and Personal Bests restored) stay even then. It is held compressed.
 - **Crops:**
-  - The EXP Bar Region's from the last 10 minutes, where they changed.
+  - The EXP figures' from the last 10 minutes, where they changed: cut from the Status Bar's capture where they were read (ADR 0017).
   - The Title Region's where its reading changed.
   - The game's client area 400 px each way from the pointer, at each Item Card or Item Lookup press, from the last 10 minutes; named with the pointer's spot in it, as `samples/item-tooltip` names its frames.
   - For the whole run, the crops behind a reading the core found unusual or that changed the map shown, and behind an Item Tooltip whose name couldn't be read or isn't an item's.

@@ -163,6 +163,13 @@ impl GrindTrackerWindow {
 }
 
 /// The page reports how tall its content is, so the window fits it.
+/// The settings view's Grind Tracker switch: on, the EXP figures are read from the Status
+/// Bar; off, they aren't, and the Grind Tracker doesn't show.
+#[tauri::command]
+pub fn grind_tracker_set(on: bool, commands: State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::Act(minerva_core::Action::SetGrindTracker { on }));
+}
+
 #[tauri::command]
 pub fn grind_tracker_height(height: f64, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::GrindTrackerHeight(height));

@@ -10,7 +10,7 @@ pub mod world;
 use minerva_core::osms::{OsmsFiles, SavedFiles};
 use minerva_core::osms_items::{ItemFiles, SavedItemFiles};
 use minerva_core::{
-    Minerva, ExpBarRegion, Fetched, Frame, GameWindow, ItemHit, MapDataSource, PanelState, Rect,
+    Minerva, Fetched, Frame, GameWindow, ItemHit, MapDataSource, PanelState, Rect,
     ScreenRect, Settings, Size, SourceError, TitleRegion, default_title_region,
 };
 use std::path::{Path, PathBuf};
@@ -94,7 +94,6 @@ pub fn tracking_with(source: FakeSource) -> Minerva {
     let mut minerva = Minerva::new(source);
     minerva.restore(Settings {
         title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 1005, y: 1144, width: 240, height: 32 }, client }),
         ..Settings::default()
     });
     let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };

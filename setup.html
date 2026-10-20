@@ -30,8 +30,8 @@
         <p>To keep that risk low, Minerva only looks at the screen:</p>
         <ul>
           <li>
-            It captures the minimap title (and, if you choose, the EXP bar, an item's tooltip or a
-            Player Shop) the same way a screenshot does, and draws its own window.
+            It captures the minimap title and the bar at the bottom of the game (and, if you choose,
+            an item's tooltip or a Player Shop) the same way a screenshot does, and draws its own window.
           </li>
           <li>It never reads or changes the game's memory or files, and never injects anything into it.</li>
           <li>It never presses keys or clicks for you, and automates nothing.</li>
@@ -105,28 +105,16 @@
       </section>
 
       <section data-step="exp">
-        <h2 tabindex="-1">Grind Tracker (optional)</h2>
+        <h2 tabindex="-1">Grind Tracker</h2>
         <p>
-          To see how fast you level, drag a box around the EXP figures on the EXP bar at the
-          bottom of the game, like <strong>EXP. 160 [3.81%]</strong>. Take in the number and the
-          percentage in brackets.
+          The Grind Tracker shows how fast you level. There's nothing to mark: Minerva reads the
+          EXP figures on the EXP bar at the bottom of the game, like <strong>EXP. 160 [3.81%]</strong>,
+          by itself.
         </p>
         <p class="muted" id="exp-status"></p>
         <p class="muted" id="resetup-hint"></p>
         <footer>
           <button class="secondary" data-action="back">Back</button>
-          <button class="secondary" id="exp-off" hidden>Turn off the Grind Tracker</button>
-          <button class="secondary" id="exp-skip">Skip</button>
-          <button class="mark-exp">Mark the EXP bar</button>
-        </footer>
-      </section>
-
-      <section data-step="expTest">
-        <h2 tabindex="-1">Test read</h2>
-        <div class="test-read" id="exp-test-read" role="status" aria-atomic="true"></div>
-        <footer>
-          <button class="secondary mark-exp">Mark again</button>
-          <button class="secondary" id="exp-test-skip">Skip</button>
           <button id="finish">Finish</button>
         </footer>
       </section>

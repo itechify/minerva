@@ -8,7 +8,7 @@ mod common;
 
 use common::{FakeSource, arrive};
 use minerva_core::{
-    Minerva, ExpBar, ExpBarReading, ExpBarRegion, Foreground, GameWindow, Hotkeys, PanelControl,
+    Minerva, ExpBar, ExpBarReading, Foreground, GameWindow, Hotkeys, PanelControl,
     PlacementMode, Rect, Request, ScreenRect, Settings, SetupReason, Size, TitleRegion, TrackingState,
 };
 
@@ -398,7 +398,6 @@ fn tracking_with(hotkeys: Hotkeys) -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms());
     minerva.restore(Settings {
         title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 1005, y: 1144, width: 240, height: 32 }, client }),
         hotkeys,
         ..Settings::default()
     });
@@ -410,7 +409,7 @@ fn tracking_with(hotkeys: Hotkeys) -> Minerva {
 /// Start a Session: the EXP bar reads `160 [3.81%]`, then `266 [6.33%]`.
 fn start_session(minerva: &mut Minerva) {
     for (at_ms, exp, percent_hundredths) in [(0, 160, 381), (10_000, 266, 633)] {
-        minerva.on_exp_bar_reading(ExpBarReading { bar: Some(ExpBar { exp, percent_hundredths }), at_ms });
+        minerva.on_exp_bar_reading(ExpBarReading { bar: Some(ExpBar { exp, percent_hundredths }), at_ms, place: None });
     }
     assert_eq!(minerva.panel_state().exp_tracking.state, TrackingState::WarmingUp);
 }

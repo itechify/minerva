@@ -11,14 +11,14 @@
 //! Where it goes, worked as in `grind_tracker_window.rs`: the game's client area at
 //! (812,110), 1920x1200 physical px, on one 3440x1440 monitor, and a Personal Bests window
 //! of 920x600, so centred at (1312,410). The Title Region is captured at (882,150)
-//! 130x48 and the EXP Bar Region at (1817,1254) 384x32.
+//! 130x48.
 
 mod common;
 
 use common::player::Player;
 use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, osms, sharing_a_title, tracking, tracking_with};
 use minerva_core::{
-    Action, BESTS_VERSION, CharacterBests, ClientOffset, Minerva, ExpBarRegion, Foreground, GameWindow, LevelRange, MapBests,
+    Action, BESTS_VERSION, CharacterBests, ClientOffset, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, LevelRange, MapBests,
     PanelControl, PanelSizes, PanelState, PersonalBestsMap, PersonalBestsVisit,
     PersonalBestsWindow, Rect, Request, SavedBests, ScreenRect, Settings, Size, TitleRegion, VisitBest, meowdb,
 };
@@ -597,11 +597,10 @@ fn game(client: ScreenRect) -> Option<GameWindow> {
     Some(GameWindow { client, frame, screens: vec![SCREEN] })
 }
 
-/// Settings with both regions marked on the game's client area.
+/// Settings with the Title Region marked on the game's client area.
 fn tracking_settings() -> Settings {
     Settings {
         title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client: CLIENT }),
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 1005, y: 1144, width: 240, height: 32 }, client: CLIENT }),
         ..Settings::default()
     }
 }
@@ -705,9 +704,11 @@ fn dragged_back_to_the_middle_it_stays_centred_again() {
 #[test]
 fn dragged_onto_a_captured_region_it_moves_off_it() {
     let mut minerva = opened(tracking_settings());
+    let area = rect(1817, 1254, 384, 32);
+    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place: Some(ExpBarPlace { area, remembered: false }) });
 
-    // Over the EXP Bar Region (1817..2201, 1254..1286): our windows show in the capture,
-    // so it moves the shortest way off it, here above it.
+    // Over the EXP figures found in the Status Bar (1817..2201, 1254..1286): our windows
+    // show in the capture, so it moves the shortest way off them, here above.
     let state = minerva.act(Action::PersonalBestsMoved { x: 1700, y: 700 });
 
     assert_eq!(placed(state), Some(rect(1700, 654, 920, 600)));
@@ -736,7 +737,7 @@ fn it_hides_without_the_game_while_setup_is_open_and_while_another_app_is_in_fro
 fn it_shows_with_exp_tracking_off() {
     let mut minerva = opened(tracking_settings());
 
-    let state = minerva.act(Action::ClearExpBarRegion);
+    let state = minerva.act(Action::SetGrindTracker { on: false });
 
     assert_eq!(state.grind_tracker.placement, None);
     assert_eq!(placed(state), Some(rect(1312, 410, 920, 600)));

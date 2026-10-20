@@ -31,3 +31,4 @@ When a change alters something a shot shows, the PR that makes it lists the shot
 - `grind-tracker.png`: the solo EXP/h comparison has a ? help icon explaining the calculation. Update its alt text in `site/index.html` to say so.
 - `item-card.png`: each line under Market now has the Deal Line's ring before its name, filled on the Deal Line (Your price). Update its alt text in `site/index.html` to say so.
 - `grind-tracker.png`: the EXP bar's reading at its foot has the character playing beside it, by the name and level the status bar shows ("Egbert · Lv. 13"). Update its alt text in `site/index.html` to say so.
+- `setup.png`: a re-setup has one step fewer, as the EXP bar needs no mark (step 3 of 5), and its notice says "Mark the minimap title again, or keep it as it is." Update its row above.

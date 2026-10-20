@@ -15,7 +15,7 @@
 //! - The trace reaches back to launch, but no further than [`TRACE_MS`]; the lines that
 //!   set the run up (the settings and Personal Bests restored) are kept even then. It is
 //!   held compressed.
-//! - Crops: the EXP Bar Region's from the last [`RECENT_CROPS_MS`], where it changed, and
+//! - Crops: the EXP figures' from the last [`RECENT_CROPS_MS`], where they changed, and
 //!   the Title Region's where its reading changed; for the whole run, those behind a
 //!   reading the core found unusual ([`Note::is_unusual`]) or that changed the map shown.
 //! - A report is at most [`MAX_REPORT_BYTES`]: crops are left out to keep it so, the
@@ -24,7 +24,7 @@
 //!   the set to replay with, and a set that has changed since replays differently. The
 //!   same goes for the Item Card's OSMS item files (ADR 0010).
 
-use crate::exp_bar::{ExpBar, ExpBarReading};
+use crate::exp_bar::{ExpBar, ExpBarPlace, ExpBarReading};
 use crate::hotkey_settings::KeyPress;
 use crate::item_lookup::ItemHit;
 use crate::item_lookup::ItemLookup;
@@ -137,8 +137,14 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "is_false")]
         same: bool,
     },
-    /// An EXP Bar Region frame captured at `at_ms` read as `bar` (`None`: not whole).
-    ExpBar { at_ms: u64, bar: Option<ExpBar> },
+    /// The EXP figures captured at `at_ms` read as `bar` (`None`: not whole), at `place` in
+    /// a Status Bar capture (`None`: a frame of the figures alone, or nowhere to read them).
+    ExpBar {
+        at_ms: u64,
+        bar: Option<ExpBar>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        place: Option<ExpBarPlace>,
+    },
     GameWindow { game: Option<GameWindow> },
     PanelSizes { sizes: PanelSizes },
     ItemLookupSize { size: Size },
@@ -400,9 +406,8 @@ pub struct ReportFile {
     pub truncated: bool,
     /// The game window's client area, physical screen px.
     pub game_client: Option<ScreenRect>,
-    /// Where the Title Region and the EXP Bar Region were captured, physical screen px.
+    /// Where the Title Region was captured, physical screen px.
     pub title_region: Option<ScreenRect>,
-    pub exp_bar_region: Option<ScreenRect>,
     /// The fingerprints of the OSMS file sets the run took, in order.
     pub osms_sets: Vec<String>,
     /// Every map the panel showed.
@@ -485,7 +490,7 @@ fn cut(frame: &Frame, (x0, y0): (u32, u32), (x1, y1): (u32, u32)) -> Frame {
 
 /// What of `frame`, its top-left pixel at `origin` on screen, lies between the screen points
 /// `top_left` and `bottom_right`; `None` if nothing does, or the frame is short of pixels.
-fn cut_on_screen(frame: &Frame, origin: ScreenPoint, top_left: (i32, i32), bottom_right: (i32, i32)) -> Option<Frame> {
+pub(crate) fn cut_on_screen(frame: &Frame, origin: ScreenPoint, top_left: (i32, i32), bottom_right: (i32, i32)) -> Option<Frame> {
     if frame.rgba.len() < (frame.width * frame.height * 4) as usize {
         return None;
     }
@@ -941,7 +946,6 @@ impl Recorder {
             truncated: self.truncated,
             game_client: press.game_client,
             title_region: press.state.title_region,
-            exp_bar_region: press.state.exp_bar_region,
             osms_sets: self.sets.clone(),
             maps: press.maps.clone(),
             crops,
@@ -1023,7 +1027,7 @@ impl Recorder {
         out += "  report.json  the run's facts: version, system, regions, the maps shown and their Map Summaries\n";
         out += "  trace.jsonl  every input the core took in, a JSON object a line (t: ms since launch),\n";
         out += "               with what came of it: answers, notes, what the Grind Tracker and map showed\n";
-        out += "  crops/       EXP Bar Region and Title Region crops, named by capture time (ms since launch)\n";
+        out += "  crops/       the EXP figures', the Title Region's and the Status Bar's crops, named by capture time (ms since launch)\n";
         out
     }
 }
@@ -1325,8 +1329,8 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
                 title_lines.clone_from(&lines);
                 minerva.on_reading(TitleReading { lines, at_ms });
             }
-            Event::ExpBar { at_ms, bar } => {
-                minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms });
+            Event::ExpBar { at_ms, bar, place } => {
+                minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place });
             }
             Event::GameWindow { game } => {
                 minerva.on_game_window(game);
@@ -1669,8 +1673,9 @@ impl Event {
                 None => "title unreadable again".to_string(),
             },
             Event::Title { .. } => "title unreadable".to_string(),
-            Event::ExpBar { bar: Some(b), .. } => format!("EXP bar read {}", bar(b)),
-            Event::ExpBar { bar: None, .. } => "EXP bar not whole".to_string(),
+            Event::ExpBar { bar: Some(b), place, .. } => format!("EXP bar read {}{}", bar(b), remembered(place)),
+            Event::ExpBar { bar: None, place: None, .. } => "EXP bar not whole".to_string(),
+            Event::ExpBar { bar: None, place, .. } => format!("EXP bar not whole{}", remembered(place)),
             Event::GameWindow { game: Some(game) } => {
                 let c = game.client;
                 format!("game window: client {}x{} at ({}, {})", c.width, c.height, c.x, c.y)
@@ -1874,6 +1879,11 @@ fn signed(n: i64) -> String {
 
 fn percent(hundredths: u32) -> String {
     format!("{}.{:02}%", hundredths / 100, hundredths % 100)
+}
+
+/// ", where it was last found" for EXP figures read where they were remembered.
+fn remembered(place: &Option<ExpBarPlace>) -> &'static str {
+    if place.is_some_and(|place| place.remembered) { ", where it was last found" } else { "" }
 }
 
 fn bar(bar: &ExpBar) -> String {

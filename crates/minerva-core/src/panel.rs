@@ -70,11 +70,7 @@ pub enum Action {
     /// The player marked the Title Region (relative to the game client area) and wants
     /// a test read of it.
     MarkTitleRegion(crate::Rect),
-    /// The player marked the EXP Bar Region (relative to the game client area) and wants
-    /// a test read of it.
-    MarkExpBarRegion(crate::Rect),
-    /// Open the marking window on the Title Region or the EXP Bar Region, with a
-    /// keyboard-adjustable selection.
+    /// Open the marking window on the Title Region, with a keyboard-adjustable selection.
     BeginSelection(crate::MarkTarget),
     /// Arrow keys move the selection; Alt resizes it, Shift uses ten-pixel steps.
     AdjustSelection { direction: crate::SelectionDirection, resize: bool, coarse: bool },
@@ -82,14 +78,9 @@ pub enum Action {
     ConfirmSelection,
     /// Close marking without changing the previous test read or saved region.
     CancelSelection,
-    /// Drop the EXP Bar Region being marked (its test read failed, or the player skips
-    /// it); the one kept, if any, stays.
-    DiscardExpBarMark,
-    /// Turn EXP tracking off: forget the EXP Bar Region, kept or being marked.
-    ClearExpBarRegion,
     /// Finish setup: keep the marked Title Region if its test read recognised a map (or,
-    /// with none marked, the saved one if it still fits), and likewise the EXP Bar
-    /// Region if its figures read whole. Refused while either test read hasn't succeeded.
+    /// with none marked, the saved one if it still fits). Refused while its test read
+    /// hasn't succeeded.
     FinishSetup,
     /// The player wants to redo setup (the re-setup hotkey).
     RequestSetup,
@@ -194,6 +185,9 @@ pub enum Action {
     /// The settings view's Deal Margin: how far below the Deal Line, in percent, a price must
     /// be to be a deal; at most 99.
     SetDealMargin { percent: u32 },
+    /// The settings view's Grind Tracker switch: on, the EXP figures are read from the Status
+    /// Bar and the Session runs; off, neither, and the Grind Tracker doesn't show.
+    SetGrindTracker { on: bool },
     /// A click on a Deal Badge: the card of the item its listing sells shows beside it.
     /// `row` counts the listings not sold out from the top, as [`crate::DealBadge::row`].
     OpenDealItem { row: u32 },
@@ -328,8 +322,9 @@ pub(crate) struct Panel {
     pub mode: PlacementMode,
     /// The detached panel's top-left corner; `None` until it is first detached.
     pub detached_at: Option<ScreenPoint>,
-    /// Where the Title Region and the EXP Bar Region are captured on screen. A panel
-    /// inside the game is kept off them, or the capture would read the panel instead.
+    /// Where the Title Region is captured on screen, and where the Status Bar's Character
+    /// and EXP figures were found. A panel inside the game is kept off them, or the capture
+    /// would read the panel instead.
     pub avoid: Vec<ScreenRect>,
     /// The monitors' work areas, as last known with the game window: a detached panel
     /// stays within them after the game is gone.

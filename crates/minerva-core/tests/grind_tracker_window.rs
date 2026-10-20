@@ -1,5 +1,5 @@
-//! The Grind Tracker has a window of its own, beside the panel. It opens once the EXP
-//! bar is set, beside the panel with the tops level, and follows the panel there until
+//! The Grind Tracker has a window of its own, beside the panel. It shows while the Grind
+//! Tracker is on, beside the panel with the tops level, and follows the panel there until
 //! the player drags it somewhere; then it keeps that spot relative to the game window,
 //! until they drag it back beside the panel. The player closes
 //! it with its × and opens it again from the panel (or Ctrl+Shift+G); closed, it stays
@@ -7,14 +7,13 @@
 //!
 //! Worked example used throughout, as in `panel.rs`: the game's client area at
 //! (812,110), 1920x1200 physical px, on one 3440x1440 monitor; an expanded panel of
-//! 340x72 (so at (2376,510)) and a Grind Tracker window of 300x150. The EXP Bar Region
-//! is marked at client (1005,1144) 32 px tall, so it is captured at (1817,1254) 384x32.
+//! 340x72 (so at (2376,510)) and a Grind Tracker window of 300x150.
 
 mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    Action, ClientOffset, Minerva, ExpBarRegion, Foreground, GameWindow, PanelControl, PanelSizes, PanelState, Rect,
+    Action, ClientOffset, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, PanelControl, PanelSizes, PanelState, Rect,
     ScreenRect, Settings, Size, TitleRegion,
 };
 
@@ -36,11 +35,10 @@ fn sizes(expanded_height: u32) -> PanelSizes {
     PanelSizes { expanded: Size { width: 340, height: expanded_height }, collapsed: Size { width: 44, height: 44 } }
 }
 
-/// Settings with both regions marked on the game's client area.
+/// Settings with the Title Region marked on the game's client area.
 fn tracking_settings() -> Settings {
     Settings {
         title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client: CLIENT }),
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 1005, y: 1144, width: 240, height: 32 }, client: CLIENT }),
         ..Settings::default()
     }
 }
@@ -66,8 +64,8 @@ fn restart(minerva: &Minerva) -> Minerva {
 }
 
 #[test]
-fn without_an_exp_bar_there_is_no_grind_tracker_window() {
-    let minerva = started(Settings { exp_bar_region: None, ..tracking_settings() });
+fn with_the_grind_tracker_off_there_is_no_grind_tracker_window() {
+    let minerva = started(Settings { grind_tracker_on: false, ..tracking_settings() });
 
     assert_eq!(tracker(minerva.panel_state()), None);
 }
@@ -163,9 +161,11 @@ fn dragged_back_beside_the_panel_it_follows_the_panel_again() {
 #[test]
 fn dragged_onto_the_exp_bar_it_moves_off_it() {
     let mut minerva = started(tracking_settings());
+    let area = rect(1817, 1254, 384, 32);
+    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place: Some(ExpBarPlace { area, remembered: false }) });
 
-    // Over the top of the EXP Bar Region (1817..2201, 1254..1286): our windows show in
-    // the capture, so it moves the shortest way off it, here above it.
+    // Over the top of the EXP figures found in the Status Bar (1817..2201, 1254..1286): our
+    // windows show in the capture, so it moves the shortest way off them, here above.
     let state = minerva.act(Action::GrindTrackerMoved { x: 1800, y: 1180 });
 
     assert_eq!(tracker(state), Some(rect(1800, 1104, 300, 150)));
@@ -214,6 +214,7 @@ fn closing_it_leaves_the_session_running() {
     let reading = |exp, percent_hundredths, at_ms| minerva_core::ExpBarReading {
         bar: Some(minerva_core::ExpBar { exp, percent_hundredths }),
         at_ms,
+        place: None,
     };
     minerva.on_exp_bar_reading(reading(160, 381, 0));
     minerva.on_exp_bar_reading(reading(266, 633, 10_000));
@@ -258,7 +259,7 @@ fn it_hides_while_another_app_is_in_front_of_the_game() {
 fn turning_tracking_off_hides_it() {
     let mut minerva = started(tracking_settings());
 
-    minerva.act(Action::ClearExpBarRegion);
+    minerva.act(Action::SetGrindTracker { on: false });
 
     assert_eq!(tracker(minerva.panel_state()), None);
 }

@@ -28,19 +28,19 @@ const OTHER: u64 = 16_682;
 /// The EXP bar read as `exp` on a level of `total` EXP, at `at_ms`.
 fn read(minerva: &mut Minerva, at_ms: u64, exp: u64, total: u64) -> PanelState {
     let bar = Some(ExpBar { exp, percent_hundredths: percent(exp, total) });
-    minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms }).clone()
+    minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place: None }).clone()
 }
 
 /// A frame of the EXP bar at `at_ms` whose figures don't read whole.
 fn unread(minerva: &mut Minerva, at_ms: u64) -> PanelState {
-    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms }).clone()
+    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms, place: None }).clone()
 }
 
 /// The Status Bar read at `at_ms`, showing a Magician named `name` (`None`: unreadable) at
 /// `level`.
 fn status(minerva: &mut Minerva, at_ms: u64, name: Option<&str>, level: Option<u32>) -> PanelState {
     let area = ScreenRect { x: 334, y: 1145, width: 331, height: 55 };
-    let bar = StatusBar { area, level, job: Some("Magician".to_string()), name: name.map(String::from) };
+    let bar = StatusBar { area, level, job: Some("Magician".to_string()), name: name.map(String::from), exp_figures: None };
     minerva.on_status_bar_reading(StatusBarReading { bar: Some(bar), at_ms }).clone()
 }
 

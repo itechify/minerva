@@ -13,7 +13,7 @@ mod common;
 use common::FakeSource;
 use common::world::SEARCH;
 use minerva_core::{
-    Action, Minerva, DEFAULT_PANEL_WIDTH, ExpBarRegion, Foreground, GameWindow, Layer, MIN_PANEL_WIDTH, PanelSizes,
+    Action, Minerva, DEFAULT_PANEL_WIDTH, ExpBarPlace, ExpBarReading, Foreground, GameWindow, Layer, MIN_PANEL_WIDTH, PanelSizes,
     PlacementMode, Rect, ScreenRect,
     Settings, Size, TitleRegion,
 };
@@ -590,11 +590,18 @@ fn the_collapsed_icon_never_covers_the_minimap_title_either() {
     assert!(!overlaps(placement, state.title_region.unwrap()), "{placement:?}");
 }
 
-// ...nor the EXP Bar Region. Worked example: a 640x400 client at (812,110) with the title
-// marked as above (captured at client y 40..88) and the EXP figures marked at client
-// (100,150) 120x26 (captured 312 px wide: client x 100..412, y 150..176).
+// ...nor the EXP figures where they were found in the Status Bar. Worked example: a 640x400
+// client at (812,110) with the title marked as above (captured at client y 40..88) and the
+// EXP figures found at client (100,150) 312x26 (client x 100..412, y 150..176).
 
 const TALLER_SMALL_GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 640, height: 400 };
+
+/// The EXP figures read where they were found, at client (100,150) 312x26.
+fn found_exp_figures(minerva: &mut Minerva) -> ScreenRect {
+    let area = rect(912, 260, 312, 26);
+    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place: Some(ExpBarPlace { area, remembered: false }) });
+    area
+}
 
 #[test]
 fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_the_exp_bar_too() {
@@ -602,10 +609,10 @@ fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_the_exp_bar_too() {
     let client = Size { width: 640, height: 400 };
     minerva.restore(Settings {
         title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 100, y: 150, width: 120, height: 26 }, client }),
         ..Settings::default()
     });
     minerva.on_game_window(game(TALLER_SMALL_GAME));
+    let figures = found_exp_figures(&mut minerva);
 
     let state = minerva.act(Action::PanelMoved { x: 892, y: 140 }).clone();
 
@@ -613,7 +620,7 @@ fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_the_exp_bar_too() {
     let placement = state.placement.unwrap();
     assert_eq!(placement, rect(892, 110 + 176, 340, 72));
     assert!(!overlaps(placement, state.title_region.unwrap()));
-    assert!(!overlaps(placement, state.exp_bar_region.unwrap()));
+    assert!(!overlaps(placement, figures));
 }
 
 #[test]
@@ -622,10 +629,10 @@ fn a_panel_dragged_onto_the_exp_bar_is_moved_clear_of_it() {
     let client = Size { width: 640, height: 400 };
     minerva.restore(Settings {
         title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
-        exp_bar_region: Some(ExpBarRegion { marked: Rect { x: 100, y: 150, width: 120, height: 26 }, client }),
         ..Settings::default()
     });
     minerva.on_game_window(game(TALLER_SMALL_GAME));
+    let figures = found_exp_figures(&mut minerva);
 
     // Client (150,140): over the EXP bar (client y 150..176) and clear of the title.
     let state = minerva.act(Action::PanelMoved { x: 962, y: 250 }).clone();
@@ -634,7 +641,7 @@ fn a_panel_dragged_onto_the_exp_bar_is_moved_clear_of_it() {
     let placement = state.placement.unwrap();
     assert_eq!(placement, rect(962, 110 + 176, 340, 72));
     assert!(!overlaps(placement, state.title_region.unwrap()));
-    assert!(!overlaps(placement, state.exp_bar_region.unwrap()));
+    assert!(!overlaps(placement, figures));
 }
 
 #[test]
