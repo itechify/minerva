@@ -1256,9 +1256,10 @@ impl Minerva {
         self.sync_panel()
     }
 
-    /// The player turned "Share to the Map Leaderboards" on (`on`) for the Character named
-    /// `name` in the Personal Bests window, having confirmed, or off. On, their entries go up at
-    /// the next tick, and again whenever they change; off, they are deleted from the site.
+    /// The player turned "Share" on (`on`) for the Character named `name` in the Personal Bests
+    /// window, or off. On, their entries go up at the next tick, and again whenever they change;
+    /// off, they are deleted from the site, and stay off. A Character met for the first time with
+    /// an entry starts on without this.
     pub fn show_on_leaderboards(&mut self, name: &str, on: bool) -> &PanelState {
         self.record(Event::ShowOnLeaderboards { name: name.to_string(), on });
         self.leaderboards.show(name, on);
@@ -1636,7 +1637,7 @@ impl Minerva {
         self.grind_tracker.open = settings.grind_tracker_open;
         self.grind_tracker.at = settings.grind_tracker_at;
         self.bests_window.at = settings.personal_bests_at;
-        self.leaderboards.restore(settings.map_leaderboards.clone());
+        self.leaderboards.restore(settings.map_leaderboards.clone(), settings.map_leaderboards_met.clone());
         self.settings = settings;
         // The travel toggles change Distances.
         self.sync_search();
@@ -1665,6 +1666,7 @@ impl Minerva {
             grind_tracker_at: self.grind_tracker.at,
             personal_bests_at: self.bests_window.at,
             map_leaderboards: self.leaderboards.saved(),
+            map_leaderboards_met: self.leaderboards.met(),
             ..self.settings.clone()
         }
     }
@@ -1679,10 +1681,13 @@ impl Minerva {
     }
 
     /// Pick up the Personal Bests an earlier launch saved ([`SavedBests::default`] when
-    /// none were). The shell restores them at startup, before any reading.
+    /// none were). The shell restores them at startup, before any reading, after
+    /// [`Minerva::restore`]: with settings from before version 7, every Character in them
+    /// counts as met, so none of them starts shared on the Map Leaderboards.
     pub fn restore_bests(&mut self, bests: SavedBests) -> &PanelState {
         self.record(Event::RestoreBests { bests: bests.clone() });
         self.session.restore_bests(bests);
+        self.leaderboards.bests_restored(self.session.bests().history());
         self.sync_panel()
     }
 

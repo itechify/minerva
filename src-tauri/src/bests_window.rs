@@ -226,8 +226,7 @@ pub fn personal_bests_merge_characters(from: String, into: String, commands: Sta
     let _ = commands.send(Command::MergeCharacters { from, into });
 }
 
-/// The player turned "Share to the Map Leaderboards" on (`on`, having confirmed) or off for the
-/// Character named `name`.
+/// The player turned "Share" on (`on`) or off for the Character named `name`.
 #[tauri::command]
 pub fn personal_bests_show_on_leaderboards(name: String, on: bool, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::ShowOnLeaderboards { name, on });

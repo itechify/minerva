@@ -54,10 +54,10 @@ type Rejected = {
   reason: { overCap: { cap: number } } | { removed: Record<string, never> };
 };
 
-/** Mirror of `minerva_core::LeaderboardToggle`: a Character's "Share to the Map Leaderboards". */
+/** Mirror of `minerva_core::LeaderboardToggle`: a Character's Share, on the Map Leaderboards. */
 type Toggle = {
   on: boolean;
-  /** How many maps they have an entry for: what turning it on asks about. */
+  /** How many maps they have an entry for: what turning it on shares. */
   maps: number;
   /** The switch is offered: they're shown, or have something to upload. */
   offered: boolean;
@@ -77,7 +77,7 @@ type BestsCharacter = {
   current: boolean;
   /** Their rows, highest EXP/h first. */
   maps: BestsMap[];
-  /** Their "Share to the Map Leaderboards"; `null` for the Unassigned bests, never uploaded. */
+  /** Their Share, on the Map Leaderboards; `null` for the Unassigned bests, never uploaded. */
   leaderboard: Toggle | null;
 };
 
@@ -93,6 +93,7 @@ const panelEl = byId("panel");
 const whose = byId("whose");
 const count = byId("count");
 const countActions = byId("count-actions");
+const shareEl = byId("share");
 const manageEl = byId("manage");
 const problemsEl = byId("problems");
 const rows = byId("rows");
@@ -543,15 +544,15 @@ const opened = new Set<string>();
 /** The choice the player picked, by its key; `null` until they pick one, and after it goes:
  *  the picker shows the Character playing. */
 let picked: string | null = null;
-/** The shown Character's Manage is open: their switch, Merge and Remove. Kept as the player
+/** The shown Character's Manage is open: their Merge and Remove. Kept as the player
  *  picks another, until they close it. */
 let managing = false;
 /** What a click armed, until a second click does it, a click anywhere else, the window
  *  hiding or its button going: one at a time. A Visit's × (`remove:<visit>`), its Move
  *  (`move:<visit>`, and `move:<visit>><name>` once a Character is clicked); a Character's
- *  Remove (`remove-character:<name>`), Merge (`merge:<name>`, and `merge:<name>><into>`), switch
- *  (`leaderboard:<name>`) and held uploads' Send (`send:<name>`); and Unassigned's Assign all
- *  (`assign:`, and `assign:><name>`). */
+ *  Remove (`remove-character:<name>`) and Merge (`merge:<name>`, and `merge:<name>><into>`),
+ *  and held uploads' Send (`send:<name>`); and Unassigned's Assign all (`assign:`, and
+ *  `assign:><name>`). */
 let armed: string | null = null;
 /** When the button now armed was armed (`performance.now()`): a second click within
  *  [`SECOND_CLICK_MS`] of it is a double-click's, and is ignored, so a double-click never
@@ -649,21 +650,21 @@ function renderWhose() {
       countActions.append(assign);
     }
   } else if (manageable(current)) {
-    // The Character's switch, Merge and Remove, folded under one quiet line so the bars lead.
+    // The Character's Merge and Remove, folded under one quiet line so the bars lead.
     const manage = document.createElement("button");
     manage.type = "button";
     manage.className = "manage-toggle";
     manage.setAttribute("aria-expanded", String(managing));
     manage.setAttribute("aria-controls", "manage");
-    manage.title = managing ? `Hide what you can do with ${current.name}` : `Share to the Map Leaderboards, merge or remove ${current.name}`;
+    manage.title = managing ? `Hide what you can do with ${current.name}` : `Merge or remove ${current.name}`;
     manage.append("Manage", span("sr-only", ` ${current.name}`), chevron());
     countActions.append(manage);
   }
 }
 
-/** Whether a Character has anything to manage: their switch, or bests to merge or remove. */
+/** Whether a Character has anything to manage: bests to merge or remove. */
 function manageable(c: BestsCharacter) {
-  return c.maps.length > 0 || !!c.leaderboard?.offered;
+  return c.maps.length > 0;
 }
 
 /** A day and time in the player's local time: "3 Oct, 14:02". */
@@ -694,10 +695,25 @@ function line(...parts: (string | HTMLElement)[]) {
   return div;
 }
 
-/** The shown Character's Manage, while open: their "Share to the Map Leaderboards" switch and
- *  where they stand; then Merge into… (for a Character the game renamed) and Remove, each
- *  asking again before it does anything. Unassigned's Assign all to… opens its Characters
- *  here too. */
+/** The shown Character's Share, under their name: the switch and where they stand on the Map
+ *  Leaderboards, or why nothing of theirs can go there yet. Unassigned has none. */
+function renderShare() {
+  const c = shown();
+  const t = c?.leaderboard;
+  shareEl.replaceChildren();
+  if (c?.name && t?.offered) {
+    shareEl.append(leaderboardSwitch(c.name, t), span("leaderboard-status", standing(t)));
+  } else if (c?.name && t && c.maps.length > 0) {
+    shareEl.append(
+      span("move-label", `Nothing of ${c.name}'s can go on the Map Leaderboards yet: a best goes up once Minerva has read the level and job that set it, and its date.`),
+    );
+  }
+  shareEl.hidden = shareEl.childElementCount === 0;
+}
+
+/** The shown Character's Manage, while open: Merge into… (for a Character the game renamed)
+ *  and Remove, each asking again before it does anything. Unassigned's Assign all to… opens
+ *  its Characters here too. */
 function renderManage() {
   const c = shown();
   manageEl.replaceChildren();
@@ -716,13 +732,6 @@ function renderManage() {
     const name = c.name;
     const t = c.leaderboard;
     const public_ = !!t && (t.on || t.status !== "off");
-    if (t?.offered) {
-      manageEl.append(line(leaderboardSwitch(name, t), span("leaderboard-status", standing(t))));
-    } else if (t) {
-      manageEl.append(
-        line(span("move-label", `Nothing of ${name}'s can go on the Map Leaderboards yet: a best goes up once Minerva has read the level and job that set it, and its date.`)),
-      );
-    }
     if (c.maps.length > 0) {
       const into = names().filter((other) => other !== name);
       const site = public_ ? " and their Map Leaderboard entries" : "";
@@ -758,26 +767,23 @@ function renderManage() {
   manageEl.hidden = manageEl.childElementCount === 0;
 }
 
-/** A Character's "Share to the Map Leaderboards": a switch, which asks again before it does
- *  anything, either way: on, with how many maps go up and that the site is public; off, that
- *  it deletes them there. Armed, it is a button asking, so it is announced as the question. */
+/** A Character's Share: a switch, which flips at a click. Its tooltip says what that does: on,
+ *  how many maps go up and that the site is public; off, that it deletes them there. */
 function leaderboardSwitch(name: string, t: Toggle) {
-  const arm = `leaderboard:${name}`;
-  const asking = armed === arm;
-  const button = armButton(arm, true);
-  button.className = asking ? "switch armed" : "switch";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "switch";
+  button.dataset.share = name;
   button.dataset.on = String(t.on);
-  const question = t.on
-    ? `Take ${name}'s bests off owlofminerva.app?`
-    : `Share ${name}'s bests on ${mapsText(t.maps)} publicly on owlofminerva.app?`;
-  if (!asking) {
-    button.setAttribute("role", "switch");
-    button.setAttribute("aria-checked", String(t.on));
-  }
-  button.title = t.on ? `Take ${name}'s bests off the Map Leaderboards: deleted from the site` : `Share ${name}'s bests to the Map Leaderboards, for anyone to see`;
+  button.setAttribute("role", "switch");
+  button.setAttribute("aria-checked", String(t.on));
+  button.setAttribute("aria-label", `Share ${name}'s bests on the Map Leaderboards`);
+  button.title = t.on
+    ? `${name}'s bests are on the Map Leaderboards at owlofminerva.app, for anyone to see. Turn off to delete them from the site.`
+    : `Share ${name}'s bests on ${mapsText(t.maps)} on the Map Leaderboards at owlofminerva.app, for anyone to see.`;
   const knob = span("knob", "");
   knob.setAttribute("aria-hidden", "true");
-  button.append(knob, asking ? question : "Share to the Map Leaderboards");
+  button.append(knob, "Share");
   return button;
 }
 
@@ -868,6 +874,7 @@ function renderAll() {
   noteDot.hidden = !maps.some((m) => m.visits.some((v) => v.thisVisit));
   const draw = () => {
     renderWhose();
+    renderShare();
     renderManage();
     renderProblems();
     renderRows();
@@ -967,9 +974,6 @@ function act(arm: string) {
     invoke("personal_bests_remove_character", { name: key });
   } else if (what === "merge" && target) {
     invoke("personal_bests_merge_characters", { from: key, into: target });
-  } else if (what === "leaderboard") {
-    const on = !characters.find((c) => c.name === key)?.leaderboard?.on;
-    invoke("personal_bests_show_on_leaderboards", { name: key, on });
   } else if (what === "send") {
     invoke("personal_bests_send_again", { name: key });
   }
@@ -985,10 +989,11 @@ function armedWords(arm: string) {
 
 // Its ×, through the core like the panel's icons; a map's name, to its MeowDB page, and its
 // Map Leaderboard to the site; a map's count, opening or closing its Visit History; a choice
-// in the picker, showing it; Manage, opening or closing the Character's. A button that asks
-// first (a Visit's × or Move, a Character's Remove, Merge or switch, Assign all, held
-// uploads' Send) arms it, and asks again: a second click does it through the core, once the
-// double-click it may be part of is over. Any other click disarms it.
+// in the picker, showing it; a Character's Share, flipping it through the core; Manage, opening
+// or closing the Character's. A button that asks first (a Visit's × or Move, a Character's
+// Remove or Merge, Assign all, held uploads' Send) arms it, and asks again: a second click
+// does it through the core, once the double-click it may be part of is over. Any other click
+// disarms it.
 document.addEventListener("click", (e) => {
   const target = e.target instanceof Element ? e.target : null;
   const control = target?.closest<HTMLButtonElement>("button[data-control]");
@@ -999,6 +1004,8 @@ document.addEventListener("click", (e) => {
   if (board) invoke("personal_bests_open_leaderboard", { character: shown()?.name ?? null, id: board.dataset.id });
   const again = target?.closest<HTMLButtonElement>("button[data-send-again]");
   if (again) invoke("personal_bests_send_again", { name: again.dataset.sendAgain });
+  const share = target?.closest<HTMLButtonElement>("button[data-share]");
+  if (share) invoke("personal_bests_show_on_leaderboards", { name: share.dataset.share, on: share.dataset.on !== "true" });
   const toggle = target?.closest<HTMLButtonElement>("button.visits-toggle");
   const pick = target?.closest<HTMLButtonElement>("button[data-pick]");
   const manage = target?.closest<HTMLButtonElement>("button.manage-toggle");
