@@ -1,6 +1,7 @@
 // The Map Leaderboards: each Character's entries, mirrored whole from the app, and each
 // map's Level Bands ranked from them.
 import { bandOf, levelsOf } from "../level-bands";
+import { type Top, takenTops, tell } from "./announce";
 import { type Answer, badRequest, body } from "./http";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
@@ -128,7 +129,41 @@ async function claim(
 /** Each statement of a write runs only while the key still holds the name. */
 const HELD = "EXISTS (SELECT 1 FROM characters WHERE name_key = ?1 AND key_hash = ?2)";
 
-export async function upload(env: Env, request: Request, name: string): Promise<Answer> {
+/** A place on the Map Leaderboards: one map's Level Band. */
+interface Place {
+  map: string;
+  band: number;
+}
+
+/** How many places one top-spots read asks about at a time. Each takes two bound
+ *  parameters, and a D1 statement takes at most 100. */
+const PLACES_PER_READ = 40;
+
+/** The top entry of each of `places` that has one. Places with no entry are left out. */
+async function topsAt(env: Env, places: Place[]): Promise<Top[]> {
+  const tops: Top[] = [];
+  for (let from = 0; from < places.length; from += PLACES_PER_READ) {
+    const asked = places.slice(from, from + PLACES_PER_READ);
+    const rows = await env.DB.prepare(
+      `WITH places (map_id, band) AS (VALUES ${asked.map(() => "(?, ?)").join(", ")}),
+         ranked AS (
+           SELECT e.map_id, e.band, e.name_key, c.name, e.exp_per_hour,
+                  ROW_NUMBER() OVER (PARTITION BY e.map_id, e.band
+                                     ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank
+           FROM entries e JOIN characters c USING (name_key)
+           JOIN places p ON p.map_id = e.map_id AND p.band = e.band)
+       SELECT map_id, band, name_key, name, exp_per_hour FROM ranked WHERE rank = 1`,
+    )
+      .bind(...asked.flatMap((p) => [p.map, p.band]))
+      .all<{ map_id: string; band: number; name_key: string; name: string; exp_per_hour: number }>();
+    for (const r of rows.results) {
+      tops.push({ map: r.map_id, band: r.band, nameKey: r.name_key, name: r.name, expPerHour: r.exp_per_hour });
+    }
+  }
+  return tops;
+}
+
+export async function upload(env: Env, request: Request, name: string, ctx?: ExecutionContext): Promise<Answer> {
   const now = Date.now();
   // Read first, so an upload that can't be taken claims nothing.
   const entries = entriesOf(await body(request), now);
@@ -137,9 +172,11 @@ export async function upload(env: Env, request: Request, name: string): Promise<
   const claimed = (await claim(env, request, name, now))!;
   if (!("nameKey" in claimed)) return claimed;
   const { nameKey, keyHash } = claimed;
-  const removed = await env.DB.prepare("SELECT map_id, band, exp_per_hour FROM removed_entries WHERE name_key = ?")
-    .bind(nameKey)
-    .all<{ map_id: string; band: number; exp_per_hour: number }>();
+  type EntryRow = { map_id: string; band: number; exp_per_hour: number };
+  const [removed, had] = await env.DB.batch<EntryRow>([
+    env.DB.prepare("SELECT map_id, band, exp_per_hour FROM removed_entries WHERE name_key = ?").bind(nameKey),
+    env.DB.prepare("SELECT map_id, band, exp_per_hour FROM entries WHERE name_key = ?").bind(nameKey),
+  ]);
   const wasRemoved = (e: Upload) =>
     removed.results.some((r) => r.map_id === e.map && r.band === e.band && r.exp_per_hour === e.expPerHour);
   const rejected: Rejected[] = [];
@@ -150,6 +187,13 @@ export async function upload(env: Env, request: Request, name: string): Promise<
     else return true;
     return false;
   });
+  // Only an entry that is new, or higher than the one it replaces, can take a top spot, so
+  // the top spots are read for those places alone. `takenTops` would turn the rest down
+  // anyway; this is what keeps the reads off almost every upload, since the app uploads a
+  // Character's whole set as each Visit ends and nearly all of it is unchanged (ADR 0017).
+  const held = new Map(had.results.map((r) => [`${r.map_id} ${r.band}`, r.exp_per_hour]));
+  const improved: Place[] = accepted.filter((e) => (held.get(`${e.map} ${e.band}`) ?? 0) < e.expPerHour);
+  const before = improved.length === 0 ? [] : await topsAt(env, improved);
   await env.DB.batch([
     env.DB.prepare(`UPDATE characters SET name = ?3 WHERE name_key = ?1 AND key_hash = ?2`).bind(nameKey, keyHash, name),
     env.DB.prepare(`DELETE FROM entries WHERE name_key = ?1 AND ${HELD}`).bind(nameKey, keyHash),
@@ -160,6 +204,13 @@ export async function upload(env: Env, request: Request, name: string): Promise<
       ).bind(nameKey, keyHash, e.map, e.band, e.level, e.job, e.expPerHour, e.setAt),
     ),
   ]);
+  if (improved.length > 0) {
+    const told = tell(env, takenTops(before, await topsAt(env, improved), nameKey));
+    // The upload is answered without waiting for Discord; with no context to hand it to
+    // (a direct call), it is waited for, so nothing is left running after the answer.
+    if (ctx === undefined) await told;
+    else ctx.waitUntil(told);
+  }
   return { status: 200, body: { accepted: accepted.length, rejected } };
 }
 

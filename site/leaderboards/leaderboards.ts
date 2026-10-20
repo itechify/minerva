@@ -5,6 +5,12 @@
 import { dayText } from "../../src/dates.ts";
 import { levels, rate } from "../../src/figures.ts";
 import { bandOf, levelsOf } from "../level-bands.ts";
+import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts";
+
+// A map's name is worked out in one place for the whole site (map-names.ts), so a page still
+// takes everything it shows from this module.
+export { mapNames, placeOf };
+export type { MapNameRow, MapNames, MapPlace } from "../map-names.ts";
 
 /** A map's page as its address names it: `/leaderboards/map/?map=<ID>&band=<first level>&name=<name>`.
  *  Any part may be missing, or dropped for not being one. */
@@ -43,51 +49,9 @@ export function readLink(search: string): Link {
   return { map: mapIn(query.get("map")), band: bandIn(query.get("band")), name: nameIn(query.get("name")) };
 }
 
-/** A row of the map names fixture (crates/minerva-core/tests/fixtures/osms-map-names.json),
- *  as OSMS writes it: its ID a number without its leading zeros, its text untrimmed. */
-export interface MapNameRow {
-  id: number;
-  street_name: string;
-  name: string;
-  region: string;
-}
-
-/** A map as a page names it: its Map Name under its Street Name, as the panel does. */
-export interface MapPlace {
-  /** The 9-digit ID. */
-  id: string;
-  name: string;
-  street: string;
-  region: string;
-  /** Whether the map names fixture names it. */
-  known: boolean;
-}
-
-/** The maps the fixture names, by 9-digit ID. */
-export type MapNames = Map<string, MapPlace>;
-
 /** The regions of maps the player can't normally enter, which search leaves out, as the
  *  panel's does (`MapEntry::is_left_out`). */
 const LEFT_OUT_REGIONS = ["Event", "Dev"];
-
-/** The maps the fixture names, trimmed as the core reads them, leaving out any with no name
- *  or street. */
-export function mapNames(rows: MapNameRow[]): MapNames {
-  const names: MapNames = new Map();
-  for (const row of rows) {
-    const [name, street] = [row.name.trim(), row.street_name.trim()];
-    if (name === "" || street === "") continue;
-    const id = String(row.id).padStart(9, "0");
-    names.set(id, { id, name, street, region: row.region, known: true });
-  }
-  return names;
-}
-
-/** Map `id` as a page names it: a map the fixture doesn't name (one newer than it) by its
- *  ID, "Not in the map list", as the Personal Bests window names it. */
-export function placeOf(names: MapNames, id: string): MapPlace {
-  return names.get(id) ?? { id, name: `Map ${id}`, street: "Not in the map list", region: "", known: false };
-}
 
 /** How well a name holds a query: it starts with it, a word in it does, or it holds it
  *  elsewhere. Lower is better. */
