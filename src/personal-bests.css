@@ -122,9 +122,9 @@
   transform: rotate(90deg);
 }
 
-/* What Manage opens, under the picker: the switch and where they stand, then Merge into…
-   and Remove, then the Characters to merge into while Merge is open; or Unassigned's
-   Characters to assign them all to. Lines of light buttons on the glass, no box. */
+/* What Manage opens, under the picker: Merge into… and Remove, then the Characters to merge
+   into while Merge is open; or Unassigned's Characters to assign them all to. Lines of light
+   buttons on the glass, no box. */
 .manage {
   display: flex;
   flex-direction: column;
@@ -155,19 +155,17 @@
 }
 
 /* A button asking before it does what can't be undone (a Visit's "Remove?", "Move to
-   Egbert?", a Character's Remove or Merge, the switch either way): in the problem palette,
-   cream with an amber edge and brown words, as the "paused" tag is, without the orange.
-   A second click within 400ms of the first is a double-click's, and is ignored. */
-.text-button.armed,
-.switch.armed {
+   Egbert?", a Character's Remove or Merge): in the problem palette, cream with an amber
+   edge and brown words, as the "paused" tag is, without the orange. A second click within
+   400ms of the first is a double-click's, and is ignored. */
+.text-button.armed {
   border-color: var(--problem-edge);
   background: var(--problem-bg);
   box-shadow: none;
   color: var(--problem-ink);
 }
 
-.text-button.armed:hover,
-.switch.armed:hover {
+.text-button.armed:hover {
   background: var(--problem-bg);
 }
 
@@ -436,11 +434,22 @@ tbody tr.board-row td {
   outline-offset: 2px;
 }
 
-/* The shown Character's "Share to the Map Leaderboards", in Manage: a switch, its knob left
-   on Greyed while off and right on Edit Blue while on (the system's checked colour, as the
-   travel checkboxes'), then where they stand there. Armed, either way, it asks in the
-   problem palette: on, with the count of maps and that the site is public; off, that they
-   come off it. */
+/* The shown Character's Share, under the picker: a switch, its knob left on Greyed while
+   off and right on Edit Blue while on (the system's checked colour, as the travel
+   checkboxes'), then where they stand on the Map Leaderboards. It flips at a click: its
+   tooltip says what that does. */
+.share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.share[hidden] {
+  display: none;
+}
+
+
 .switch {
   display: inline-flex;
   align-items: center;

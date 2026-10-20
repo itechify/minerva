@@ -236,14 +236,15 @@ pub struct LeaderboardCharacter {
     pub held: bool,
 }
 
-/// The Personal Bests window's "Share to the Map Leaderboards" for a Character.
+/// The Personal Bests window's "Share" for a Character, under their name: on for one met for
+/// the first time with an entry, until the player turns it off.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LeaderboardToggle {
     /// The player shows them there.
     pub on: bool,
-    /// How many maps they have an entry for: what turning it on asks about ("Upload Egbert's
-    /// bests on 14 maps?").
+    /// How many maps they have an entry for: what turning it on says it shares ("Share
+    /// Egbert's bests on 14 maps").
     pub maps: usize,
     /// The window offers the switch: they're shown, so it can turn them off, or they have an
     /// entry to upload. With none (bests with no level, job or date read), there is nothing to
@@ -307,10 +308,17 @@ struct Wait {
     rate_limited: bool,
 }
 
-/// Every Character shown on the Map Leaderboards, or being taken off.
+/// Every Character shown on the Map Leaderboards, or being taken off, and every one met.
 #[derive(Debug, Default)]
 pub(crate) struct Leaderboards {
     standings: Vec<UploadStanding>,
+    /// Every Character met with an entry, or shown or taken off by the player: one met for the
+    /// first time is shown. `None` while it isn't known who was met before (settings from
+    /// before version 7, until the bests read at a launch).
+    met: Option<Vec<String>>,
+    /// [`Leaderboards::met`] was just taken from the bests restored at this launch, which may
+    /// yet turn out not to have been read.
+    met_from_bests: bool,
     /// The id of the last upload asked for.
     last_id: u64,
     /// The latest capture time seen in a tick.
@@ -318,9 +326,12 @@ pub(crate) struct Leaderboards {
 }
 
 impl Leaderboards {
-    /// Take back the Characters an earlier launch kept, in place of any: nothing is under way.
-    pub fn restore(&mut self, saved: Vec<LeaderboardCharacter>) {
+    /// Take back the Characters an earlier launch kept, and those it met (`None`: not known), in
+    /// place of any: nothing is under way.
+    pub fn restore(&mut self, saved: Vec<LeaderboardCharacter>, met: Option<Vec<String>>) {
         self.standings = saved.into_iter().map(UploadStanding::new).collect();
+        self.met = met;
+        self.met_from_bests = false;
     }
 
     /// The Characters to keep with the settings.
@@ -328,9 +339,28 @@ impl Leaderboards {
         self.standings.iter().map(|standing| standing.saved.clone()).collect()
     }
 
+    /// The Characters met, to keep with the settings.
+    pub fn met(&self) -> Option<Vec<String>> {
+        self.met.clone()
+    }
+
+    /// The bests earlier launches saved are back, `history`: when it isn't known who was met
+    /// before, everyone in them was, so none of them starts shown.
+    pub fn bests_restored(&mut self, history: &SavedBests) {
+        if self.met.is_none() {
+            self.met = Some(history.characters.iter().map(|c| c.name.clone()).collect());
+            self.met_from_bests = true;
+        }
+    }
+
     /// The player showed the Character named `name` on the Map Leaderboards (`on`), or took them
-    /// off.
+    /// off: met, so that stands.
     pub fn show(&mut self, name: &str, on: bool) {
+        if let Some(met) = &mut self.met
+            && !met.iter().any(|m| m == name)
+        {
+            met.push(name.to_string());
+        }
         match self.standings.iter_mut().find(|standing| standing.saved.name == name) {
             Some(standing) if standing.saved.shown != on => {
                 standing.saved.shown = on;
@@ -371,18 +401,34 @@ impl Leaderboards {
     }
 
     /// The Personal Bests saved at earlier launches couldn't be read at this one: hold the
-    /// uploads of every Character shown.
+    /// uploads of every Character shown. Who was met can't be told from them either.
     pub fn bests_lost(&mut self) {
+        if self.met_from_bests {
+            self.met = None;
+        }
         for standing in self.standings.iter_mut().filter(|standing| standing.saved.shown) {
             standing.saved.held = true;
         }
     }
 
-    /// Time passed, to `at_ms`: ask for each upload due, with `history` the bests of ended
-    /// Visits and `wall_clock` the time now. None before the wall clock is known.
+    /// Time passed, to `at_ms`: show each Character met for the first time with an entry, and
+    /// ask for each upload due, with `history` the bests of ended Visits and `wall_clock` the
+    /// time now. None before the wall clock is known.
     pub fn tick(&mut self, at_ms: u64, history: &SavedBests, wall_clock: Option<u64>) {
         self.now_ms = self.now_ms.max(at_ms);
         let Some(now_unix_ms) = wall_clock else { return };
+        let new: Vec<String> = match &self.met {
+            Some(met) => history
+                .characters
+                .iter()
+                .filter(|c| !met.contains(&c.name) && !entries(history, &c.name, now_unix_ms).is_empty())
+                .map(|c| c.name.clone())
+                .collect(),
+            None => Vec::new(),
+        };
+        for name in new {
+            self.show(&name, true);
+        }
         for standing in &mut self.standings {
             // Held, nothing goes but the deletion the player asks for by turning them off.
             if standing.in_flight.is_some() || (standing.saved.shown && standing.saved.held) {

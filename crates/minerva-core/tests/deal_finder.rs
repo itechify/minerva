@@ -441,7 +441,7 @@ fn a_file_from_before_the_deal_finder_gets_its_hotkey_unless_another_has_it() {
     minerva.restore(serde_json::from_str(file).unwrap());
     assert_eq!(minerva.panel_state().hotkeys.deal_finder, "", "off, as another hotkey has its default");
     assert_eq!(minerva.panel_state().hotkeys.search, "ctrl+shift+d");
-    assert_eq!(minerva.settings().version, 6);
+    assert_eq!(minerva.settings().version, 7);
 }
 
 #[test]

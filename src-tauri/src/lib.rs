@@ -125,7 +125,7 @@ pub(crate) enum Command {
     /// The player merged the Character named `from` into the one named `into`, in the
     /// Personal Bests window.
     MergeCharacters { from: String, into: String },
-    /// The player turned "Share to the Map Leaderboards" on (`on`) or off for the Character
+    /// The player turned "Share" on the Map Leaderboards on (`on`) or off for the Character
     /// named `name`, in the Personal Bests window.
     ShowOnLeaderboards { name: String, on: bool },
     /// The player sent the Character with this name to the Map Leaderboards again, in the

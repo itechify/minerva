@@ -50,7 +50,7 @@ fn ctrl_shift_i_shows_the_item_card_and_ctrl_shift_u_looks_the_item_up_even_with
     assert_eq!(state.hotkeys.toggle_panel, ctrl_shift("x"), "the player's own bindings are kept");
     let saved = minerva.settings();
     assert_eq!((saved.hotkeys.item_card.as_str(), saved.hotkeys.item_lookup.as_str()), ("ctrl+shift+i", "ctrl+shift+u"));
-    assert_eq!(saved.version, 6, "and saved with the rest");
+    assert_eq!(saved.version, 7, "and saved with the rest");
 }
 
 /// The Item Card took Item Lookup's key: the key the player presses over an item now

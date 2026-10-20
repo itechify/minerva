@@ -239,6 +239,7 @@ fn settings_with_an_exp_bar_region_load_with_the_grind_tracker_on_and_the_region
         assert!(state.grind_tracker.on, "{exp_bar_region}");
         let saved = serde_json::to_string(&minerva.settings()).unwrap();
         assert!(!saved.contains("expBarRegion"), "{saved}");
+        assert_eq!(minerva.settings().version, 7, "saved as the current version");
     }
 }
 
