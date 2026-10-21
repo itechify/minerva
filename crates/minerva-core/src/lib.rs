@@ -390,8 +390,8 @@ pub enum PanelControl {
     ResetSession,
     /// The Grind Tracker window's Undo, after a reset: bring the old Session back.
     UndoReset,
-    /// The × on the Grind Tracker's Best row: remove the shown map's Personal Best from
-    /// its history, the best of the earlier Visits.
+    /// The × on the Grind Tracker's Best row: remove the shown map's Personal Best the row
+    /// shows, this Visit's or the best of the earlier Visits.
     RemoveBest,
     /// The Grind Tracker window's ×: close it.
     CloseGrindTracker,
@@ -1196,8 +1196,9 @@ impl Minerva {
     /// from a bug, named by whose it is (`character`, `None` for the Unassigned bests) and
     /// by its best as the window lists it (any map's, not only the one they are on). The
     /// Visits under it move up, the Best row follows if it is of `map`, and with no best
-    /// left anywhere the window closes. There is no undo. The Visit under way's best isn't
-    /// in the Visit History yet: naming it, or a Visit no longer there, changes nothing.
+    /// left anywhere the window closes. There is no undo. The Visit under way's best can be
+    /// named too: only the play since counts towards it again. A Visit no longer there
+    /// changes nothing.
     pub fn remove_visit(&mut self, character: Option<&str>, map: &str, visit: &VisitBest) -> &PanelState {
         let event = Event::RemoveVisit { map: map.to_string(), visit: visit.clone(), character: character.map(String::from) };
         self.record(event);

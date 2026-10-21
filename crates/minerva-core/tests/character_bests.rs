@@ -109,9 +109,9 @@ fn each_characters_bests_are_kept_apart_and_the_grind_tracker_races_the_one_play
     player.hunt(MIN, 10);
     player.arrive(CONSTRUCTION_SITE);
     assert_eq!(best_row(&player.arrive(SUNSET)), None);
-    // 3,600 EXP/h: his own first best, which Egbert's doesn't star or race.
+    // 3,600 EXP/h: his own first best, on his row, never measured against Egbert's 7,200.
     let five = player.hunt(6 * MIN, 10);
-    assert_eq!((best_row(&five), five.exp_tracking.new_best), (None, false));
+    assert_eq!((best_row(&five), five.exp_tracking.personal_best_this_visit), (Some(3600), true));
     assert_eq!(kept(&player.minerva, Some("Bob"), SUNSET_SKY_ID), [(3600, Some(40))]);
     assert_eq!(kept(&player.minerva, Some("Egbert"), SUNSET_SKY_ID), [(7200, Some(13))]);
 

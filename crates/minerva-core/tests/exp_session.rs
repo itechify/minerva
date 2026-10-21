@@ -651,6 +651,7 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
             "resetUndoable": false,
             "bar": { "exp": 266, "percentHundredths": 633 },
             "personalBest": null,
+            "personalBestThisVisit": false,
             "newBest": false,
             "pace": null,
             "forecast": [],
@@ -679,6 +680,7 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
             "resetUndoable": false,
             "bar": { "exp": 335, "percentHundredths": 798 },
             "personalBest": null,
+            "personalBestThisVisit": false,
             "newBest": false,
             "pace": null,
             "forecast": [

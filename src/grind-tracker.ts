@@ -39,6 +39,7 @@ const sessionExp = byId("session-exp");
 const sessionPercent = byId("session-percent");
 const bestRow = byId("best-row");
 const bestExp = byId("best-exp");
+const bestThisVisit = byId("best-this-visit");
 const share = byId("tracking-share");
 const shareText = document.createElement("span");
 share.append(shareText, soloExpHelp());
@@ -136,9 +137,11 @@ function render(view: TrackerView) {
   sessionLength.textContent = length(t.activeS);
   sessionExp.textContent = expPerHour(t.sessionAverage);
   sessionPercent.textContent = percentPerHour(t.sessionAverage);
-  // The map's best from its history, written as the rates are, with its ×.
+  // The map's best as it stands, written as the rates are, with its ×, and whether this
+  // Visit set it.
   bestRow.hidden = t.personalBest === null;
   bestExp.textContent = t.personalBest === null ? "" : rate(t.personalBest);
+  bestThisVisit.hidden = !t.personalBestThisVisit;
 
   const shareOf = t.ceilingShareHundredths;
   share.hidden = shareOf === null || t.soloExpCeiling === null;

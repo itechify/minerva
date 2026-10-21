@@ -687,10 +687,10 @@ td.lane-cell .grid {
 }
 
 /* The last column: each map's count of Visits, which opens its Visit History under its
-   row, and each Visit's × there. As wide as the widest it holds, so neither the count nor
-   the armed "Remove?" moves a figure. */
+   row, and each Visit's × there. As wide as the widest it holds, the Visit under way's tag
+   and its ×, so neither the count nor the armed "Remove?" moves a figure. */
 .controls {
-  width: 72px;
+  width: 88px;
 }
 
 /* The count: Panel Ink Steel at rest, Portal Blue and underlined under the pointer, as the
@@ -752,9 +752,11 @@ tbody tr.visit.last td {
   color: var(--ink-2);
 }
 
-/* The Visit under way's best, which can't be removed until it ends: a tag where the ×
-   would be. */
+/* The Visit under way's best, which can't be moved until it ends: a tag where Move would be,
+   before its ×. */
 .this-visit {
+  margin-right: 4px;
+  vertical-align: middle;
   padding: 0 5px;
   border: 1px solid var(--tag-edge);
   border-radius: 3px;

@@ -778,8 +778,10 @@
                   <summary>What's a Personal Best?</summary>
                   <p>
                     On a map with mobs, the best EXP per hour the character you're playing has had over 5 minutes of play
-                    there. Come back to the map and a Best row shows it from the moment you arrive. Once you've played 5
-                    minutes, a yellow star marks your last 5 minutes while they beat it.
+                    there. Come back to the map and a Best row shows it from the moment you arrive. Beat it, or play 5
+                    minutes on a map for the first time, and the row moves up to your new best at once, saying
+                    "this visit". A yellow star marks your last 5 minutes while they're that best. When you slow down,
+                    the row keeps your best, so you can see where you were.
                   </p>
                 </details>
                 <details class="qa" id="pace-trace">
@@ -793,7 +795,8 @@
                   <p>
                     On a map where you have a Personal Best, once you come within 10% of its pace, it joins as a gold
                     line ending in a star and stays until you leave the map. Get above it and the gap is lit yellow; the
-                    number by your dot turns gold and counts against your best.
+                    number by your dot turns gold and counts against your best. Set a new best and the gold line moves
+                    up to it, so later on it shows how far you are from your best pace.
                   </p>
                 </details>
                 <details class="qa" id="best-characters">
@@ -840,15 +843,17 @@
                     best at lower levels. In your Personal Bests, click its count ("3 visits") to list them, best first,
                     each with the level you set it at, its EXP per hour and its own bar, its share of the ceiling and its
                     date, then a link to the map's <a href="#leaderboard-link">Map Leaderboard</a>. The visit you're on
-                    is marked "This visit", and joins your history when you leave the map.
+                    is marked "This visit", and joins your history when you leave the map; until then it can be removed,
+                    but not moved.
                   </p>
                 </details>
                 <details class="qa" id="remove-best">
                   <summary>A best came from a misreading. How do I remove it?</summary>
                   <p>
                     On the Grind Tracker, the × beside the Best row removes it at once, with no undo, and your next-best
-                    visit takes over. In your Personal Bests, click a visit's ×, then "Remove?" to confirm. The visit you're
-                    on can't be removed until you leave the map.
+                    visit takes over, even when it's this visit's. In your Personal Bests, click a visit's ×, then
+                    "Remove?" to confirm, the visit you're on included. Once this visit's best is removed, only the 5
+                    minutes after it count towards a new one, so the misreading isn't counted again.
                   </p>
                 </details>
                 <details class="qa" id="bests-window">

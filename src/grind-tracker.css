@@ -168,11 +168,11 @@
 
 /* "Best" opens the Personal Bests window: plain at rest, so the row reads as before; Portal
    Blue and underlined under the pointer, deeper while pressed, as a mob's name in the
-   panel. */
+   panel. After it, "this visit" in Ink Slate as the Session's length is, while the best is
+   this Visit's. */
 .rates .best-link {
   all: unset;
   cursor: pointer;
-  padding-right: 8px;
   white-space: nowrap;
 }
 

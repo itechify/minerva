@@ -11,7 +11,7 @@ use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame};
 use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES};
 use minerva_core::{
     ListedPrice, ShopCapture, ShopList, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
-    Action, BESTS_VERSION, Minerva, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
+    Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, Rect, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TitleRegion, TrackingState, VisitBest,
 };
@@ -151,6 +151,23 @@ fn a_visit_removed_in_the_personal_bests_window_replays_and_reads_in_the_timelin
         WALL_AT_START - HOUR
     );
     assert!(recording.timeline(0).iter().any(|line| line.ends_with(&said)), "{:#?}", recording.timeline(0));
+}
+
+#[test]
+fn this_visits_best_removed_from_the_best_row_replays_counting_only_the_play_since() {
+    // 6 minutes on the Construction Site set this Visit's best, which the Best row shows.
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(6 * MIN, CONSTRUCTION_SITE, grind);
+    assert!(shell.minerva.panel_state().exp_tracking.personal_best_this_visit);
+
+    // Removed, then 4 minutes more: too few since to set it again.
+    shell.minerva.press(PanelControl::RemoveBest);
+    shell.play(10 * MIN, CONSTRUCTION_SITE, grind);
+    assert_eq!(shell.minerva.panel_state().exp_tracking.personal_best, None);
+    assert!(shell.minerva.bests().unassigned.is_empty());
+
+    let (_, recording) = shell.report();
+    assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
 }
 
 #[test]
