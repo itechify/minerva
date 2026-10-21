@@ -4,8 +4,7 @@
 //! with it closed.
 //!
 //! - Live: the bests as saved now, the Visit under way's included, as closing Minerva
-//!   would keep them. So a map's row may be higher than the Best row there, which shows
-//!   only the earlier Visits'.
+//!   would keep them, as the Best row has them.
 //! - One Character's bests at a time: the core gives each Character's with a best, and the
 //!   one playing's (with none, if they have none), by name, then the Unassigned ones while
 //!   there are any or no Character is named. The page's picker shows the one playing until
@@ -20,9 +19,9 @@
 //! - The map the player is on is marked: only while the panel is certain of it.
 //! - Each map's row holds its Visit History, highest first, for the player to open: each
 //!   Visit's EXP/h, its share of the ceiling, its date, and the level and job that set it.
-//!   The Visit under way's best is among them, marked, where the history would keep it, but
-//!   it isn't in the history yet, so it can't be removed. The page keeps which maps are
-//!   open; the core never knows.
+//!   The Visit under way's best is among them, marked, where the history would keep it: it
+//!   can be removed, but isn't in the history yet, so it can't be moved. The page keeps
+//!   which maps are open; the core never knows.
 //! - Where it goes: centred over the game's client area until the player drags it, then
 //!   where they left it relative to the client area, until they drag it back to the
 //!   middle. As wide as its page lays it out, unless the client area is narrower, and no
@@ -134,7 +133,7 @@ pub struct PersonalBestsVisit {
     /// the row's; `None` with no ceiling.
     pub ceiling_share_hundredths: Option<u64>,
     /// It is the Visit under way's best: not in the Visit History until the Visit ends, so
-    /// it can't be removed yet.
+    /// it can be removed but not moved yet.
     pub this_visit: bool,
 }
 

@@ -152,7 +152,7 @@ The last 5 minutes of active play drawn kill by kill on the Grind Tracker, raced
 _Avoid_: graph, chart, sparkline
 
 **Personal Best**:
-The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in their Visit History of the map. Each is stamped with the Character, level and job the Status Bar showed at the refresh that set it. The Grind Tracker shows the Character playing's (the Unassigned one while no name is read) and marks the Rolling Rate while it beats it.
+The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in their Visit History of the map, or the Visit under way's once it beats that. Each is stamped with the Character, level and job the Status Bar showed at the refresh that set it. The Grind Tracker's Best row shows the Character playing's (the Unassigned one while no name is read) as it stands, from arriving on the map and from the refresh that sets a new one, saying "this visit" while the Visit under way set it; a star marks the Rolling Rate while it is that best (ADR 0018).
 _Avoid_: record, high score, PB, max
 
 **Level Band**:
@@ -172,7 +172,7 @@ The stretch from the panel confirming a map until it confirms another. Losing th
 _Avoid_: stay, trip
 
 **Visit History**:
-A Character's best Visits on a map that have ended (or the Unassigned ones), highest first: the first is its Personal Best. It keeps the 10 best, and the best in each Level Band even if it isn't among them, so a Character that levels up keeps their lower bands' bests. The Visit under way's best joins it when the Visit ends, or when another Character is named. The player can remove any Visit in it that came from a bug.
+A Character's best Visits on a map that have ended (or the Unassigned ones), highest first: the first is its Personal Best. It keeps the 10 best, and the best in each Level Band even if it isn't among them, so a Character that levels up keeps their lower bands' bests. The Visit under way's best joins it when the Visit ends, or when another Character is named. The player can remove any Visit in it that came from a bug, and the Visit under way's best before it joins.
 _Avoid_: runs, attempts, records
 
 **Map Leaderboard**:

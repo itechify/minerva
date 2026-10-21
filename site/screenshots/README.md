@@ -32,3 +32,4 @@ When a change alters something a shot shows, the PR that makes it lists the shot
 - `item-card.png`: each line under Market now has the Deal Line's ring before its name, filled on the Deal Line (Your price). Update its alt text in `site/index.html` to say so.
 - `grind-tracker.png`: the EXP bar's reading at its foot has the character playing beside it, by the name and level the status bar shows ("Egbert · Lv. 13"). Update its alt text in `site/index.html` to say so.
 - `setup.png`: a re-setup has one step fewer, as the EXP bar needs no mark (step 3 of 5), and its notice says "Mark the minimap title again, or keep it as it is." Update its row above.
+- `grind-tracker.png`: the Best row moves up to a new best as soon as it is set, and says "this visit" after "Best" while this visit set it (ADR 0018). If the shot shows a best set on the visit, update its alt text in `site/index.html` to say so.

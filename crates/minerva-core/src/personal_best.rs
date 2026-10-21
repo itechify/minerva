@@ -13,11 +13,11 @@
 //!   existed (version 1). The player can move an Unassigned Visit to a Character, remove a
 //!   Character with its bests, and merge one Character's into another's.
 //! - A map's Personal Best, for a Character (or Unassigned), is the best of its Visits'.
-//!   Each keeps a history of its best Visits on each map, the ones that have ended, and the
-//!   Grind Tracker's Best row shows the best in the current Character's (or the Unassigned
-//!   one while no Character is named) from arriving: it can't change until the Visit ends,
-//!   when this Visit's best joins the history, unless the player removes it, or another
-//!   Character is named. No rate is capped or rejected.
+//!   Each keeps a history of its best Visits on each map, the ones that have ended. The
+//!   Grind Tracker's Best row shows the current Character's (or the Unassigned one's while no
+//!   Character is named) as it stands (ADR 0018): the best in the history from arriving, and
+//!   this Visit's from the refresh that beats it. This Visit's best joins the history when
+//!   the Visit ends, or another Character is named. No rate is capped or rejected.
 //! - A Visit's best is for the map it was last certain on with a rate to count. The
 //!   player may choose among Candidates, and the hotkey goes past the others on the way.
 //!   One shown with nothing to count yet (just after a reset, say) doesn't take the
@@ -36,11 +36,11 @@
 //!   it had ended: closing Minerva ends it.
 //! - The Personal Bests window shows every map's, as handed out (see [`crate::bests_window`]),
 //!   one Character at a time, with where the Visit under way's best is among its map's.
-//! - The player can remove a Visit that came from a bug from the history: the best the
-//!   Best row shows, or any Visit on any map from the Personal Bests window. Removing the
-//!   best, the map's next-best Visit's takes over the row. There is no undo. This Visit's
-//!   best can't be removed: it joins the history when the Visit ends, and can be removed
-//!   then.
+//! - The player can remove a Visit that came from a bug: the best the Best row shows, or
+//!   any Visit on any map from the Personal Bests window, this Visit's included. Removing
+//!   the best, the map's next-best Visit's takes over the row. There is no undo. Once this
+//!   Visit's best is removed, only the play since counts towards it again (the Session sees
+//!   to that), so the play that set it isn't counted again.
 
 use serde::{Deserialize, Serialize};
 
@@ -256,6 +256,14 @@ impl Bests {
         self.visit.iter().find(|under_way| &under_way.map == on)
     }
 
+    /// The Visit under way's best on `map`, if it is `character`'s (the Unassigned one's for
+    /// `None`) and for that map: the one the Visit's best is for.
+    pub fn this_visits_best(&self, character: Option<&str>, map: &str) -> Option<&VisitBest> {
+        self.this_visit()
+            .filter(|under_way| under_way.map == map && under_way.character.as_deref() == character)
+            .map(|under_way| &under_way.best)
+    }
+
     /// Do `change`, moving the revision on if it changed what [`Bests::saved`] hands out.
     fn changing(&mut self, change: impl FnOnce(&mut Self)) {
         let before = self.saved();
@@ -267,23 +275,34 @@ impl Bests {
 
     /// `map`'s Personal Best from the history of the Character named `character` (the
     /// Unassigned one for `None`), the best of the earlier Visits, if it has one: what the
-    /// Best row shows.
+    /// Best row shows until this Visit beats it.
     pub fn history_best(&self, character: Option<&str>, map: &str) -> Option<&VisitBest> {
         self.history.maps_of(character).iter().find(|m| m.id == map).and_then(|m| m.visits.first())
     }
 
     /// Remove `map`'s Personal Best from the history of `character` (the Unassigned one for
     /// `None`), the best of the earlier Visits. The map's next-best Visit's takes over. This
-    /// Visit's best isn't in the history until the Visit ends.
+    /// Visit's best isn't in the history until the Visit ends: see [`Bests::remove_this_visit`].
     pub fn remove(&mut self, character: Option<&str>, map: &str) {
         if let Some(best) = self.history_best(character, map).cloned() {
             self.remove_visit(character, map, &best);
         }
     }
 
+    /// Remove the Visit under way's best on `map`, if it is `character`'s (the Unassigned
+    /// one's for `None`); whether there was one. Nothing of it joins the history when the
+    /// Visit ends, unless a best is set again.
+    pub fn remove_this_visit(&mut self, character: Option<&str>, map: &str) -> bool {
+        if self.this_visits_best(character, map).is_none() {
+            return false;
+        }
+        self.changing(|bests| bests.visit.retain(|under_way| under_way.map != map));
+        true
+    }
+
     /// Remove the Visit whose best was `visit` from `character`'s history of `map` (the
     /// Unassigned one for `None`); whether there was one. The Visits under it move up. This
-    /// Visit's best isn't in the history until the Visit ends.
+    /// Visit's best isn't in the history until the Visit ends: see [`Bests::remove_this_visit`].
     pub fn remove_visit(&mut self, character: Option<&str>, map: &str, visit: &VisitBest) -> bool {
         let mut removed = false;
         self.changing(|bests| removed = take(&mut bests.history, character, map, visit));

@@ -48,9 +48,10 @@
               </button>
             </div>
             <!-- Meso and item rows come later, from the Pickup Log. -->
-            <!-- The Best row is the map's Personal Best from its history, from arriving on
-                 the map: until the Session starts it is all the figures hold. The star
-                 marks Last 5 min while it beats it. -->
+            <!-- The Best row is the map's Personal Best as it stands, from arriving on the
+                 map: until the Session starts it is all the figures hold. Once this Visit
+                 beats it, it is this Visit's, and says so. The star marks Last 5 min while it
+                 is that best. -->
             <div class="rates">
               <div class="row" id="rolling-row">
                 <span class="period">Last 5 min<svg class="star" id="rolling-star" viewBox="0 0 16 16" role="img" aria-label="New best on this map"><title>New best on this map</title><path d="M8 1.5L9.76 6.07L14.66 6.34L10.85 9.43L12.11 14.16L8 11.5L3.89 14.16L5.15 9.43L1.34 6.34L6.24 6.07Z" /><ellipse class="lit" cx="7.1" cy="6.9" rx="1.5" ry="1.1" /></svg></span>
@@ -64,9 +65,9 @@
               </div>
               <div class="row best" id="best-row" hidden>
                 <!-- "Best" opens the Personal Bests window too, where the player meets their bests. -->
-                <button type="button" class="period best-link" data-control="togglePersonalBests" title="Your Personal Bests on every map">Best</button>
+                <span class="period"><button type="button" class="best-link" data-control="togglePersonalBests" title="Your Personal Bests on every map">Best</button> <span class="length" id="best-this-visit" hidden>this visit</span></span>
                 <span class="value" id="best-exp"></span><span class="unit">EXP/h</span>
-                <button type="button" class="icon-button light" data-control="removeBest" aria-label="Remove this best from your history" title="Remove this best from your history">
+                <button type="button" class="icon-button light" data-control="removeBest" aria-label="Remove this best" title="Remove this best: your next best takes its place">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
                 </button>
               </div>

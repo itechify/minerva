@@ -77,7 +77,7 @@ fn bests_handed_out_by_one_launch_show_the_same_best_row_and_star_in_the_next() 
     let mut next = relaunch(saved_then, WALL_AT_START + DAY);
     assert_eq!(best_row(&next.arrive(SUNSET)), best_row(&back));
     let next_five = next.hunt(5 * MIN, 30);
-    assert_eq!((best_row(&next_five), next_five.exp_tracking.new_best), (Some(7200), true));
+    assert_eq!((best_row(&next_five), next_five.exp_tracking.new_best), (Some(10_800), true));
     assert_eq!(saved(&next.minerva, SUNSET_SKY_ID)[1], best(7200, set));
 }
 
@@ -148,11 +148,11 @@ fn bests_of_no_exp_in_a_hand_edited_file_are_left_out() {
     assert_eq!(saved(&next.minerva, SUNSET_SKY_ID), [best(3600, next.wall_clock())]);
 
     // The Construction Site's best is the 7,200; removing it leaves the map no history,
-    // and this Visit's 3,600 to save.
+    // and this Visit's 3,600 on the row and to save.
     assert_eq!(best_row(&next.arrive(CONSTRUCTION_SITE)), Some(7200));
     next.hunt(5 * MIN, 10);
     let set = next.wall_clock();
-    assert_eq!(best_row(&next.press(PanelControl::RemoveBest)), None);
+    assert_eq!(best_row(&next.press(PanelControl::RemoveBest)), Some(3600));
     assert_eq!(saved(&next.minerva, CONSTRUCTION_SITE_ID), [best(3600, set)]);
 }
 
@@ -361,15 +361,12 @@ fn removing_a_best_from_the_history_changes_the_bests_the_shell_saves() {
     let mut player = Player::saved_by_the_shell(tracking());
     let sunset_rates = |player: &Player| saved_rates(&player.minerva.bests(), SUNSET_SKY_ID);
 
-    // A first Visit's best at 7,200 EXP/h isn't in the history yet: removing takes
-    // nothing, and there is nothing to save.
+    // A first Visit's best at 7,200 EXP/h.
     player.arrive(SUNSET);
     player.hunt(5 * MIN, 20);
     let set = player.wall_clock();
     player.hunt(MIN, 20);
-    let saves = player.saves();
-    player.press(PanelControl::RemoveBest);
-    assert_eq!((player.saves(), sunset_rates(&player)), (saves, vec![7200]));
+    assert_eq!(sunset_rates(&player), [7200]);
 
     // A second Visit at 10,800 EXP/h, then back a third time: removing the 10,800 leaves
     // the 7,200, and the shell saves that.
@@ -440,14 +437,15 @@ fn removing_the_best_from_the_history_leaves_every_candidates_best_from_this_vis
     player.hunt(MIN, 100);
     let site = player.choose_next();
     let site_set = player.wall_clock();
-    assert_eq!(best_row(&site), None);
+    // The Construction Site has no earlier Visits': its row is this Visit's, from the choice.
+    assert_eq!(best_row(&site), Some(36_000));
     player.hunt(MIN, 100);
     assert_eq!(best_row(&player.choose_next()), Some(72_000));
     assert_eq!(saved(&player.minerva, SUNSET_SKY_ID), [best(72_000, earlier_set), best(36_000, sunset_set)]);
 
     // Removing takes the 72,000: Sunset Sky's best from this Visit is left as it was
-    // set...
-    assert_eq!(best_row(&player.press(PanelControl::RemoveBest)), None);
+    // set, and takes the row...
+    assert_eq!(best_row(&player.press(PanelControl::RemoveBest)), Some(36_000));
     assert_eq!(saved(&player.minerva, SUNSET_SKY_ID), [best(36_000, sunset_set)]);
     // ...and so is the Construction Site's, the Visit's once it shows again.
     player.hunt(MIN, 100);

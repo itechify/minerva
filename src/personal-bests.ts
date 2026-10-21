@@ -16,8 +16,8 @@ type BestsVisit = {
   level: number | null;
   job: string | null;
   ceilingShareHundredths: number | null;
-  /** The Visit under way's best: not in the Visit History until the Visit ends, so it
-   *  can't be removed yet. */
+  /** The Visit under way's best: not in the Visit History until the Visit ends, so it can
+   *  be removed but not moved yet. */
   thisVisit: boolean;
 };
 
@@ -384,11 +384,10 @@ function chevron() {
 
 /** Each of a map's Visits by a key of its own: whose it is, its map, its best (with the
  *  level and job that set it) and, for Visits whose bests are the same, which of them it
- *  is. `null` for the Visit under way's, which has no ×. */
-function visitKeys(m: BestsMap): (string | null)[] {
+ *  is. */
+function visitKeys(m: BestsMap): string[] {
   const seen = new Map<string, number>();
   return m.visits.map((v) => {
-    if (v.thisVisit) return null;
     const best = [shownKey(), m.id, v.expPerHour, v.setAtUnixMs ?? "-", v.level ?? "-", v.job ?? "-"].join(" ");
     const n = seen.get(best) ?? 0;
     seen.set(best, n + 1);
@@ -402,9 +401,9 @@ function setBy(v: BestsVisit) {
 }
 
 /** One of an opened map's Visits, under its row: the level that set it, its best's EXP/h,
- *  share and date under the row's, then its Move (with another Character to move it to)
- *  and its × (or, for the Visit under way's, "This visit"). */
-function visitRow(m: BestsMap, v: BestsVisit, key: string | null, place: number, last: boolean) {
+ *  share and date under the row's, then its Move (with another Character to move it to), or
+ *  for the Visit under way's "This visit", and its ×. */
+function visitRow(m: BestsMap, v: BestsVisit, key: string, place: number, last: boolean) {
   const tr = document.createElement("tr");
   tr.className = last ? "visit last" : "visit";
 
@@ -429,14 +428,14 @@ function visitRow(m: BestsMap, v: BestsVisit, key: string | null, place: number,
   tr.append(date);
 
   const controls = cell(null, "controls");
-  if (key === null) {
-    controls.append(span("this-visit", "This visit"));
-  } else {
-    listed.set(key, { map: m.id, visit: v });
-    // While its × asks "Remove?", that takes Move's room too, so the column never widens.
-    if (moveTargets().length > 0 && armed !== `remove:${key}`) controls.append(moveButton(key));
-    controls.append(removeButton(key));
+  listed.set(key, { map: m.id, visit: v });
+  // While its × asks "Remove?", that takes Move's room too, so the column never widens. The
+  // Visit under way's can't be moved until it ends: its tag stands in Move's place.
+  if (armed !== `remove:${key}`) {
+    if (v.thisVisit) controls.append(span("this-visit", "This visit"));
+    else if (moveTargets().length > 0) controls.append(moveButton(key));
   }
+  controls.append(removeButton(key));
   tr.append(controls);
   return tr;
 }
@@ -604,7 +603,7 @@ function renderRows() {
       const visits = m.visits.flatMap((v, i) => {
         const key = mapKeys[i];
         const line = visitRow(m, v, key, i + 1, !board && i === m.visits.length - 1);
-        return key !== null && picking("move", key) ? [line, moveRow(key)] : [line];
+        return picking("move", key) ? [line, moveRow(key)] : [line];
       });
       return [row(m, marks), ...visits, ...(board ? [boardRow(m)] : [])];
     }),

@@ -249,7 +249,7 @@ fn a_best_on_a_map_the_player_has_not_been_on_has_its_names_region_levels_and_sh
 }
 
 #[test]
-fn the_window_has_this_visits_best_though_the_best_row_shows_the_earlier_visits() {
+fn the_window_has_this_visits_best_as_the_best_row_does() {
     // Sunset Sky at 7,200 EXP/h, then 2 minutes on the Construction Site, and back.
     let mut player = Player::clocked(tracking());
     player.arrive(SUNSET);
@@ -258,10 +258,10 @@ fn the_window_has_this_visits_best_though_the_best_row_shows_the_earlier_visits(
     player.hunt(2 * MIN, 30);
     player.arrive(SUNSET);
 
-    // 10,800 EXP/h beats it: the Best row stays at the earlier Visit's.
+    // 10,800 EXP/h beats it: both show this Visit's.
     let beaten = player.hunt(5 * MIN, 30);
     let set = player.wall_clock();
-    assert_eq!(beaten.exp_tracking.personal_best, Some(7200));
+    assert_eq!(beaten.exp_tracking.personal_best, Some(10_800));
     let window = toggle(&mut player);
     assert_eq!(rows(&window), [(SUNSET_SKY_ID, 10_800, true)]);
     assert_eq!(row(&window, SUNSET_SKY_ID).set_at_unix_ms, set);
@@ -546,7 +546,7 @@ fn removing_the_best_on_the_map_the_player_is_on_moves_the_best_row_at_once() {
 }
 
 #[test]
-fn this_visits_best_and_a_visit_no_longer_listed_cannot_be_removed() {
+fn this_visits_best_is_removed_at_once_and_only_the_play_since_counts_again() {
     // An earlier Visit to Sunset Sky at 3,600 EXP/h, and this one's at 7,200.
     let mut minerva = tracking();
     minerva.restore_bests(histories_of(&[(SUNSET_SKY_ID, vec![3600])]));
@@ -558,8 +558,31 @@ fn this_visits_best_and_a_visit_no_longer_listed_cannot_be_removed() {
     assert!(this_visit.this_visit);
     let saves = player.saves();
 
+    // Removed: the earlier Visit's best is the row's, here and on the Grind Tracker, and saved.
     let this_one = VisitBest { exp_per_hour: this_visit.exp_per_hour, set_at_unix_ms: this_visit.set_at_unix_ms, ..VisitBest::default() };
-    assert_eq!(player.remove_visit(SUNSET_SKY_ID, this_one).personal_bests, window);
+    let removed = player.remove_visit(SUNSET_SKY_ID, this_one);
+    assert_eq!(visits(&removed.personal_bests, SUNSET_SKY_ID), [(3600, false)]);
+    assert_eq!((removed.exp_tracking.personal_best, removed.exp_tracking.personal_best_this_visit), (Some(3600), false));
+    assert_eq!(player.saves(), saves + 1);
+
+    // Last 5 min still holds the play before: it isn't counted again, until 5 minutes since.
+    let still = player.hunt(4 * MIN + 30 * S, 20);
+    assert_eq!(visits(&still.personal_bests, SUNSET_SKY_ID), [(3600, false)]);
+    let since = player.hunt(30 * S, 20);
+    assert_eq!(visits(&since.personal_bests, SUNSET_SKY_ID), [(7200, true), (3600, false)]);
+}
+
+#[test]
+fn a_visit_no_longer_listed_cannot_be_removed() {
+    // An earlier Visit to Sunset Sky at 3,600 EXP/h, and this one's at 7,200.
+    let mut minerva = tracking();
+    minerva.restore_bests(histories_of(&[(SUNSET_SKY_ID, vec![3600])]));
+    let mut player = Player::saved_by_the_shell(minerva);
+    player.arrive(SUNSET);
+    player.hunt(6 * MIN, 20);
+    let window = toggle(&mut player);
+    let saves = player.saves();
+
     assert_eq!(player.remove_visit(SUNSET_SKY_ID, saved_best(5000)).personal_bests, window);
     assert_eq!(player.remove_visit(CONSTRUCTION_SITE_ID, saved_best(3600)).personal_bests, window);
     assert_eq!(player.saves(), saves);
