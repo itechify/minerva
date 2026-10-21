@@ -454,6 +454,13 @@ struct Against {
     character: Option<String>,
 }
 
+/// The Best row: the map's Personal Best as it stands, in EXP/h, and whether this Visit set it.
+#[derive(Debug, Clone, Copy)]
+struct BestRow {
+    exp_per_hour: u64,
+    this_visit: bool,
+}
+
 /// Where a started Session stood at an EXP change.
 #[derive(Debug, Clone, Copy)]
 struct Mark {
@@ -926,9 +933,10 @@ impl Session {
     /// best from its history. What is shown is measured afresh against the next best, at once.
     pub fn remove_best(&mut self, map: &str) {
         let character = self.character_name().map(String::from);
-        match self.best_row(map) {
-            Some((_, true)) => self.remove_this_visit(character.as_deref(), map),
-            _ => self.bests.remove(character.as_deref(), map),
+        if self.best_row(map).is_some_and(|row| row.this_visit) {
+            self.remove_this_visit(character.as_deref(), map);
+        } else {
+            self.bests.remove(character.as_deref(), map);
         }
         self.shown = None;
     }
@@ -937,25 +945,29 @@ impl Session {
     /// (the Unassigned one for `None`), this Visit's included: if it was there, what is
     /// shown is measured afresh, at once, as the Best row may name another.
     pub fn remove_visit(&mut self, character: Option<&str>, map: &str, visit: &VisitBest) {
-        if self.bests.this_visits_best(character, map) == Some(visit) {
-            self.remove_this_visit(character, map);
-            self.shown = None;
-        } else if self.bests.remove_visit(character, map, visit) {
+        let removed = if self.bests.this_visits_best(character, map) == Some(visit) {
+            self.remove_this_visit(character, map)
+        } else {
+            self.bests.remove_visit(character, map, visit)
+        };
+        if removed {
             self.shown = None;
         }
     }
 
     /// Remove this Visit's best on `map`, if it is `character`'s: only the play from now on
     /// counts towards it again, so what set it (a misread, say) isn't counted again. So too
-    /// for the Session a reset set aside, should the player undo it.
-    fn remove_this_visit(&mut self, character: Option<&str>, map: &str) {
-        if self.bests.remove_this_visit(character, map) {
+    /// for the Session a reset set aside, should the player undo it. Whether there was one.
+    fn remove_this_visit(&mut self, character: Option<&str>, map: &str) -> bool {
+        let removed = self.bests.remove_this_visit(character, map);
+        if removed {
             let now = self.now;
             let undone = self.undo.as_mut().map(|undo| &mut undo.figures);
             for figures in self.figures.iter_mut().chain(undone) {
                 figures.best_from = figures.active(now);
             }
         }
+        removed
     }
 
     /// The player moved the Visit whose best was `visit` on `map`, of the Character named
@@ -1098,9 +1110,9 @@ impl Session {
                     // Over a full 5 minutes here, the Rolling Rate shown is the one counted,
                     // against the Character's best (the Unassigned one while none is named).
                     let row = self.best_row(map);
-                    let best = row.map(|(best, _)| best);
+                    let best = row.map(|row| row.exp_per_hour);
                     fresh.personal_best = best;
-                    fresh.personal_best_this_visit = row.is_some_and(|(_, this_visit)| this_visit);
+                    fresh.personal_best_this_visit = row.is_some_and(|row| row.this_visit);
                     // The star: Last 5 min is the best this Visit set on the row, as written.
                     fresh.new_best = fresh.personal_best_this_visit
                         && counted.zip(best).is_some_and(|(rate, best)| three_figures(rate) == three_figures(best));
@@ -1120,16 +1132,17 @@ impl Session {
     }
 
     /// `map`'s Best row for the Character the Session is for (the Unassigned one while none
-    /// is named): its EXP/h, and whether it is this Visit's best. This Visit's takes it from
-    /// the history's only once it reads higher, as the Grind Tracker writes them.
-    fn best_row(&self, map: &str) -> Option<(u64, bool)> {
+    /// is named), if the map has a best. This Visit's takes it from the history's only once
+    /// it reads higher, as the Grind Tracker writes them.
+    fn best_row(&self, map: &str) -> Option<BestRow> {
         let character = self.character_name();
         let earlier = self.bests.history_best(character, map).map(|best| best.exp_per_hour);
         let this_visit = self.bests.this_visits_best(character, map).map(|best| best.exp_per_hour);
+        let row = |exp_per_hour, this_visit| BestRow { exp_per_hour, this_visit };
         match (earlier, this_visit) {
-            (Some(earlier), Some(now)) if three_figures(now) > three_figures(earlier) => Some((now, true)),
-            (Some(earlier), _) => Some((earlier, false)),
-            (None, now) => now.map(|now| (now, true)),
+            (Some(earlier), Some(visits)) if three_figures(visits) > three_figures(earlier) => Some(row(visits, true)),
+            (Some(earlier), _) => Some(row(earlier, false)),
+            (None, visits) => visits.map(|visits| row(visits, true)),
         }
     }
 
@@ -1254,9 +1267,10 @@ fn forecast(bar: Option<ExpBar>, rolling: Option<ExpRate>) -> Vec<Forecast> {
 
 /// An EXP rate as the Grind Tracker writes it, to 3 significant figures, halves up:
 /// 66,523 is 66,500, and 66,550 is 66,600. It must agree with `rate()` in
-/// `src/grind-tracker.ts`, which writes Last 5 min and the Best row: the star compares
-/// the two through this, so it never shows beside two figures that read the same
-/// (`the_star_compares_the_rates_as_the_grind_tracker_writes_them`).
+/// `src/grind-tracker.ts`, which writes Last 5 min and the Best row: this Visit's best
+/// takes the row only once it reads higher than the earlier Visits', and the star shows
+/// while Last 5 min reads the same as it
+/// (`this_visits_best_takes_the_row_once_it_reads_higher_as_the_grind_tracker_writes_them`).
 fn three_figures(exp_per_hour: u64) -> u64 {
     let mut step = 1;
     while exp_per_hour / step >= 1000 {

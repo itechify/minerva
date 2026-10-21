@@ -459,6 +459,22 @@ fn removing_this_visits_best_falls_back_to_the_earlier_visits_and_counts_only_pl
 }
 
 #[test]
+fn this_visits_best_removed_after_a_reset_isnt_counted_again_when_the_reset_is_undone() {
+    let (mut player, _) = back_on_sunset_sky_after_a_best_of_7200();
+    player.hunt(5 * MIN, 30);
+
+    // Reset, then this Visit's 10,800 removed while the Session waits for its Undo.
+    player.press(PanelControl::ResetSession);
+    let removed = player.press(PanelControl::RemoveBest);
+    assert_eq!((best_row(&removed), this_visits(&removed)), (Some(7200), false));
+
+    // Undone: Last 5 min is the 10,800 again, all play before the removal, so no best.
+    let undone = player.press(PanelControl::UndoReset);
+    assert_eq!((rolling(&undone), best_row(&undone), starred(&undone)), (Some(10_800), Some(7200), false));
+    assert_eq!(saved_rates(&player, SUNSET_SKY_ID), [7200]);
+}
+
+#[test]
 fn a_first_visits_best_can_be_removed_at_once() {
     let mut player = Player::new(tracking());
     player.arrive(SUNSET);
