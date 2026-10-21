@@ -180,11 +180,18 @@ function render(view: TrackerView) {
   reportHeight();
 }
 
+/** What the forecast was last laid out for. */
+let forecastFor = "";
 /** The forecast under the gauge: Time to Level at its end, where the bar is full, then a
  *  notch where the bar will be in so long, clear of the fill, of each other and of the
  *  end, three at most. Where two crowd, the further reach takes the nearer's place, so a
  *  slow pace reads in hours rather than skipping one. */
 function drawForecast(t: ExpTracking) {
+  // Laid out notch by notch, each measured as it goes in: only when what it says, or the
+  // room it has, has changed.
+  const key = JSON.stringify([t.bar?.percentHundredths ?? null, t.timeToLevelBadge, t.forecast, forecast.clientWidth]);
+  if (key === forecastFor) return;
+  forecastFor = key;
   forecast.replaceChildren();
   forecast.hidden = !t.bar || (t.timeToLevelBadge === null && t.forecast.length === 0);
   if (!t.bar || forecast.hidden) return;

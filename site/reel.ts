@@ -1,5 +1,7 @@
 // The hero's opening: how Minerva reads the map you're on, filmed in the game window as
-// the page scrolls. The camera moves in from the whole game window to the minimap's title;
+// the page scrolls. It opens on the hero shot, the panel under the minimap, so the first
+// screen shows what Minerva does; the camera draws back to the whole game window, then moves
+// in to the minimap's title;
 // setup's dashed box is marked around its two lines; a read passes over them and turns them
 // into Minerva's own lettering, which drops into the panel's title under the minimap;
 // and the camera draws back to the hero shot as it is. While it plays, the hero stays put
@@ -30,26 +32,28 @@ const MAP = "Henesys Hunting Ground I";
 const READ_FROM = [0xa4, 0xc8, 0xda];
 const READ_TO = [0xab, 0xcf, 0xe2];
 
-// The film's beats, as shares of its scroll: in to the title, the box marked, the read,
-// the drop into the panel, then back out to the hero shot.
-const PUSH = [0, 0.3];
-const VEIL_IN = [0.3, 0.36];
-const DRAG = [0.32, 0.44];
-const READ = [0.46, 0.6];
-const DROP = [0.62, 0.8];
-const VEIL_OUT = [0.8, 0.88];
-const LANDED = [0.82, 0.88];
-const BACK = [0.84, 1];
+// The film's beats, as shares of its scroll: out from the hero shot to the whole window, in
+// to the title, the box marked, the read, the drop into the panel, then back to the shot.
+const OUT = [0, 0.12];
+const PUSH = [0.14, 0.34];
+const VEIL_IN = [0.34, 0.397];
+const DRAG = [0.359, 0.472];
+const READ = [0.491, 0.623];
+const DROP = [0.642, 0.811];
+const VEIL_OUT = [0.811, 0.887];
+const LANDED = [0.83, 0.887];
+const BACK = [0.849, 1];
 /**
  * Each caption and the stretch it shows for, fading in after its start and out before its
- * end, so one has gone before the next comes. The last is the shot's own caption.
+ * end, so one has gone before the next comes. The first and last are the shot's own caption.
  */
 const CAPTIONS: [string, number, number][] = [
-  ["MapleStory, windowed, with its minimap open.", -1, 0.29],
-  ["At setup, you mark the minimap's title: both its lines.", 0.29, 0.45],
-  ["Minerva captures just that box, the way a screenshot does, and reads it.", 0.45, 0.61],
-  ["The panel names the map it read.", 0.61, 0.84],
-  ["", 0.84, 2],
+  ["", -1, 0.1],
+  ["MapleStory, windowed, with its minimap open.", 0.1, 0.331],
+  ["At setup, you mark the minimap's title: both its lines.", 0.331, 0.481],
+  ["Minerva captures just that box, the way a screenshot does, and reads it.", 0.481, 0.632],
+  ["The panel names the map it read.", 0.632, 0.849],
+  ["", 0.849, 2],
 ];
 const FADE = 0.015;
 /** The share of the pinned scroll the film takes; the rest holds its last frame. */
@@ -74,6 +78,8 @@ function between(a: Rect, b: Rect, t: number): Rect {
 }
 
 function camera(p: number): Rect {
+  if (p < OUT[1]) return between(HERO, WHOLE, ease(seg(p, OUT)));
+  if (p < PUSH[0]) return WHOLE;
   if (p < PUSH[1]) return between(WHOLE, CLOSE, ease(seg(p, PUSH)));
   if (p < BACK[0]) return CLOSE;
   return between(CLOSE, HERO, ease(seg(p, BACK)));
@@ -244,7 +250,8 @@ export function reel(head: () => number) {
     frame.style.height = `${height}px`;
     world.style.transform = `scale(${s}) translate(${-cam.x}px, ${-cam.y}px)`;
     world.classList.toggle("close", s > 1);
-    world.classList.toggle("feather", p < PUSH[1]);
+    // Wider than the shot, its edges are in view over the window at half size.
+    world.classList.toggle("feather", cam.w > HERO.w + 0.5);
     captions.style.transform = `translateY(${frameTop + height + 8}px)`;
     lines.forEach((line, k) => {
       const [, a, b] = CAPTIONS[k];

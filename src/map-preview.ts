@@ -153,6 +153,16 @@ let cardMarks: MapMarks = {};
 let brokenUrl: string | null = null;
 /** What the rings were last drawn for: the marks and the picture's drawn size. */
 let drawnFor = "";
+/** The marks and spawn points as a key, and the preview they were read from. */
+let marksKey = "";
+let keyedFor: MapPreview | null = null;
+/**
+ * Where the picture's corner was when its rings were drawn. A drag moves the picture, not
+ * its size, so the rings drawn then move with it as one rather than being drawn again.
+ */
+let drawnAt = { left: 0, top: 0 };
+/** The rings, arrows and dots as drawn, moved as one while the picture is dragged. */
+let drawnMarks: SVGGElement | null = null;
 /** The mark the pointer is on (or on whose row), if any. */
 let lit: { mark: number; onRing: boolean } | null = null;
 /** The spawn point whose dot the pointer is on, if any (an index into the preview's spawns). */
@@ -361,12 +371,21 @@ export function layOutMapPreview() {
     "aria-label",
     `Map of ${mapName}: ${portals} portal${portals === 1 ? "" : "s"} marked, ${hidden} of them hidden${onRoute}${spawns}`,
   );
-  const key = JSON.stringify([shown.marks, shown.spawns, frame]);
+  if (shown !== keyedFor) {
+    keyedFor = shown;
+    marksKey = JSON.stringify([shown.marks, shown.spawns]);
+  }
+  const key = `${marksKey}|${frame.width}|${frame.height}|${frame.scale}`;
   if (key !== drawnFor) {
     drawnFor = key;
+    drawnAt = { left: Math.round(left), top: Math.round(top) };
     drawMarks(shown.marks, shown.spawns, frame);
     relight();
   }
+  drawnMarks?.setAttribute(
+    "transform",
+    `translate(${Math.round(left) - drawnAt.left} ${Math.round(top) - drawnAt.top})`,
+  );
 }
 
 /**
@@ -465,7 +484,9 @@ function drawMarks(marks: PortalMark[], spawns: SpawnMark[], f: Frame) {
     );
     dots.append(g);
   });
-  marksSvg.replaceChildren(defs, dots, arrows, routeRings, rings);
+  drawnMarks = svg("g", {});
+  drawnMarks.append(dots, arrows, routeRings, rings);
+  marksSvg.replaceChildren(defs, drawnMarks);
 }
 
 /** Light `mark` (or nothing) and its row, its arrows, and its card. */
@@ -839,12 +860,15 @@ function scrollbarShows(): boolean {
 }
 
 /** How wide a scrollbar is here, in CSS px: it changes with the display's scale. */
+let scrollbar: { ratio: number; width: number } | null = null;
 function scrollbarWidth(): number {
+  if (scrollbar?.ratio === devicePixelRatio) return scrollbar.width;
   const probe = document.createElement("div");
   probe.style.cssText = "position: absolute; visibility: hidden; width: 50px; height: 50px; overflow-y: scroll";
   document.body.append(probe);
   const width = probe.offsetWidth - probe.clientWidth;
   probe.remove();
+  scrollbar = { ratio: devicePixelRatio, width };
   return width;
 }
 

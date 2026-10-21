@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-13T03:37:52.000Z",
+  "generatedAt": "2026-10-21T15:00:13.000Z",
   "title": "Design System: Minerva",
   "extensions": {
     "colorMeta": {
@@ -242,6 +242,81 @@
           "oklch(70% 0.085 231.3)",
           "oklch(82% 0.085 231.3)",
           "oklch(95% 0.034 231.3)"
+        ]
+      },
+      "game-button-hover-top": {
+        "role": "neutral",
+        "displayName": "Game Button Blue, Hover Top",
+        "canonical": "oklch(77.1% 0.138 234.2)",
+        "tonalRamp": [
+          "oklch(15% 0.138 234.2)",
+          "oklch(25% 0.138 234.2)",
+          "oklch(36% 0.138 234.2)",
+          "oklch(47% 0.138 234.2)",
+          "oklch(58% 0.138 234.2)",
+          "oklch(70% 0.138 234.2)",
+          "oklch(82% 0.138 234.2)",
+          "oklch(95% 0.055 234.2)"
+        ]
+      },
+      "game-button-hover-mid": {
+        "role": "neutral",
+        "displayName": "Game Button Blue, Hover",
+        "canonical": "oklch(81.3% 0.118 229.6)",
+        "tonalRamp": [
+          "oklch(15% 0.118 229.6)",
+          "oklch(25% 0.118 229.6)",
+          "oklch(36% 0.118 229.6)",
+          "oklch(47% 0.118 229.6)",
+          "oklch(58% 0.118 229.6)",
+          "oklch(70% 0.118 229.6)",
+          "oklch(82% 0.118 229.6)",
+          "oklch(95% 0.047 229.6)"
+        ]
+      },
+      "game-button-hover-base": {
+        "role": "neutral",
+        "displayName": "Game Button Blue, Hover Base",
+        "canonical": "oklch(86.3% 0.094 223.1)",
+        "tonalRamp": [
+          "oklch(15% 0.094 223.1)",
+          "oklch(25% 0.094 223.1)",
+          "oklch(36% 0.094 223.1)",
+          "oklch(47% 0.094 223.1)",
+          "oklch(58% 0.094 223.1)",
+          "oklch(70% 0.094 223.1)",
+          "oklch(82% 0.094 223.1)",
+          "oklch(95% 0.038 223.1)"
+        ]
+      },
+      "game-button-pressed-top": {
+        "role": "neutral",
+        "displayName": "Game Button Blue, Pressed Top",
+        "canonical": "oklch(65.8% 0.144 240.1)",
+        "tonalRamp": [
+          "oklch(15% 0.144 240.1)",
+          "oklch(25% 0.144 240.1)",
+          "oklch(36% 0.144 240.1)",
+          "oklch(47% 0.144 240.1)",
+          "oklch(58% 0.144 240.1)",
+          "oklch(70% 0.144 240.1)",
+          "oklch(82% 0.144 240.1)",
+          "oklch(95% 0.058 240.1)"
+        ]
+      },
+      "game-button-pressed-base": {
+        "role": "neutral",
+        "displayName": "Game Button Blue, Pressed Base",
+        "canonical": "oklch(72.1% 0.143 236.3)",
+        "tonalRamp": [
+          "oklch(15% 0.143 236.3)",
+          "oklch(25% 0.143 236.3)",
+          "oklch(36% 0.143 236.3)",
+          "oklch(47% 0.143 236.3)",
+          "oklch(58% 0.143 236.3)",
+          "oklch(70% 0.143 236.3)",
+          "oklch(82% 0.143 236.3)",
+          "oklch(95% 0.057 236.3)"
         ]
       },
       "panel-rule": {
@@ -859,6 +934,36 @@
           "oklch(95% 0.043 264)"
         ]
       },
+      "button-hover-top": {
+        "role": "neutral",
+        "displayName": "Button Steel, Hover Top",
+        "canonical": "oklch(53.1% 0.138 261.6)",
+        "tonalRamp": [
+          "oklch(15% 0.138 261.6)",
+          "oklch(25% 0.138 261.6)",
+          "oklch(36% 0.138 261.6)",
+          "oklch(47% 0.138 261.6)",
+          "oklch(58% 0.138 261.6)",
+          "oklch(70% 0.138 261.6)",
+          "oklch(82% 0.138 261.6)",
+          "oklch(95% 0.055 261.6)"
+        ]
+      },
+      "button-hover-base": {
+        "role": "neutral",
+        "displayName": "Button Steel, Hover Base",
+        "canonical": "oklch(42.2% 0.137 263)",
+        "tonalRamp": [
+          "oklch(15% 0.137 263)",
+          "oklch(25% 0.137 263)",
+          "oklch(36% 0.137 263)",
+          "oklch(47% 0.137 263)",
+          "oklch(58% 0.137 263)",
+          "oklch(70% 0.137 263)",
+          "oklch(82% 0.137 263)",
+          "oklch(95% 0.055 263)"
+        ]
+      },
       "button-light-top": {
         "role": "neutral",
         "displayName": "Light Steel, Top",
@@ -887,6 +992,21 @@
           "oklch(70% 0.026 261.1)",
           "oklch(82% 0.026 261.1)",
           "oklch(95% 0.01 261.1)"
+        ]
+      },
+      "button-light-hover-base": {
+        "role": "neutral",
+        "displayName": "Light Steel, Hover Base",
+        "canonical": "oklch(92.6% 0.022 263.2)",
+        "tonalRamp": [
+          "oklch(15% 0.022 263.2)",
+          "oklch(25% 0.022 263.2)",
+          "oklch(36% 0.022 263.2)",
+          "oklch(47% 0.022 263.2)",
+          "oklch(58% 0.022 263.2)",
+          "oklch(70% 0.022 263.2)",
+          "oklch(82% 0.022 263.2)",
+          "oklch(95% 0.009 263.2)"
         ]
       },
       "disabled-bg": {
@@ -979,6 +1099,21 @@
           "oklch(95% 0.084 115.6)"
         ]
       },
+      "exp-low": {
+        "role": "tertiary",
+        "displayName": "EXP Lime, Low",
+        "canonical": "oklch(91.3% 0.209 116.2)",
+        "tonalRamp": [
+          "oklch(15% 0.209 116.2)",
+          "oklch(25% 0.209 116.2)",
+          "oklch(36% 0.209 116.2)",
+          "oklch(47% 0.209 116.2)",
+          "oklch(58% 0.209 116.2)",
+          "oklch(70% 0.209 116.2)",
+          "oklch(82% 0.209 116.2)",
+          "oklch(95% 0.084 116.2)"
+        ]
+      },
       "exp-base": {
         "role": "tertiary",
         "displayName": "EXP Lime, Base",
@@ -992,6 +1127,36 @@
           "oklch(70% 0.2 116.3)",
           "oklch(82% 0.2 116.3)",
           "oklch(95% 0.08 116.3)"
+        ]
+      },
+      "exp-track-top": {
+        "role": "tertiary",
+        "displayName": "EXP Track, Top",
+        "canonical": "oklch(91.3% 0 0)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(36% 0 0)",
+          "oklch(47% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(82% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "exp-track-base": {
+        "role": "tertiary",
+        "displayName": "EXP Track, Base",
+        "canonical": "oklch(79.5% 0 0)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(36% 0 0)",
+          "oklch(47% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(82% 0 0)",
+          "oklch(95% 0 0)"
         ]
       },
       "exp-track": {
@@ -1112,6 +1277,216 @@
           "oklch(70% 0.076 90.7)",
           "oklch(82% 0.076 90.7)",
           "oklch(95% 0.005 90.7)"
+        ]
+      },
+      "epic-top": {
+        "role": "tertiary",
+        "displayName": "Epic Purple, Top",
+        "canonical": "oklch(56.4% 0.182 297.5)",
+        "tonalRamp": [
+          "oklch(15% 0.182 297.5)",
+          "oklch(25% 0.182 297.5)",
+          "oklch(36% 0.182 297.5)",
+          "oklch(47% 0.182 297.5)",
+          "oklch(58% 0.182 297.5)",
+          "oklch(70% 0.182 297.5)",
+          "oklch(82% 0.182 297.5)",
+          "oklch(95% 0.073 297.5)"
+        ]
+      },
+      "epic-base": {
+        "role": "tertiary",
+        "displayName": "Epic Purple",
+        "canonical": "oklch(45.9% 0.184 295.8)",
+        "tonalRamp": [
+          "oklch(15% 0.184 295.8)",
+          "oklch(25% 0.184 295.8)",
+          "oklch(36% 0.184 295.8)",
+          "oklch(47% 0.184 295.8)",
+          "oklch(58% 0.184 295.8)",
+          "oklch(70% 0.184 295.8)",
+          "oklch(82% 0.184 295.8)",
+          "oklch(95% 0.074 295.8)"
+        ]
+      },
+      "epic-edge": {
+        "role": "tertiary",
+        "displayName": "Epic Edge",
+        "canonical": "oklch(34.2% 0.144 293.3)",
+        "tonalRamp": [
+          "oklch(15% 0.144 293.3)",
+          "oklch(25% 0.144 293.3)",
+          "oklch(36% 0.144 293.3)",
+          "oklch(47% 0.144 293.3)",
+          "oklch(58% 0.144 293.3)",
+          "oklch(70% 0.144 293.3)",
+          "oklch(82% 0.144 293.3)",
+          "oklch(95% 0.058 293.3)"
+        ]
+      },
+      "epic-hover-top": {
+        "role": "tertiary",
+        "displayName": "Epic Purple, Hover Top",
+        "canonical": "oklch(63% 0.171 299.8)",
+        "tonalRamp": [
+          "oklch(15% 0.171 299.8)",
+          "oklch(25% 0.171 299.8)",
+          "oklch(36% 0.171 299.8)",
+          "oklch(47% 0.171 299.8)",
+          "oklch(58% 0.171 299.8)",
+          "oklch(70% 0.171 299.8)",
+          "oklch(82% 0.171 299.8)",
+          "oklch(95% 0.068 299.8)"
+        ]
+      },
+      "epic-hover-base": {
+        "role": "tertiary",
+        "displayName": "Epic Purple, Hover Base",
+        "canonical": "oklch(49.3% 0.185 296.8)",
+        "tonalRamp": [
+          "oklch(15% 0.185 296.8)",
+          "oklch(25% 0.185 296.8)",
+          "oklch(36% 0.185 296.8)",
+          "oklch(47% 0.185 296.8)",
+          "oklch(58% 0.185 296.8)",
+          "oklch(70% 0.185 296.8)",
+          "oklch(82% 0.185 296.8)",
+          "oklch(95% 0.074 296.8)"
+        ]
+      },
+      "unique-top": {
+        "role": "tertiary",
+        "displayName": "Unique Gold, Top",
+        "canonical": "oklch(95.3% 0.093 98.6)",
+        "tonalRamp": [
+          "oklch(15% 0.093 98.6)",
+          "oklch(25% 0.093 98.6)",
+          "oklch(36% 0.093 98.6)",
+          "oklch(47% 0.093 98.6)",
+          "oklch(58% 0.093 98.6)",
+          "oklch(70% 0.093 98.6)",
+          "oklch(82% 0.093 98.6)",
+          "oklch(95% 0.037 98.6)"
+        ]
+      },
+      "unique-mid": {
+        "role": "tertiary",
+        "displayName": "Unique Gold",
+        "canonical": "oklch(89% 0.168 94.2)",
+        "tonalRamp": [
+          "oklch(15% 0.168 94.2)",
+          "oklch(25% 0.168 94.2)",
+          "oklch(36% 0.168 94.2)",
+          "oklch(47% 0.168 94.2)",
+          "oklch(58% 0.168 94.2)",
+          "oklch(70% 0.168 94.2)",
+          "oklch(82% 0.168 94.2)",
+          "oklch(95% 0.067 94.2)"
+        ]
+      },
+      "unique-base": {
+        "role": "tertiary",
+        "displayName": "Unique Gold, Base",
+        "canonical": "oklch(82.3% 0.166 87.8)",
+        "tonalRamp": [
+          "oklch(15% 0.166 87.8)",
+          "oklch(25% 0.166 87.8)",
+          "oklch(36% 0.166 87.8)",
+          "oklch(47% 0.166 87.8)",
+          "oklch(58% 0.166 87.8)",
+          "oklch(70% 0.166 87.8)",
+          "oklch(82% 0.166 87.8)",
+          "oklch(95% 0.066 87.8)"
+        ]
+      },
+      "unique-edge": {
+        "role": "tertiary",
+        "displayName": "Unique Edge",
+        "canonical": "oklch(52.8% 0.109 82.4)",
+        "tonalRamp": [
+          "oklch(15% 0.109 82.4)",
+          "oklch(25% 0.109 82.4)",
+          "oklch(36% 0.109 82.4)",
+          "oklch(47% 0.109 82.4)",
+          "oklch(58% 0.109 82.4)",
+          "oklch(70% 0.109 82.4)",
+          "oklch(82% 0.109 82.4)",
+          "oklch(95% 0.044 82.4)"
+        ]
+      },
+      "unique-ink": {
+        "role": "tertiary",
+        "displayName": "Unique Ink",
+        "canonical": "oklch(30% 0.062 82)",
+        "tonalRamp": [
+          "oklch(15% 0.062 82)",
+          "oklch(25% 0.062 82)",
+          "oklch(36% 0.062 82)",
+          "oklch(47% 0.062 82)",
+          "oklch(58% 0.062 82)",
+          "oklch(70% 0.062 82)",
+          "oklch(82% 0.062 82)",
+          "oklch(95% 0.025 82)"
+        ]
+      },
+      "unique-gauge": {
+        "role": "tertiary",
+        "displayName": "Unique Gauge",
+        "canonical": "oklch(38.6% 0.08 79.8)",
+        "tonalRamp": [
+          "oklch(15% 0.08 79.8)",
+          "oklch(25% 0.08 79.8)",
+          "oklch(36% 0.08 79.8)",
+          "oklch(47% 0.08 79.8)",
+          "oklch(58% 0.08 79.8)",
+          "oklch(70% 0.08 79.8)",
+          "oklch(82% 0.08 79.8)",
+          "oklch(95% 0.032 79.8)"
+        ]
+      },
+      "unique-hover-top": {
+        "role": "tertiary",
+        "displayName": "Unique Gold, Hover Top",
+        "canonical": "oklch(96.8% 0.065 99)",
+        "tonalRamp": [
+          "oklch(15% 0.065 99)",
+          "oklch(25% 0.065 99)",
+          "oklch(36% 0.065 99)",
+          "oklch(47% 0.065 99)",
+          "oklch(58% 0.065 99)",
+          "oklch(70% 0.065 99)",
+          "oklch(82% 0.065 99)",
+          "oklch(95% 0.026 99)"
+        ]
+      },
+      "unique-hover-mid": {
+        "role": "tertiary",
+        "displayName": "Unique Gold, Hover",
+        "canonical": "oklch(90.7% 0.151 95.4)",
+        "tonalRamp": [
+          "oklch(15% 0.151 95.4)",
+          "oklch(25% 0.151 95.4)",
+          "oklch(36% 0.151 95.4)",
+          "oklch(47% 0.151 95.4)",
+          "oklch(58% 0.151 95.4)",
+          "oklch(70% 0.151 95.4)",
+          "oklch(82% 0.151 95.4)",
+          "oklch(95% 0.06 95.4)"
+        ]
+      },
+      "unique-hover-base": {
+        "role": "tertiary",
+        "displayName": "Unique Gold, Hover Base",
+        "canonical": "oklch(84.2% 0.163 88.7)",
+        "tonalRamp": [
+          "oklch(15% 0.163 88.7)",
+          "oklch(25% 0.163 88.7)",
+          "oklch(36% 0.163 88.7)",
+          "oklch(47% 0.163 88.7)",
+          "oklch(58% 0.163 88.7)",
+          "oklch(70% 0.163 88.7)",
+          "oklch(82% 0.163 88.7)",
+          "oklch(95% 0.065 88.7)"
         ]
       }
     },
@@ -1269,7 +1644,17 @@
       {
         "name": "pressed",
         "value": "inset 0 1px 2px rgba(0, 40, 80, 0.5)",
-        "purpose": "A held game-blue button; deep steel uses inset 0 1px 3px rgba(10, 20, 50, 0.45), light steel the same at 0.25. The site uses the deep-steel one on a held Download and the light-steel one on a held tab or secondary button."
+        "purpose": "A held game-blue button (--game-button-pressed-shadow)."
+      },
+      {
+        "name": "pressed-steel",
+        "value": "inset 0 1px 3px rgba(10, 20, 50, 0.45)",
+        "purpose": "A held deep-steel button (--pressed-steel); on the site, a held Download."
+      },
+      {
+        "name": "pressed-light-steel",
+        "value": "inset 0 1px 3px rgba(10, 20, 50, 0.25)",
+        "purpose": "A held light-steel button (--pressed-light-steel); on the site, a held tab or secondary button."
       },
       {
         "name": "field-inset",
@@ -1295,13 +1680,23 @@
         "name": "focus-ring",
         "value": "outline: 2px solid #2f63c8; outline-offset: 2px",
         "purpose": "Keyboard focus in every window (:focus-visible)."
+      },
+      {
+        "name": "pressed-epic",
+        "value": "inset 0 1px 3px rgba(30, 10, 60, 0.5)",
+        "purpose": "A held great-deal badge, on Epic Purple."
+      },
+      {
+        "name": "pressed-unique",
+        "value": "inset 0 1px 3px rgba(70, 45, 0, 0.45)",
+        "purpose": "A held steal badge, on Unique Gold."
       }
     ],
     "tints": [
       {
         "name": "row-hover",
         "value": "rgba(47, 99, 200, 0.08)",
-        "purpose": "Edit Blue at 8%: suggestion and result rows, the Personal Bests window's rows and the site's questions under the pointer."
+        "purpose": "Edit Blue at 8% (--row-hover): suggestion and result rows, the Personal Bests window's rows and the site's questions under the pointer."
       }
     ],
     "motion": [

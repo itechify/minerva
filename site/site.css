@@ -5,8 +5,9 @@
    don't animate. */
 
 /* NEXON's Maplestory typeface (assets/fonts/NOTICE.md), as WOFF2 copies of the files the
-   app bundles. Over the web it may arrive after the page, so the text draws in Arial first
-   rather than not at all. Arial also stands in for the dashes and minus it lacks. */
+   app bundles without their Korean, which the site never shows. Over the web it may arrive
+   after the page, so the text draws in Arial first rather than not at all. Arial also
+   stands in for the dashes and minus it lacks. */
 @font-face {
   font-family: "Maplestory";
   src: url("./fonts/Maplestory-Light.woff2") format("woff2");
@@ -182,7 +183,7 @@ a:active {
 }
 .tab:active {
   background: var(--button-light);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25);
+  box-shadow: var(--pressed-light-steel);
 }
 .tab[aria-current="page"] {
   padding-top: 9px;
@@ -223,7 +224,7 @@ a:active {
 }
 .button:active {
   background: var(--button-hover);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.45);
+  box-shadow: var(--pressed-steel);
   color: #fff;
 }
 .button.secondary {
@@ -238,7 +239,7 @@ a:active {
 }
 .button.secondary:active {
   background: var(--button-light);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25);
+  box-shadow: var(--pressed-light-steel);
 }
 .button.small {
   padding: 5px 14px 6px;
@@ -295,6 +296,18 @@ h1 {
   font-size: 17px;
   line-height: 28px;
   text-wrap: pretty;
+}
+/* The answer to "will I get banned?", under what Minerva shows: what it does to the game,
+   which is nothing but look. How it stays safe says the rest. */
+.lede-safe {
+  margin: 0;
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+.lede-safe strong {
+  color: var(--ink);
 }
 .actions {
   display: flex;
@@ -436,7 +449,8 @@ figcaption {
 }
 
 /* The frame onto the game window, framed as every screenshot is. reel.ts sets its height
-   from the camera: as wide as the game window at first, as tall as the shot at the end. */
+   from the camera: as tall as the shot at the start and the end, as wide as the game window
+   between. */
 .reel-frame {
   position: absolute;
   left: 0;
@@ -484,9 +498,9 @@ figcaption {
   width: 1922px;
   height: 1232px;
 }
-/* While the whole window is in view, the shot's right and bottom edges fade into the window
-   at half size, so where one gives way to the other shows no line. Close in, those edges
-   are out of the frame, and the shot ends the film as it is. */
+/* While more than the shot is in view, its right and bottom edges fade into the window at
+   half size, so where one gives way to the other shows no line. Framed on the shot or closer,
+   those edges are at or past the frame's, and the shot opens and ends the film as it is. */
 .reel-world.feather > .reel-shot {
   mask-image:
     linear-gradient(to right, #000 calc(100% - 64px), transparent),
@@ -781,7 +795,7 @@ strong {
 }
 .qa > summary:active .fold {
   background: var(--button-light);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25);
+  box-shadow: var(--pressed-light-steel);
 }
 
 .qa-answer {
@@ -793,6 +807,11 @@ strong {
 .qa-answer ul,
 .qa-answer dl {
   margin-bottom: 12px;
+}
+/* An answer's words at a reading measure, about 75 characters a line, however wide the
+   question over it runs; its screenshots keep the answer's width. */
+.qa-answer > :not(figure) {
+  max-width: 32em;
 }
 .qa-answer li + li {
   margin-top: 4px;
@@ -1357,12 +1376,19 @@ button.icon-button:hover {
 }
 button.icon-button:active {
   background: var(--game-button-pressed);
-  box-shadow: inset 0 1px 2px rgba(0, 40, 80, 0.5);
+  box-shadow: var(--game-button-pressed-shadow);
 }
 
 /* The title: the owl as the map's emblem, then where you are as the game names a map,
    the part as its street over the topic as its name, in the Mini Map's lettering. */
 .mm-title {
+  /* The Mini Map's lettering at the minimap's 11px and 13px: its outline a shade deeper than
+     the game's, so the light letters hold 4.5:1 against it (4.6 to the game's 4.4). */
+  --title-outline: #4c7096;
+  --title-lettering:
+    -1px -1px 0 var(--title-outline), 0 -1px 0 var(--title-outline), 1px -1px 0 var(--title-outline),
+    -1px 0 0 var(--title-outline), 1px 0 0 var(--title-outline), -1px 1px 0 var(--title-outline),
+    0 1px 0 var(--title-outline), 1px 1px 0 var(--title-outline), 0 2px 1px rgba(30, 60, 100, 0.3);
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   column-gap: 7px;
@@ -1713,9 +1739,8 @@ button.icon-button:active {
 .lb-questions > .qa-block {
   margin-top: 0;
 }
-/* Prose on the Map Leaderboards keeps a reading measure, about 70 characters a line (the
-   face's 0 is wide, so 55ch). */
-.lb-questions .qa p,
+/* What the Map Leaderboards say keeps a reading measure, about 70 characters a line (the
+   face's 0 is wide, so 55ch); their questions' answers keep every answer's. */
 .lb-said {
   max-width: 55ch;
 }
@@ -1793,7 +1818,7 @@ button.icon-button:active {
 }
 .lb-band:active {
   background: var(--button-light);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25);
+  box-shadow: var(--pressed-light-steel);
   color: var(--ink);
 }
 .lb-band[aria-current] {
@@ -2073,6 +2098,26 @@ html.lb-morph::view-transition-group(lb-head) {
 }
 .lb-report-button:active {
   color: var(--frame);
+}
+
+/* On a touch screen wider than a phone, the tabs, the questions and Report take a thumb's
+   tap too, 44px tall, as the window bar's buttons do; a phone's own rules below take over
+   from these. */
+@media (hover: none) and (pointer: coarse) {
+  .tab {
+    padding-block: 11px;
+  }
+  .tab[aria-current="page"] {
+    padding-top: 15px;
+  }
+  .qa > summary {
+    padding-block: 11px;
+  }
+  .lb-report-button::after {
+    content: "";
+    position: absolute;
+    inset: -13px -8px;
+  }
 }
 
 /* Reporting an entry: a small window over the page, framed as the site's window, under
