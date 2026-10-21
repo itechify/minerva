@@ -111,7 +111,7 @@ button.deal-badge:hover {
 
 button.deal-badge:active {
   background: var(--button-light);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25);
+  box-shadow: var(--pressed-light-steel);
 }
 
 button.deal-badge:focus-visible {
@@ -141,18 +141,18 @@ button.deal-badge.deal:hover {
 
 button.deal-badge.deal:active {
   background: var(--button);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.45);
+  box-shadow: var(--pressed-steel);
 }
 
 /* Its card is open: held down, as a pressed button sinks. */
 button.deal-badge.open {
   background: var(--button-light);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25);
+  box-shadow: var(--pressed-light-steel);
 }
 
 button.deal-badge.deal.open {
   background: var(--button);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.45);
+  box-shadow: var(--pressed-steel);
 }
 
 /* The gauge, the badge's bottom edge: from nothing at its left to twice the Deal Line at its

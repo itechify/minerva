@@ -51,6 +51,11 @@
   background: var(--button-light-hover);
 }
 
+.pick:active {
+  background: var(--button-light);
+  box-shadow: var(--pressed-light-steel);
+}
+
 .pick[aria-pressed="true"] {
   border-color: var(--select-edge);
   background: var(--select);
@@ -151,7 +156,7 @@
 /* A list that's open (Move, Merge into…, Assign all to…): its button pressed. */
 .text-button[aria-expanded="true"] {
   background: var(--button-light);
-  box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25);
+  box-shadow: var(--pressed-light-steel);
 }
 
 /* A button asking before it does what can't be undone (a Visit's "Remove?", "Move to
@@ -315,6 +320,10 @@ th:not(.text) .sort {
   color: var(--ink);
 }
 
+.sort:active {
+  color: var(--frame);
+}
+
 .sort:focus-visible,
 .row-map:focus-visible,
 .visits-toggle:focus-visible {
@@ -342,7 +351,7 @@ tbody tr + tr td {
 
 /* A reading aid across the row; only the name and the count open anything. */
 tbody tr:hover td {
-  background: rgba(47, 99, 200, 0.08);
+  background: var(--row-hover);
 }
 
 /* The map's Map Mark, then its name, which wraps beside it rather than under it. */
@@ -429,6 +438,10 @@ tbody tr.board-row td {
   text-decoration-color: currentColor;
 }
 
+.row-leaderboard:active {
+  color: var(--frame);
+}
+
 .row-leaderboard:focus-visible {
   outline: 2px solid var(--edit);
   outline-offset: 2px;
@@ -468,6 +481,11 @@ tbody tr.board-row td {
 
 .switch:hover {
   background: var(--button-light-hover);
+}
+
+.switch:active {
+  background: var(--button-light);
+  box-shadow: var(--pressed-light-steel);
 }
 
 .switch .knob {
@@ -513,6 +531,14 @@ tbody tr.board-row td {
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
+}
+
+.text-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.text-link:active {
+  color: var(--frame);
 }
 
 .text-link:focus-visible {
@@ -934,7 +960,7 @@ tbody tr.move-row td {
   }
 
   tbody tr:hover {
-    background: rgba(47, 99, 200, 0.08);
+    background: var(--row-hover);
   }
 
   tbody tr:hover td,

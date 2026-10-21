@@ -182,6 +182,12 @@
   background: var(--button-light-hover);
 }
 
+.deal-mark:active::before {
+  border-color: var(--button-edge);
+  background: var(--button-light);
+  box-shadow: var(--pressed-light-steel);
+}
+
 .deal-mark[aria-checked="true"] {
   cursor: default;
 }

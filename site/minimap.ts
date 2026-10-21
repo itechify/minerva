@@ -182,8 +182,12 @@ export function minimap(line: () => number) {
   // The walk: where the reader is at each stop and at each platform's ends, and the scroll
   // each is reached at. A drop down a rope takes the last of the scroll before its part.
   let steps: Step[] = [];
+  // Whether the minimap shows (on wide screens), read with the walk rather than on every
+  // scroll, where the read would follow the reel's writes and force a layout each frame.
+  let showing = false;
   const reach = (el: HTMLElement) => el.getBoundingClientRect().top + scrollY - line();
   function measure() {
+    showing = nav.offsetWidth > 0;
     const walk: Step[] = [];
     const ofPart = (i: number) => stops.flatMap((stop, k) => (stop.part === i ? [k] : []));
     for (let i = 0; i < n; i++) {
@@ -233,7 +237,7 @@ export function minimap(line: () => number) {
   let shown = -1;
   /** Puts the dot where the reader is, and the title and the lit portal on their stop. */
   function draw(where: Place) {
-    if (!nav.offsetWidth) return;
+    if (!showing) return;
     you.style.transform = `translate(${where.x}px, ${where.y}px)`;
     if (where.stop === shown) return;
     if (shown >= 0) marks[shown].removeAttribute("aria-current");
