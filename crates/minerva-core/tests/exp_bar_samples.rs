@@ -97,6 +97,35 @@ fn every_window_samples_figures_are_found_in_its_status_bar_and_read() {
     assert!(wrong.is_empty(), "wrong or unread:\n{}", wrong.join("\n"));
 }
 
+/// Whether a sample is a strip across the bottom of a client area, not the figures alone.
+fn is_strip(path: &Path) -> bool {
+    path.file_stem().is_some_and(|stem| stem.to_string_lossy().ends_with("-strip"))
+}
+
+#[test]
+fn every_strip_samples_status_bar_is_found_and_its_figures_read() {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
+        .expect("samples dir")
+        .map(|e| e.expect("dir entry").path())
+        .filter(|p| p.extension().is_some_and(|x| x == "png") && is_strip(p))
+        .collect();
+    paths.sort();
+    assert!(!paths.is_empty(), "expected the strip samples");
+
+    let mut wrong = Vec::new();
+    for path in &paths {
+        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let strip = image::open(path).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
+        let mut minerva = started(strip.width(), strip.height());
+        let capture = StatusBarCapture { frame: common::frame(&strip, 0), origin: ScreenPoint { x: 0, y: 0 } };
+        let state = minerva.on_status_bar_capture(capture);
+        if state.status_bar.is_none() || state.exp_bar != named_reading(&name) {
+            wrong.push(format!("{name}: Status Bar {:?}, panel shows {:?}", state.status_bar, state.exp_bar));
+        }
+    }
+    assert!(wrong.is_empty(), "wrong or unread:\n{}", wrong.join("\n"));
+}
+
 /// "160__3.81" -> 160 EXP at 381 hundredths; "unreadable" -> `None`.
 fn named_reading(name: &str) -> Option<ExpBar> {
     let answer = name.split_once("--").map_or(name, |(a, _)| a);
@@ -116,7 +145,7 @@ fn every_single_sample_reads_as_its_filename_names() {
     let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
         .expect("samples dir")
         .map(|e| e.expect("dir entry").path())
-        .filter(|p| p.extension().is_some_and(|x| x == "png"))
+        .filter(|p| p.extension().is_some_and(|x| x == "png") && !is_strip(p))
         .collect();
     paths.sort();
     assert!(paths.len() >= 3, "expected the EXP bar samples, found {}", paths.len());

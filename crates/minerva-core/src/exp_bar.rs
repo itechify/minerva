@@ -23,6 +23,7 @@ use crate::bug_report::cut_on_screen;
 use crate::panel::ScreenRect;
 use crate::prep::{PAD, Rect};
 use crate::recogniser::{Recogniser, frame_to_rgb};
+use crate::ui_size;
 use crate::{Frame, StatusBar, StatusBarCapture};
 use image::{GrayImage, Luma, RgbImage};
 use serde::{Deserialize, Serialize};
@@ -102,7 +103,8 @@ impl ExpBarReader {
     }
 
     fn read_rgb(&self, img: &RgbImage) -> Option<ExpBar> {
-        let prepared = prepare(img)?;
+        let resampled = ui_size::to_samples_size(img, measure(img)?);
+        let prepared = prepare(resampled.as_ref().unwrap_or(img))?;
         let lines = self.recogniser.read_lines(&prepared.canvas, &[prepared.exp, prepared.percent])?;
         let text = |i: usize| lines.get(i)?.as_ref().map(|l| l.to_string());
         let (exp_text, percent_text) = (text(0)?, text(1)?);
@@ -148,9 +150,15 @@ fn digits(text: &str) -> Option<String> {
 /// The EXP from "68,063": one to three digits, then threes after each thousands comma
 /// (which ocrs reads as a point at this size, "8.435"). ocrs has merged a glyph into the
 /// one beside it ("26,777" read "26,77"), and the pointer over the "EXP." label has cut
-/// a figure short at its comma (".909"); neither has this shape.
+/// a figure short at its comma (".909"); neither has this shape. At another UI Size it has
+/// read a comma as both (".,": "100.,300"), which is one between digits.
 fn thousands(text: &str) -> Option<u64> {
-    let groups: Vec<String> = text.trim().split([',', '.']).map(digits).collect::<Option<_>>()?;
+    let text = text.trim();
+    let separators = [',', '.'];
+    if text.starts_with(separators) || text.ends_with(separators) {
+        return None;
+    }
+    let groups: Vec<String> = text.split(separators).filter(|group| !group.is_empty()).map(digits).collect::<Option<_>>()?;
     let (first, rest) = groups.split_first()?;
     let shaped = first.len() <= 3 && rest.iter().all(|group| group.len() == 3);
     shaped.then(|| groups.concat().parse().ok()).flatten()
@@ -200,9 +208,14 @@ const INK_LUMA_LO: f32 = 100.0;
 const INK_LUMA_HI: f32 = 190.0;
 /// A column holds a glyph when its ink in the band sums past this.
 const COL_MIN_INK: f32 = 0.5;
-/// A bracket is at most this wide, and at least this tall and twice as tall as wide.
+/// A bracket is at most this wide, and at least this tall and twice as tall as wide, at the
+/// samples' UI Size (ADR 0020)...
 const BRACKET_MAX_W: u32 = 4;
 const BRACKET_MIN_H: u32 = 6;
+/// ...where it is this tall: what the figures' UI Size is measured by. At any UI Size, a
+/// bracket is at least this tall, and twice as tall as wide.
+const BRACKET_H: u32 = 11;
+const ANY_BRACKET_MIN_H: u32 = 4;
 /// Per row of bracket height: glyphs of one figure are fewer ink-free columns apart than
 /// this (digits touch or nearly; the "EXP." label ends 4 columns before them on the
 /// samples)...
@@ -262,12 +275,13 @@ fn blobs(img: &RgbImage) -> Vec<Blob> {
 /// The "[" and "]" of the figures: the rightmost pair of bracket-shaped components with
 /// the same top and bottom and room for a digit between them (a stray component on
 /// other rows between them doesn't break the pair).
-fn brackets(img: &RgbImage) -> Option<(Blob, Blob)> {
+/// Brackets are at most `max_w` wide and at least `min_h` tall.
+fn brackets(img: &RgbImage, (max_w, min_h): (u32, u32)) -> Option<(Blob, Blob)> {
     let mut shaped: Vec<Blob> = blobs(img)
         .into_iter()
         .filter(|b| {
             let (w, h) = (b.x1 - b.x0 + 1, b.y1 - b.y0 + 1);
-            w <= BRACKET_MAX_W && h >= BRACKET_MIN_H && h >= 2 * w
+            w <= max_w && h >= min_h && h >= 2 * w
         })
         .collect();
     shaped.sort_by_key(|b| b.x0);
@@ -280,8 +294,15 @@ fn brackets(img: &RgbImage) -> Option<(Blob, Blob)> {
     })
 }
 
+/// The figures' UI Size: their brackets' height next to the samples'.
+fn measure(img: &RgbImage) -> Option<f32> {
+    let (open, close) = brackets(img, (u32::MAX, ANY_BRACKET_MIN_H))?;
+    let h = (open.y1 - open.y0).max(close.y1 - close.y0) + 1;
+    Some(h as f32 / BRACKET_H as f32)
+}
+
 fn prepare(img: &RgbImage) -> Option<Prepared> {
-    let (open, close) = brackets(img)?;
+    let (open, close) = brackets(img, (BRACKET_MAX_W, BRACKET_MIN_H))?;
     // The digits' rows: the brackets', with a row either side for anti-aliasing.
     let y0 = open.y0.min(close.y0).saturating_sub(1);
     let y1 = (open.y1.max(close.y1) + 2).min(img.height());
@@ -296,21 +317,27 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
     let (px0, px1) = (*inside.first()?, *inside.last()? + 1);
 
     // The EXP: the clusters of ink left of "[", back to the label (any cluster of it
-    // rises above the brackets) or a gap wider than a space.
+    // rises above the brackets). Without the label just left of it, the EXP may go on past
+    // what was captured ("100,300" cut to "00,300", where the figures were looked for at
+    // another UI Size), or something covers it: unreadable.
     let h = (open.y1 - open.y0 + 1) as f32;
     let split = (h * GLYPH_GAP_PER_H).ceil() as usize;
     let max_gap = (h * SPACE_PER_H).ceil() as u32;
     let foot = (h * FOOT_PER_H).ceil() as u32;
     let on: Vec<bool> = (0..open.x0).map(inked).collect();
     let mut number: Option<(u32, u32)> = None;
+    let mut labelled = false;
     for (x0, x1) in clusters(&on, split).into_iter().rev() {
-        let far = number.is_some_and(|(n0, _)| n0 - x1 > max_gap);
-        if far || (x0..x1).any(rises) {
+        if number.is_some_and(|(n0, _)| n0 - x1 > max_gap) {
+            break;
+        }
+        if (x0..x1).any(rises) {
+            labelled = true;
             break;
         }
         number = Some((x0, number.map_or(x1, |(_, n1)| n1)));
     }
-    let (ex0, ex1) = number?;
+    let (ex0, ex1) = number.filter(|_| labelled)?;
 
     // Black on white, from the EXP's first column to the percentage's last.
     let (cx0, cw, ch) = (ex0, px1 - ex0, y1 - y0);
