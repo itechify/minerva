@@ -20,5 +20,6 @@ The readers that find the game's UI in a capture of the client area (the Player 
 
 ## Consequences
 
+- The game's Default Ratio reads best: the samples were taken at it. With Ideal Ratio, the maintainer's checks across sizes (#136) found the shop read well at most sizes, and a listing now and then read less reliably. The FAQ says so, and a frame from it that reads wrong becomes a sample.
 - The Status Bar and its EXP figures still assume the samples' UI Size: they follow this decision when a sample at another shows them failing.
 - A reader that finds nothing saves no crop in a Bug Report, so a UI Size it can't find leaves no frame to make a sample of: such frames come from `probe item` or `probe record` until it does.
