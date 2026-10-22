@@ -5,6 +5,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hotkeyAvailable, keyLabel, type Hotkeys } from "./hotkeys";
 import { mapMark, type MapMarks } from "./map-marks";
+import { momentText } from "./dates";
 import { LOADING_MAP_LIST, recognitionProblem, type Recognition } from "./recognition";
 
 /** Mirror of `minerva_core::TestRead`. */
@@ -15,6 +16,38 @@ type TestRead =
 
 
 type SetupReason = "firstRun" | "resolutionChanged" | "requested";
+
+/** Mirror of `minerva_core::UpdateStatus`. */
+type UpdateStatus = "notChecked" | "checking" | "upToDate" | "newerVersion" | "failed";
+
+/** Mirror of `minerva_core::UpdateStage`. */
+type UpdateStage =
+  | "notifyOnly"
+  | "out"
+  | "asking"
+  | "downloading"
+  | "downloadingForQuit"
+  | "installsWhenYouQuit"
+  | "finishingBeforeQuit"
+  | "installing"
+  | "downloadFailed"
+  | "installFailed"
+  | "changed";
+
+/** Mirror of `minerva_core::UpdateOffer`. */
+type UpdateOffer = "nothing" | "releasePage" | "update" | "choices" | "updateNow" | "tryAgain";
+
+/** Mirror of `minerva_core::UpdateNotice`: decided by the core, only put into words here. */
+type UpdateNotice = { version: string; releaseUrl: string; stage: UpdateStage; offer: UpdateOffer };
+
+/** Mirror of `minerva_core::Updates`. */
+type Updates = {
+  /** "Check for updates" is on (the panel's Settings). */
+  checksOn: boolean;
+  status: UpdateStatus;
+  lastCheckedUnixMs: number | null;
+  notice: UpdateNotice | null;
+};
 
 /** Mirror of the shell's `SetupView`. */
 type SetupView = {
@@ -34,6 +67,8 @@ type SetupView = {
   hotkeys: Hotkeys;
   /** Every Map Mark, by OSMS's name for it, which a recognised map names its own by. */
   mapMarks: MapMarks;
+  /** Whether a newer version is out, for About & Credits. */
+  updates: Updates;
 };
 
 const STEPS = ["warning", "window", "requirements", "mark", "test", "exp"] as const;
@@ -170,6 +205,99 @@ function render() {
   $("change-hotkeys-note").hidden = !!game;
   $("hotkey-problem").textContent = hotkeyProblems(view);
   $("hotkey-problem").hidden = $("hotkey-problem").textContent === "";
+
+  const { updates } = view;
+  const updateState = updateText(updates);
+  if ($("update-state").textContent !== updateState) $("update-state").textContent = updateState;
+  $("update-state").hidden = updateState === "";
+  const newer = updates.notice;
+  $("update-newer").hidden = !newer;
+  $("update-version").textContent = newer?.version ?? "";
+  ($("update-check") as HTMLButtonElement).disabled = updates.status === "checking";
+
+  const progress = newer ? updateProgress(newer) : "";
+  if ($("update-progress").textContent !== progress) $("update-progress").textContent = progress;
+  $("update-progress").hidden = progress === "";
+  const failed = newer ? updateFailure(newer) : "";
+  $("update-failed-text").textContent = failed;
+  $("update-failed").hidden = failed === "";
+  $("update-ask").hidden = newer?.offer !== "choices";
+  const install = newer ? updateButton(newer.offer) : "";
+  $("update-install").textContent = install;
+  $("update-install").hidden = install === "";
+}
+
+/** About & Credits' line on how updating is going, or, in a build that can't install, where
+ *  to get the newer version. */
+function updateProgress({ stage, version }: UpdateNotice): string {
+  switch (stage) {
+    case "notifyOnly":
+      return "This copy of Minerva doesn't update itself: download the new version from its release page.";
+    case "downloading":
+      return `Downloading Minerva ${version}…`;
+    case "downloadingForQuit":
+      return `Downloading Minerva ${version}. It installs when you quit Minerva.`;
+    case "installsWhenYouQuit":
+      return `Minerva ${version} installs when you choose Quit Minerva in the tray.`;
+    case "finishingBeforeQuit":
+      return `Finishing Minerva ${version}'s download, then quitting to install it.`;
+    case "installing":
+      return `Starting Minerva ${version}'s installer. Minerva closes while it installs.`;
+    case "out":
+    case "asking":
+    case "downloadFailed":
+    case "installFailed":
+    case "changed":
+      return "";
+  }
+}
+
+/** What went wrong updating, if it did: nothing was installed. */
+function updateFailure({ stage, version }: UpdateNotice): string {
+  switch (stage) {
+    case "downloadFailed":
+      return `Couldn't download Minerva ${version}, or it wasn't signed as Minerva's own, so nothing was installed.`;
+    case "installFailed":
+      return `Couldn't start Minerva ${version}'s installer, so this version stays.`;
+    case "changed":
+      return `The update changed since Minerva ${version} was found, so nothing was installed.`;
+    default:
+      return "";
+  }
+}
+
+/** The Update button's label, or "" while it offers nothing. */
+function updateButton(offer: UpdateOffer): string {
+  switch (offer) {
+    case "update":
+      return "Update";
+    case "updateNow":
+      return "Update now";
+    case "tryAgain":
+      return "Try again";
+    case "nothing":
+    case "releasePage":
+    case "choices":
+      return "";
+  }
+}
+
+/** About & Credits' line on updates: what the last check came to, or one under way. A newer
+ *  version has a line of its own, which a failed check after it leaves showing. */
+function updateText({ checksOn, status, lastCheckedUnixMs }: Updates): string {
+  const lastChecked = lastCheckedUnixMs === null ? "" : ` (last checked ${momentText(lastCheckedUnixMs)})`;
+  switch (status) {
+    case "notChecked":
+      return checksOn ? "" : "Check for updates is off in Settings: Minerva checks only when you ask.";
+    case "checking":
+      return "Checking for updates…";
+    case "upToDate":
+      return `Minerva is up to date${lastChecked}.`;
+    case "newerVersion":
+      return lastCheckedUnixMs === null ? "" : `Last checked ${momentText(lastCheckedUnixMs)}.`;
+    case "failed":
+      return `Couldn't check for updates${lastChecked}.`;
+  }
 }
 
 /** "Recognised", in the overlay's tag vocabulary. */
@@ -208,6 +336,7 @@ function hotkeyProblems(view: SetupView): string {
 }
 
 function update(next: SetupView) {
+  const before = view?.updates.notice?.stage;
   view = next;
   const needed = view.setup.needed;
   if (needed && needed !== openedFor) {
@@ -217,6 +346,10 @@ function update(next: SetupView) {
     if (!needed) openedFor = null;
     render();
   }
+  // Choosing to update (from the tray, say) shows how it goes, or asks first, in About.
+  const stage = view.updates.notice?.stage;
+  const shows = stage === "asking" || stage === "downloading" || stage === "downloadingForQuit";
+  if (shows && stage !== before && step !== "about") show("about");
 }
 
 listen<SetupView>("setup-state", (e) => update(e.payload));
@@ -249,6 +382,32 @@ $("discord-open").addEventListener("click", () => {
   $("action-error").hidden = true;
   invoke("open_discord").catch(actionError);
 });
+$("update-check").addEventListener("click", () => {
+  $("action-error").hidden = true;
+  invoke("check_for_updates").catch(actionError);
+});
+$("update-whats-new").addEventListener("click", () => {
+  $("action-error").hidden = true;
+  invoke("open_release").catch(actionError);
+});
+$("update-release").addEventListener("click", () => {
+  $("action-error").hidden = true;
+  invoke("open_release").catch(actionError);
+});
+$("update-install").addEventListener("click", () => {
+  $("action-error").hidden = true;
+  invoke("update").catch(actionError);
+});
+for (const [id, choice] of [
+  ["update-now", "now"],
+  ["update-when-i-quit", "whenIQuit"],
+  ["update-later", "later"],
+] as const) {
+  $(id).addEventListener("click", () => {
+    $("action-error").hidden = true;
+    invoke("update_choice", { choice }).catch(actionError);
+  });
+}
 getVersion().then((version) => ($("app-version").textContent = version));
 
 function actionError(error: unknown) {

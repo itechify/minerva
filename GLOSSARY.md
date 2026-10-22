@@ -248,3 +248,15 @@ _Avoid_: item search (Search is the search view's)
 **Bug Report**:
 The `.zip` Minerva saves when the player chooses Bug Report in the tray menu, to go with a bug's issue: everything it read and made of it since launch (up to a day), with crops of the regions it captured. Fed back to the core, it goes through the same states again (ADR 0009).
 _Avoid_: log, diagnostics, dump, trace (to the player; "trace" is its record of inputs, in the code)
+
+### Updating
+
+**Update Check**:
+Minerva asking its feed (`latest.json` on GitHub's newest release) which version is the latest: at launch, every 6 hours while "Check for updates" is on, and whenever the player presses Check for updates. It sends only the version. It comes to up to date, a newer version (shown in the tray and Help & Setup, never on the panels), or "Couldn't check", which is also what one unanswered for 2 minutes comes to (ADR 0019).
+_Avoid_: ping, poll, auto-update (nothing installs by itself)
+
+**Update when I quit**:
+The player's choice, when Help & Setup asks before updating during a Session, to have the newer version download now and install when they choose Quit Minerva, without starting it again. It lasts for this run. Quit Minerva chosen while it is still downloading waits for it; chosen again, it quits without it. The other answers are Update now (install and start it again) and Later (nothing more for now).
+
+**Notify-only**:
+A build that only says a newer version is out, with its release page, and never installs one: the portable `.exe` and dev builds, which the bundler didn't patch.

@@ -155,6 +155,7 @@ These are the Rust crates compiled into the Windows app: the dependencies of `sr
 | [markup5ever](https://github.com/servo/html5ever) | 0.39.0 | MIT OR Apache-2.0 |
 | [memchr](https://github.com/BurntSushi/memchr) | 2.8.3 | Unlicense OR MIT |
 | [mime](https://github.com/hyperium/mime) | 0.3.17 | MIT OR Apache-2.0 |
+| [minisign-verify](https://github.com/jedisct1/rust-minisign-verify) | 0.3.0 | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide) | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide) | 0.9.1 | MIT OR Zlib OR Apache-2.0 |
 | [mio](https://github.com/tokio-rs/mio) | 1.2.4 | MIT |
@@ -256,9 +257,11 @@ These are the Rust crates compiled into the Windows app: the dependencies of `sr
 | [tauri-plugin-global-shortcut](https://github.com/tauri-apps/plugins-workspace) | 2.4.0 | Apache-2.0 OR MIT |
 | [tauri-plugin-opener](https://github.com/tauri-apps/plugins-workspace) | 2.5.5 | Apache-2.0 OR MIT |
 | [tauri-plugin-single-instance](https://github.com/tauri-apps/plugins-workspace) | 2.4.5 | Apache-2.0 OR MIT |
+| [tauri-plugin-updater](https://github.com/tauri-apps/plugins-workspace) | 2.14.0 | Apache-2.0 OR MIT |
 | [tauri-runtime](https://github.com/tauri-apps/tauri) | 2.12.1 | Apache-2.0 OR MIT |
 | [tauri-runtime-wry](https://github.com/tauri-apps/tauri) | 2.12.1 | Apache-2.0 OR MIT |
 | [tauri-utils](https://github.com/tauri-apps/tauri) | 2.10.1 | Apache-2.0 OR MIT |
+| [tempfile](https://github.com/Stebalien/tempfile) | 3.27.0 | MIT OR Apache-2.0 |
 | [tendril](https://github.com/servo/html5ever) | 0.5.1 | MIT OR Apache-2.0 |
 | [thiserror](https://github.com/dtolnay/thiserror) | 2.0.21 | MIT OR Apache-2.0 |
 | [thiserror-impl](https://github.com/dtolnay/thiserror) | 2.0.21 | MIT OR Apache-2.0 |

@@ -8,7 +8,7 @@ use std::task::Poll;
 use std::time::Duration;
 
 /// Who is asking: name, version, purpose and where to find out more. Never a browser UA.
-const USER_AGENT: &str = concat!(
+pub(crate) const USER_AGENT: &str = concat!(
     "Minerva/",
     env!("CARGO_PKG_VERSION"),
     " (personal-use map helper; +https://github.com/itechify/minerva)"

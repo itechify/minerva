@@ -46,6 +46,14 @@
 //! the PC the report came from). So with the Item Card's OSMS item files (ADR 0010),
 //! fetched live only if the run had them, or read from the `osms-items.json` given. No game
 //! window is needed.
+//!
+//! `cargo run -p minerva --example probe update-manifest <out> [--bundle-dir <dir>] [--base-url <url>]`
+//! Update manifest mode, for releasing (`docs/releasing.md`): write the updater's
+//! `latest.json` to `out` for the version in `src-tauri/tauri.conf.json`, published now,
+//! with the setup `.exe` and the MSI each at its GitHub Release address (or under the
+//! `--base-url` given, for the update smoke test's local server) and with its `.sig` (from
+//! `nsis/` and `msi/` under the bundle folder, `target/release/bundle` by default). It refuses a bare `windows-x86_64` key, and a `.sig` that is missing or was signed as
+//! another version. No game window is needed.
 
 use minerva_core::{Minerva, GAME_WINDOW_TITLE, PortalKind, Rect, TitleReader};
 use minerva_lib::{capture, capture_title_frame, gamewin, source::WebSource};
@@ -75,6 +83,14 @@ fn main() {
         if let Err(e) = ceilings(&args[1..]) {
             eprintln!("{e}");
             eprintln!("usage: probe ceilings <out.json> [--osms <osms-set.json>]");
+            std::process::exit(2);
+        }
+        return;
+    }
+    if args.first().map(String::as_str) == Some("update-manifest") {
+        if let Err(e) = update_manifest(&args[1..]) {
+            eprintln!("{e}");
+            eprintln!("usage: probe update-manifest <out> [--bundle-dir <dir>] [--base-url <url>]");
             std::process::exit(2);
         }
         return;
@@ -229,6 +245,41 @@ fn ceilings(args: &[String]) -> Result<(), String> {
     let rows: Vec<String> = ceilings.iter().map(|(id, solo)| format!("  \"{id}\": {solo}")).collect();
     std::fs::write(out, format!("{{\n{}\n}}\n", rows.join(",\n"))).map_err(|e| format!("{out}: {e}"))?;
     println!("Wrote the solo ceilings of {} maps (of {} in the map list) to {out}", ceilings.len(), set.maps().count());
+    Ok(())
+}
+
+/// `<out> [--bundle-dir <dir>] [--base-url <url>]`: write `latest.json` from the built installers' `.sig`s.
+fn update_manifest(args: &[String]) -> Result<(), String> {
+    use minerva_lib::update_manifest::{installers, manifest};
+    let mut rest = args.iter();
+    let out = rest.next().ok_or("no file to write")?;
+    let mut bundle = Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/release/bundle");
+    let mut base = None;
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            "--bundle-dir" => bundle = PathBuf::from(rest.next().ok_or("--bundle-dir needs a folder")?),
+            "--base-url" => base = Some(rest.next().ok_or("--base-url needs an address")?.as_str()),
+            other => return Err(format!("unknown argument {other:?}")),
+        }
+    }
+    let conf = Path::new(env!("CARGO_MANIFEST_DIR")).join("tauri.conf.json");
+    let json = std::fs::read(&conf).map_err(|e| format!("{}: {e}", conf.display()))?;
+    let conf: serde_json::Value = serde_json::from_slice(&json).map_err(|e| format!("tauri.conf.json: {e}"))?;
+    let version = conf["version"].as_str().ok_or("tauri.conf.json has no version")?;
+    let mut found = installers(version);
+    for installer in &mut found {
+        let sig = bundle.join(installer.folder).join(format!("{}.sig", installer.file));
+        installer.signature = match std::fs::read_to_string(&sig) {
+            Ok(text) => Some(text),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(format!("{}: {e}", sig.display())),
+        };
+    }
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let written = manifest(version, now, base, &found).map_err(|why| format!("{}: {why}", bundle.display()))?;
+    std::fs::write(out, written).map_err(|e| format!("{out}: {e}"))?;
+    let files: Vec<&str> = found.iter().map(|i| i.file.as_str()).collect();
+    println!("Wrote {out} for Minerva {version}: {}", files.join(" and "));
     Ok(())
 }
 

@@ -135,7 +135,8 @@
                 <details class="qa" id="free">
                   <summary>Is Minerva free? Does it need an account?</summary>
                   <p>
-                    It's free, and you never sign up. There's no analytics and no update check. Putting a character on the
+                    It's free, and you never sign up. There's no analytics, and its check for a new version sends only the
+                    version you have (<a href="#self-update">see how</a>). Putting a character on the
                     Map Leaderboards needs no account either: a secret key Minerva makes on your PC ties the name to it
                     (<a href="#leaderboard-public">see what the site shows</a>).
                   </p>
@@ -164,10 +165,15 @@
                       The shown map's picture and its mobs' animations, once, kept until they go 30 days unused. An item's
                       picture only when a card lists it to pick from.
                     </dd>
+                    <dt>New versions</dt>
+                    <dd>
+                      A small file from GitHub naming the newest release, when you start Minerva, every 6 hours while it
+                      runs, and when you ask. <a href="#self-update">See how it updates</a>.
+                    </dd>
                   </dl>
                   <p>Item Lookup also asks MeowDB's search for an item's name: <a href="#meowdb">see below</a>.</p>
                   <p>
-                    It sends nothing but a character's bests on the
+                    It sends nothing but the version you have, with each request, and a character's bests on the
                     <a href="#leaderboard-appear">Map Leaderboards</a>, which a new character shares by default: their
                     bests go to this site, with their name, job, level and dates, and your Leaderboard Key, which the
                     site keeps only as a hash. Turn <strong>Share</strong> off under a character's name in your
@@ -280,10 +286,55 @@
                 <details class="qa" id="update">
                   <summary>How do I update Minerva?</summary>
                   <p>
-                    Quit the running Minerva first: click its owl in the notification area, by the clock, and choose
-                    <strong>Quit Minerva</strong>. Then run the new version's setup. Your settings, hotkeys and Personal
-                    Bests carry over. Minerva doesn't check for updates itself:
-                    <a href="https://github.com/itechify/minerva/releases">each release</a> says what's new.
+                    From inside Minerva. When a new version is out (<a href="#self-update">see how it checks</a>), click
+                    its owl in the notification area, by the clock, and choose <strong>Update to</strong> the new version,
+                    or press <strong>Update</strong> in Help &amp; Setup's About &amp; Credits. Minerva downloads it,
+                    installs it with a small progress window, and starts again. Your settings, hotkeys and Personal Bests
+                    carry over. <a href="https://github.com/itechify/minerva/releases">Each release</a> says what's new.
+                  </p>
+                  <p>
+                    The portable <code>.exe</code> doesn't update itself: its owl's menu opens the new version's release
+                    page instead. Quit the running Minerva first (choose <strong>Quit Minerva</strong> in the owl's menu),
+                    then download the new portable <code>.exe</code> and run it. Your settings and Personal Bests carry
+                    over.
+                  </p>
+                </details>
+                <details class="qa" id="self-update">
+                  <summary>Does Minerva update itself?</summary>
+                  <p>
+                    Never without you. Minerva asks GitHub, where its releases are, whether a new version is out: when it
+                    starts, every 6 hours while it runs, and when you press <strong>Check for updates</strong> in Help &amp;
+                    Setup's About &amp; Credits. The request sends only the version you have, nothing about you or your
+                    game. A new version shows in the owl's menu and tooltip, in the notification area, and in Help &amp;
+                    Setup, with a <strong>What's new</strong> link to its release. Never on the panels over the game, and
+                    nothing is downloaded until you choose to update. There's no skipping a version:
+                    <strong>Later</strong> leaves the notice where it is, quietly.
+                  </p>
+                  <p>
+                    When you choose to update, Minerva downloads the new version, checks it's signed as Minerva's own,
+                    and installs it with a small progress window, then starts again. If you installed with the
+                    <code>.msi</code>, Windows asks for admin rights first, as the MSI installs for all users. If the
+                    download fails, or isn't signed as Minerva's own, Help &amp; Setup says so and nothing is installed:
+                    try again, or download it from the release's page. If the installer fails, it says why, and the
+                    version you have stays. Minerva only installs the version it told you about, and never one as old as
+                    yours: if the release changes before the download (taken down, say), it says so, installs nothing,
+                    and checks again.
+                  </p>
+                  <p>
+                    Updating restarts Minerva, so while you're grinding it asks first: "Updating restarts Minerva and
+                    ends this Session." Choose <strong>Update now</strong>, or <strong>Update when I quit</strong>, and it
+                    installs when you next choose <strong>Quit Minerva</strong>, without starting again. If it's still
+                    downloading then, Minerva's windows close and its owl says it's finishing the update before quitting;
+                    choose <strong>Quit now, without updating</strong> there to quit at once instead. Your Personal
+                    Bests are saved as you set them either way.
+                  </p>
+                  <p>
+                    The portable <code>.exe</code> never installs anything: it says the new version is out, with a link
+                    to its release page (<a href="#update">see how to update it</a>).
+                  </p>
+                  <p>
+                    To stop the checks, turn off <strong>Check for updates</strong> in Settings, the gear at the top of the
+                    panel. The button in Help &amp; Setup still checks when you press it.
                   </p>
                 </details>
               </div>

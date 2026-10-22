@@ -893,6 +893,11 @@ impl Session {
         self.undo = None;
     }
 
+    /// The Session has started: it has figures, since the first EXP gain.
+    pub fn running(&self) -> bool {
+        self.figures.is_some()
+    }
+
     /// The player's reset: as [`Session::reset`], but the Session it ends is set aside
     /// until the EXP next changes, for [`Session::undo_reset`]. Pressed again while
     /// waiting, the one set aside stays.

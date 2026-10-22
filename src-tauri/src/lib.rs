@@ -34,13 +34,15 @@ mod setup;
 mod sizemove;
 pub mod source;
 mod tray;
+pub mod update_manifest;
+mod updates;
 mod view;
 
 use minerva_core::{
     Action, DEAL_FINDER_CAPTURE_MS, Minerva, ExpBarReader, ExpBarReading, ExpFigures, Frame, GameWindow, ItemCapture, ItemTooltipReader,
     ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
     Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, Size, StatusBarCapture, StatusBarReader, StatusBarReading,
-    TitleReader, TitleReading, VisitBest, default_title_region,
+    TitleReader, TitleReading, UpdateAnswer, VisitBest, default_title_region,
 };
 use source::WebSource;
 use bests_window::{BestsWindow, PersonalBestsView};
@@ -137,6 +139,11 @@ pub(crate) enum Command {
     OpenBestsLeaderboard { character: Option<String>, id: String },
     /// The Map Leaderboards answered the core's upload `id` (or it couldn't be made).
     LeaderboardAnswer { id: u64, answer: LeaderboardAnswer },
+    /// The core's check `id` for a newer version came to this.
+    UpdateAnswer { id: u64, answer: UpdateAnswer },
+    /// The core's download `id` of a newer version came to this: its installer, checked
+    /// against the public key, or why not.
+    UpdateDownload { id: u64, fetched: Result<updates::Fetched, String> },
     /// The player picked the item with this MeowDB ID from the ones an Item Lookup found
     /// sharing the name it read.
     PickItem(String),
@@ -256,6 +263,9 @@ pub fn capture_title_frame(client: ScreenRect, at_ms: u64) -> Result<Frame, Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut context = tauri::generate_context!();
+    // An http feed only on this computer, for the update smoke test (ADR 0019).
+    updates::allow_local_feed(context.config_mut());
     tauri::Builder::default()
         // First, so a second launch exits before it sets anything up: only one
         // Minerva runs, and the running one shows itself instead.
@@ -265,6 +275,8 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        // Checks for a newer version (ADR 0019), driven from Rust only: no capability.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // The views last sent to our pages, managed before the windows in tauri.conf.json
         // are made: a page loads and asks for its view while the rest are still being made,
         // before `setup` below runs.
@@ -313,6 +325,9 @@ pub fn run() {
             let (prices_file, saved_prices) =
                 market_prices::MarketPricesFile::load(market_prices::path(app.handle())?);
             minerva.restore_market_prices(saved_prices);
+            // Whether this build can update in place, or only say a newer version is out.
+            let build = updates::build();
+            minerva.on_build(build);
             // Where a tool of the player's own leaves prices, taken in as the core loop runs.
             let market_imports = market_prices::imports_path(app.handle())?;
             let (commands, commands_rx) = mpsc::channel();
@@ -322,7 +337,7 @@ pub fn run() {
             // Registered only while the game or one of our windows is in front.
             let hotkeys = hotkeys::install(app, &minerva.panel_state().hotkeys, commands.clone())?;
             // The one way to quit at any time, the game open or not.
-            tray::install(app, commands.clone())?;
+            let tray = tray::install(app, commands.clone())?;
             app.manage(commands.clone());
             let (picks, picks_rx) = mpsc::channel();
             app.manage(Bridge {
@@ -380,19 +395,16 @@ pub fn run() {
                 item_card,
                 deal_badges,
                 hotkeys,
+                tray,
             };
             // The uploads to the Map Leaderboards, with the Leaderboard Key, which the core never has.
             let key = leaderboards::KeyFile::new(leaderboards::key_path(app.handle())?);
             let uploader = leaderboards::Uploader::new(key, app.state::<Sender<Command>>().inner().clone());
+            let updater = updates::Updater::new(app.handle().clone(), build, app.state::<Sender<Command>>().inner().clone());
             std::thread::Builder::new().name("core-loop".into()).spawn(move || {
-                let files = Files {
-                    settings: settings_path,
-                    bests: bests_file,
-                    market_prices: prices_file,
-                    market_imports,
-                    uploader,
-                };
-                core_loop(handle, windows, minerva, reader, channels, files)
+                let files =
+                    Files { settings: settings_path, bests: bests_file, market_prices: prices_file, market_imports };
+                core_loop(handle, windows, minerva, reader, channels, files, Online { uploader, updater })
             })?;
             Ok(())
         })
@@ -431,10 +443,15 @@ pub fn run() {
             hotkey_settings::hotkeys_reset,
             hotkey_settings::hotkeys_undo_reset,
             hotkey_settings::game_data_refresh,
+            hotkey_settings::check_for_updates_set,
             setup::open_hotkey_settings,
             setup::open_site,
             setup::open_github,
             setup::open_discord,
+            setup::check_for_updates,
+            setup::open_release,
+            setup::update,
+            setup::update_choice,
             grind_tracker::grind_tracker_set,
             grind_tracker::grind_tracker_height,
             grind_tracker::grind_tracker_view,
@@ -470,7 +487,7 @@ pub fn run() {
             deal_badges::deal_badge_open,
             deal_badges::deal_margin_set,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
 
@@ -487,17 +504,47 @@ struct Windows {
     deal_badges: DealBadgesWindow,
     /// Not a window, but registered and released as the foreground changes.
     hotkeys: hotkeys::GlobalHotkeys,
+    /// Not a window either: the owl in the tray, which shows a newer version.
+    tray: tray::Tray,
 }
 
 /// Where the core loop saves the settings, the Personal Bests and the market prices, and
-/// the folder it takes Market Imports from; and what makes its uploads to the Map
-/// Leaderboards, with the Leaderboard Key's file.
+/// the folder it takes Market Imports from.
 struct Files {
     settings: PathBuf,
     bests: bests::BestsFile,
     market_prices: market_prices::MarketPricesFile,
     market_imports: PathBuf,
+}
+
+/// What of the settings, the Personal Bests and the market prices the core loop saved last
+/// (or restored at startup): the settings themselves, and the core's revisions of the others.
+struct Saved {
+    settings: minerva_core::Settings,
+    bests: u64,
+    prices: u64,
+}
+
+/// What the core loop asks over the network for the core: the uploads to the Map
+/// Leaderboards (with the Leaderboard Key's file), and the checks for a newer version, with
+/// its downloads and installs.
+struct Online {
     uploader: leaderboards::Uploader,
+    updater: updates::Updater,
+}
+
+/// Save whatever Quit Minerva saves to `files`: the Personal Bests, the market prices, and
+/// the settings if they changed since `saved`, which then holds them.
+fn save_for_quit(minerva: &Minerva, files: &Files, saved: &mut Saved) {
+    save_bests(minerva, &files.bests, &mut saved.bests);
+    save_market_prices(minerva, &files.market_prices, &mut saved.prices);
+    let current = minerva.settings();
+    if current != saved.settings {
+        if let Err(e) = settings::save(&files.settings, &current) {
+            error!("saving settings failed: {e}");
+        }
+        saved.settings = current;
+    }
 }
 
 /// Save the Personal Bests if the core's bests revision moved on from `saved` (the one
@@ -683,12 +730,12 @@ fn core_loop(
     mut reader: ReaderThread,
     channels: Channels,
     files: Files,
+    online: Online,
 ) {
-    let settings_path = files.settings;
-    let mut uploader = files.uploader;
+    let Online { mut uploader, mut updater } = online;
     // Restored at startup: saved already.
-    let mut bests_saved = minerva.bests_revision();
-    let mut prices_saved = minerva.market_prices_revision();
+    let mut saved =
+        Saved { settings: minerva.settings(), bests: minerva.bests_revision(), prices: minerva.market_prices_revision() };
     let Windows {
         overlay: mut window,
         setup: mut setup_windows,
@@ -698,9 +745,9 @@ fn core_loop(
         mut item_card,
         mut deal_badges,
         mut hotkeys,
+        mut tray,
     } = windows;
-    let mut saved = minerva.settings();
-    let mut pending = (saved.clone(), Instant::now());
+    let mut pending = (saved.settings.clone(), Instant::now());
     let mut emitted: Option<PanelState> = None;
     let mut game = None;
     let mut expanded_height = EXPANDED_HEIGHT;
@@ -775,6 +822,13 @@ fn core_loop(
             Ok(Command::LeaderboardAnswer { id, answer }) => {
                 minerva.on_leaderboard_answer(id, answer);
             }
+            Ok(Command::UpdateAnswer { id, answer }) => {
+                minerva.on_update_answer(id, answer);
+            }
+            Ok(Command::UpdateDownload { id, fetched }) => {
+                let answer = updater.downloaded(id, fetched);
+                minerva.on_update_download(id, answer);
+            }
             Ok(Command::PickItem(id)) => {
                 let request = minerva.pick_item(&id);
                 carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
@@ -820,17 +874,10 @@ fn core_loop(
             Ok(Command::BugReport) => bug_reports::save(&app, &mut minerva, &window.overlay),
             Ok(Command::Error { from, message }) => minerva.note_error(&from, &message),
             Ok(Command::Quit) => {
-                // Whatever the player changed last (a drag, say) is saved first.
-                save_bests(&minerva, &files.bests, &mut bests_saved);
-                save_market_prices(&minerva, &files.market_prices, &mut prices_saved);
-                let current = minerva.settings();
-                if current != saved
-                    && let Err(e) = settings::save(&settings_path, &current)
-                {
-                    error!("saving settings failed: {e}");
-                }
-                app.exit(0);
-                return;
+                // The core says whether to quit now (below), or to install first the newer
+                // version the player chose to install when they quit; chosen again while
+                // that waits, it quits at once.
+                minerva.act(Action::Quit);
             }
             Ok(Command::GestureStarted(gesture)) => window.gesture_started(gesture),
             Ok(Command::Resized(size)) => window.player_resized(size),
@@ -971,6 +1018,29 @@ fn core_loop(
         }
         // The core asks for uploads to the Map Leaderboards on a tick: each is made once.
         uploader.sync(&minerva.panel_state().leaderboard_uploads);
+        // And for a check for a newer version, and its download: each is run once.
+        updater.sync(&minerva.panel_state().updates);
+        // Its install, on this thread: whatever Quit Minerva saves is saved first, as the
+        // installer ends Minerva with `process::exit(0)`, and nothing after runs.
+        if let Some(install) = updater.install(&minerva.panel_state().updates) {
+            let (id, why) = match install {
+                Ok(install) => {
+                    let id = install.id;
+                    save_for_quit(&minerva, &files, &mut saved);
+                    // Saved, as on the way to quitting: nothing waits to be saved again.
+                    pending = (saved.settings.clone(), Instant::now());
+                    // Nor would the owl be taken out of the tray after: it would stay there,
+                    // a ghost, until the pointer passed over it. Back if it didn't start.
+                    tray.set_visible(false);
+                    let why = install.run();
+                    tray.set_visible(true);
+                    (id, why)
+                }
+                Err(id) => (id, "its download is gone".to_string()),
+            };
+            error!("starting the installer failed: {why}");
+            minerva.on_update_install_failed(id, &why);
+        }
         // Prices a tool of the player's own left (ADR 0013), saved below like those typed.
         // Left waiting while the prices can't be saved, rather than taken in and lost.
         if Instant::now() >= next_import_check && files.market_prices.saves() {
@@ -1005,10 +1075,20 @@ fn core_loop(
         }
         let state = minerva.panel_state();
         if state.quit {
-            save_bests(&minerva, &files.bests, &mut bests_saved);
-            save_market_prices(&minerva, &files.market_prices, &mut prices_saved);
+            // Whatever the player changed last (a drag, say) is saved first.
+            save_for_quit(&minerva, &files, &mut saved);
             app.exit(0);
             return;
+        }
+        // Live even while Quit Minerva waits for the update: it says so, and Quit Minerva
+        // chosen again quits at once.
+        tray.sync(&state.updates);
+        if state.updates.quitting {
+            // Waiting for the download to install: no window shows again.
+            for webview in app.webview_windows().values() {
+                let _ = webview.hide();
+            }
+            continue;
         }
         setup_windows.sync(state, game.map(|g| g.client));
         if emitted.as_ref() != Some(state) {
@@ -1029,14 +1109,14 @@ fn core_loop(
         if current != pending.0 {
             pending = (current, Instant::now());
         }
-        if pending.0 != saved && pending.1.elapsed() >= SAVE_DELAY {
-            if let Err(e) = settings::save(&settings_path, &pending.0) {
+        if pending.0 != saved.settings && pending.1.elapsed() >= SAVE_DELAY {
+            if let Err(e) = settings::save(&files.settings, &pending.0) {
                 error!("saving settings failed: {e}");
             }
-            saved = pending.0.clone();
+            saved.settings = pending.0.clone();
         }
-        save_bests(&minerva, &files.bests, &mut bests_saved);
-        save_market_prices(&minerva, &files.market_prices, &mut prices_saved);
+        save_bests(&minerva, &files.bests, &mut saved.bests);
+        save_market_prices(&minerva, &files.market_prices, &mut saved.prices);
     }
 }
 

@@ -43,7 +43,7 @@ pub fn capture_rgba(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, String> {
         if lines != h {
             return Err(format!("GetDIBits returned {lines} of {h} rows"));
         }
-        for px in buf.chunks_exact_mut(4) {
+        for px in buf.as_chunks_mut::<4>().0 {
             px.swap(0, 2); // BGRA -> RGBA
             px[3] = 0xFF;
         }

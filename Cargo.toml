@@ -6,7 +6,8 @@ default-members = ["crates/minerva-core"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.85"
+# tauri-plugin-updater 2.14 needs 1.90.
+rust-version = "1.90"
 license = "MIT"
 
 [workspace.dependencies]

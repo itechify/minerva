@@ -142,6 +142,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "license": "MIT",
     "copyright": "Copyright © 2026 Jeffrey Davis",
     "icon": [
@@ -151,5 +152,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU0MzBEOEU0NDVCNEY0RDEKUldUUjlMUkY1Tmd3Vk5HRXpmVlV6WjFkTUlXa0tiNHp3dVNBNVYxM1cvYldJZGZjMDZ3K1F4Z1AK",
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

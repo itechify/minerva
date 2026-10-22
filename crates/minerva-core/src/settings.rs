@@ -75,6 +75,9 @@ pub struct Settings {
     /// read at a launch: everyone in them counts as met then, so none of them starts shared.
     #[serde(default)]
     pub map_leaderboards_met: Option<Vec<String>>,
+    /// "Check for updates" (Settings' switch): Minerva checks for a newer version by itself,
+    /// at launch and every 6 hours (ADR 0019). Files from before it have it on.
+    pub check_for_updates: bool,
 }
 
 impl Default for Settings {
@@ -98,6 +101,7 @@ impl Default for Settings {
             deal_margin_percent: 0,
             map_leaderboards: Vec::new(),
             map_leaderboards_met: Some(Vec::new()),
+            check_for_updates: true,
         }
     }
 }

@@ -42,6 +42,7 @@ use crate::recogniser::{TitleLines, TitleReading};
 use crate::session::{ExpTracking, TrackingState};
 use crate::settings::Settings;
 use crate::status_bar::{StatusBar, StatusBarCapture, StatusBarReading};
+use crate::updates::{Build, DownloadAnswer, UpdateAnswer, UpdateJob, UpdateStep};
 use crate::{MINERVA_VERSION, Minerva, Frame, PanelControl, PanelState};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -238,6 +239,14 @@ pub enum Event {
     /// The Map Leaderboards answered upload `id`, for the Character named `name` (empty for an
     /// upload no longer under way), with `answer`.
     LeaderboardAnswer { id: u64, name: String, answer: LeaderboardAnswer },
+    /// Check `id` for a newer version came to `answer`.
+    UpdateAnswer { id: u64, answer: UpdateAnswer },
+    /// What this build can do with a newer version: install it, or only say it is out.
+    Build { build: Build },
+    /// Download `id` of a newer version came to `answer`.
+    UpdateDownload { id: u64, answer: DownloadAnswer },
+    /// The installer download `id` fetched couldn't be started, for `why`.
+    UpdateInstallFailed { id: u64, why: String },
     /// Not an input: an error the shell or one of our windows ran into (`from`), which
     /// would otherwise go nowhere.
     Error { from: String, message: String },
@@ -357,6 +366,12 @@ pub struct Line {
     /// The uploads to the Map Leaderboards the core asked the shell for after.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub uploads: Vec<AskedUpload>,
+    /// The check for a newer version the core asked the shell for after, by its id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_check: Option<u64>,
+    /// The step of updating the core asked the shell for after: a download, or an install.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_job: Option<UpdateJob>,
     /// The crop of the frame read, kept in the report under this name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crop: Option<String>,
@@ -365,7 +380,19 @@ pub struct Line {
 impl Line {
     fn new(t: u64, ticked: bool, event: Event) -> Self {
         let (answers, notes, uploads) = (Vec::new(), Vec::new(), Vec::new());
-        Self { t, ticked, event, answers, notes, grind_tracker: None, map: None, uploads, crop: None }
+        Self {
+            t,
+            ticked,
+            event,
+            answers,
+            notes,
+            grind_tracker: None,
+            map: None,
+            uploads,
+            update_check: None,
+            update_job: None,
+            crop: None,
+        }
     }
 }
 
@@ -606,6 +633,10 @@ struct Last {
     exp_bar_rgba: Vec<u8>,
     /// The id of the last upload to the Map Leaderboards written down as asked for.
     upload_id: u64,
+    /// The id of the last check for a newer version written down as asked for.
+    update_check: u64,
+    /// The last step of updating written down as asked for.
+    update_job: Option<UpdateJob>,
 }
 
 /// Writes the trace down as the core takes its inputs in, and keeps the crops.
@@ -664,6 +695,8 @@ impl Recorder {
                 status_bar: None,
                 exp_bar_rgba: Vec::new(),
                 upload_id: 0,
+                update_check: 0,
+                update_job: None,
             },
             crops: VecDeque::new(),
             maps: BTreeSet::new(),
@@ -778,6 +811,15 @@ impl Recorder {
                 let entries = upload.entries.as_ref().map(Vec::len);
                 line.uploads.push(AskedUpload { id: upload.id, name: upload.name.clone(), entries });
                 self.last.upload_id = self.last.upload_id.max(upload.id);
+            }
+            if let Some(id) = outcome.state.updates.check.filter(|&id| id > self.last.update_check) {
+                line.update_check = Some(id);
+                self.last.update_check = id;
+            }
+            let job = outcome.state.updates.job;
+            if job != self.last.update_job {
+                line.update_job = job;
+                self.last.update_job = job;
             }
             self.last.state = outcome.state.clone();
         }
@@ -909,7 +951,11 @@ impl Recorder {
         let Ok(json) = serde_json::to_string(&line) else { return };
         let launch = matches!(
             line.event,
-            Event::Restore { .. } | Event::RestoreBests { .. } | Event::BestsLost {} | Event::RestoreMarketPrices { .. }
+            Event::Restore { .. }
+                | Event::RestoreBests { .. }
+                | Event::BestsLost {}
+                | Event::RestoreMarketPrices { .. }
+                | Event::Build { .. }
         );
         if launch {
             self.launch.push_str(&json);
@@ -1492,6 +1538,18 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::LeaderboardAnswer { id, answer, .. } => {
                 minerva.on_leaderboard_answer(id, answer);
             }
+            Event::UpdateAnswer { id, answer } => {
+                minerva.on_update_answer(id, answer);
+            }
+            Event::Build { build } => {
+                minerva.on_build(build);
+            }
+            Event::UpdateDownload { id, answer } => {
+                minerva.on_update_download(id, answer);
+            }
+            Event::UpdateInstallFailed { id, why } => {
+                minerva.on_update_install_failed(id, &why);
+            }
             Event::Error { from, message } => minerva.note_error(&from, &message),
             Event::BugReport {} => minerva.mark_bug_report(),
         }
@@ -1558,6 +1616,10 @@ impl Recording {
                     | Event::ShowOnLeaderboards { .. }
                     | Event::SendToLeaderboardsAgain { .. }
                     | Event::LeaderboardAnswer { .. }
+                    | Event::UpdateAnswer { .. }
+                    | Event::Build { .. }
+                    | Event::UpdateDownload { .. }
+                    | Event::UpdateInstallFailed { .. }
                     | Event::Error { .. }
                     | Event::BugReport {}
             );
@@ -1565,6 +1627,8 @@ impl Recording {
                 || !line.notes.is_empty()
                 || line.map.is_some()
                 || !line.uploads.is_empty()
+                || line.update_check.is_some()
+                || line.update_job.is_some()
                 || line.answers.iter().any(Answer::is_set);
             let quiet = consequences.is_empty()
                 && matches!(
@@ -1609,6 +1673,12 @@ impl Line {
         out.extend(self.uploads.iter().map(|upload| match upload.entries {
             Some(entries) => format!("Map Leaderboards upload {} asked: {:?}'s {entries} entries", upload.id, upload.name),
             None => format!("Map Leaderboards upload {} asked: deleting {:?}'s entries", upload.id, upload.name),
+        }));
+        out.extend(self.update_check.map(|id| format!("update check {id} asked")));
+        out.extend(self.update_job.map(|job| match job.step {
+            UpdateStep::Download => format!("update download {} asked", job.id),
+            UpdateStep::Install { relaunch: true } => format!("update download {}'s install asked, relaunching", job.id),
+            UpdateStep::Install { relaunch: false } => format!("update download {}'s install asked, not relaunching", job.id),
         }));
         out
     }
@@ -1812,6 +1882,20 @@ impl Event {
                 };
                 format!("Map Leaderboards upload {id} for {name:?}: {said}")
             }
+            Event::UpdateAnswer { id, answer: UpdateAnswer::Latest { version } } => {
+                format!("update check {id}: the latest version is {version}")
+            }
+            Event::UpdateAnswer { id, answer: UpdateAnswer::Failed { why } } => format!("update check {id} failed: {why}"),
+            Event::Build { build: Build::Nsis } => "build installed with the setup .exe: updates in place".to_string(),
+            Event::Build { build: Build::Msi } => "build installed with the .msi: updates in place".to_string(),
+            Event::Build { build: Build::NotifyOnly } => "portable or dev build: updates are notify-only".to_string(),
+            Event::UpdateDownload { id, answer: DownloadAnswer::Downloaded { version } } => {
+                format!("update download {id}: {version} downloaded, its signature checked")
+            }
+            Event::UpdateDownload { id, answer: DownloadAnswer::Failed { why } } => {
+                format!("update download {id} failed: {why}")
+            }
+            Event::UpdateInstallFailed { id, why } => format!("update download {id}'s installer didn't start: {why}"),
             Event::WallClock { unix_ms } => format!("wall clock {unix_ms} (ms since 1970)"),
             Event::Error { from, message } => format!("{from} error: {message}"),
             Event::BugReport {} => "Bug Report saved".to_string(),
@@ -1888,7 +1972,7 @@ fn thousands(n: u64) -> String {
     let digits = n.to_string();
     let mut out = String::new();
     for (i, digit) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(digit);
