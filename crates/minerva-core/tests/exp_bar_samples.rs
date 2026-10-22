@@ -5,7 +5,10 @@
 //!   ([`Minerva::on_exp_bar_frame`]): they test reading the figures.
 //! - The `--window` samples in `samples/minimap` are whole game windows: the bottom of their
 //!   client area, captured as the shell captures it for the Status Bar, tests finding the
-//!   figures there too.
+//!   figures there too; so do the `-strip` samples here, the bottom of a client area at
+//!   another UI Size (ADR 0020) across its full width, fed whole as a Status Bar capture.
+//! - Each sample is also fed scaled to sizes no sample is at: there it reads as what it
+//!   shows, or as unreadable.
 //!
 //! - Single samples are named for their reading: `<exp>__<percent>[--variant].png`
 //!   ("160__3.81--kerning-city-window"), or `unreadable[--variant].png`. The

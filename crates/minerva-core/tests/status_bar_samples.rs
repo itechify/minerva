@@ -11,7 +11,8 @@
 //!   record mode at each of the game's UI Sizes (Default Ratio, with its filter or not, and
 //!   Ideal Ratio) at 1366x768 to 2560x1440: drawn at x0.64 to x1.28 of the rest.
 //! - Each frame is fed as it is and as the darker colours of live captures (`prep.rs`), to a
-//!   core of its own, at the screen's origin.
+//!   core of its own, at the screen's origin; and scaled to sizes no sample is at, where it
+//!   may read as unreadable, and is found where it is at that size (ADR 0020).
 //! - The `--window` samples in `samples/minimap` are whole game windows: the bottom of their
 //!   client area, as the shell captures it, reads too.
 

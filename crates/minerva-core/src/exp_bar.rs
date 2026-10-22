@@ -5,11 +5,13 @@
 //! 1. Find the brackets: the only yellow-green glyphs in the figures, a pair of narrow
 //!    upright components with the same top and bottom. The bar's fill below is the same
 //!    colour but never pairs up like that. If the mark takes in another pair (the HP
-//!    figures to the left), the rightmost pair is the EXP's.
+//!    figures to the left), the rightmost pair is the EXP's. Their height measures the figures' UI
+//!    Size (ADR 0020): figures at another are scaled to the samples' size, and read as below.
 //! 2. The digits are neutral light grey on the dark slate bar, as tall as the brackets.
-//!    The EXP is the cluster of ink just left of "[", stopping at the "EXP." label (taller
-//!    than the brackets) or a gap wider than between digits; the percentage is the ink
-//!    between the brackets.
+//!    The EXP is the cluster of ink just left of "[", back to the "EXP." label (taller than
+//!    the brackets); with no label just left of it (a gap wider than between digits, or the
+//!    edge of what was captured), it is unreadable. The percentage is the ink between the
+//!    brackets.
 //! 3. ocrs reads both as black-on-white lines, enlarged twice over. Only their digits
 //!    count: the percentage always has two decimals, so its digits are hundredths of a
 //!    percent.

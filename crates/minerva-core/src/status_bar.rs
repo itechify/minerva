@@ -1,10 +1,13 @@
 //! The Status Bar reader (ADR 0016): finds the game's Status Bar at the bottom of the client
 //! area and reads the Character's level, job and name from it.
 //!
-//! The game draws its UI at a fixed pixel size, and pins the Status Bar to the bottom of the
-//! client area. The shell captures a strip there; how far up the bar sits in it isn't
+//! The game pins the Status Bar to the bottom of the client area, and draws it at the UI Size
+//! (ADR 0020). The shell captures a strip there; how far up the bar sits in it isn't
 //! assumed, it is found:
 //!
+//! 0. The bar's UI Size is measured by its LV box, found at any size (below), [`BOX_H`] rows
+//!    tall at the samples' size; a capture at another is scaled to the samples' size, read as
+//!    below, and what was found is put back where it is in the capture.
 //! 1. The level is written in orange tiles (255,148,21), one per digit, [`TILE_PITCH`] px
 //!    apart, in a dark grey box (the "LV." box). The tiles are where orange components of a
 //!    tile's size line up at that pitch, with nothing but the box around them. Live captures

@@ -4,7 +4,7 @@ status: accepted
 
 # Readers find the game's UI Size, and read at the samples' size
 
-The readers that find the game's UI in a capture of the client area (the Player Shop's list, ADR 0014; the Status Bar and its EXP figures, ADRs 0016 and 0017) were written on the premise that the game draws its UI at a fixed pixel size, whatever the client area's size. It doesn't. The game sizes its UI from a setting and the window's size together, the UI Size: its Default Ratio keeps the share of the screen the UI had at 1366×768 (×1.5625 at 1920×1200), and its other ratio picks a size for the resolution (×1 at 1920×1200, about ×1.8 at 2560×1600). The scales aren't whole numbers, and the game offers no list of them. Every sample so far is at one UI Size, the maintainer's: a Player Shop listing's band 253 px wide. A player at another found no shop, and no Status Bar, at either of two window sizes (#130).
+The readers that find the game's UI in a capture of the client area (the Player Shop's list, ADR 0014; the Status Bar and its EXP figures, ADRs 0016 and 0017) were written on the premise that the game draws its UI at a fixed pixel size, whatever the client area's size. It doesn't. The game sizes its UI from a setting and the window's size together, the UI Size: its Default Ratio keeps the share of the screen the UI had at 1366×768 (the window's height over 768: ×1.5625 at 1920×1200), sharpened or not (Default Ratio (Filter Applied)), and its Ideal Ratio picks a size for the resolution (×1 from 1366×768 to 1920×1200, ×2 at 2560×1440, about ×1.8 at 2560×1600). The scales aren't whole numbers, and the game offers no list of them. Every sample so far is at one UI Size, the maintainer's: a Player Shop listing's band 253 px wide. A player at another found no shop, and no Status Bar, at either of two window sizes (#130).
 
 ## The decision
 
@@ -20,5 +20,7 @@ The readers that find the game's UI in a capture of the client area (the Player 
 
 ## Consequences
 
-- The Status Bar and its EXP figures still assume the samples' UI Size: they follow this decision when a sample at another shows them failing.
+- The Status Bar follows this decision since #132, measured by its LV box (47 rows at the samples' size), and so do its EXP figures, measured by their brackets (11 rows). The strip captured for the bar is 128 rows, room for it at ×1.9 of the samples'.
+- Sharpening leaves a dark fringe along the UI's edges, where the game's filter puts it and where Catmull-Rom does. The Status Bar's checks for its box and for covered text take a fringe with the slate's tint, and a pixel or two of black, beside the text; the pointer's outline is far more black than that, and still covers it.
+- A sample the tests scale with a bilinear filter often reads as unreadable (the blend from a tile's orange into the box isn't the box's grey): unreadable, never wrong, as this decision allows. The game's own sizes read whole.
 - A reader that finds nothing saves no crop in a Bug Report, so a UI Size it can't find leaves no frame to make a sample of: such frames come from `probe item` or `probe record` until it does.
