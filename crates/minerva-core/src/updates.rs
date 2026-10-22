@@ -226,6 +226,16 @@ enum Updating {
     Changed,
 }
 
+/// What choosing to update comes to.
+pub(crate) enum Chosen {
+    /// Help & Setup shows how updating goes, or asks first.
+    Shown,
+    /// The release page opens, if a newer version is known: this build can't install it.
+    ReleasePage,
+    /// Nothing: Quit Minerva waits for the download, and Minerva is quitting.
+    Nothing,
+}
+
 /// Checks for a newer version, and downloads and installs it when the player chooses: when
 /// each is due, and what the last came to.
 #[derive(Default)]
@@ -271,11 +281,13 @@ impl Updater {
     }
 
     /// The player chose to update (the tray's "Update to X.Y.Z…", or Help & Setup's Update),
-    /// with a Session `running` or not. Returns whether it did anything, which Help & Setup
-    /// shows: nothing in a build that can't install, or with no newer version known.
-    pub fn choose(&mut self, running: bool) -> bool {
+    /// with a Session `running` or not.
+    pub fn choose(&mut self, running: bool) -> Chosen {
+        if self.quitting {
+            return Chosen::Nothing;
+        }
         if !self.can_install() {
-            return false;
+            return Chosen::ReleasePage;
         }
         if self.updating == Updating::Installing {
             // Minerva ends at any moment.
@@ -284,12 +296,12 @@ impl Updater {
         } else {
             self.update_now();
         }
-        true
+        Chosen::Shown
     }
 
     /// Update now: install as soon as it has downloaded, and start the new version.
     pub fn update_now(&mut self) {
-        if !self.can_install() {
+        if !self.can_install() || self.quitting {
             return;
         }
         self.asking = false;
@@ -305,7 +317,7 @@ impl Updater {
     /// Update when I quit: download now, and install when the player quits, without
     /// starting the new version.
     pub fn when_i_quit(&mut self) {
-        if !self.can_install() || self.updating == Updating::Installing {
+        if !self.can_install() || self.quitting || self.updating == Updating::Installing {
             return;
         }
         self.asking = false;
@@ -321,8 +333,13 @@ impl Updater {
     }
 
     /// The player chose Quit Minerva. Returns whether Minerva quits now: not while what
-    /// they chose to install when they quit installs, or has yet to download.
+    /// they chose to install when they quit installs, or has yet to download. Chosen again
+    /// while it waits, Minerva quits at once, and nothing installs.
     pub fn quit(&mut self) -> bool {
+        if self.quitting {
+            self.job = None;
+            return true;
+        }
         if !self.when_i_quit {
             return true;
         }

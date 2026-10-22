@@ -119,7 +119,7 @@ use session::Session;
 use setup::Setup;
 pub use recogniser::{TitleLines, TitleReader, TitleReading};
 use tracker::Tracker;
-use updates::Updater;
+use updates::{Chosen, Updater};
 use serde::{Deserialize, Serialize};
 use osms::MapSet;
 use std::collections::{BTreeMap, VecDeque};
@@ -1237,11 +1237,14 @@ impl Minerva {
             PanelControl::OpenDiscord => return Some(Request::OpenInBrowser { url: DISCORD_URL.into() }),
             PanelControl::OpenRelease => return self.open_release(),
             PanelControl::Update => {
-                if !self.updater.choose(self.session_running()) {
-                    return self.open_release();
+                match self.updater.choose(self.session_running()) {
+                    Chosen::Shown => {
+                        self.setup.request();
+                        self.sync_panel();
+                    }
+                    Chosen::ReleasePage => return self.open_release(),
+                    Chosen::Nothing => {}
                 }
-                self.setup.request();
-                self.sync_panel();
                 return None;
             }
         };

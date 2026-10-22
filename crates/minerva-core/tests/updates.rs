@@ -502,6 +502,43 @@ fn quitting_while_the_update_for_when_i_quit_downloads_waits_to_install_it() {
 }
 
 #[test]
+fn quit_minerva_chosen_again_while_it_waits_quits_at_once_and_installs_nothing() {
+    let mut player = hunting();
+    player.minerva.press(PanelControl::Update);
+    let id = downloading(&player.minerva.act(Action::UpdateWhenIQuit).clone());
+    assert!(!player.minerva.act(Action::Quit).quit);
+
+    let state = player.minerva.act(Action::Quit).clone();
+    assert!(state.quit);
+    assert_eq!(job(&state), None);
+
+    // The download that comes after installs nothing.
+    let state = player.minerva.on_update_download(id, got(NEWER)).clone();
+    assert!(state.quit);
+    assert_eq!(job(&state), None);
+}
+
+#[test]
+fn while_quit_minerva_waits_choosing_to_update_changes_nothing() {
+    let mut player = hunting();
+    player.minerva.press(PanelControl::Update);
+    let id = downloading(&player.minerva.act(Action::UpdateWhenIQuit).clone());
+    let waiting = player.minerva.act(Action::Quit).clone();
+
+    assert_eq!(player.minerva.press(PanelControl::Update), None);
+    for action in [Action::UpdateWhenIQuit, Action::UpdateLater, Action::UpdateNow] {
+        player.minerva.act(action);
+    }
+    let state = player.minerva.panel_state();
+    assert_eq!(state.updates, waiting.updates);
+    assert_eq!(downloading(state), id);
+
+    // Once it has downloaded, it installs as Quit Minerva would: without starting again.
+    let state = player.minerva.on_update_download(id, got(NEWER)).clone();
+    assert_eq!(job(&state), Some(UpdateJob { id, step: UpdateStep::Install { relaunch: false } }));
+}
+
+#[test]
 fn quitting_while_the_update_for_when_i_quit_downloads_quits_if_it_fails() {
     let mut player = hunting();
     player.minerva.press(PanelControl::Update);
