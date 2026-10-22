@@ -152,7 +152,20 @@
         <div class="updates" role="group" aria-label="Updates">
           <p id="update-state" role="status"></p>
           <p id="update-newer" hidden>Minerva <span id="update-version"></span> is out. <button type="button" class="link" id="update-whats-new">What's new</button></p>
-          <button type="button" id="update-check">Check for updates</button>
+          <p id="update-progress" role="status" hidden></p>
+          <p id="update-failed" role="alert" hidden><span id="update-failed-text"></span> Try again, or download it from <button type="button" class="link" id="update-release">its release page</button>.</p>
+          <div class="update-ask" id="update-ask" role="group" aria-labelledby="update-ask-text" hidden>
+            <p id="update-ask-text">Updating restarts Minerva and ends this Session.</p>
+            <div class="update-buttons">
+              <button type="button" id="update-now">Update now</button>
+              <button type="button" class="secondary" id="update-when-i-quit">Update when I quit</button>
+              <button type="button" class="secondary" id="update-later">Later</button>
+            </div>
+          </div>
+          <div class="update-buttons">
+            <button type="button" id="update-install" hidden>Update</button>
+            <button type="button" class="secondary" id="update-check">Check for updates</button>
+          </div>
         </div>
         <p><button type="button" class="link" id="site-open">The Minerva site</button> (owlofminerva.app) explains each feature and how to use it. Ask about Minerva on <button type="button" class="link" id="discord-open">its Discord</button>. Each link opens in your browser.</p>
         <dl class="credits">

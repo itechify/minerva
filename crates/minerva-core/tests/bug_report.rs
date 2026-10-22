@@ -13,7 +13,7 @@ use minerva_core::{
     ListedPrice, ShopCapture, ShopList, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, Rect, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
-    TitleReading, TitleRegion, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build,
+    TitleReading, TitleRegion, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, Updating,
 };
 
 const S: u64 = 1000;
@@ -316,6 +316,62 @@ fn update_checks_their_answers_the_build_and_the_setting_replay_and_read_in_the_
         "action \"checkForUpdates\"",
         "update check 2 asked",
         "update check 2: the latest version is 999.0.0",
+    ] {
+        assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
+    }
+}
+
+#[test]
+fn updating_its_choices_downloads_and_installs_replay_and_read_in_the_timeline() {
+    // A Session running, so choosing to update asks first: Later, then Update when I quit,
+    // whose download fails; then Update now, whose installer doesn't start; then Update when
+    // I quit again, downloaded, and Quit Minerva installs it.
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.minerva.on_build(Build::Nsis);
+    shell.play(5 * S, CONSTRUCTION_SITE, grind);
+    let id = shell.minerva.panel_state().updates.check.expect("the launch check");
+    shell.minerva.on_update_answer(id, UpdateAnswer::Latest { version: "999.0.0".into() });
+    shell.play(40 * S, CONSTRUCTION_SITE, grind);
+
+    shell.minerva.press(PanelControl::Update);
+    assert!(shell.minerva.panel_state().updates.asking);
+    shell.minerva.act(Action::UpdateLater);
+    shell.minerva.press(PanelControl::Update);
+    shell.minerva.act(Action::UpdateWhenIQuit);
+    shell.play(42 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.on_update_download(1, DownloadAnswer::Failed { why: "the signature didn't check out".into() });
+    shell.play(44 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.press(PanelControl::Update);
+    shell.minerva.act(Action::UpdateNow);
+    shell.play(46 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.on_update_download(2, DownloadAnswer::Downloaded { version: "999.0.0".into() });
+    shell.minerva.on_update_install_failed(2, "the installer was blocked");
+    shell.play(48 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.press(PanelControl::Update);
+    shell.minerva.act(Action::UpdateWhenIQuit);
+    shell.minerva.on_update_download(3, DownloadAnswer::Downloaded { version: "999.0.0".into() });
+    shell.play(50 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.act(Action::Quit);
+    assert_eq!(shell.minerva.panel_state().updates.updating, Updating::Installing);
+
+    let (_, recording) = shell.report();
+    let replay = bug_report::replay(&recording, Some(osms::game().files()));
+    assert_eq!(replay.divergence, None);
+    assert_eq!(replay.lines, recording.lines.len());
+    let timeline = recording.timeline(0);
+    for said in [
+        "pressed \"update\"",
+        "action \"updateLater\"",
+        "action \"updateWhenIQuit\"",
+        "update download 1 asked",
+        "update download 1 failed: the signature didn't check out",
+        "action \"updateNow\"",
+        "update download 2: 999.0.0 downloaded, its signature checked",
+        "update download 2's install asked, relaunching",
+        "update download 2's installer didn't start: the installer was blocked",
+        "update download 3 asked",
+        "action \"quit\"",
+        "update download 3's install asked, not relaunching",
     ] {
         assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
     }

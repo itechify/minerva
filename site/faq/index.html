@@ -286,11 +286,17 @@
                 <details class="qa" id="update">
                   <summary>How do I update Minerva?</summary>
                   <p>
-                    Minerva tells you when a new version is out (<a href="#self-update">see how</a>): its owl's menu says
-                    <strong>Update to</strong> the new version, which opens the release's page. Quit the running Minerva
-                    first: click its owl in the notification area, by the clock, and choose <strong>Quit Minerva</strong>.
-                    Then run the new version's setup. Your settings, hotkeys and Personal Bests carry over.
-                    <a href="https://github.com/itechify/minerva/releases">Each release</a> says what's new.
+                    From inside Minerva. When a new version is out (<a href="#self-update">see how it checks</a>), click
+                    its owl in the notification area, by the clock, and choose <strong>Update to</strong> the new version,
+                    or press <strong>Update</strong> in Help &amp; Setup's About &amp; Credits. Minerva downloads it,
+                    installs it with a small progress window, and starts again. Your settings, hotkeys and Personal Bests
+                    carry over. <a href="https://github.com/itechify/minerva/releases">Each release</a> says what's new.
+                  </p>
+                  <p>
+                    The portable <code>.exe</code> doesn't update itself: its owl's menu opens the new version's release
+                    page instead. Quit the running Minerva first (choose <strong>Quit Minerva</strong> in the owl's menu),
+                    then download the new portable <code>.exe</code> and run it. Your settings and Personal Bests carry
+                    over.
                   </p>
                 </details>
                 <details class="qa" id="self-update">
@@ -301,7 +307,26 @@
                     Setup's About &amp; Credits. The request sends only the version you have, nothing about you or your
                     game. A new version shows in the owl's menu and tooltip, in the notification area, and in Help &amp;
                     Setup, with a <strong>What's new</strong> link to its release. Never on the panels over the game, and
-                    nothing is downloaded until you choose to update.
+                    nothing is downloaded until you choose to update. There's no skipping a version:
+                    <strong>Later</strong> leaves the notice where it is, quietly.
+                  </p>
+                  <p>
+                    When you choose to update, Minerva downloads the new version, checks it's signed as Minerva's own,
+                    and installs it with a small progress window, then starts again. If you installed with the
+                    <code>.msi</code>, Windows asks for admin rights first, as the MSI installs for all users. If the
+                    download fails, or isn't signed as Minerva's own, Help &amp; Setup says so and nothing is installed:
+                    try again, or download it from the release's page. If the installer fails, it says why, and the
+                    version you have stays.
+                  </p>
+                  <p>
+                    Updating restarts Minerva, so while you're grinding it asks first: "Updating restarts Minerva and
+                    ends this Session." Choose <strong>Update now</strong>, or <strong>Update when I quit</strong>, and it
+                    installs when you next choose <strong>Quit Minerva</strong>, without starting again. Your Personal
+                    Bests are saved as you set them either way.
+                  </p>
+                  <p>
+                    The portable <code>.exe</code> never installs anything: it says the new version is out, with a link
+                    to its release page (<a href="#update">see how to update it</a>).
                   </p>
                   <p>
                     To stop the checks, turn off <strong>Check for updates</strong> in Settings, the gear at the top of the

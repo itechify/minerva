@@ -252,8 +252,11 @@ _Avoid_: log, diagnostics, dump, trace (to the player; "trace" is its record of 
 ### Updating
 
 **Update Check**:
-Minerva asking its feed (`latest.json` on GitHub's newest release) which version is the latest: at launch, every 6 hours while "Check for updates" is on, and whenever the player presses Check for updates. It sends only the version. It comes to up to date, a newer version (shown in the tray and Help & Setup, never on the panels), or "Couldn't check" (ADR 0019).
+Minerva asking its feed (`latest.json` on GitHub's newest release) which version is the latest: at launch, every 6 hours while "Check for updates" is on, and whenever the player presses Check for updates. It sends only the version. It comes to up to date, a newer version (shown in the tray and Help & Setup, never on the panels), or "Couldn't check", which is also what one unanswered for 2 minutes comes to (ADR 0019).
 _Avoid_: ping, poll, auto-update (nothing installs by itself)
+
+**Update when I quit**:
+The player's choice, when Help & Setup asks before updating during a Session, to have the newer version download now and install when they choose Quit Minerva, without starting it again. It lasts for this run. The other answers are Update now (install and start it again) and Later (nothing more for now).
 
 **Notify-only**:
 A build that only says a newer version is out, with its release page, and never installs one: the portable `.exe` and dev builds, which the bundler didn't patch.

@@ -198,6 +198,18 @@ pub enum Action {
     /// The settings view's "Check for updates": on, Minerva checks for a newer version at
     /// launch and every 6 hours; off, only when the player presses Check for updates.
     SetCheckForUpdates { on: bool },
+    /// Help & Setup's Update now: download the newer version if it isn't yet, then install
+    /// it and start it, ending the Session.
+    UpdateNow,
+    /// Help & Setup's Update when I quit: download the newer version, and install it when the
+    /// player chooses Quit Minerva, without starting it again. Kept for this run only.
+    UpdateWhenIQuit,
+    /// Help & Setup's Later, when it asked before updating: nothing more for now. The newer
+    /// version still shows, quietly.
+    UpdateLater,
+    /// The tray's Quit Minerva: save and quit, after installing a newer version if the
+    /// player chose Update when I quit.
+    Quit,
     /// A click on a Deal Badge: the card of the item its listing sells shows beside it.
     /// `row` counts the listings not sold out from the top, as [`crate::DealBadge::row`].
     OpenDealItem { row: u32 },

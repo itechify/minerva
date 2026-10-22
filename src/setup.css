@@ -383,6 +383,27 @@ h3 {
   margin: 0;
 }
 
+/* Update, and Check for updates; or, asked before updating, the three answers. */
+.update-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Asked before updating while a Session is running: set off from the lines around it. */
+.update-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--frame);
+  border-radius: 4px;
+}
+
+.update-ask[hidden] {
+  display: none;
+}
+
 /* About & Credits: what each credit is for, then who and on what terms. */
 .credits {
   margin: 0 0 12px;
