@@ -126,7 +126,7 @@ fn scaled(img: &RgbaImage, factor: f32) -> RgbaImage {
 /// The UI Size `img` shows, next to the samples': the widest its listings' bands run on a
 /// listing's worth of rows, of the band's colour at any brightness (narrower where something
 /// covers them), over the samples'.
-fn ui_size(img: &RgbaImage) -> f32 {
+fn sample_ui_size(img: &RgbaImage) -> f32 {
     let band = |p: &Rgba<u8>| {
         let k = p[2] as f32 / 223.0;
         (0.8..=1.1).contains(&k) && (p[0] as f32 - 202.0 * k).abs() <= 6.0 && (p[1] as f32 - 213.0 * k).abs() <= 6.0
@@ -250,7 +250,7 @@ fn every_samples_listings_read_at_other_ui_sizes_as_its_readings_say_or_as_unrea
     let mut misplaced = Vec::new();
     for sample in &samples {
         let img = image_of(&sample.file);
-        let own = ui_size(&img);
+        let own = sample_ui_size(&img);
         let at_own = check(&samples, sample, frame_of(&img, 1.0), &sample.file, &mut wrong);
         for size in OTHER_UI_SIZES {
             let factor = size / own;
@@ -284,7 +284,7 @@ fn bands_too_narrow_or_too_wide_for_any_ui_size_or_with_no_listing_show_no_badge
     let samples = samples();
     for sample in &samples {
         let img = image_of(&sample.file);
-        let own = ui_size(&img);
+        let own = sample_ui_size(&img);
         for size in [0.5, 2.0] {
             let mut minerva = started(&samples);
             let frame = frame_of(&scaled(&img, size / own), 1.0);
@@ -373,4 +373,19 @@ fn sold_out_listings_in_live_captures_get_no_badge_from_one_shop_to_the_next_at(
 
     let state = minerva.on_player_shop_capture(placed("live-hats-scrolled-five-sold-out.png", (1343, 696), 25_481, size));
     assert_eq!(shown(state), [name("Brown Guise")], "none on the sold-out listings, nor what was there before");
+}
+
+/// Another of the game's windows drawn in the band's colour, with more rows of it than the
+/// shop's list, doesn't hide the shop.
+#[test]
+fn a_larger_stack_of_the_bands_colour_elsewhere_doesnt_hide_the_shop() {
+    let samples = samples();
+    let mut minerva = started(&samples);
+    let mut client = RgbaImage::from_pixel(1920, 1200, Rgba([96, 150, 210, 255]));
+    imageops::replace(&mut client, &RgbaImage::from_pixel(300, 900, Rgba([202, 213, 223, 255])), 100, 100);
+    imageops::replace(&mut client, &image_of("gems-and-ores.png"), 1343, 643);
+
+    let state = minerva.on_player_shop_capture(ShopCapture { frame: frame_of(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 } });
+
+    assert_eq!(badges(state).iter().filter_map(read).count(), 5, "the shop's five listings");
 }

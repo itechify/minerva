@@ -547,20 +547,22 @@ pub(crate) fn cut_on_screen(frame: &Frame, origin: ScreenPoint, top_left: (i32, 
     (x1 > x0 && y1 > y0).then(|| cut(frame, (x0, y0), (x1, y1)))
 }
 
-/// How far the crop of a Deal Finder capture reaches around the shop's list (px): enough
-/// for the reader to find the list in it again, with the scroll bar, and none of the
-/// shop's title, its seller's name or its chat.
-const PLAYER_SHOP_MARGIN: u32 = 10;
+/// How far the crop of a Deal Finder capture reaches around the shop's list (px, at the
+/// samples' UI Size; as much farther at a larger one, ADR 0020): enough for the reader to
+/// find the list in it again, with the scroll bar, and none of the shop's title, its seller's
+/// name or its chat.
+const PLAYER_SHOP_MARGIN: f32 = 10.0;
 /// ...and how far right of the list's picture column: past the scroll bar.
-const PLAYER_SHOP_WIDTH: u32 = 352;
+const PLAYER_SHOP_WIDTH: f32 = 352.0;
 
 /// The Player Shop's item list in a Deal Finder capture, for a Bug Report: the listings the
 /// reader read, or should have, as `samples/player-shop` keeps them. `None` with no shop.
 pub(crate) fn player_shop_crop(capture: &ShopCapture, shop: Option<&ShopList>) -> Option<(Region, Frame)> {
-    let list = shop?.area;
-    let margin = PLAYER_SHOP_MARGIN as i32;
+    let shop = shop?;
+    let (list, size) = (shop.area, shop.ui_size());
+    let (margin, width) = ((PLAYER_SHOP_MARGIN * size).round() as i32, (PLAYER_SHOP_WIDTH * size).round() as i32);
     let top_left = (list.x - margin, list.y - margin);
-    let bottom_right = (list.x + PLAYER_SHOP_WIDTH as i32, list.y + list.height as i32 + margin);
+    let bottom_right = (list.x + width, list.y + list.height as i32 + margin);
     Some((Region::PlayerShop, cut_on_screen(&capture.frame, capture.origin, top_left, bottom_right)?))
 }
 
