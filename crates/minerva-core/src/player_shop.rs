@@ -27,7 +27,8 @@
 //!    it is reported as such, so what it read before can stand, marked as covered.
 //! 5. ocrs reads every line at once, black on white, enlarged twice over. A price counts
 //!    only in the game's exact shape: "<quantity> for <mesos> mesos", the mesos with their
-//!    commas where the game puts them.
+//!    commas where the game puts them, and only with as many digits and commas as its line's
+//!    ink is wide for ([`PRICE_DIGIT_W`]): a digit ocrs drops leaves the shape whole.
 
 use crate::Frame;
 use crate::panel::{ScreenPoint, ScreenRect};
@@ -142,6 +143,12 @@ const PRICE_SLACK: u32 = 3;
 /// pointer's over it or not: ink that starts further in, on a slot's every scanline, is the
 /// game's tooltip's edge over an empty slot (#134).
 const NAME_LEFT_MAX: u32 = 12;
+/// A price line's ink is this many px wide, and this many more for each digit and comma in it,
+/// to a px or two at every sample's size and at others (the quantity's digits too: "1 for 25
+/// mesos" is 127 px, "800 for 1,999,999 mesos" 214).
+const PRICE_W: f32 = 94.0;
+const PRICE_DIGIT_W: f32 = 11.0;
+const PRICE_COMMA_W: f32 = 4.7;
 /// A listing's band starts this far above its price line's top (the "1" of "1 for", the
 /// same height in every listing), and is this tall.
 const BAND_ABOVE_PRICE: u32 = 33;
@@ -239,7 +246,8 @@ impl PlayerShopReader {
         for listing in &listings {
             if listing.clean {
                 let name = texts.next().flatten();
-                let price = texts.next().flatten().as_deref().and_then(parse_price);
+                let price = texts.next().flatten().filter(|read| fits(read, &listing.price));
+                let price = price.as_deref().and_then(parse_price);
                 rows.push((listing.top(), ShopRow { area: on_screen(band_area(listing.top())), name, price, covered: false }));
             } else {
                 unclean.push(listing.top());
@@ -671,6 +679,15 @@ pub(crate) fn parse_price(read: &str) -> Option<ListedPrice> {
     let quantity: u64 = digits(quantity)?;
     let mesos = grouped(mesos)?;
     (quantity > 0).then_some(ListedPrice { quantity, mesos })
+}
+
+/// Whether a price line read as `read` is as wide as its ink, `line`: ocrs may drop a digit
+/// from a line it otherwise reads whole ("1 for 250,000 mesos" as "1 for 50,000 mesos", #134),
+/// which still has the game's shape. The game's digits are all as wide.
+fn fits(read: &str, line: &TextLine) -> bool {
+    let count = |c: fn(&char) -> bool| read.chars().filter(c).count() as f32;
+    let width = PRICE_W + PRICE_DIGIT_W * count(char::is_ascii_digit) + PRICE_COMMA_W * count(|&c| c == ',');
+    (width - (line.x1 - line.x0) as f32).abs() <= PRICE_DIGIT_W / 2.0
 }
 
 fn digits(text: &str) -> Option<u64> {
