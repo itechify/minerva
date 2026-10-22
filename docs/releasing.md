@@ -32,6 +32,7 @@ How a Minerva version is numbered, made and published as a GitHub Release. Follo
   - If dependencies were added, removed or upgraded, regenerate the crate table in `THIRD-PARTY-NOTICES.md` (how is described there).
   - If a bundled asset or data source changed, update About & Credits in `setup.html` to match.
 - **The Map Leaderboards API is live** before the first release that uploads to it: its one-time setup and deploy are in `docs/map-leaderboards-setup.md`. `curl https://owlofminerva.app/api/maps` answers with JSON.
+- **The updater's signing key is at hand** (#125): the minisign private key and its password, from the password manager. Every installer is signed with it, and installed copies only take an update it signed. If it's lost, they can never update again.
 - **Tools:** `gh` is signed in to an account that can push to `itechify/minerva`. Cargo is on `PATH`; in Git Bash, `export PATH="$HOME/.cargo/bin:$PATH"`.
 
 ## 1. Bump the version
@@ -64,23 +65,58 @@ git push origin main
 
 ## 3. Build the release files
 
-On the merge commit, with nothing uncommitted:
+On the merge commit, with nothing uncommitted, set the signing key in the shell, then build:
 
 ```bash
 pnpm install --frozen-lockfile
+export TAURI_SIGNING_PRIVATE_KEY="<the private key's text, or the path to its file>"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<its password>"
 pnpm tauri build
+cargo run -p minerva --example probe update-manifest target/release/bundle/latest.json
 ```
 
-Tauri builds the optimised app and both installers. It downloads the NSIS and WiX tools the first time. The files land under `target/release/`, at the repo root, because the repo is a Cargo workspace:
+The two variables must be set in the shell that runs `pnpm tauri build`: a `.env` file doesn't work. Without them the build fails when it comes to sign the installers.
+
+Tauri builds the optimised app and both installers, and signs each installer, writing a `.sig` beside it. It downloads the NSIS and WiX tools the first time. The files land under `target/release/`, at the repo root, because the repo is a Cargo workspace. `probe update-manifest` then writes `latest.json`, the updater's feed: the version (from `tauri.conf.json`), and each installer's download address on this release and its signature. It refuses if a `.sig` is missing or was signed as another version, and it never lists a bare `windows-x86_64` key (the portable `.exe` would take it and run the setup).
 
 | Built file | Upload it as |
 | --- | --- |
 | `target/release/bundle/nsis/Minerva_X.Y.Z_x64-setup.exe` | as is |
+| `target/release/bundle/nsis/Minerva_X.Y.Z_x64-setup.exe.sig` | as is |
 | `target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi` | as is |
+| `target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi.sig` | as is |
+| `target/release/bundle/latest.json` | as is |
 | `target/release/minerva.exe` | `minerva-X.Y.Z-portable.exe` (copy and rename) |
 | `THIRD-PARTY-NOTICES.md` | as is |
 
-Before uploading, install the setup `.exe` over the previous version and check that it starts: About & Credits shows `X.Y.Z`, and settings and Personal Bests carried over.
+### The update smoke test
+
+Before tagging, check that an installed copy updates to this one. The previous version must have the updater (0.13.0 or later); for 0.13.0 itself, the first with it, install the setup `.exe` over 0.12.0 by hand instead, and check that About & Credits shows `X.Y.Z` and settings and Personal Bests carried over.
+
+1. Install the previous version's setup `.exe`, and quit it.
+2. Serve the new installers from a local server, from the repo root:
+
+   ```bash
+   mkdir -p target/update-test
+   cp target/release/bundle/nsis/Minerva_X.Y.Z_x64-setup.exe target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi target/update-test/
+   sed 's|https://github.com/itechify/minerva/releases/download/vX.Y.Z/|http://localhost:8000/|' \
+     target/release/bundle/latest.json > target/update-test/latest.json
+   python -m http.server 8000 --directory target/update-test
+   ```
+
+   The signatures are over the installers' bytes, so they still check with the addresses changed.
+3. The feed itself must come over `https`: an installed (release) build refuses an `http` feed, though it takes `http` downloads. Put the local `latest.json` in a secret gist, `gh gist create target/update-test/latest.json`, and take its raw address, `https://gist.githubusercontent.com/<user>/<id>/raw/latest.json`.
+4. In another shell, point `MINERVA_UPDATE_ENDPOINT` at it and start the installed previous version:
+
+   ```bash
+   MINERVA_UPDATE_ENDPOINT="https://gist.githubusercontent.com/<user>/<id>/raw/latest.json" \
+     "$LOCALAPPDATA/Minerva/minerva.exe"
+   ```
+
+   That is where the setup `.exe` installs by default.
+
+5. Confirm that it updates to `X.Y.Z` and relaunches, that About & Credits shows `X.Y.Z`, and that settings and Personal Bests carried over. Until updating in place is in (#128), confirm instead that the notice of `X.Y.Z` shows.
+6. Delete the gist (`gh gist delete <id>`) and stop the server.
 
 ## 4. Tag
 
@@ -126,20 +162,28 @@ To list what changed since the last release, run `git log --first-parent vPREVIO
 cp target/release/minerva.exe minerva-X.Y.Z-portable.exe
 gh release create vX.Y.Z --verify-tag --title "Minerva X.Y.Z" --notes-file notes.md \
   target/release/bundle/nsis/Minerva_X.Y.Z_x64-setup.exe \
+  target/release/bundle/nsis/Minerva_X.Y.Z_x64-setup.exe.sig \
   target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi \
+  target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi.sig \
+  target/release/bundle/latest.json \
   minerva-X.Y.Z-portable.exe \
   THIRD-PARTY-NOTICES.md
 ```
 
-The newest release becomes Latest, which the README's download link points to. Publishing it runs the Site workflow (`.github/workflows/site.yml`), which builds the site from the tag and publishes it to <https://owlofminerva.app/>.
+**Every release from 0.13.0 on must carry `latest.json`.** Installed copies check `releases/latest/download/latest.json`, so a Latest release without it is a failed check for every player, not "no update".
+
+The newest release becomes Latest, which the README's download link and the updater's feed point to. Publishing it runs the Site workflow (`.github/workflows/site.yml`), which builds the site from the tag and publishes it to <https://owlofminerva.app/>.
 
 Then check the release:
-- `gh release view vX.Y.Z` lists the four files.
+- `gh release view vX.Y.Z` lists the seven files.
+- The feed answers with the new version: `curl -sL https://github.com/itechify/minerva/releases/latest/download/latest.json` shows `"version": "X.Y.Z"`.
 - The release page reads correctly.
 - Downloading the setup `.exe` from it and installing works.
 - The Site workflow passed (`gh run list --workflow site.yml --limit 1`), and the site says it describes X.Y.Z, its Download button fetching that version's setup `.exe`.
 
 ## If a release goes wrong
+
+Deleting a release moves Latest back to the one before, and with it the updater's feed, so players stop being offered it.
 
 - **Before anyone could download it** (minutes after publishing):
   1. `gh release delete vX.Y.Z --cleanup-tag --yes` removes the release and its tag. If the site was already published from it, publish it again from the previous release: `gh workflow run site.yml` builds from the latest release's tag. But if that tag is older than the Map Leaderboards API, publish from `main` instead (`gh workflow run site.yml -f ref=main`): an older tag deploys a Worker without the API (`docs/map-leaderboards-setup.md`).
