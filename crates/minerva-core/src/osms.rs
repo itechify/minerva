@@ -183,7 +183,7 @@ fn read_set(files: &OsmsFiles, overrides: &[PortalOverride]) -> Result<MapSet, S
 
     let mut set = Vec::new();
     for (entry, map) in &listed {
-        let mut data = map_data(entry, map, portals.get(&entry.id), &mobs, &name_of, overrides)
+        let mut data = map_data(entry, map, portals.get(&entry.id), &mobs, &lookups.mob_names, &name_of, overrides)
             .map_err(|why| format!("map {}: {why}", entry.id))?;
         data.picture = pictures.get(&entry.id).cloned();
         if titled(entry) {
@@ -256,16 +256,19 @@ fn mob_details(mob: &OsmsMob, all: &[OsmsMob]) -> MobDetails {
     }
 }
 
-/// One map's data, from its entry in `maps.json`, its `portals` and the `mobs`.
+/// One map's data, from its entry in `maps.json`, its `portals` and the `mobs`, with
+/// `mob_names` from `lookups.json`.
 fn map_data(
     entry: &MapEntry,
     map: &OsmsMap,
     portals: Option<&Vec<OsmsPortal>>,
     mobs: &HashMap<u64, &OsmsMob>,
+    mob_names: &HashMap<String, String>,
     name_of: &impl Fn(&str) -> Destination,
     overrides: &[PortalOverride],
 ) -> Result<MapData, String> {
-    let (summary, mobs) = spawns(map, mobs)?;
+    let spawning = spawn_mobs(map, mobs, mob_names)?;
+    let (summary, mobs) = spawns(map, &spawning, mobs)?;
     let exits = portals
         .map_or(&[][..], Vec::as_slice)
         .iter()
@@ -302,9 +305,10 @@ fn map_data(
     let spawns = map
         .mob_positions
         .iter()
-        .filter_map(|point| {
+        .zip(&spawning)
+        .filter_map(|(point, mob)| {
             let at = PicturePoint { x: pixel(point.x?)?, y: pixel(point.y?)? };
-            Some(SpawnMark { at, mob: point.id.to_string() })
+            Some(SpawnMark { at, mob: mob.to_string() })
         })
         .collect();
     Ok(MapData {
@@ -329,20 +333,50 @@ const RESPAWN_SECONDS: f64 = 7.56;
 /// The share of a full party's kills a player alone gets on untimed spawn points.
 const SOLO_SHARE: f64 = 0.75;
 
-/// A map's mobs, from its spawn points grouped by mob, with their figures from the mobs'
-/// records; and its Map Summary, worked out as MeowDB works it out (`None` without mobs).
+/// The mob each of `map`'s spawn points spawns, in their order: the ID of its record in
+/// `monsters.json`.
+///
+/// OSMS folds some mobs into another of the same name: a spawn point may name a mob with
+/// no record of its own, whose points the record of a mob of its name (`lookups.json`'s
+/// `mob_names`) counts on the map with its own. That record is the one of its name on the
+/// map whose `count` there is more than its own spawn points; with none, or more than
+/// one, the file set isn't as the reader expects.
+fn spawn_mobs(map: &OsmsMap, mobs: &HashMap<u64, &OsmsMob>, mob_names: &HashMap<String, String>) -> Result<Vec<u64>, String> {
+    let points_of = |id: u64| map.mob_positions.iter().filter(|point| point.id == id).count() as u64;
+    let folds_more = |mob: &OsmsMob| mob.maps.iter().any(|on| on.id == map.id && on.count > points_of(mob.id));
+    map.mob_positions
+        .iter()
+        .map(|point| {
+            if mobs.contains_key(&point.id) {
+                return Ok(point.id);
+            }
+            let unlisted = || format!("mob {} isn't in monsters.json", point.id);
+            let name = mob_names.get(&point.id.to_string()).map(|name| name.trim()).ok_or_else(unlisted)?;
+            let folding: Vec<u64> =
+                mobs.values().filter(|mob| mob.name.trim() == name && folds_more(mob)).map(|mob| mob.id).collect();
+            match folding[..] {
+                [id] => Ok(id),
+                _ => Err(format!("{}, nor folded into one {name} on the map", unlisted())),
+            }
+        })
+        .collect()
+}
+
+/// A map's mobs, from its spawn points grouped by mob (`spawning`, as [`spawn_mobs`]
+/// gives them), with their figures from the mobs' records; and its Map Summary, worked out
+/// as MeowDB works it out (`None` without mobs).
 ///
 /// An untimed spawn point gives a full party `3600 / 7.56` mobs an hour, and a player
 /// alone 0.75 of that. A timed one gives `3600 / timer`, alone or in a party; a ranged
 /// timer, the average OSMS gives. Each mob's EXP an hour is its EXP times its mobs an
 /// hour. Each mob's figures are rounded, the map's are their sums, and the map's Mob
 /// Rate isn't applied.
-fn spawns(map: &OsmsMap, mobs: &HashMap<u64, &OsmsMob>) -> Result<(Option<MapSummary>, Vec<Mob>), String> {
+fn spawns(map: &OsmsMap, spawning: &[u64], mobs: &HashMap<u64, &OsmsMob>) -> Result<(Option<MapSummary>, Vec<Mob>), String> {
     let mut points: Vec<(u64, u64)> = Vec::new();
-    for point in &map.mob_positions {
-        match points.iter_mut().find(|(mob, _)| *mob == point.id) {
+    for &id in spawning {
+        match points.iter_mut().find(|(mob, _)| *mob == id) {
             Some((_, count)) => *count += 1,
-            None => points.push((point.id, 1)),
+            None => points.push((id, 1)),
         }
     }
     let total: u64 = points.iter().map(|(_, count)| count).sum();
@@ -476,6 +510,9 @@ struct OsmsPortal {
 struct LookupsFile {
     /// By 9-digit map ID.
     map_names: HashMap<String, String>,
+    /// By mob ID, unpadded: the mobs `monsters.json` folds into another among them.
+    #[serde(default)]
+    mob_names: HashMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -535,6 +572,9 @@ enum Affinity {
 #[derive(Deserialize)]
 struct MobOnMap {
     id: u64,
+    /// Its spawn points on the map, those of the mobs folded into it among them.
+    #[serde(default)]
+    count: u64,
     /// Its spawn points' timer on the map, if they're timed.
     mob_time: Option<String>,
 }

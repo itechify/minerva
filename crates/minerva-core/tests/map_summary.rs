@@ -106,6 +106,76 @@ fn a_ranged_timer_counts_as_the_average_osms_gives() {
     assert_eq!(data(&state).summary, summary((269, 2810), (269, 2810)));
 }
 
+/// Primrose Hill's shape: OSMS folds some mobs into another of the same name, so a spawn
+/// point names a mob `monsters.json` has no record of, and the record of a mob of its name
+/// counts that point on the map with its own. Here Flyeye 33's 2 points are counted as
+/// Flyeye 32's, and Goblin Fire 35's 1 as Goblin Fire 34's: 3 each, of 10.
+fn hill() -> osms::World {
+    osms::world(
+        vec![
+            map(100_000_000, "Made-up Street", "Hill")
+                .spawns(30, 2)
+                .spawns(31, 2)
+                .spawns(32, 1)
+                .spawns(33, 2)
+                .spawns(34, 2)
+                .spawns(35, 1),
+        ],
+        vec![
+            mob(30, "Stirge", 11, 200, 36),
+            mob(31, "Stirge", 12, 210, 37),
+            mob(32, "Flyeye", 13, 250, 42),
+            mob(33, "Flyeye", 13, 250, 42),
+            mob(34, "Goblin Fire", 15, 300, 49),
+            mob(35, "Goblin Fire", 15, 300, 49),
+        ],
+    )
+    .folding(33, 32)
+    .folding(35, 34)
+}
+
+#[test]
+fn a_mob_folded_into_another_of_its_name_is_counted_as_that_mob() {
+    let state = arrive_at(hill(), "Made-up Street", "Hill");
+
+    assert_eq!(
+        data(&state).mobs,
+        [
+            mob_row("30", "Stirge", 11, 200, 36, 2, 20),
+            mob_row("31", "Stirge", 12, 210, 37, 2, 20),
+            mob_row("32", "Flyeye", 13, 250, 42, 3, 30),
+            mob_row("34", "Goblin Fire", 15, 300, 49, 3, 30),
+        ]
+    );
+}
+
+/// The Map Summary is the one the folded points would give as the record's own.
+#[test]
+fn a_mob_folded_into_another_counts_towards_the_map_summary_as_that_mob() {
+    let as_own = hill().changing(100_000_000, |m| {
+        osms::Map { spawns: Vec::new(), ..m }.spawns(30, 2).spawns(31, 2).spawns(32, 3).spawns(34, 3)
+    });
+
+    let folded = arrive_at(hill(), "Made-up Street", "Hill");
+    let own = arrive_at(as_own, "Made-up Street", "Hill");
+
+    assert!(data(&folded).summary.is_some());
+    assert_eq!(data(&folded).summary, data(&own).summary);
+}
+
+/// Of two records of its name on the map, a folded mob is counted as the one whose count
+/// there is more than its own spawn points: Stirge 36's 2 points as Stirge 31's.
+#[test]
+fn of_two_mobs_of_its_name_a_folded_mob_is_counted_as_the_one_whose_count_has_its_points() {
+    let world = hill().folding(36, 31).with_mob(mob(36, "Stirge", 12, 210, 37)).changing(100_000_000, |m| m.spawns(36, 2));
+
+    let state = arrive_at(world, "Made-up Street", "Hill");
+
+    let stirges: Vec<(&str, u32)> =
+        data(&state).mobs.iter().filter(|m| m.name == "Stirge").map(|m| (m.id.as_str(), m.spawn_count)).collect();
+    assert_eq!(stirges, [("30", 2), ("31", 4)]);
+}
+
 #[test]
 fn a_town_has_no_mobs_and_no_map_summary_which_is_not_an_error() {
     let mut minerva = Minerva::new(FakeSource::osms());
@@ -124,11 +194,20 @@ fn a_file_set_whose_mobs_are_not_as_expected_is_a_format_change_with_no_map_show
     let unlisted_mob = osms::game().changing(HENESYS_HUNTING_GROUND_I, |m| m.spawns(99_999, 2));
     let not_a_timer = osms::game().changing(HENESYS_HUNTING_GROUND_I, |m| m.timed(3, 1, "soon"));
     let no_timer = osms::game().changing(HENESYS_HUNTING_GROUND_I, |m| m.timed(3, 1, "0.00"));
+    // Blue Snails 90 and 91 folded into Blue Snail 3 and Blue Snail 92: either could count them.
+    let folded_into_either = osms::game()
+        .with_mob(mob(90, "Blue Snail", 2, 50, 4))
+        .with_mob(mob(91, "Blue Snail", 2, 50, 4))
+        .with_mob(mob(92, "Blue Snail", 2, 50, 4))
+        .folding(90, 3)
+        .folding(91, 92)
+        .changing(HENESYS_HUNTING_GROUND_I, |m| m.spawns(90, 1).spawns(92, 1).spawns(91, 1));
     let files = osms::game().files();
     let altered = [
         ("a spawn point of a mob monsters.json doesn't have", unlisted_mob.files()),
         ("a timer that isn't one", not_a_timer.files()),
         ("a timer of nothing", no_timer.files()),
+        ("a mob folded into either of two of its name", folded_into_either.files()),
         ("monsters.json isn't JSON", minerva_core::osms::OsmsFiles { monsters: "<html>".into(), ..files.clone() }),
         ("a mob's EXP renamed", minerva_core::osms::OsmsFiles { monsters: files.monsters.replace("\"exp\"", "\"xp\""), ..files.clone() }),
         ("a spawn point's mob renamed", minerva_core::osms::OsmsFiles { maps: files.maps.replace("{\"id\":3,", "{\"mob\":3,"), ..files.clone() }),

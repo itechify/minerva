@@ -127,7 +127,7 @@ fn portals_to_the_dead_end_are_not_marked() {
 /// `lookups.json`, with no street, or failing that it is its ID.
 #[test]
 fn a_portal_to_a_map_not_in_the_data_is_marked_as_such_with_the_name_osms_gives_it() {
-    let world = osms::game().naming(88_001_000, "Backalley Semi-Basement");
+    let world = osms::game().without(88_001_000).without(88_000_000).naming(88_001_000, "Backalley Semi-Basement");
 
     let state = on_field_in(world, |m| m.portal("in10", 2, 88_001_000).portal("b", 10, 88_000_000));
 

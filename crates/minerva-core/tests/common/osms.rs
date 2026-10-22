@@ -302,12 +302,15 @@ pub struct World {
     pub maps: Vec<Map>,
     pub mobs: Vec<Mob>,
     pub other_maps: Vec<(u64, String)>,
+    /// Mobs with no record of their own, each folded into a mob's record, as OSMS folds
+    /// some: (the folded mob, the mob whose record counts its spawn points).
+    pub folded: Vec<(u64, u64)>,
     /// `map_mark_icons`, each mark's name and its picture's path; `None` leaves it out.
     pub mark_icons: Option<Vec<(String, String)>>,
 }
 
 pub fn world(maps: Vec<Map>, mobs: Vec<Mob>) -> World {
-    World { maps, mobs, other_maps: Vec::new(), mark_icons: Some(Vec::new()) }
+    World { maps, mobs, other_maps: Vec::new(), folded: Vec::new(), mark_icons: Some(Vec::new()) }
 }
 
 impl World {
@@ -372,6 +375,14 @@ impl World {
     /// The same world, with no `map_mark_icons` at all.
     pub fn without_mark_icons(mut self) -> Self {
         self.mark_icons = None;
+        self
+    }
+
+    /// The same world, with mob `id` folded into mob `into`'s record, as OSMS folds some:
+    /// `monsters.json` has no record of `id`, `lookups.json` names it as `into`, and
+    /// `into`'s count on each map has `id`'s spawn points with its own.
+    pub fn folding(mut self, id: u64, into: u64) -> Self {
+        self.folded.push((id, into));
         self
     }
 
@@ -475,10 +486,13 @@ impl World {
     }
 
     fn monsters_json(&self) -> Value {
+        let folded = |id: u64| self.folded.iter().any(|&(folded, _)| folded == id);
         let monsters: Vec<Value> = self
             .mobs
             .iter()
+            .filter(|mob| !folded(mob.id))
             .map(|mob| {
+                let counted = |id: u64| id == mob.id || self.folded.contains(&(id, mob.id));
                 let mut m = json!({
                     "id": mob.id,
                     "name": mob.name,
@@ -519,7 +533,7 @@ impl World {
                     .maps
                     .iter()
                     .filter_map(|map| {
-                        let spawns: Vec<&Spawn> = map.spawns.iter().filter(|s| s.mob == mob.id).collect();
+                        let spawns: Vec<&Spawn> = map.spawns.iter().filter(|s| counted(s.mob)).collect();
                         let count: u32 = spawns.iter().map(|s| s.points).sum();
                         (count > 0).then(|| {
                             let mut on = json!({ "id": map.id, "name": map.name, "count": count });
@@ -536,7 +550,7 @@ impl World {
                 m
             })
             .collect();
-        json!({ "monsters": monsters, "total": self.mobs.len() })
+        json!({ "monsters": monsters, "total": self.mobs.iter().filter(|mob| !folded(mob.id)).count() })
     }
 
     fn manifest_json(&self) -> Value {
@@ -552,7 +566,13 @@ impl World {
             .map(|m| (m.id, m.name.clone()))
             .chain(self.other_maps.iter().cloned())
             .map(|(id, name)| (format!("{id:09}"), json!(name)));
-        json!({ "item_names": {}, "npc_names": {}, "mob_names": {}, "map_names": Object::from_iter(names) })
+        let name = |id: u64| self.mobs.iter().find(|mob| mob.id == id).map(|mob| json!(mob.name));
+        let mob_names = self
+            .mobs
+            .iter()
+            .map(|mob| (mob.id.to_string(), json!(mob.name)))
+            .chain(self.folded.iter().filter_map(|&(id, into)| Some((id.to_string(), name(into)?))));
+        json!({ "item_names": {}, "npc_names": {}, "mob_names": Object::from_iter(mob_names), "map_names": Object::from_iter(names) })
     }
 }
 

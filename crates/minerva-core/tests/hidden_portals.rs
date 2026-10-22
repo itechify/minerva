@@ -143,7 +143,7 @@ fn only_destinations_on_a_hidden_street_are_labelled_hidden_street() {
 /// street; one that isn't there either is named by its ID.
 #[test]
 fn a_destination_outside_the_map_list_is_named_from_osms_lookups_or_else_by_its_id() {
-    let world = osms::game().naming(88_001_000, "Backalley Semi-Basement");
+    let world = osms::game().without(88_001_000).without(88_000_000).naming(88_001_000, "Backalley Semi-Basement");
 
     let state = on_field_with(world, |m| m.portal("a", 10, 88_001_000).portal("b", 10, 88_000_000), Vec::new());
 

@@ -57,6 +57,21 @@ fn a_spawn_point_without_a_position_counts_but_has_no_dot() {
     assert_eq!(data.mobs[0].spawn_count, 2);
 }
 
+/// OSMS folds some mobs into another of the same name: a spawn point of one is dotted with
+/// the mob whose record counts it.
+#[test]
+fn a_spawn_point_of_a_mob_folded_into_another_is_dotted_with_that_mob() {
+    let world = osms::game()
+        .with_mob(osms::mob(99, "Blue Snail", 2, 50, 4))
+        .folding(99, BLUE_SNAIL)
+        .with(map(FIELD, "Made-up Street", "Field").spawn_at(BLUE_SNAIL, 412, 520).spawn_at(99, 903, 611).portal("east00", 2, KERNING_CITY));
+    let mut minerva = Minerva::new(FakeSource::with_world(world));
+    minerva.on_reading(read_as(0));
+    let state = minerva.on_reading(read_as(333));
+
+    assert_eq!(spawns(state), [dot(412, 520, BLUE_SNAIL), dot(903, 611, BLUE_SNAIL)]);
+}
+
 #[test]
 fn a_map_without_mobs_has_no_dots() {
     let state = on_field(|m| m);
