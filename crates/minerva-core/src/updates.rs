@@ -10,6 +10,9 @@
 //!   page; or that it couldn't check. A failed check shows nothing more: a newer version found
 //!   before stays, and the next check tries again. A check unanswered for
 //!   [`CHECK_GIVES_UP_MS`] has failed, so a later one can be asked.
+//! - **The notice** of a newer version is decided here, whole: the one stage it is at, what
+//!   choosing to update offers then, and what Quit Minerva does ([`UpdateNotice`]). The tray
+//!   and Help & Setup only put it into words.
 //! - **Updating** (#128): choosing to update, in a build that can install, downloads the newer
 //!   version (the shell checks its signature) and installs it, starting it again after. While
 //!   a Session is running, Help & Setup asks first: Update now, Update when I quit (the
@@ -30,61 +33,108 @@ const CHECK_GIVES_UP_MS: u64 = 2 * 60 * 1000;
 /// Minerva's releases, each version's page under it.
 const RELEASES_URL: &str = "https://github.com/itechify/minerva/releases";
 
-/// Updates, as the tray and Help & Setup show them.
+/// Updates, as the tray, Help & Setup and the settings view show them.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Updates {
     /// "Check for updates" is on (the settings view's switch): Minerva checks by itself.
-    pub on: bool,
+    pub checks_on: bool,
     /// What the last check came to, or one under way.
     pub status: UpdateStatus,
-    /// The newer version the last check that answered found; `None` while none is known. A
-    /// failed check leaves it as it is.
-    pub newer: Option<NewerVersion>,
     /// When a check last answered (ms since the Unix epoch); `None` until one has, or while
     /// the wall clock wasn't known then.
     pub last_checked_unix_ms: Option<u64>,
-    /// This build can only say a newer version is out, with its release page: it can't
-    /// install one (the portable `.exe` and dev builds).
-    pub notify_only: bool,
+    /// The newer version the last check that answered found, and how updating to it goes;
+    /// `None` while none is known. A failed check leaves it as it is.
+    pub notice: Option<UpdateNotice>,
+    /// The player chose Quit Minerva, and it waits for the update they chose to install when
+    /// they quit to finish downloading: nothing shows but the tray, which says so.
+    pub quitting: bool,
     /// The check under way, by its id, for the shell to run once and tell the answer to
     /// [`crate::Minerva::on_update_answer`]; `None` while there is none. Not sent to the
-    /// overlay.
+    /// pages.
     #[serde(skip_serializing)]
     pub check: Option<u64>,
-    /// Where choosing to update has got to.
-    pub updating: Updating,
-    /// The player chose to update while a Session is running: Help & Setup asks first,
-    /// "Updating restarts Minerva and ends this Session", with Update now, Update when I
-    /// quit and Later.
-    pub asking: bool,
-    /// The player chose Update when I quit, for this run: Quit Minerva installs the newer
-    /// version once it has downloaded, and doesn't start it.
-    pub when_i_quit: bool,
     /// What the shell must do to update, by its id: download the newer version, then
     /// install it. Not sent to the pages.
     #[serde(skip_serializing)]
     pub job: Option<UpdateJob>,
 }
 
-/// Where choosing to update has got to, for the tray and Help & Setup.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+/// A newer version than this one, as the tray and Help & Setup show it: each puts `stage`,
+/// `offer` and `quit` into words of its own, and decides nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum Updating {
-    /// Not chosen, or the player chose Later.
-    #[default]
-    Idle,
-    /// The newer version is downloading, and its signature is being checked.
+pub struct UpdateNotice {
+    pub version: String,
+    /// Its release page, which says what's new.
+    pub release_url: String,
+    pub stage: UpdateStage,
+    /// What the tray's update item and Help & Setup's button do now.
+    pub offer: UpdateOffer,
+    /// What the tray's Quit Minerva does now.
+    pub quit: QuitItem,
+}
+
+/// Where a newer version stands: one at a time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum UpdateStage {
+    /// This build can't install it (the portable `.exe` and dev builds): its release page is
+    /// where to get it.
+    NotifyOnly,
+    /// It is out, and nothing is under way: the player hasn't chosen to update, or chose Later.
+    Out,
+    /// The player chose to update while a Session is running: Help & Setup asks first,
+    /// "Updating restarts Minerva and ends this Session".
+    Asking,
+    /// It is downloading, and installs and starts once it has.
     Downloading,
-    /// The newer version downloaded, and installs when the player quits.
-    Downloaded,
+    /// It is downloading, and installs when the player chooses Quit Minerva.
+    DownloadingForQuit,
+    /// It downloaded, and installs when the player chooses Quit Minerva.
+    InstallsWhenYouQuit,
+    /// The player chose Quit Minerva while it downloaded: Minerva quits and installs it once
+    /// it has, or quits without it if Quit Minerva is chosen again.
+    FinishingBeforeQuit,
     /// The installer is starting: Minerva ends once it has.
     Installing,
-    /// The download failed, or its signature didn't check out: nothing was installed, and
-    /// the player can try again, or download it from its release page.
+    /// The download failed, or its signature didn't check out: nothing was installed.
     DownloadFailed,
-    /// The installer couldn't be started: this version stays, and the player can try again.
+    /// The installer couldn't be started: this version stays.
     InstallFailed,
+}
+
+/// What choosing to update (the tray's update item, Help & Setup's button) does now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum UpdateOffer {
+    /// Nothing: updating is under way, or Minerva is ending.
+    Nothing,
+    /// Opens the release page: this build can't install it.
+    ReleasePage,
+    /// Updates (asking first while a Session is running).
+    Update,
+    /// Help & Setup asks: Update now, Update when I quit, or Later. The tray's item asks again.
+    Choices,
+    /// Installs it now and starts it, rather than when the player quits.
+    UpdateNow,
+    /// Tries again, after a download or an installer that failed.
+    TryAgain,
+}
+
+/// What the tray's Quit Minerva does now.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum QuitItem {
+    /// Quits.
+    #[default]
+    Quit,
+    /// Quits, and installs the newer version without starting it: the player chose Update
+    /// when I quit.
+    QuitAndUpdate,
+    /// Quits at once, without installing what is still downloading.
+    QuitWithoutUpdating,
 }
 
 /// What the shell must do to update: download the newer version, then install it. The id
@@ -127,18 +177,10 @@ pub enum UpdateStatus {
     Checking,
     /// The feed names this version, or an older one.
     UpToDate,
-    /// The feed names a newer version: [`Updates::newer`].
+    /// The feed names a newer version: [`Updates::notice`].
     NewerVersion,
     /// The check failed: the feed couldn't be reached, or doesn't read.
     Failed,
-}
-
-/// A newer version than this one, and its release page, which says what's new.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewerVersion {
-    pub version: String,
-    pub release_url: String,
 }
 
 /// What a check came to, as the shell tells it.
@@ -164,9 +206,24 @@ pub enum Build {
     NotifyOnly,
 }
 
-/// Checks for a newer version: when one is due, and what the last came to.
+/// Where choosing to update has got to.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum Updating {
+    /// Not chosen, or the player chose Later.
+    #[default]
+    Idle,
+    Downloading,
+    /// Downloaded, to install when the player quits.
+    Downloaded,
+    Installing,
+    DownloadFailed,
+    InstallFailed,
+}
+
+/// Checks for a newer version, and downloads and installs it when the player chooses: when
+/// each is due, and what the last came to.
 #[derive(Default)]
-pub(crate) struct UpdateChecks {
+pub(crate) struct Updater {
     build: Build,
     /// When the next check is due by itself (capture time); 0 at launch.
     due_at: u64,
@@ -177,7 +234,8 @@ pub(crate) struct UpdateChecks {
     /// The check under way.
     in_flight: Option<u64>,
     status: UpdateStatus,
-    newer: Option<NewerVersion>,
+    /// The newer version the last check that answered found.
+    newer: Option<String>,
     last_checked_unix_ms: Option<u64>,
     /// When the check under way began (capture time).
     in_flight_since: u64,
@@ -195,7 +253,7 @@ pub(crate) struct UpdateChecks {
     downloaded: Option<u64>,
 }
 
-impl UpdateChecks {
+impl Updater {
     /// A build that can install, with a newer version to install.
     fn can_install(&self) -> bool {
         self.build != Build::NotifyOnly && self.newer.is_some()
@@ -301,7 +359,7 @@ impl UpdateChecks {
     }
 
     /// The installer downloaded as `id` couldn't be started. Returns whether Minerva quits
-    /// now, as [`UpdateChecks::downloaded`]. One no longer under way changes nothing.
+    /// now, as [`Updater::downloaded`]. One no longer under way changes nothing.
     pub fn install_failed(&mut self, id: u64) -> bool {
         if !matches!(self.job, Some(UpdateJob { id: job, step: UpdateStep::Install { .. } }) if job == id) {
             return false;
@@ -355,7 +413,7 @@ impl UpdateChecks {
         }
         self.in_flight = None;
         let latest = match answer {
-            UpdateAnswer::Latest { version } => Some(version.trim().trim_start_matches('v').to_string()),
+            UpdateAnswer::Latest { version } => Some(read_version(&version)),
             UpdateAnswer::Failed { .. } => None,
         };
         let newer = match latest.as_deref().map(|latest| (latest, compare(latest, MINERVA_VERSION))) {
@@ -366,7 +424,7 @@ impl UpdateChecks {
         };
         match newer {
             Some(newer) => {
-                self.newer = newer.map(|version| NewerVersion { release_url: format!("{RELEASES_URL}/tag/v{version}"), version });
+                self.newer = newer;
                 self.status = if self.newer.is_some() { UpdateStatus::NewerVersion } else { UpdateStatus::UpToDate };
                 self.last_checked_unix_ms = wall_clock;
             }
@@ -376,25 +434,60 @@ impl UpdateChecks {
 
     /// The newer version's release page, if one is known.
     pub fn release_url(&self) -> Option<String> {
-        self.newer.as_ref().map(|newer| newer.release_url.clone())
+        self.newer.as_deref().map(release_url)
     }
 
-    /// As the tray, Help & Setup and the settings view show it, with "Check for updates" `on`
-    /// or off.
-    pub fn state(&self, on: bool) -> Updates {
+    /// As the tray, Help & Setup and the settings view show it, with "Check for updates"
+    /// `checks_on` or off.
+    pub fn state(&self, checks_on: bool) -> Updates {
         Updates {
-            on,
+            checks_on,
             status: if self.in_flight.is_some() { UpdateStatus::Checking } else { self.status },
-            newer: self.newer.clone(),
             last_checked_unix_ms: self.last_checked_unix_ms,
-            notify_only: self.build == Build::NotifyOnly,
+            notice: self.newer.as_ref().map(|version| self.notice(version)),
+            quitting: self.quitting,
             check: self.in_flight,
-            updating: self.updating,
-            asking: self.asking,
-            when_i_quit: self.when_i_quit,
             job: self.job,
         }
     }
+
+    /// The notice of the newer `version`: the one stage that shows, of all that may hold at
+    /// once, what choosing to update offers then, and what Quit Minerva does.
+    fn notice(&self, version: &str) -> UpdateNotice {
+        let (stage, offer) = if self.build == Build::NotifyOnly {
+            (UpdateStage::NotifyOnly, UpdateOffer::ReleasePage)
+        } else {
+            match self.updating {
+                Updating::Installing => (UpdateStage::Installing, UpdateOffer::Nothing),
+                _ if self.quitting => (UpdateStage::FinishingBeforeQuit, UpdateOffer::Nothing),
+                _ if self.asking => (UpdateStage::Asking, UpdateOffer::Choices),
+                Updating::Downloading if self.when_i_quit => (UpdateStage::DownloadingForQuit, UpdateOffer::UpdateNow),
+                Updating::Downloading => (UpdateStage::Downloading, UpdateOffer::Nothing),
+                Updating::Downloaded => (UpdateStage::InstallsWhenYouQuit, UpdateOffer::UpdateNow),
+                Updating::Idle => (UpdateStage::Out, UpdateOffer::Update),
+                Updating::DownloadFailed => (UpdateStage::DownloadFailed, UpdateOffer::TryAgain),
+                Updating::InstallFailed => (UpdateStage::InstallFailed, UpdateOffer::TryAgain),
+            }
+        };
+        let quit = if self.quitting {
+            QuitItem::QuitWithoutUpdating
+        } else if self.when_i_quit && self.updating != Updating::Installing {
+            QuitItem::QuitAndUpdate
+        } else {
+            QuitItem::Quit
+        };
+        UpdateNotice { version: version.to_string(), release_url: release_url(version), stage, offer, quit }
+    }
+}
+
+/// `version`'s release page.
+fn release_url(version: &str) -> String {
+    format!("{RELEASES_URL}/tag/v{version}")
+}
+
+/// A version as the feed or the plugin names it, without the space around it or a `v` before.
+fn read_version(version: &str) -> String {
+    version.trim().trim_start_matches('v').to_string()
 }
 
 /// How version `a` compares with `b`, both `X.Y.Z` with an optional `-pre-release` (which

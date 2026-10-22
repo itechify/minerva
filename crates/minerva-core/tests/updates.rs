@@ -5,15 +5,17 @@
 //! Help & Setup show: up to date (and when it last checked), a newer version with its release
 //! page, or that it couldn't check. A failed check leaves a newer version found before as it is.
 //! Choosing to update (#128) downloads and installs it in a build that can install, asking first
-//! while a Session is running, and only opens the release page in one that can't.
+//! while a Session is running, and only opens the release page in one that can't. The notice
+//! the tray and Help & Setup turn into words is the core's: which stage it is at, what choosing
+//! to update offers, and what Quit Minerva does.
 
 mod common;
 
 use common::FakeSource;
 use common::player::Player;
 use minerva_core::{
-    Action, Build, DownloadAnswer, MINERVA_VERSION, Minerva, NewerVersion, PanelControl, PanelState, Request, Settings,
-    UpdateAnswer, UpdateJob, UpdateStatus, UpdateStep, Updating,
+    Action, Build, DownloadAnswer, MINERVA_VERSION, Minerva, PanelControl, PanelState, QuitItem, Request, Settings,
+    UpdateAnswer, UpdateJob, UpdateNotice, UpdateOffer, UpdateStage, UpdateStatus, UpdateStep,
 };
 
 const S: u64 = 1000;
@@ -25,6 +27,9 @@ const WALL: u64 = 1_792_598_400_000;
 /// A version newer than any Minerva yet, and one older.
 const NEWER: &str = "999.0.0";
 const OLDER: &str = "0.0.1";
+
+/// The newer version's release page.
+const RELEASE_URL: &str = "https://github.com/itechify/minerva/releases/tag/v999.0.0";
 
 /// A core at launch with `settings` restored and the wall clock told, before its first tick.
 fn launched_with(settings: Settings) -> Minerva {
@@ -63,6 +68,21 @@ fn failed() -> UpdateAnswer {
     UpdateAnswer::Failed { why: "offline".to_string() }
 }
 
+/// The notice of a newer version the tray and Help & Setup show.
+fn notice(state: &PanelState) -> &UpdateNotice {
+    state.updates.notice.as_ref().expect("a notice of a newer version")
+}
+
+/// The notice's stage, what choosing to update offers, and what Quit Minerva does.
+fn shown(state: &PanelState) -> (UpdateStage, UpdateOffer, QuitItem) {
+    let notice = notice(state);
+    (notice.stage, notice.offer, notice.quit)
+}
+
+fn version(state: &PanelState) -> Option<&str> {
+    state.updates.notice.as_ref().map(|notice| notice.version.as_str())
+}
+
 #[test]
 fn a_check_is_asked_for_at_launch_and_says_up_to_date_when_the_feed_names_this_version() {
     let mut minerva = launched();
@@ -76,7 +96,7 @@ fn a_check_is_asked_for_at_launch_and_says_up_to_date_when_the_feed_names_this_v
     let state = answer(&mut minerva, latest(MINERVA_VERSION));
     assert_eq!(asked(&state), None);
     assert_eq!(state.updates.status, UpdateStatus::UpToDate);
-    assert_eq!(state.updates.newer, None);
+    assert_eq!(state.updates.notice, None);
     assert_eq!(state.updates.last_checked_unix_ms, Some(WALL + 2 * S));
 }
 
@@ -112,14 +132,14 @@ fn turning_check_for_updates_off_stops_the_checks_and_on_again_checks_if_one_is_
     tick(&mut minerva, 0);
     answer(&mut minerva, latest(MINERVA_VERSION));
 
-    assert!(minerva.panel_state().updates.on);
+    assert!(minerva.panel_state().updates.checks_on);
     let state = minerva.act(Action::SetCheckForUpdates { on: false }).clone();
-    assert!(!state.updates.on);
+    assert!(!state.updates.checks_on);
     assert!(!minerva.settings().check_for_updates);
     assert_eq!(asked(&tick(&mut minerva, 7 * HOUR)), None);
 
     let state = minerva.act(Action::SetCheckForUpdates { on: true }).clone();
-    assert!(state.updates.on);
+    assert!(state.updates.checks_on);
     assert!(minerva.settings().check_for_updates);
     assert!(asked(&tick(&mut minerva, 7 * HOUR + S)).is_some());
 }
@@ -167,10 +187,10 @@ fn a_newer_version_shows_with_its_release_page_which_opens_from_the_tray_and_wha
 
     let state = answer(&mut minerva, latest(NEWER));
     assert_eq!(state.updates.status, UpdateStatus::NewerVersion);
-    let release_url = "https://github.com/itechify/minerva/releases/tag/v999.0.0";
-    assert_eq!(state.updates.newer, Some(NewerVersion { version: NEWER.into(), release_url: release_url.into() }));
+    assert_eq!(version(&state), Some(NEWER));
+    assert_eq!(notice(&state).release_url, RELEASE_URL);
     assert_eq!(state.updates.last_checked_unix_ms, Some(WALL));
-    assert_eq!(minerva.press(PanelControl::OpenRelease), Some(Request::OpenInBrowser { url: release_url.into() }));
+    assert_eq!(minerva.press(PanelControl::OpenRelease), Some(Request::OpenInBrowser { url: RELEASE_URL.into() }));
 }
 
 #[test]
@@ -178,7 +198,7 @@ fn a_version_named_with_a_v_reads_as_without() {
     let mut minerva = launched();
     tick(&mut minerva, 0);
     let state = answer(&mut minerva, latest("v999.0.0"));
-    assert_eq!(state.updates.newer.map(|newer| newer.version), Some(NEWER.to_string()));
+    assert_eq!(version(&state), Some(NEWER));
 }
 
 #[test]
@@ -187,7 +207,7 @@ fn an_older_version_than_this_one_is_up_to_date() {
     tick(&mut minerva, 0);
     let state = answer(&mut minerva, latest(OLDER));
     assert_eq!(state.updates.status, UpdateStatus::UpToDate);
-    assert_eq!(state.updates.newer, None);
+    assert_eq!(state.updates.notice, None);
 }
 
 #[test]
@@ -209,7 +229,7 @@ fn a_version_that_does_not_read_is_a_failed_check() {
     tick(&mut minerva, 0);
     let state = answer(&mut minerva, latest("soon"));
     assert_eq!(state.updates.status, UpdateStatus::Failed);
-    assert_eq!(state.updates.newer, None);
+    assert_eq!(state.updates.notice, None);
     assert_eq!(state.updates.last_checked_unix_ms, None);
 }
 
@@ -233,12 +253,12 @@ fn a_failed_check_says_so_and_the_next_good_one_says_what_it_found() {
 fn a_failed_check_after_a_newer_version_was_found_leaves_it_showing() {
     let mut minerva = launched();
     tick(&mut minerva, 0);
-    let found = answer(&mut minerva, latest(NEWER)).updates.newer;
+    let found = answer(&mut minerva, latest(NEWER)).updates.notice;
 
     tick(&mut minerva, 6 * HOUR);
     let state = answer(&mut minerva, failed());
     assert_eq!(state.updates.status, UpdateStatus::Failed);
-    assert_eq!(state.updates.newer, found);
+    assert_eq!(state.updates.notice, found);
     assert_eq!(state.updates.last_checked_unix_ms, Some(WALL));
 }
 
@@ -274,13 +294,38 @@ fn an_answer_to_a_check_no_longer_under_way_changes_nothing() {
     assert_eq!(after, before);
 }
 
+// The notice: one stage at a time, what choosing to update offers then, and what Quit
+// Minerva does, for the tray and Help & Setup to turn into words.
+
+#[test]
+fn with_no_newer_version_known_there_is_no_notice() {
+    let mut minerva = launched();
+    minerva.on_build(Build::Nsis);
+    assert_eq!(minerva.panel_state().updates.notice, None);
+    tick(&mut minerva, 0);
+    assert_eq!(answer(&mut minerva, latest(MINERVA_VERSION)).updates.notice, None);
+}
+
+#[test]
+fn a_newer_version_in_a_build_that_can_install_offers_to_update() {
+    for build in [Build::Nsis, Build::Msi] {
+        let minerva = newer_known(build);
+        let state = minerva.panel_state();
+        assert_eq!(notice(state).version, NEWER);
+        assert_eq!(notice(state).release_url, RELEASE_URL);
+        assert_eq!(shown(state), (UpdateStage::Out, UpdateOffer::Update, QuitItem::Quit));
+    }
+}
+
 #[test]
 fn a_build_is_notify_only_until_the_shell_says_it_can_install() {
     let mut minerva = launched();
-    assert!(minerva.panel_state().updates.notify_only);
-    assert!(!minerva.on_build(Build::Nsis).updates.notify_only);
-    assert!(!minerva.on_build(Build::Msi).updates.notify_only);
-    assert!(minerva.on_build(Build::NotifyOnly).updates.notify_only);
+    tick(&mut minerva, 0);
+    answer(&mut minerva, latest(NEWER));
+    assert_eq!(shown(minerva.panel_state()), (UpdateStage::NotifyOnly, UpdateOffer::ReleasePage, QuitItem::Quit));
+    assert_eq!(notice(minerva.on_build(Build::Nsis)).stage, UpdateStage::Out);
+    assert_eq!(notice(minerva.on_build(Build::Msi)).stage, UpdateStage::Out);
+    assert_eq!(notice(minerva.on_build(Build::NotifyOnly)).stage, UpdateStage::NotifyOnly);
 }
 
 // Updating in place (#128): choosing to update downloads the newer version, which the shell
@@ -324,33 +369,35 @@ fn downloading(state: &PanelState) -> u64 {
     }
 }
 
+/// `version`, downloaded, its signature checked.
+fn got(version: &str) -> DownloadAnswer {
+    DownloadAnswer::Downloaded { version: version.into() }
+}
+
 #[test]
 fn with_no_session_running_choosing_to_update_downloads_then_installs_and_relaunches() {
     let mut minerva = newer_known(Build::Nsis);
     assert_eq!(job(minerva.panel_state()), None);
-    assert_eq!(minerva.panel_state().updates.updating, Updating::Idle);
 
     assert_eq!(minerva.press(PanelControl::Update), None);
     let state = minerva.panel_state().clone();
-    assert_eq!(state.updates.updating, Updating::Downloading);
+    assert_eq!(shown(&state), (UpdateStage::Downloading, UpdateOffer::Nothing, QuitItem::Quit));
     let id = downloading(&state);
     // Help & Setup opens, to show it.
     assert!(state.setup.window_open);
 
-    let state = minerva.on_update_download(id, DownloadAnswer::Downloaded { version: NEWER.into() }).clone();
-    assert_eq!(state.updates.updating, Updating::Installing);
+    let state = minerva.on_update_download(id, got(NEWER)).clone();
+    assert_eq!(shown(&state), (UpdateStage::Installing, UpdateOffer::Nothing, QuitItem::Quit));
     assert_eq!(job(&state), Some(UpdateJob { id, step: UpdateStep::Install { relaunch: true } }));
 }
 
 #[test]
 fn a_build_that_cannot_install_opens_the_release_page_and_never_downloads() {
     let mut minerva = newer_known(Build::NotifyOnly);
-    let release_url = "https://github.com/itechify/minerva/releases/tag/v999.0.0";
 
-    assert_eq!(minerva.press(PanelControl::Update), Some(Request::OpenInBrowser { url: release_url.into() }));
+    assert_eq!(minerva.press(PanelControl::Update), Some(Request::OpenInBrowser { url: RELEASE_URL.into() }));
     let state = minerva.panel_state().clone();
-    assert!(state.updates.notify_only);
-    assert_eq!(state.updates.updating, Updating::Idle);
+    assert_eq!(shown(&state), (UpdateStage::NotifyOnly, UpdateOffer::ReleasePage, QuitItem::Quit));
     assert_eq!(job(&state), None);
     assert!(!state.setup.window_open);
 
@@ -367,8 +414,7 @@ fn with_a_session_running_choosing_to_update_asks_first_and_downloads_nothing() 
     let mut player = hunting();
     assert_eq!(player.minerva.press(PanelControl::Update), None);
     let state = player.minerva.panel_state().clone();
-    assert!(state.updates.asking);
-    assert_eq!(state.updates.updating, Updating::Idle);
+    assert_eq!(shown(&state), (UpdateStage::Asking, UpdateOffer::Choices, QuitItem::Quit));
     assert_eq!(job(&state), None);
     // Help & Setup opens, to ask.
     assert!(state.setup.window_open);
@@ -380,13 +426,12 @@ fn update_now_after_the_warning_downloads_then_installs_and_relaunches() {
     player.minerva.press(PanelControl::Update);
 
     let state = player.minerva.act(Action::UpdateNow).clone();
-    assert!(!state.updates.asking);
-    assert_eq!(state.updates.updating, Updating::Downloading);
+    assert_eq!(notice(&state).stage, UpdateStage::Downloading);
     let id = downloading(&state);
 
-    let state = player.minerva.on_update_download(id, DownloadAnswer::Downloaded { version: NEWER.into() }).clone();
+    let state = player.minerva.on_update_download(id, got(NEWER)).clone();
     assert_eq!(job(&state), Some(UpdateJob { id, step: UpdateStep::Install { relaunch: true } }));
-    assert_eq!(state.updates.updating, Updating::Installing);
+    assert_eq!(notice(&state).stage, UpdateStage::Installing);
 }
 
 #[test]
@@ -395,15 +440,14 @@ fn later_leaves_the_newer_version_showing_and_downloads_nothing() {
     player.minerva.press(PanelControl::Update);
 
     let state = player.minerva.act(Action::UpdateLater).clone();
-    assert!(!state.updates.asking);
-    assert_eq!(state.updates.updating, Updating::Idle);
+    assert_eq!(shown(&state), (UpdateStage::Out, UpdateOffer::Update, QuitItem::Quit));
     assert_eq!(job(&state), None);
     assert_eq!(state.updates.status, UpdateStatus::NewerVersion);
-    assert_eq!(state.updates.newer.map(|newer| newer.version), Some(NEWER.to_string()));
+    assert_eq!(version(&state), Some(NEWER));
 
     // And choosing to update again asks again.
     player.minerva.press(PanelControl::Update);
-    assert!(player.minerva.panel_state().updates.asking);
+    assert_eq!(notice(player.minerva.panel_state()).stage, UpdateStage::Asking);
 }
 
 #[test]
@@ -412,23 +456,33 @@ fn update_when_i_quit_downloads_now_and_installs_without_relaunching_on_quit_min
     player.minerva.press(PanelControl::Update);
 
     let state = player.minerva.act(Action::UpdateWhenIQuit).clone();
-    assert!(!state.updates.asking);
-    assert!(state.updates.when_i_quit);
+    assert_eq!(shown(&state), (UpdateStage::DownloadingForQuit, UpdateOffer::UpdateNow, QuitItem::QuitAndUpdate));
     let id = downloading(&state);
 
     // Downloaded, it waits for the player to quit: the Session carries on.
-    let state = player.minerva.on_update_download(id, DownloadAnswer::Downloaded { version: NEWER.into() }).clone();
-    assert_eq!(state.updates.updating, Updating::Downloaded);
-    assert!(state.updates.when_i_quit);
+    let state = player.minerva.on_update_download(id, got(NEWER)).clone();
+    assert_eq!(shown(&state), (UpdateStage::InstallsWhenYouQuit, UpdateOffer::UpdateNow, QuitItem::QuitAndUpdate));
     assert_eq!(job(&state), None);
     let state = player.hunt(60 * S, 10);
     assert_eq!(job(&state), None);
-    assert!(state.updates.when_i_quit);
+    assert_eq!(notice(&state).stage, UpdateStage::InstallsWhenYouQuit);
 
     let state = player.minerva.act(Action::Quit).clone();
     assert!(!state.quit);
-    assert_eq!(state.updates.updating, Updating::Installing);
+    assert_eq!(notice(&state).stage, UpdateStage::Installing);
     assert_eq!(job(&state), Some(UpdateJob { id, step: UpdateStep::Install { relaunch: false } }));
+}
+
+#[test]
+fn asked_again_after_update_when_i_quit_the_question_shows_and_quit_minerva_still_updates() {
+    let mut player = hunting();
+    player.minerva.press(PanelControl::Update);
+    let id = downloading(&player.minerva.act(Action::UpdateWhenIQuit).clone());
+    player.minerva.on_update_download(id, got(NEWER));
+
+    player.minerva.press(PanelControl::Update);
+    let state = player.minerva.panel_state();
+    assert_eq!(shown(state), (UpdateStage::Asking, UpdateOffer::Choices, QuitItem::QuitAndUpdate));
 }
 
 #[test]
@@ -439,9 +493,10 @@ fn quitting_while_the_update_for_when_i_quit_downloads_waits_to_install_it() {
 
     let state = player.minerva.act(Action::Quit).clone();
     assert!(!state.quit);
-    assert_eq!(state.updates.updating, Updating::Downloading);
+    assert!(state.updates.quitting);
+    assert_eq!(shown(&state), (UpdateStage::FinishingBeforeQuit, UpdateOffer::Nothing, QuitItem::QuitWithoutUpdating));
 
-    let state = player.minerva.on_update_download(id, DownloadAnswer::Downloaded { version: NEWER.into() }).clone();
+    let state = player.minerva.on_update_download(id, got(NEWER)).clone();
     assert!(!state.quit);
     assert_eq!(job(&state), Some(UpdateJob { id, step: UpdateStep::Install { relaunch: false } }));
 }
@@ -471,13 +526,12 @@ fn update_now_after_update_when_i_quit_installs_at_once_and_relaunches() {
     let mut player = hunting();
     player.minerva.press(PanelControl::Update);
     let id = downloading(&player.minerva.act(Action::UpdateWhenIQuit).clone());
-    player.minerva.on_update_download(id, DownloadAnswer::Downloaded { version: NEWER.into() });
+    player.minerva.on_update_download(id, got(NEWER));
 
     // Asked again, as a Session is running.
     player.minerva.press(PanelControl::Update);
-    assert!(player.minerva.panel_state().updates.asking);
     let state = player.minerva.act(Action::UpdateNow).clone();
-    assert!(!state.updates.when_i_quit);
+    assert_eq!(shown(&state), (UpdateStage::Installing, UpdateOffer::Nothing, QuitItem::Quit));
     assert_eq!(job(&state), Some(UpdateJob { id, step: UpdateStep::Install { relaunch: true } }));
 }
 
@@ -488,19 +542,19 @@ fn a_failed_download_says_so_installs_nothing_and_can_be_tried_again() {
     let id = downloading(minerva.panel_state());
 
     let state = minerva.on_update_download(id, DownloadAnswer::Failed { why: "signature didn't check out".into() }).clone();
-    assert_eq!(state.updates.updating, Updating::DownloadFailed);
+    assert_eq!(shown(&state), (UpdateStage::DownloadFailed, UpdateOffer::TryAgain, QuitItem::Quit));
     assert_eq!(job(&state), None);
     assert!(!state.quit);
     // The release page, to download it from, is still there.
-    assert!(state.updates.newer.is_some());
+    assert_eq!(notice(&state).release_url, RELEASE_URL);
 
     minerva.press(PanelControl::Update);
     let again = downloading(minerva.panel_state());
     assert!(again > id);
-    assert_eq!(minerva.panel_state().updates.updating, Updating::Downloading);
+    assert_eq!(notice(minerva.panel_state()).stage, UpdateStage::Downloading);
     // A late answer to the first changes nothing.
     let before = minerva.panel_state().clone();
-    assert_eq!(minerva.on_update_download(id, DownloadAnswer::Downloaded { version: NEWER.into() }), &before);
+    assert_eq!(minerva.on_update_download(id, got(NEWER)), &before);
 }
 
 #[test]
@@ -508,10 +562,10 @@ fn an_installer_that_does_not_start_says_so_and_can_be_tried_again() {
     let mut minerva = newer_known(Build::Nsis);
     minerva.press(PanelControl::Update);
     let id = downloading(minerva.panel_state());
-    minerva.on_update_download(id, DownloadAnswer::Downloaded { version: NEWER.into() });
+    minerva.on_update_download(id, got(NEWER));
 
     let state = minerva.on_update_install_failed(id, "the installer was blocked").clone();
-    assert_eq!(state.updates.updating, Updating::InstallFailed);
+    assert_eq!(shown(&state), (UpdateStage::InstallFailed, UpdateOffer::TryAgain, QuitItem::Quit));
     assert_eq!(job(&state), None);
     assert!(!state.quit);
 
@@ -528,5 +582,5 @@ fn choosing_to_update_with_no_newer_version_known_does_nothing() {
 
     assert_eq!(minerva.press(PanelControl::Update), None);
     assert_eq!(job(minerva.panel_state()), None);
-    assert_eq!(minerva.panel_state().updates.updating, Updating::Idle);
+    assert_eq!(minerva.panel_state().updates.notice, None);
 }

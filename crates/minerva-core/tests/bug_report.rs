@@ -13,7 +13,7 @@ use minerva_core::{
     ListedPrice, ShopCapture, ShopList, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, Rect, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
-    TitleReading, TitleRegion, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, Updating,
+    TitleReading, TitleRegion, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
 };
 
 const S: u64 = 1000;
@@ -334,7 +334,7 @@ fn updating_its_choices_downloads_and_installs_replay_and_read_in_the_timeline()
     shell.play(40 * S, CONSTRUCTION_SITE, grind);
 
     shell.minerva.press(PanelControl::Update);
-    assert!(shell.minerva.panel_state().updates.asking);
+    assert_eq!(shell.minerva.panel_state().updates.notice.as_ref().map(|notice| notice.stage), Some(UpdateStage::Asking));
     shell.minerva.act(Action::UpdateLater);
     shell.minerva.press(PanelControl::Update);
     shell.minerva.act(Action::UpdateWhenIQuit);
@@ -352,7 +352,7 @@ fn updating_its_choices_downloads_and_installs_replay_and_read_in_the_timeline()
     shell.minerva.on_update_download(3, DownloadAnswer::Downloaded { version: "999.0.0".into() });
     shell.play(50 * S, CONSTRUCTION_SITE, grind);
     shell.minerva.act(Action::Quit);
-    assert_eq!(shell.minerva.panel_state().updates.updating, Updating::Installing);
+    assert_eq!(shell.minerva.panel_state().updates.notice.as_ref().map(|notice| notice.stage), Some(UpdateStage::Installing));
 
     let (_, recording) = shell.report();
     let replay = bug_report::replay(&recording, Some(osms::game().files()));
