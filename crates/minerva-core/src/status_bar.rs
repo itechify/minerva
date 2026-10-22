@@ -135,9 +135,10 @@ const JOBS: &[&str] = &[
 /// The highest level a Character can have.
 pub const MAX_LEVEL: u32 = 200;
 
-/// How tall a strip of the client area's bottom the shell captures: the bar is 55 rows,
-/// pinned to the bottom, with room to spare.
-pub const STATUS_BAR_STRIP: u32 = 96;
+/// How tall a strip of the client area's bottom the shell captures: the bar is pinned to the
+/// bottom, 55 rows at the samples' UI Size and about 100 at the largest the game draws it
+/// (×1.8, Default Ratio at 2160 rows; ADR 0020), with room to spare.
+pub const STATUS_BAR_STRIP: u32 = 128;
 
 /// A level tile's orange component is about 17 px wide and 20 tall...
 const TILE_W: std::ops::RangeInclusive<u32> = 13..=21;

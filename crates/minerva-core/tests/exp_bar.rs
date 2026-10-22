@@ -63,24 +63,25 @@ fn read(minerva: &mut Minerva, sample: &str, at_ms: u64) -> PanelState {
     minerva.on_status_bar_capture(capture).clone()
 }
 
-/// Something black over columns `x0..x1` and rows `y0..y1` of the strip.
-fn cover(img: &mut image::RgbaImage, (x0, x1): (u32, u32), (y0, y1): (u32, u32)) {
-    for y in y0..y1 {
+/// Something black over columns `x0..x1` of the strip, and the rows `up.0` to `up.1` rows up
+/// from its bottom (the client area's).
+fn cover(img: &mut image::RgbaImage, (x0, x1): (u32, u32), up: (u32, u32)) {
+    for y in img.height() - up.0..img.height() - up.1 {
         for x in x0..x1 {
             img.put_pixel(x, y, image::Rgba([0, 0, 0, 255]));
         }
     }
 }
 
-/// The LV box and its tiles, covered: the Status Bar can't be found. (The strip starts at
-/// client row 1101; the tiles are at client (403,1163).)
+/// The LV box and its tiles, covered: the Status Bar can't be found. (The client area is 1197
+/// rows; the tiles are at client (403,1163).)
 fn lv_box_covered(img: &mut image::RgbaImage) {
-    cover(img, (380, 470), (50, 90));
+    cover(img, (380, 470), (46, 6));
 }
 
 /// The EXP figures covered, the rest of the bar not.
 fn figures_covered(img: &mut image::RgbaImage) {
-    cover(img, (1005, 1229), (43, 75));
+    cover(img, (1005, 1229), (53, 21));
 }
 
 /// The sample's Status Bar captured every second from `from` to `until`, painted.
