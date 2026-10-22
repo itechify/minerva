@@ -36,11 +36,17 @@ const MSI: &str = "windows-x86_64-msi";
 const BARE: &str = "windows-x86_64";
 
 /// `latest.json` for `version`, published at `now` (Unix seconds), or why it can't be.
+/// The installers are downloaded from `base` (for the update smoke test's local server),
+/// or with `None` from version `version`'s GitHub Release.
 ///
 /// It lists exactly the setup `.exe` and the MSI, each signed as `version`. It never
 /// lists a bare `windows-x86_64`: the portable `.exe` falls back to it, and would run
 /// the setup it points at, installing a second copy.
-pub fn manifest(version: &str, now: u64, installers: &[Installer]) -> Result<String, String> {
+pub fn manifest(version: &str, now: u64, base: Option<&str>, installers: &[Installer]) -> Result<String, String> {
+    let base = match base {
+        Some(base) => base.trim_end_matches('/').to_owned(),
+        None => format!("{RELEASES}/v{version}"),
+    };
     let mut platforms = BTreeMap::new();
     for installer in installers {
         let key = installer.platform.as_str();
@@ -59,7 +65,7 @@ pub fn manifest(version: &str, now: u64, installers: &[Installer]) -> Result<Str
             Some(signed) => return Err(format!("{sig} was signed as version {signed}, not {version}")),
             None => return Err(format!("{sig} says no version: it isn't a signature Tauri's CLI 2.12 or later made")),
         }
-        let url = format!("{RELEASES}/v{version}/{}", installer.file);
+        let url = format!("{base}/{}", installer.file);
         if platforms.insert(key, Platform { signature, url }).is_some() {
             return Err(format!("{key} is listed twice"));
         }
@@ -153,7 +159,7 @@ mod tests {
         let mut built = built("0.13.0", "0.13.0");
         built[0].signature = Some(SETUP_0_13_0.into());
         let msi = built[1].signature.clone().unwrap();
-        let written: Value = serde_json::from_str(&manifest("0.13.0", NOW, &built).unwrap()).unwrap();
+        let written: Value = serde_json::from_str(&manifest("0.13.0", NOW, None, &built).unwrap()).unwrap();
         assert_eq!(
             written,
             json!({
@@ -175,6 +181,17 @@ mod tests {
     }
 
     #[test]
+    fn for_the_smoke_test_the_installers_can_be_downloaded_from_a_local_server_instead() {
+        let built = built("0.13.0", "0.13.0");
+        for base in ["http://127.0.0.1:8000", "http://127.0.0.1:8000/"] {
+            let written = manifest("0.13.0", NOW, Some(base), &built).unwrap();
+            let written: Value = serde_json::from_str(&written).unwrap();
+            assert_eq!(written["platforms"]["windows-x86_64-nsis"]["url"], "http://127.0.0.1:8000/Minerva_0.13.0_x64-setup.exe");
+            assert_eq!(written["platforms"]["windows-x86_64-msi"]["url"], "http://127.0.0.1:8000/Minerva_0.13.0_x64_en-US.msi");
+        }
+    }
+
+    #[test]
     fn the_installers_are_where_the_bundler_puts_them() {
         let found: Vec<_> = installers("0.13.0").into_iter().map(|i| (i.platform, i.folder, i.file)).collect();
         assert_eq!(
@@ -191,14 +208,14 @@ mod tests {
         let mut built = built("0.13.0", "0.13.0");
         let bare = Installer { platform: "windows-x86_64".into(), ..built[0].clone() };
         built.push(bare);
-        let why = manifest("0.13.0", NOW, &built).unwrap_err();
+        let why = manifest("0.13.0", NOW, None, &built).unwrap_err();
         assert!(why.contains("windows-x86_64") && why.contains("portable"), "{why}");
     }
 
     #[test]
     fn a_manifest_without_both_installers_is_refused() {
         let built = built("0.13.0", "0.13.0");
-        let why = manifest("0.13.0", NOW, &built[..1]).unwrap_err();
+        let why = manifest("0.13.0", NOW, None, &built[..1]).unwrap_err();
         assert!(why.contains("windows-x86_64-msi"), "{why}");
     }
 
@@ -206,7 +223,7 @@ mod tests {
     fn a_missing_sig_is_refused_by_its_name() {
         let mut built = built("0.13.0", "0.13.0");
         built[1].signature = None;
-        let why = manifest("0.13.0", NOW, &built).unwrap_err();
+        let why = manifest("0.13.0", NOW, None, &built).unwrap_err();
         assert!(why.contains("Minerva_0.13.0_x64_en-US.msi.sig"), "{why}");
     }
 
@@ -214,7 +231,7 @@ mod tests {
     fn a_sig_made_for_another_version_is_refused() {
         let mut built = built("0.13.0", "0.13.0");
         built[1].signature = Some(MSI_0_12_0.into());
-        let why = manifest("0.13.0", NOW, &built).unwrap_err();
+        let why = manifest("0.13.0", NOW, None, &built).unwrap_err();
         assert!(why.contains("0.12.0") && why.contains("Minerva_0.13.0_x64_en-US.msi.sig"), "{why}");
     }
 
@@ -222,7 +239,7 @@ mod tests {
     fn a_sig_bound_to_no_version_is_refused() {
         let mut built = built("0.13.0", "0.13.0");
         built[0].signature = Some(signed("timestamp:1792645359\tfile:Minerva_0.13.0_x64-setup.exe"));
-        let why = manifest("0.13.0", NOW, &built).unwrap_err();
+        let why = manifest("0.13.0", NOW, None, &built).unwrap_err();
         assert!(why.contains("no version"), "{why}");
     }
 
@@ -230,14 +247,14 @@ mod tests {
     fn a_sig_that_is_not_a_signature_is_refused() {
         let mut built = built("0.13.0", "0.13.0");
         built[0].signature = Some("not base64!".into());
-        assert!(manifest("0.13.0", NOW, &built).is_err());
+        assert!(manifest("0.13.0", NOW, None, &built).is_err());
     }
 
     #[test]
     fn a_sig_written_with_a_line_break_after_it_goes_in_without_one() {
         let mut built = built("0.13.0", "0.13.0");
         built[0].signature = Some(format!("{SETUP_0_13_0}\r\n"));
-        let written: Value = serde_json::from_str(&manifest("0.13.0", NOW, &built).unwrap()).unwrap();
+        let written: Value = serde_json::from_str(&manifest("0.13.0", NOW, None, &built).unwrap()).unwrap();
         assert_eq!(written["platforms"]["windows-x86_64-nsis"]["signature"], SETUP_0_13_0);
     }
 }

@@ -75,7 +75,7 @@ pnpm tauri build
 cargo run -p minerva --example probe update-manifest target/release/bundle/latest.json
 ```
 
-The two variables must be set in the shell that runs `pnpm tauri build`: a `.env` file doesn't work. Without them the build fails when it comes to sign the installers.
+The two variables must be set in the shell that runs `pnpm tauri build`: a `.env` file doesn't work. `pnpm tauri build` now always needs them, since it signs each installer it bundles; without them it fails when it comes to sign. `pnpm tauri build --debug --no-bundle` (AGENTS.md's build) bundles nothing, so it doesn't need them.
 
 Tauri builds the optimised app and both installers, and signs each installer, writing a `.sig` beside it. It downloads the NSIS and WiX tools the first time. The files land under `target/release/`, at the repo root, because the repo is a Cargo workspace. `probe update-manifest` then writes `latest.json`, the updater's feed: the version (from `tauri.conf.json`), and each installer's download address on this release and its signature. It refuses if a `.sig` is missing or was signed as another version, and it never lists a bare `windows-x86_64` key (the portable `.exe` would take it and run the setup).
 
@@ -94,29 +94,24 @@ Tauri builds the optimised app and both installers, and signs each installer, wr
 Before tagging, check that an installed copy updates to this one. The previous version must have the updater (0.13.0 or later); for 0.13.0 itself, the first with it, install the setup `.exe` over 0.12.0 by hand instead, and check that About & Credits shows `X.Y.Z` and settings and Personal Bests carried over.
 
 1. Install the previous version's setup `.exe`, and quit it.
-2. Serve the new installers from a local server, from the repo root:
+2. Serve the new `latest.json` and installers over `http` from `127.0.0.1`, from the repo root:
 
    ```bash
    mkdir -p target/update-test
    cp target/release/bundle/nsis/Minerva_X.Y.Z_x64-setup.exe target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi target/update-test/
-   sed 's|https://github.com/itechify/minerva/releases/download/vX.Y.Z/|http://localhost:8000/|' \
-     target/release/bundle/latest.json > target/update-test/latest.json
-   python -m http.server 8000 --directory target/update-test
+   cargo run -p minerva --example probe update-manifest target/update-test/latest.json --base-url http://127.0.0.1:8000
+   python -m http.server 8000 --bind 127.0.0.1 --directory target/update-test
    ```
 
-   The signatures are over the installers' bytes, so they still check with the addresses changed.
-3. The feed itself must come over `https`: an installed (release) build refuses an `http` feed, though it takes `http` downloads. Put the local `latest.json` in a secret gist, `gh gist create target/update-test/latest.json`, and take its raw address, `https://gist.githubusercontent.com/<user>/<id>/raw/latest.json`.
-4. In another shell, point `MINERVA_UPDATE_ENDPOINT` at it and start the installed previous version:
+   This `latest.json` points at the local server instead of the release; the signatures are over the installers' bytes, so they still check. An installed copy takes an `http` feed only from `127.0.0.1`, `localhost` or `[::1]`.
+3. In another shell, point `MINERVA_UPDATE_ENDPOINT` at it and start the installed previous version (the setup `.exe` installs it there by default):
 
    ```bash
-   MINERVA_UPDATE_ENDPOINT="https://gist.githubusercontent.com/<user>/<id>/raw/latest.json" \
-     "$LOCALAPPDATA/Minerva/minerva.exe"
+   MINERVA_UPDATE_ENDPOINT="http://127.0.0.1:8000/latest.json" "$LOCALAPPDATA/Minerva/minerva.exe"
    ```
 
-   That is where the setup `.exe` installs by default.
-
-5. Confirm that it updates to `X.Y.Z` and relaunches, that About & Credits shows `X.Y.Z`, and that settings and Personal Bests carried over. Until updating in place is in (#128), confirm instead that the notice of `X.Y.Z` shows.
-6. Delete the gist (`gh gist delete <id>`) and stop the server.
+4. Confirm that it updates to `X.Y.Z` and relaunches, that About & Credits shows `X.Y.Z`, and that settings and Personal Bests carried over. Until updating in place is in (#128), confirm instead that the notice of `X.Y.Z` shows.
+5. Stop the server. Upload the release's own `target/release/bundle/latest.json` at step 6, never the one in `target/update-test`.
 
 ## 4. Tag
 
