@@ -139,9 +139,16 @@ fn whole(row: &ShopRow) -> bool {
 /// The badges sit this far left of the shop's window (physical px).
 const SHOP_GAP: i32 = 6;
 /// The shop's window reaches this far left of its item list's picture column, and this far
-/// right of it (physical px): the game draws it at a fixed size.
-const SHOP_LEFT_OF_LIST: i32 = 8;
-const SHOP_RIGHT_OF_LIST: i32 = 809;
+/// right of it (physical px), at the samples' UI Size: as much farther at a larger one (ADR
+/// 0020).
+const SHOP_LEFT_OF_LIST: f32 = 8.0;
+const SHOP_RIGHT_OF_LIST: f32 = 809.0;
+
+/// How far the shop's window reaches left and right of `shop`'s list (physical px).
+fn shop_reach(shop: &ShopList) -> (i32, i32) {
+    let size = shop.ui_size();
+    ((SHOP_LEFT_OF_LIST * size).round() as i32, (SHOP_RIGHT_OF_LIST * size).round() as i32)
+}
 
 impl DealFinder {
     /// Turn it on or off. Off, it forgets the shop it read.
@@ -193,9 +200,9 @@ impl DealFinder {
     /// Where the shop's window is on screen, across, and its list's listings, down; `None`
     /// while no shop was found.
     pub fn shop_window(&self) -> Option<ScreenRect> {
-        let list = self.shop.as_ref()?.area;
-        let x = list.x - SHOP_LEFT_OF_LIST;
-        Some(ScreenRect { x, width: (SHOP_RIGHT_OF_LIST + SHOP_LEFT_OF_LIST) as u32, ..list })
+        let shop = self.shop.as_ref()?;
+        let ((left, right), list) = (shop_reach(shop), shop.area);
+        Some(ScreenRect { x: list.x - left, width: (right + left) as u32, ..list })
     }
 
     /// The items the listing `row`'s badge is about, if it names one.
@@ -270,8 +277,9 @@ impl DealFinder {
         let height = (shop.rows.iter().map(|row| bottom(row.area)).fold(bottom(list), i32::max) - top) as u32;
         let client = game.client;
         let width = size.width.min(client.width);
-        let left = list.x - SHOP_LEFT_OF_LIST - SHOP_GAP - width as i32;
-        let x = if left >= client.x { left } else { list.x + SHOP_RIGHT_OF_LIST + SHOP_GAP };
+        let (shop_left, shop_right) = shop_reach(shop);
+        let left = list.x - shop_left - SHOP_GAP - width as i32;
+        let x = if left >= client.x { left } else { list.x + shop_right + SHOP_GAP };
         let strip = ScreenRect { x, y: top, width, height: height.min(client.height) };
         Some(clear_of(strip, avoid, client))
     }
