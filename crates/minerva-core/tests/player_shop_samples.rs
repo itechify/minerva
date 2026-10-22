@@ -11,6 +11,9 @@
 //!   with no capture before, a slot the tooltip hides wholly isn't known to hold a listing.
 //! - Each frame is fed as the game's client area at the screen's origin, as it is and as
 //!   the darker colours of live captures (`prep.rs`), to a core of its own.
+//! - Each is fed again at the other UI Sizes in [`OTHER_UI_SIZES`], scaled smoothly as the game
+//!   draws its UI larger or smaller (ADR 0020): there a listing may read as unreadable, never as
+//!   another item or price, and its badge sits level with it.
 
 mod common;
 
@@ -20,8 +23,17 @@ use minerva_core::{
     DealBadge, Frame, GameWindow, ListedPrice, Minerva, PanelState, ScreenPoint, ScreenRect, Settings, ShopCapture, Size,
     Verdict,
 };
+use image::imageops::{self, FilterType};
+use image::{Rgba, RgbaImage};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+/// A listing's band is this wide at the UI Size most samples were taken at.
+const SAMPLES_BAND_W: f32 = 253.0;
+/// The UI Sizes every sample is also read at, next to the samples': #130's (a band 162 px
+/// wide), and two larger.
+const OTHER_UI_SIZES: [f32; 3] = [0.64, 1.5, 1.8];
 
 fn samples_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/player-shop")
@@ -101,9 +113,49 @@ fn started(samples: &[Sample]) -> Minerva {
     minerva
 }
 
+fn image_of(file: &str) -> RgbaImage {
+    image::open(samples_dir().join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8()
+}
+
+/// `img` at `factor` times its size, scaled smoothly.
+fn scaled(img: &RgbaImage, factor: f32) -> RgbaImage {
+    let size = |px: u32| (px as f32 * factor).round() as u32;
+    imageops::resize(img, size(img.width()), size(img.height()), FilterType::Triangle)
+}
+
+/// The UI Size `img` shows, next to the samples': the widest its listings' bands run on a
+/// listing's worth of rows, of the band's colour at any brightness (narrower where something
+/// covers them), over the samples'.
+fn ui_size(img: &RgbaImage) -> f32 {
+    let band = |p: &Rgba<u8>| {
+        let k = p[2] as f32 / 223.0;
+        (0.8..=1.1).contains(&k) && (p[0] as f32 - 202.0 * k).abs() <= 6.0 && (p[1] as f32 - 213.0 * k).abs() <= 6.0
+    };
+    let mut runs: HashMap<u32, usize> = HashMap::new();
+    for y in 0..img.height() {
+        let mut x = 0;
+        while x < img.width() {
+            let start = x;
+            while x < img.width() && band(img.get_pixel(x, y)) {
+                x += 1;
+            }
+            if x - start >= 100 {
+                *runs.entry(x - start).or_default() += 1;
+            }
+            x = x.max(start + 1);
+        }
+    }
+    let width = runs.into_iter().filter(|&(_, rows)| rows >= 10).map(|(width, _)| width).max().expect("a listing's band");
+    width as f32 / SAMPLES_BAND_W
+}
+
 /// The sample's frame, its colours times `brightness`.
 fn frame(sample: &Sample, brightness: f32) -> Frame {
-    let img = image::open(samples_dir().join(&sample.file)).unwrap_or_else(|e| panic!("{}: {e}", sample.file)).to_rgba8();
+    frame_of(&image_of(&sample.file), brightness)
+}
+
+/// `img` as a frame, its colours times `brightness`.
+fn frame_of(img: &RgbaImage, brightness: f32) -> Frame {
     let mut rgba = img.as_raw().clone();
     for (i, channel) in rgba.iter_mut().enumerate() {
         if i % 4 != 3 {
@@ -127,6 +179,50 @@ fn read(badge: &DealBadge) -> Option<(String, ListedPrice)> {
     }
 }
 
+/// What a frame of a sample read as, against its readings.
+struct Checked {
+    /// Its listings read as unreadable.
+    unreadable: usize,
+    /// Where each badge of a listing not covered is on screen: its top and its height.
+    places: Vec<(i32, u32)>,
+}
+
+/// Feed `frame` of `sample` to a core of its own, and check its badges against the sample's
+/// readings: what reads wrong goes in `wrong`, labelled `label`; `None` when the badges
+/// aren't the readings' listings one for one.
+fn check(samples: &[Sample], sample: &Sample, frame: Frame, label: &str, wrong: &mut Vec<String>) -> Option<Checked> {
+    let mut minerva = started(samples);
+    let state = minerva.on_player_shop_capture(ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 } });
+    let window_top = state.deal_badges.as_ref().map_or(0, |shown| shown.placement.y);
+    let badges = badges(state);
+    let (covered, uncovered): (Vec<&DealBadge>, Vec<&DealBadge>) = badges.iter().partition(|b| b.covered);
+    let covers = sample.listings.iter().filter(|l| matches!(l, Listing::Covered { .. })).count();
+    let reads: Vec<(&String, u64, u64)> = sample
+        .listings
+        .iter()
+        .filter_map(|l| match l {
+            Listing::Read { name, quantity, mesos } => Some((name, *quantity, *mesos)),
+            Listing::Covered { .. } => None,
+        })
+        .collect();
+    if uncovered.len() != reads.len() || covered.len() > covers {
+        let found = format!("{} listings found and {} covered", uncovered.len(), covered.len());
+        wrong.push(format!("{label}: {found}, not {} and up to {covers}", reads.len()));
+        return None;
+    }
+    let mut checked = Checked { unreadable: 0, places: Vec::new() };
+    for (badge, (name, quantity, mesos)) in uncovered.into_iter().zip(reads) {
+        checked.places.push((window_top + badge.top as i32, badge.height));
+        let expected = (item_name(name), ListedPrice { quantity, mesos });
+        match read(badge) {
+            Some(read) if read == expected => {}
+            None => checked.unreadable += 1,
+            Some(read) => wrong.push(format!("{label}: {read:?}, not {expected:?}")),
+        }
+    }
+    Some(checked)
+}
+
 #[test]
 fn every_samples_listings_read_as_its_readings_say_or_as_unreadable_never_wrong() {
     let samples = samples();
@@ -135,31 +231,9 @@ fn every_samples_listings_read_as_its_readings_say_or_as_unreadable_never_wrong(
     let mut unreadable = 0;
     for sample in &samples {
         for brightness in [1.0, 0.935] {
-            let mut minerva = started(&samples);
-            let capture = ShopCapture { frame: frame(sample, brightness), origin: ScreenPoint { x: 0, y: 0 } };
-            let badges = badges(minerva.on_player_shop_capture(capture));
-            let (covered, uncovered): (Vec<&DealBadge>, Vec<&DealBadge>) = badges.iter().partition(|b| b.covered);
-            let covers = sample.listings.iter().filter(|l| matches!(l, Listing::Covered { .. })).count();
-            let reads: Vec<(&String, u64, u64)> = sample
-                .listings
-                .iter()
-                .filter_map(|l| match l {
-                    Listing::Read { name, quantity, mesos } => Some((name, *quantity, *mesos)),
-                    Listing::Covered { .. } => None,
-                })
-                .collect();
-            if uncovered.len() != reads.len() || covered.len() > covers {
-                let found = format!("{} listings found and {} covered", uncovered.len(), covered.len());
-                wrong.push(format!("{} ×{brightness}: {found}, not {} and up to {covers}", sample.file, reads.len()));
-                continue;
-            }
-            for (badge, (name, quantity, mesos)) in uncovered.into_iter().zip(reads) {
-                let expected = (item_name(name), ListedPrice { quantity, mesos });
-                match read(badge) {
-                    Some(read) if read == expected => {}
-                    None => unreadable += 1,
-                    Some(read) => wrong.push(format!("{} ×{brightness}: {read:?}, not {expected:?}", sample.file)),
-                }
+            let label = format!("{} ×{brightness}", sample.file);
+            if let Some(checked) = check(&samples, sample, frame(sample, brightness), &label, &mut wrong) {
+                unreadable += checked.unreadable;
             }
         }
     }
@@ -170,18 +244,80 @@ fn every_samples_listings_read_as_its_readings_say_or_as_unreadable_never_wrong(
 }
 
 #[test]
-fn listings_read_before_the_pointer_and_its_tooltip_came_over_them_keep_their_badges_covered() {
+fn every_samples_listings_read_at_other_ui_sizes_as_its_readings_say_or_as_unreadable_never_wrong() {
     let samples = samples();
-    let sample = |file: &str| samples.iter().find(|s| s.file == file).unwrap_or_else(|| panic!("no {file}"));
+    let mut wrong = Vec::new();
+    let mut misplaced = Vec::new();
+    for sample in &samples {
+        let img = image_of(&sample.file);
+        let own = ui_size(&img);
+        let at_own = check(&samples, sample, frame_of(&img, 1.0), &sample.file, &mut wrong);
+        for size in OTHER_UI_SIZES {
+            let factor = size / own;
+            if (factor - 1.0).abs() < 0.05 {
+                continue;
+            }
+            let resized = scaled(&img, factor);
+            for brightness in [1.0, 0.935] {
+                let label = format!("{} at ×{size} ×{brightness}", sample.file);
+                let Some(checked) = check(&samples, sample, frame_of(&resized, brightness), &label, &mut wrong) else {
+                    continue;
+                };
+                let Some(at_own) = &at_own else { continue };
+                for (&(top, height), &(own_top, own_height)) in checked.places.iter().zip(&at_own.places) {
+                    let expected = ((own_top as f32 * factor).round() as i32, (own_height as f32 * factor).round() as u32);
+                    if top.abs_diff(expected.0) > 2 || height.abs_diff(expected.1) > 2 {
+                        misplaced.push(format!("{label}: a badge at {top}, {height} px tall, not {}, {}", expected.0, expected.1));
+                    }
+                }
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
+    assert!(misplaced.is_empty(), "badges not level with their listings:\n{}", misplaced.join("\n"));
+}
+
+/// Bands narrower or wider than at any UI Size the reader takes (ADR 0020), and a stack of the
+/// band's colour with no listing on it, are no shop.
+#[test]
+fn bands_too_narrow_or_too_wide_for_any_ui_size_or_with_no_listing_show_no_badges() {
+    let samples = samples();
+    for sample in &samples {
+        let img = image_of(&sample.file);
+        let own = ui_size(&img);
+        for size in [0.5, 2.0] {
+            let mut minerva = started(&samples);
+            let frame = frame_of(&scaled(&img, size / own), 1.0);
+            let state = minerva.on_player_shop_capture(ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 } });
+            assert!(badges(state).is_empty(), "{} at ×{size}", sample.file);
+        }
+    }
+    let mut client = RgbaImage::from_pixel(1920, 1200, Rgba([96, 150, 210, 255]));
+    imageops::replace(&mut client, &RgbaImage::from_pixel(300, 400, Rgba([202, 213, 223, 255])), 800, 400);
     let mut minerva = started(&samples);
-    let capture = |frame: Frame| ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 } };
+    let state = minerva.on_player_shop_capture(ShopCapture { frame: frame_of(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 } });
+    assert!(badges(state).is_empty(), "a plain stack of the band's colour");
+}
+
+#[test]
+fn listings_read_before_the_pointer_and_its_tooltip_came_over_them_keep_their_badges_covered() {
+    for size in [1.0, 1.5] {
+        listings_read_before_the_pointer_and_its_tooltip_came_over_them_keep_their_badges_covered_at(size);
+    }
+}
+
+fn listings_read_before_the_pointer_and_its_tooltip_came_over_them_keep_their_badges_covered_at(size: f32) {
+    let samples = samples();
+    let mut minerva = started(&samples);
+    let capture =
+        |file: &str| ShopCapture { frame: frame_of(&scaled(&image_of(file), size), 1.0), origin: ScreenPoint { x: 0, y: 0 } };
     let shown = |state: &PanelState| -> Vec<(bool, Option<String>)> {
         badges(state).iter().map(|b| (b.covered, read(b).map(|(name, _)| name))).collect()
     };
     let name = |name: &str| Some(name.to_string());
 
-    minerva.on_player_shop_capture(capture(frame(sample("equips-two-sold-out.png"), 1.0)));
-    let state = minerva.on_player_shop_capture(capture(frame(sample("equips-under-the-pointer-and-its-tooltip.png"), 1.0)));
+    minerva.on_player_shop_capture(capture("equips-two-sold-out.png"));
+    let state = minerva.on_player_shop_capture(capture("equips-under-the-pointer-and-its-tooltip.png"));
 
     assert_eq!(
         shown(state),
@@ -191,16 +327,17 @@ fn listings_read_before_the_pointer_and_its_tooltip_came_over_them_keep_their_ba
             (true, name("Black Knucklevest")),
             (true, name("Black Amoria Skirt")),
         ],
-        "none for the sold-out listings, and none between the listings"
+        "none for the sold-out listings, and none between the listings, at ×{size}"
     );
 }
 
-/// A live capture of the game's client area holding `file`, a Bug Report's crop of a shop's
-/// list, back where it was captured: its top-left corner at `at`, the rest the game's sky.
-fn placed(file: &str, at: (u32, u32), at_ms: u64) -> ShopCapture {
-    let crop = image::open(samples_dir().join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
-    let mut client = image::RgbaImage::from_pixel(1920, 1200, image::Rgba([96, 150, 210, 255]));
-    image::imageops::replace(&mut client, &crop, at.0 as i64, at.1 as i64);
+/// A live capture of the game's 1920x1200 client area holding `file`, a Bug Report's crop of a
+/// shop's list, back where it was captured: its top-left corner at `at`, the rest the game's
+/// sky; all of it `size` times as large.
+fn placed(file: &str, at: (u32, u32), at_ms: u64, size: f32) -> ShopCapture {
+    let mut client = RgbaImage::from_pixel(1920, 1200, Rgba([96, 150, 210, 255]));
+    imageops::replace(&mut client, &image_of(file), at.0 as i64, at.1 as i64);
+    let client = if size == 1.0 { client } else { scaled(&client, size) };
     let frame = Frame { width: client.width(), height: client.height(), rgba: client.into_raw(), at_ms };
     ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 } }
 }
@@ -210,6 +347,12 @@ fn placed(file: &str, at: (u32, u32), at_ms: u64) -> ShopCapture {
 /// captures show a sold-out listing near white, its rules white: none of it covers anything.
 #[test]
 fn sold_out_listings_in_live_captures_get_no_badge_from_one_shop_to_the_next() {
+    for size in [1.0, 1.5] {
+        sold_out_listings_in_live_captures_get_no_badge_from_one_shop_to_the_next_at(size);
+    }
+}
+
+fn sold_out_listings_in_live_captures_get_no_badge_from_one_shop_to_the_next_at(size: f32) {
     let samples = samples();
     let mut minerva = started(&samples);
     let shown = |state: &PanelState| -> Vec<(bool, Option<String>)> {
@@ -217,10 +360,10 @@ fn sold_out_listings_in_live_captures_get_no_badge_from_one_shop_to_the_next() {
     };
     let name = |name: &str| (false, Some(name.to_string()));
 
-    let state = minerva.on_player_shop_capture(placed("live-ores-four-sold-out.png", (1343, 680), 18_605));
+    let state = minerva.on_player_shop_capture(placed("live-ores-four-sold-out.png", (1343, 680), 18_605, size));
     assert_eq!(shown(state), [name("Silver Ore"), name("Emerald Ore")]);
 
-    let state = minerva.on_player_shop_capture(placed("live-hats-two-sold-out.png", (1343, 643), 22_011));
+    let state = minerva.on_player_shop_capture(placed("live-hats-two-sold-out.png", (1343, 643), 22_011, size));
     let sailor = item_name("White Ribboned Sailor Dr...");
     assert_eq!(
         shown(state),
@@ -228,6 +371,6 @@ fn sold_out_listings_in_live_captures_get_no_badge_from_one_shop_to_the_next() {
         "none on the last shop's slots, which lie between this one's"
     );
 
-    let state = minerva.on_player_shop_capture(placed("live-hats-scrolled-five-sold-out.png", (1343, 696), 25_481));
+    let state = minerva.on_player_shop_capture(placed("live-hats-scrolled-five-sold-out.png", (1343, 696), 25_481, size));
     assert_eq!(shown(state), [name("Brown Guise")], "none on the sold-out listings, nor what was there before");
 }

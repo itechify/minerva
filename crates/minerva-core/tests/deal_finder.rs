@@ -369,6 +369,20 @@ fn with_no_room_left_of_the_shop_the_badges_go_right_of_it() {
     assert_eq!(state.deal_badges.as_ref().map(|b| b.placement.x), Some(list.x + 809 + 6));
 }
 
+/// #130's UI Size (ADR 0020): a listing's band 162 px wide, not 253, and the shop's window as
+/// much smaller.
+#[test]
+fn at_another_ui_size_the_shops_window_is_as_much_smaller() {
+    let mut minerva = on();
+    let list = ScreenRect { x: GAME.x + 100, y: 600, width: 199, height: 235 };
+    let band = ShopRow { area: ScreenRect { x: list.x + 37, y: 600, width: 162, height: 35 }, ..row(0, None, None) };
+    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![band] }), at_ms: 400 };
+    let state = minerva.on_player_shop_reading(reading);
+    let DealBadges { placement, badges } = state.deal_badges.clone().expect("badges");
+    assert_eq!(placement.x, list.x + 518 + 6, "right of a window 809 × 162/253 px right of the list");
+    assert_eq!(badges.iter().map(|b| (b.top, b.height)).collect::<Vec<_>>(), [(0, 35)]);
+}
+
 #[test]
 fn the_badges_go_when_the_shop_closes_or_the_deal_finder_is_turned_off() {
     let mut minerva = on();
