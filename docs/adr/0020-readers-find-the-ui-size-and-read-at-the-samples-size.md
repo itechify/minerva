@@ -4,7 +4,7 @@ status: accepted
 
 # Readers find the game's UI Size, and read at the samples' size
 
-The readers that find the game's UI in a capture of the client area (the Player Shop's list, ADR 0014; the Status Bar and its EXP figures, ADRs 0016 and 0017) were written on the premise that the game draws its UI at a fixed pixel size, whatever the client area's size. It doesn't. The game sizes its UI from a setting and the window's size together, the UI Size: its Default Ratio keeps the share of the screen the UI had at 1366×768 (×1.5625 at 1920×1200), and its other ratio picks a size for the resolution (×1 at 1920×1200, about ×1.8 at 2560×1600). The scales aren't whole numbers, and the game offers no list of them. Every sample so far is at one UI Size, the maintainer's: a Player Shop listing's band 253 px wide. A player at another found no shop, and no Status Bar, at either of two window sizes (#130).
+The readers that find the game's UI in a capture of the client area (the Player Shop's list, ADR 0014; the Status Bar and its EXP figures, ADRs 0016 and 0017) were written on the premise that the game draws its UI at a fixed pixel size, whatever the client area's size. It doesn't. The game sizes its UI from a setting and the window's size together, the UI Size: its Default Ratio keeps the share of the screen the UI had at 1366×768 (×1.5625 at 1920×1200), and its other ratio picks a size for the resolution (×1 at 1920×1200, about ×1.8 at 2560×1600). The sizes aren't whole multiples of one another, and the game offers no list of them. Every sample so far is at one UI Size, the maintainer's: a Player Shop listing's band 253 px wide. A player at another found no shop, and no Status Bar, at either of two window sizes (#130).
 
 ## The decision
 
