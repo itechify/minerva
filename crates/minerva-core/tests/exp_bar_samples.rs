@@ -16,6 +16,9 @@
 //!   1920x1200 client), each of a misread that ended the Session as a character
 //!   switch, or could have. Those are crops of the EXP Bar Region players once marked
 //!   (ADR 0005), from before the figures were found in the Status Bar.
+//!   "82517__53.05--five-as-dollar" is a Bug Report's crop of the figures found in the
+//!   Status Bar (2026-10-21, a 1920x1200 client): ocrs read its "53.05%" as "$3.05%",
+//!   so every frame of it read as unreadable.
 //! - `recording-*` folders are the probe's record mode (one crop a second, named by
 //!   capture time in ms) with their readings in `readings.json` (`null`: unreadable).
 //!   2026-10-07: 150 s of hunting at Lv 15, client (1005,1144) 240x32 of a 1920x1200
