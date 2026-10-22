@@ -184,7 +184,7 @@ Then check the release:
 
 ## If a release goes wrong
 
-Deleting a release moves Latest back to the one before, and with it the updater's feed, so players stop being offered it.
+Deleting a release moves Latest back to the one before, and with it the updater's feed, so players stop being offered it, and a download that asks the feed after installs nothing (ADR 0019).
 
 - **Before anyone could download it** (minutes after publishing):
   1. `gh release delete vX.Y.Z --cleanup-tag --yes` removes the release and its tag. If the site was already published from it, publish it again from the previous release: `gh workflow run site.yml` builds from the latest release's tag. But if that tag is older than the Map Leaderboards API, publish from `main` instead (`gh workflow run site.yml -f ref=main`): an older tag deploys a Worker without the API (`docs/map-leaderboards-setup.md`).
