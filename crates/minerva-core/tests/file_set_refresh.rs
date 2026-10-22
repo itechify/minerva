@@ -1,5 +1,6 @@
-//! OSMS's file set is fetched at startup, unless the set saved at an earlier launch is
-//! under a day old, and every 24 hours after; a new one is swapped in whole once it reads.
+//! OSMS's file set is fetched at startup, unless the set saved at an earlier launch of this
+//! version is under a day old, and every 24 hours after; a new one is swapped in whole once
+//! it reads. (The player's Refresh fetches it at once: `game_data_refresh.rs`.)
 //! When OSMS can't be reached the panel falls back on the set saved, and says so, with
 //! its date, only once that is over 7 days old: game data changes only on patch days. A
 //! set that doesn't read keeps the one in use, and the panel says the format changed only
@@ -143,6 +144,34 @@ fn a_set_saved_over_a_day_ago_is_used_when_a_fresh_one_cannot_be_had_or_does_not
         assert_eq!(state.recognition, Recognition::Ready, "{how}");
         assert_eq!(blue_snails(&state), Some(6), "{how}");
     }
+}
+
+/// Minerva was updated since: the set the old version saved is fetched afresh at launch
+/// however young, as the new one may read a set the old one couldn't. A set saved before
+/// saved sets said which version saved them counts as another version's.
+#[test]
+fn a_set_another_version_saved_is_fetched_afresh_at_launch() {
+    for version in [Some("0.0.1"), None] {
+        let source = FakeSource::with_world(with_blue_snails(9))
+            .with_saved_set(with_blue_snails(6), SAVED_AT)
+            .saved_by(version);
+        let requests = source.osms_requests.clone();
+
+        let (_, state) = on_sunset_sky_from(source, SAVED_AT + 60_000);
+
+        assert_eq!(requests.load(Ordering::SeqCst), 1, "{version:?}");
+        assert_eq!(blue_snails(&state), Some(9), "{version:?}");
+    }
+}
+
+#[test]
+fn with_osms_unreachable_a_set_another_version_saved_is_used() {
+    let source = saved_and_offline().saved_by(Some("0.0.1"));
+
+    let (_, state) = on_sunset_sky_from(source, SAVED_AT + 60_000);
+
+    assert_eq!(state.recognition, Recognition::Ready);
+    assert!(matches!(&state.data, MapDataStatus::Ready(data) if data.mobs.len() == 5));
 }
 
 /// A saved set that doesn't read (Minerva was updated, say) is as good as none: a

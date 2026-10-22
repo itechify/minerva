@@ -158,7 +158,12 @@ type PanelState = {
   search: SearchState;
   /** Mirror of `minerva_core::DealFinderView`. */
   dealFinder: { on: boolean; dealLine: string | null; marginPercent: number; shopFound: boolean };
+  /** Mirror of `minerva_core::GameData`: when the map set was fetched, and the player's Refresh. */
+  gameData: { fetchedAtUnixMs: number | null; refresh: Refresh | null };
 };
+
+/** Mirror of `minerva_core::Refresh`. */
+type Refresh = "upToDate" | "unreachable" | "needsUpdate" | "refreshing";
 
 const panelEl = byId("panel");
 const street = byId("street");
@@ -231,6 +236,8 @@ const dealState = byId("deal-state");
 const dealDetail = byId("deal-detail");
 const dealMargin = byId("deal-margin") as HTMLInputElement;
 const grindTrackerOn = byId("grind-tracker-on") as HTMLInputElement;
+const gameDataState = byId("game-data-state");
+const gameDataRefresh = byId("game-data-refresh") as HTMLButtonElement;
 const iconArt = byId("icon-art") as HTMLImageElement;
 const resultsHeader = resultsHead();
 resultsTable.append(resultsHeader);
@@ -302,6 +309,30 @@ function candidateRow(id: string, outline: Outline): HTMLLIElement {
 
 /** "7 Oct 2026", in the player's time zone. */
 const savedOn = (unixMs: number) => dayText(new Date(unixMs), true);
+
+/** "21 Oct, 9:04 AM", in the player's time zone, with the year if it isn't this one. */
+function fetchedOn(unixMs: number): string {
+  const date = new Date(unixMs);
+  const day = dayText(date, date.getFullYear() !== new Date().getFullYear());
+  return `${day}, ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+}
+
+/** Game Data's line: how the player's Refresh is going or what it came to, or else when
+ *  the map set was fetched. */
+function gameDataText({ fetchedAtUnixMs, refresh }: PanelState["gameData"]): string {
+  switch (refresh) {
+    case "refreshing":
+      return "Refreshing…";
+    case "upToDate":
+      return "Up to date";
+    case "unreachable":
+      return "Couldn't reach OSMS Data Explorer";
+    case "needsUpdate":
+      return "OSMS's data changed: update Minerva to read it";
+    case null:
+      return fetchedAtUnixMs === null ? "Not fetched yet" : `Fetched ${fetchedOn(fetchedAtUnixMs)}`;
+  }
+}
 
 /** The note shown above the map's data: only that it comes from a saved copy over a week old. */
 function dataNote(data: MapDataStatus): string {
@@ -785,6 +816,8 @@ function renderSettingsView(panel: PanelState) {
   // The Deal Margin as saved, unless the player is typing one.
   if (document.activeElement !== dealMargin) dealMargin.value = String(panel.dealFinder.marginPercent);
   grindTrackerOn.checked = panel.grindTracker.on;
+  const gameData = gameDataText(panel.gameData);
+  if (changed("game-data", gameData)) gameDataState.textContent = gameData;
   settingsNotice.textContent = view.notice ? settingsNoticeText(view.notice, hotkeys) : "";
   hotkeysUndo.hidden = view.notice?.kind !== "restored";
   // Nothing to restore, or a row waiting: one change at a time.
@@ -1421,6 +1454,7 @@ dealMargin.addEventListener("keydown", (e) => {
 });
 grindTrackerOn.addEventListener("change", () => invoke("grind_tracker_set", { on: grindTrackerOn.checked }));
 hotkeysReset.addEventListener("click", () => invoke("hotkeys_reset"));
+gameDataRefresh.addEventListener("click", () => invoke("game_data_refresh"));
 hotkeysUndo.addEventListener("click", () => invoke("hotkeys_undo_reset"));
 // A row's Change button waits for its new combination; while it waits, it cancels.
 hotkeyRows.addEventListener("click", (e) => {

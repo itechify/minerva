@@ -1,5 +1,5 @@
 ---
-status: accepted, amended by ADR-0010 (the Item Card reads OSMS's item files, a set of their own) and ADR-0015 (a table of each map's solo ceiling is committed, for the Map Leaderboards' cap)
+status: accepted, amended by ADR-0010 (the Item Card reads OSMS's item files, a set of their own), ADR-0015 (a table of each map's solo ceiling is committed, for the Map Leaderboards' cap), and 2026-10-21 (a set another version saved is fetched afresh at launch, and the player can Refresh it now)
 ---
 
 # Map and mob data from OSMS Data Explorer's files, not MeowDB's pages
@@ -15,7 +15,7 @@ Minerva now takes every map's and mob's data from the JSON files that OSMS Data 
   - `map_manifest.json`: each map's picture.
   - `lookups.json`: names of maps outside `maps.json`.
 
-  They are fetched one at a time with Minerva's user agent, and no other pace. At launch the core looks at the set saved before, and uses it as it is while it's under a day old. Otherwise, and every 24 hours while running, the core has the set fetched afresh, so a set used at one daily ask is always fetched afresh at the next. A fetched set is saved only once the core's reader reads it, and is swapped in whole. A file that fails or isn't shaped as expected keeps the previous set. With no set saved, the core asks again every minute.
+  They are fetched one at a time with Minerva's user agent, and no other pace. At launch the core looks at the set saved before, and uses it as it is while it's under a day old and this version of Minerva saved it (the saved file says which version did): a new version may read a set the old one couldn't, as the Grand Launch's set showed. Otherwise, and every 24 hours while running, the core has the set fetched afresh, so a set used at one daily ask is always fetched afresh at the next. The player can have it fetched afresh at once with Refresh under Game Data in Settings, which says when the set was fetched and what a Refresh came to: up to date, OSMS unreachable, or Minerva needing an update. A fetched set is saved only once the core's reader reads it, and is swapped in whole. A file that fails or isn't shaped as expected keeps the previous set. With no set saved, the core asks again every minute.
 - **Saved Copies:** the panel says it shows a Saved Copy, with its date, only once the saved set is over 7 days old by the wall clock, because game data changes only on patch days. It says the format changed only when there's no previous set to fall back on, and that the map list couldn't be loaded only when nothing is saved.
 - **Not bundled:** OSMS's repo has no licence, so nothing grants redistribution. Minerva fetches the files and ships none of them. The tests use made-up worlds in OSMS's shape and a committed list of the game's map names (IDs, streets, names and regions only). Nothing on the site restricts fetching, so we didn't ask OSMS's author.
 - **The map list:** IDs are zero-padded to the game's 9 digits, which are MeowDB's too, and names are trimmed. The one map with no name or street is left out, so 304 of the 305 are listed. Regions are OSMS's, and Search and routes leave out its "Event" and "Dev" maps.

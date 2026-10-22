@@ -154,7 +154,8 @@
                     <dt>Map and mob data</dt>
                     <dd>
                       Five files from <a href="https://osmsdataexplorer.com">OSMS Data Explorer</a>, under 1 MB together,
-                      when you start Minerva if its copy is a day old, and every 24 hours while it runs.
+                      when you start Minerva if its copy is a day old or an earlier version got it, every 24 hours while
+                      it runs, and when you <a href="#refresh">refresh it</a>.
                     </dd>
                     <dt>Item data</dt>
                     <dd>Two more OSMS files, about 1.2 MB together, on the same schedule.</dd>
@@ -171,6 +172,18 @@
                     bests go to this site, with their name, job, level and dates, and your Leaderboard Key, which the
                     site keeps only as a hash. Turn <strong>Share</strong> off under a character's name in your
                     Personal Bests, and nothing of theirs is sent.
+                  </p>
+                </details>
+                <details class="qa" id="refresh">
+                  <summary>Search doesn't find a new map, mob or item. What do I do?</summary>
+                  <p>
+                    Minerva gets the game's data once a day, so a patch can take a day to show. To get it now, open
+                    Settings, the gear at the top of the panel, and press <strong>Refresh</strong> under Game Data.
+                    A new version of Minerva gets it afresh the first time it starts.
+                  </p>
+                  <p>
+                    If Refresh says to update Minerva, OSMS Data Explorer's data changed in a way this version can't read:
+                    <a href="#update">install the latest release</a>. Until then, Minerva keeps the data it has.
                   </p>
                 </details>
                 <details class="qa" id="offline">
@@ -433,7 +446,7 @@
                     </li>
                     <li>
                       <span class="icon-button" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M6.67 3.91L6.8 1.82L9.2 1.82L9.33 3.91A4.3 4.3 0 0 1 10.88 4.8L12.75 3.87L13.96 5.95L12.21 7.11A4.3 4.3 0 0 1 12.21 8.89L13.96 10.05L12.75 12.13L10.88 11.2A4.3 4.3 0 0 1 9.33 12.09L9.2 14.18L6.8 14.18L6.67 12.09A4.3 4.3 0 0 1 5.12 11.2L3.25 12.13L2.04 10.05L3.79 8.89A4.3 4.3 0 0 1 3.79 7.11L2.04 5.95L3.25 3.87L5.12 4.8A4.3 4.3 0 0 1 6.67 3.91Z" /><circle cx="8" cy="8" r="1.6" /></svg></span>
-                      <span>Settings, to change the hotkeys.</span>
+                      <span>Settings, to change the hotkeys or <a href="#refresh">refresh the game data</a>.</span>
                     </li>
                     <li>
                       <span class="icon-button" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5.8 6a2.2 2.2 0 1 1 3.3 1.9c-.7.4-1.1.9-1.1 1.7v.6" /><circle class="dot" cx="8" cy="12.6" r=".9" /></svg></span>

@@ -681,6 +681,29 @@ fn with_osms_unreachable_the_item_files_saved_are_used_however_old() {
     assert_eq!(bronze_ore_price(&mut minerva, 1_000), Some(ShopPrice::Sells { mesos: 450 }));
 }
 
+/// Minerva was updated since: the item files the old version saved are fetched afresh at
+/// launch however young, as the new one may read files the old one couldn't.
+#[test]
+fn item_files_another_version_saved_are_fetched_afresh_at_launch() {
+    for version in [Some("0.0.1"), None] {
+        let source = FakeSource::osms_offline()
+            .with_items(bronze_ore_at(500))
+            .with_saved_items(bronze_ore_at(450), SAVED_AT)
+            .saved_by(version);
+        let mut minerva = started_at(source, SAVED_AT + 60_000);
+
+        assert_eq!(bronze_ore_price(&mut minerva, 1_000), Some(ShopPrice::Sells { mesos: 500 }), "{version:?}");
+    }
+}
+
+#[test]
+fn with_osms_unreachable_item_files_another_version_saved_are_used() {
+    let source = FakeSource::osms_offline().with_saved_items(bronze_ore_at(450), SAVED_AT).saved_by(Some("0.0.1"));
+    let mut minerva = started_at(source, SAVED_AT + 60_000);
+
+    assert_eq!(bronze_ore_price(&mut minerva, 1_000), Some(ShopPrice::Sells { mesos: 450 }));
+}
+
 #[test]
 fn item_files_are_fetched_afresh_every_day_and_swapped_in_once_they_read() {
     let answers = vec![Poll::Ready(Ok(bronze_ore_at(450).files())), changed_format(), Poll::Ready(Ok(bronze_ore_at(500).files()))];

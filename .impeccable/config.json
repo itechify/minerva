@@ -6,5 +6,20 @@
       "maxFindings": 5,
       "maxChars": 8000
     }
+  },
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "site/faq/index.html"
+        ],
+        "createdAt": "2026-10-22T01:35:06.133Z",
+        "reason": "Claude, checked site/site.css: the flagged .qa-list is a bordered list of flush rows by design; each row's text is inset 16px (.qa > summary padding 10px 12px 10px 16px, .qa-answer padding 0 16px 14px)"
+      }
+    ]
   }
 }

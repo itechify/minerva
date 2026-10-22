@@ -4,13 +4,15 @@
 //!
 //! Saved apart from the map set ([`crate::osms`]) as one file of their own, so a change in
 //! them takes down only the Item Card, and the file's modification time says when they
-//! were saved. The core decides when to fetch them afresh, on the map set's schedule.
-//! Fetched files are saved only once the core's reader reads them. If any file fails, or
-//! they don't read, nothing is saved, and the core keeps the files it has.
+//! were saved; the file says which Minerva version saved them. The core decides when to
+//! fetch them afresh, on the map set's schedule. Fetched files are saved only once the
+//! core's reader reads them. If any file fails, or they don't read, nothing is saved, and
+//! the core keeps the files it has.
 
 use crate::errors::error;
+use crate::files::Stamped;
 use crate::http;
-use minerva_core::SourceError;
+use minerva_core::{MINERVA_VERSION, SourceError};
 use minerva_core::osms::DATA_URL;
 use minerva_core::osms_items::{self, ItemFiles, SavedItemFiles};
 use std::path::{Path, PathBuf};
@@ -37,13 +39,14 @@ impl OsmsItems {
         Self { client, file: cache_dir.join(ITEMS_FILE), in_flight: None }
     }
 
-    /// The files saved, and when; `None` if none are, or they can't be read back.
+    /// The files saved, when, and by which version; `None` if none are, or they can't be read
+    /// back.
     pub fn saved(&self) -> Option<SavedItemFiles> {
         let json = std::fs::read(&self.file).ok()?;
-        let files = serde_json::from_slice(&json).ok()?;
+        let Stamped { files, minerva_version } = serde_json::from_slice(&json).ok()?;
         let saved_at = std::fs::metadata(&self.file).and_then(|m| m.modified()).ok()?;
         let since_epoch = saved_at.duration_since(UNIX_EPOCH).unwrap_or_default();
-        Some(SavedItemFiles { files, saved_at_unix_ms: since_epoch.as_millis() as u64 })
+        Some(SavedItemFiles { files, saved_at_unix_ms: since_epoch.as_millis() as u64, saved_by: minerva_version })
     }
 
     /// Files fetched afresh, in the background: the first call starts fetching them,
@@ -87,9 +90,10 @@ pub fn fetch_live() -> Result<ItemFiles, String> {
     tauri::async_runtime::block_on(fetch(&client))
 }
 
-/// Save `files` at `file`, in place of the ones saved there, whole.
+/// Save `files` at `file`, in place of the ones saved there, whole, as this version's.
 fn save(file: &Path, files: &ItemFiles) {
-    let written = serde_json::to_vec(files)
+    let stamped = Stamped { files, minerva_version: Some(MINERVA_VERSION.to_string()) };
+    let written = serde_json::to_vec(&stamped)
         .map_err(std::io::Error::other)
         .and_then(|json| crate::files::write_atomically(file, &json));
     if let Err(e) = written {
@@ -103,7 +107,7 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn the_saved_item_files_are_read_back_with_when_they_were_saved() {
+    fn the_saved_item_files_are_read_back_with_when_and_by_which_version_they_were_saved() {
         let dir = std::env::temp_dir().join(format!("minerva-osms-items-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -117,7 +121,15 @@ mod tests {
         file.set_modified(saved_at).unwrap();
         drop(file);
 
-        assert_eq!(items.saved(), Some(SavedItemFiles { files, saved_at_unix_ms: 1_790_812_800_000 }));
+        let saved_by = Some(MINERVA_VERSION.to_string());
+        let saved = SavedItemFiles { files: files.clone(), saved_at_unix_ms: 1_790_812_800_000, saved_by };
+        assert_eq!(items.saved(), Some(saved));
+
+        // Item files saved before they said which version saved them.
+        std::fs::write(dir.join(ITEMS_FILE), serde_json::to_vec(&files).unwrap()).unwrap();
+        let saved = items.saved().expect("read back");
+        assert_eq!((saved.files, saved.saved_by), (files, None));
+
         std::fs::write(dir.join(ITEMS_FILE), b"not json").unwrap();
         assert_eq!(items.saved(), None);
         let _ = std::fs::remove_dir_all(&dir);

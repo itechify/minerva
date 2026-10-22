@@ -9,6 +9,7 @@ mod bests_window;
 pub mod bug_report;
 mod deal_finder;
 mod exp_bar;
+mod game_data;
 mod grind_tracker;
 mod hotkey_settings;
 mod item_card;
@@ -49,6 +50,7 @@ pub use bests_window::{PersonalBestsCharacter, PersonalBestsMap, PersonalBestsVi
 pub use bug_report::{BugReport, ReportAbout};
 pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, GREAT_BELOW, STEAL_BELOW, Verdict};
 pub use exp_bar::{ExpBar, ExpBarPlace, ExpBarReader, ExpBarReading, ExpFigures};
+pub use game_data::{GameData, Refresh};
 pub use grind_tracker::{ClientOffset, GrindTrackerWindow};
 pub use hotkey_settings::{KeyPress, RebindProblem, SettingsNotice, SettingsView};
 pub use item_card::{
@@ -94,6 +96,7 @@ pub use world::{Distance, Step, Travel};
 use bests_window::BestsWindow;
 use bug_report::{Event, MapFacts, Outcome, Press, RecordedSource, Recorder, Region};
 use deal_finder::DealFinder;
+use game_data::Refreshes;
 use grind_tracker::GrindTracker;
 use hotkey_settings::HotkeySettings;
 use item_card::{Editing, ItemCards, Pressed};
@@ -338,6 +341,8 @@ pub struct PanelState {
     /// while the Deal Finder is off, no shop was found, or the overlay can't show, and while
     /// an Item Card or Item Lookup press's capture is taken, which it would be in.
     pub deal_badges: Option<DealBadges>,
+    /// The settings view's Game Data: when OSMS's data was fetched, and the player's Refresh.
+    pub game_data: GameData,
 }
 
 /// What a hotkey asks the shell to do at once, beyond rendering the panel state.
@@ -416,11 +421,16 @@ const MAX_DEAL_MARGIN: u32 = 99;
 /// The game window's title, unless the player picked another by hand.
 pub const GAME_WINDOW_TITLE: &str = "MapleStory";
 
+/// This Minerva's version, which every file set it fetches is saved with: the four files
+/// that hold the version agree (`docs/releasing.md`).
+pub const MINERVA_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// How long a file set is used before it is fetched afresh: a day. Game data changes only
-/// on patch days, and a day is soon enough to catch one. At startup, a set saved under a
-/// day ago by the wall clock is used as it is; while running, the set is fetched afresh
-/// every day by capture time, however old the one held, so a set used at one daily ask is
-/// always fetched afresh at the next.
+/// on patch days, and a day is soon enough to catch one; the player's Refresh catches it
+/// sooner. At startup, a set this version saved under a day ago by the wall clock is used
+/// as it is, but never one another version saved: a new version may read a set the old one
+/// couldn't. While running, the set is fetched afresh every day by capture time, however
+/// old the one held, so a set used at one daily ask is always fetched afresh at the next.
 const SET_RECHECK_MS: u64 = 24 * 60 * 60 * 1000;
 
 /// With no file set at all, how long to wait before asking again after OSMS couldn't be
@@ -475,6 +485,8 @@ pub struct Minerva {
     /// because it is too old to use as it is: what the panel falls back on if none can be
     /// had.
     fallback: Option<HeldSet>,
+    /// The player's Refresh of OSMS's file set and item files.
+    refreshes: Refreshes,
     /// What the file set is read with: [`PORTAL_OVERRIDES`], but for tests of the list.
     portal_overrides: Vec<PortalOverride>,
     /// Built from the map list, once there is one.
@@ -557,6 +569,7 @@ impl Minerva {
             osms_in_flight: false,
             saved_set_seen: false,
             fallback: None,
+            refreshes: Refreshes::default(),
             portal_overrides: PORTAL_OVERRIDES.to_vec(),
             matcher: None,
             tracker: Tracker::default(),
@@ -989,7 +1002,17 @@ impl Minerva {
                 self.sync_search();
                 self.hotkey_settings.open();
             }
-            Action::CloseSettings => self.hotkey_settings.close(),
+            Action::CloseSettings => {
+                self.hotkey_settings.close();
+                self.refreshes.forget();
+            }
+            Action::RefreshGameData => {
+                if self.refreshes.start() {
+                    // Asked for at the next tick, unless a fetch is under way: it counts.
+                    self.ask_osms_at = 0;
+                    self.item_files.ask_now();
+                }
+            }
             Action::BeginRebind(hotkey) => self.hotkey_settings.begin(hotkey),
             Action::CancelRebind => self.hotkey_settings.cancel(),
             Action::TurnOffHotkey => {
@@ -1742,18 +1765,22 @@ impl Minerva {
             // Search matches items once they are in.
             self.sync_search();
         }
+        if let Some(refresh) = self.item_files.take_fetched() {
+            self.refreshes.items_fetched(refresh);
+        }
         // An Item Lookup's search, which the player waits on.
         let open = self.item_lookups.poll(&mut self.source, &mut self.meowdb_pace, at_ms);
         self.requests.extend(open.map(|url| Request::OpenInBrowser { url }));
         self.sync_panel()
     }
 
-    /// OSMS's file set. At startup (the first tick or frame), the set an earlier launch
-    /// saved, if it was saved under [`SET_RECHECK_MS`] ago; otherwise, and every
-    /// [`SET_RECHECK_MS`] after, one the source fetches afresh, and with no set at all, a
-    /// minute after OSMS couldn't be reached. A fetched set that reads replaces the one
-    /// held whole. One that can't be had or doesn't read leaves the one held as it is, and
-    /// at startup falls back on the saved set, however old.
+    /// OSMS's file set. At startup (the first tick or frame), the set this version saved at
+    /// an earlier launch, if it was saved under [`SET_RECHECK_MS`] ago; otherwise, and every
+    /// [`SET_RECHECK_MS`] after, or when the player presses Refresh, one the source fetches
+    /// afresh, and with no set at all, a minute after OSMS couldn't be reached. A fetched
+    /// set that reads replaces the one held whole. One that can't be had or doesn't read
+    /// leaves the one held as it is, and at startup falls back on the saved set, however
+    /// old.
     fn load_osms(&mut self, at_ms: u64) {
         if !self.osms_in_flight {
             if at_ms < self.ask_osms_at {
@@ -1777,6 +1804,7 @@ impl Minerva {
         self.osms_in_flight = false;
         self.ask_osms_at = at_ms + SET_RECHECK_MS;
         let read = fetched.and_then(|files| osms::read_with(&files, &self.portal_overrides));
+        self.refreshes.set_fetched(Refresh::of(&read));
         match (read, self.fallback.take()) {
             // The source saved it as it fetched it: now.
             (Ok(maps), _) => self.take_set(HeldSet { maps, saved_at_unix_ms: self.wall_clock }),
@@ -1790,16 +1818,17 @@ impl Minerva {
         }
     }
 
-    /// Take the set an earlier launch saved if it was saved under [`SET_RECHECK_MS`] ago by
-    /// the wall clock, or else keep it to fall back on; whether it was taken. Without the
-    /// wall clock its age is unknown, so it isn't taken as it is, and a set that doesn't
-    /// read is as good as none.
+    /// Take the set an earlier launch saved if this version saved it under
+    /// [`SET_RECHECK_MS`] ago by the wall clock, or else keep it to fall back on; whether it
+    /// was taken. Without the wall clock its age is unknown, so it isn't taken as it is, and
+    /// a set that doesn't read is as good as none.
     fn take_saved_set(&mut self) -> bool {
         let Some(saved) = self.source.saved_osms_files() else { return false };
         let Ok(maps) = osms::read_with(&saved.files, &self.portal_overrides) else { return false };
         let held = HeldSet { maps, saved_at_unix_ms: Some(saved.saved_at_unix_ms) };
         let age = self.wall_clock.and_then(|now| now.checked_sub(saved.saved_at_unix_ms));
-        if age.is_some_and(|age| age < SET_RECHECK_MS) {
+        let ours = saved.saved_by.as_deref() == Some(MINERVA_VERSION);
+        if ours && age.is_some_and(|age| age < SET_RECHECK_MS) {
             self.take_set(held);
             return true;
         }
@@ -1924,6 +1953,10 @@ impl Minerva {
         let in_front = self.panel.foreground.is_some_and(|foreground| foreground != Foreground::OtherApp);
         self.state.hotkeys_live = in_front && !self.hotkey_settings.is_rebinding();
         self.state.settings_view = self.hotkey_settings.state(&self.settings.hotkeys);
+        self.state.game_data = GameData {
+            fetched_at_unix_ms: self.set.as_ref().and_then(|set| set.saved_at_unix_ms),
+            refresh: self.refreshes.state(),
+        };
         self.state.game_window_title =
             self.settings.game_window_title.clone().unwrap_or_else(|| GAME_WINDOW_TITLE.into());
         &self.state

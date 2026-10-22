@@ -1,7 +1,22 @@
 //! Writing our own files (settings, Personal Bests, caches).
 
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::Path;
+
+/// OSMS's files as the cache keeps them: their texts, beside the Minerva version that
+/// fetched and saved them, which the core asks for at startup (a new version fetches them
+/// afresh).
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stamped<T> {
+    #[serde(flatten)]
+    pub files: T,
+    /// [`minerva_core::MINERVA_VERSION`] as it saved them; `None` in a file saved before
+    /// they said so, which reads as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minerva_version: Option<String>,
+}
 
 /// Write via a temporary file and a rename, so a crash never leaves half a file.
 pub fn write_atomically(path: &Path, contents: &[u8]) -> std::io::Result<()> {

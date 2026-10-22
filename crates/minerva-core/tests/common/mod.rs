@@ -10,7 +10,7 @@ pub mod world;
 use minerva_core::osms::{OsmsFiles, SavedFiles};
 use minerva_core::osms_items::{ItemFiles, SavedItemFiles};
 use minerva_core::{
-    Minerva, Fetched, Frame, GameWindow, ItemHit, MapDataSource, PanelState, Rect,
+    MINERVA_VERSION, Minerva, Fetched, Frame, GameWindow, ItemHit, MapDataSource, PanelState, Rect,
     ScreenRect, Settings, Size, SourceError, TitleRegion, default_title_region,
 };
 use std::path::{Path, PathBuf};
@@ -213,14 +213,25 @@ impl FakeSource {
     }
 
     /// A set of `world`'s files was saved at `saved_at_unix_ms` (ms since the Unix epoch),
-    /// at an earlier launch.
+    /// at an earlier launch of this version.
     pub fn with_saved_set(self, world: osms::World, saved_at_unix_ms: u64) -> Self {
         self.with_saved_files(world.files(), saved_at_unix_ms)
     }
 
-    /// These files were saved as OSMS's set at `saved_at_unix_ms`, at an earlier launch.
+    /// These files were saved as OSMS's set at `saved_at_unix_ms`, at an earlier launch of
+    /// this version.
     pub fn with_saved_files(self, files: OsmsFiles, saved_at_unix_ms: u64) -> Self {
-        Self { saved_set: Some(SavedFiles { files, saved_at_unix_ms }), ..self }
+        let saved_by = Some(MINERVA_VERSION.to_string());
+        Self { saved_set: Some(SavedFiles { files, saved_at_unix_ms, saved_by }), ..self }
+    }
+
+    /// The saved set and item files were saved by `version` (`None`: by a Minerva from
+    /// before saved files said which version saved them), not this one.
+    pub fn saved_by(mut self, version: Option<&str>) -> Self {
+        let by = version.map(String::from);
+        self.saved_set.iter_mut().for_each(|saved| saved.saved_by.clone_from(&by));
+        self.saved_item_set.iter_mut().for_each(|saved| saved.saved_by.clone_from(&by));
+        self
     }
 
     /// MeowDB can't be reached, and every item search is answered with a copy saved at
@@ -272,9 +283,11 @@ impl FakeSource {
         Self { item_set_answers: answers, ..self }
     }
 
-    /// These item files were saved at `saved_at_unix_ms`, at an earlier launch.
+    /// These item files were saved at `saved_at_unix_ms`, at an earlier launch of this
+    /// version.
     pub fn with_saved_items(self, items: items::ItemWorld, saved_at_unix_ms: u64) -> Self {
-        Self { saved_item_set: Some(SavedItemFiles { files: items.files(), saved_at_unix_ms }), ..self }
+        let saved_by = Some(MINERVA_VERSION.to_string());
+        Self { saved_item_set: Some(SavedItemFiles { files: items.files(), saved_at_unix_ms, saved_by }), ..self }
     }
 }
 

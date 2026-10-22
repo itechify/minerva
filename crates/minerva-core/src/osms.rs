@@ -49,6 +49,9 @@ pub struct SavedFiles {
     pub files: OsmsFiles,
     /// When it was saved (ms since the Unix epoch).
     pub saved_at_unix_ms: u64,
+    /// The Minerva version that fetched and saved it ([`crate::MINERVA_VERSION`]); `None`
+    /// for a set saved before sets said so.
+    pub saved_by: Option<String>,
 }
 
 /// Every map's data from OSMS's file set: the map list, each listed map's figures, and
