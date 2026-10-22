@@ -67,3 +67,10 @@ pub fn hotkeys_undo_reset(commands: State<'_, Sender<Command>>) {
 pub fn game_data_refresh(commands: State<'_, Sender<Command>>) {
     act(&commands, Action::RefreshGameData);
 }
+
+/// The settings view's "Check for updates" switch: on, Minerva checks at launch and every
+/// 6 hours; off, only when the player asks in Help & Setup.
+#[tauri::command]
+pub fn check_for_updates_set(on: bool, commands: State<'_, Sender<Command>>) {
+    act(&commands, Action::SetCheckForUpdates { on });
+}

@@ -370,6 +370,19 @@ h3 {
   font-weight: 700;
 }
 
+/* About & Credits' updates: what the last check came to, a newer version, and the button. */
+.updates {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.updates p {
+  margin: 0;
+}
+
 /* About & Credits: what each credit is for, then who and on what terms. */
 .credits {
   margin: 0 0 12px;

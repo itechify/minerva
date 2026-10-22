@@ -171,11 +171,10 @@ fn sweep_older_than(dir: &Path, cutoff: SystemTime) {
         let Ok(kind) = entry.file_type() else { continue };
         if kind.is_dir() {
             sweep_older_than(&entry.path(), cutoff);
-        } else if entry.metadata().and_then(|m| m.modified()).is_ok_and(|touched| touched < cutoff) {
-            if let Err(e) = std::fs::remove_file(entry.path()) {
+        } else if entry.metadata().and_then(|m| m.modified()).is_ok_and(|touched| touched < cutoff)
+            && let Err(e) = std::fs::remove_file(entry.path()) {
                 error!("OSMS picture: couldn't delete {}: {e}", entry.path().display());
             }
-        }
     }
 }
 

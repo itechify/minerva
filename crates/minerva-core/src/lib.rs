@@ -44,6 +44,7 @@ mod shown_map;
 mod status_bar;
 mod tracker;
 mod travel_links;
+mod updates;
 mod world;
 
 pub use bests_window::{PersonalBestsCharacter, PersonalBestsMap, PersonalBestsVisit, PersonalBestsWindow};
@@ -91,12 +92,14 @@ pub use setup::{
 };
 pub use shown_map::{Candidate, Candidates, FIRST_MOBS, LevelRange, Outline};
 pub use status_bar::{MAX_LEVEL, STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarReader, StatusBarReading};
+pub use updates::{Build, NewerVersion, UpdateAnswer, UpdateStatus, Updates};
 pub use world::{Distance, Step, Travel};
 
 use bests_window::BestsWindow;
 use bug_report::{Event, MapFacts, Outcome, Press, RecordedSource, Recorder, Region};
 use deal_finder::DealFinder;
 use game_data::Refreshes;
+use updates::UpdateChecks;
 use grind_tracker::GrindTracker;
 use hotkey_settings::HotkeySettings;
 use item_card::{Editing, ItemCards, Pressed};
@@ -343,6 +346,9 @@ pub struct PanelState {
     pub deal_badges: Option<DealBadges>,
     /// The settings view's Game Data: when OSMS's data was fetched, and the player's Refresh.
     pub game_data: GameData,
+    /// Updates (ADR 0019): whether a newer version is out, for the tray and Help & Setup, and
+    /// the check under way for the shell to run. Nothing of it shows on the panels.
+    pub updates: Updates,
 }
 
 /// What a hotkey asks the shell to do at once, beyond rendering the panel state.
@@ -411,6 +417,9 @@ pub enum PanelControl {
     OpenGithub,
     /// About & Credits' Discord link: open Minerva's Discord in the browser.
     OpenDiscord,
+    /// The tray's "Update to X.Y.Z...", or Help & Setup's "What's new": open the newer
+    /// version's release page in the browser. Nothing while no newer version is known.
+    OpenRelease,
     /// Turn the Deal Finder on or off.
     ToggleDealFinder,
 }
@@ -534,6 +543,8 @@ pub struct Minerva {
     status_bar_area: Option<(ScreenRect, ScreenRect)>,
     /// The Characters shown on the Map Leaderboards, and the uploads for them.
     leaderboards: Leaderboards,
+    /// The checks for a newer version.
+    updates: UpdateChecks,
     /// What the shell must do that came of time passing (a page MeowDB's answer settled),
     /// for [`Minerva::take_request`].
     requests: VecDeque<Request>,
@@ -593,6 +604,7 @@ impl Minerva {
             status_bar_reader: None,
             status_bar_area: None,
             leaderboards: Leaderboards::default(),
+            updates: UpdateChecks::default(),
             requests: VecDeque::new(),
             panel: Panel::default(),
             setup: Setup::default(),
@@ -1006,6 +1018,8 @@ impl Minerva {
                 self.hotkey_settings.close();
                 self.refreshes.forget();
             }
+            Action::CheckForUpdates => self.updates.ask(),
+            Action::SetCheckForUpdates { on } => self.settings.check_for_updates = on,
             Action::RefreshGameData => {
                 if self.refreshes.start() {
                     // Asked for at the next tick, unless a fetch is under way: it counts.
@@ -1210,6 +1224,7 @@ impl Minerva {
             PanelControl::OpenSite => return Some(Request::OpenInBrowser { url: SITE_URL.into() }),
             PanelControl::OpenGithub => return Some(Request::OpenInBrowser { url: GITHUB_URL.into() }),
             PanelControl::OpenDiscord => return Some(Request::OpenInBrowser { url: DISCORD_URL.into() }),
+            PanelControl::OpenRelease => return self.updates.release_url().map(|url| Request::OpenInBrowser { url }),
         };
         self.apply(action);
         None
@@ -1306,6 +1321,22 @@ impl Minerva {
         let name = self.leaderboards.uploads().into_iter().find(|upload| upload.id == id).map(|upload| upload.name);
         self.record(Event::LeaderboardAnswer { id, name: name.unwrap_or_default(), answer: answer.clone() });
         self.leaderboards.answer(id, answer, self.wall_clock);
+        self.sync_panel()
+    }
+
+    /// The shell ran check `id` of [`Updates::check`], and it came to `answer`. An answer to a
+    /// check no longer under way changes nothing.
+    pub fn on_update_answer(&mut self, id: u64, answer: UpdateAnswer) -> &PanelState {
+        self.record(Event::UpdateAnswer { id, answer: answer.clone() });
+        self.updates.answer(id, answer, self.wall_clock);
+        self.sync_panel()
+    }
+
+    /// What this build can do with a newer version: the shell tells it at launch, from how
+    /// the build was installed. Until it does, it is [`Build::NotifyOnly`].
+    pub fn on_build(&mut self, build: Build) -> &PanelState {
+        self.record(Event::Build { build });
+        self.updates.set_build(build);
         self.sync_panel()
     }
 
@@ -1756,6 +1787,7 @@ impl Minerva {
         self.session.tick(at_ms);
         // Uploads only on a tick: at launch the bests are back by the first.
         self.leaderboards.tick(at_ms, self.session.bests().history(), self.wall_clock);
+        self.updates.tick(at_ms, self.settings.check_for_updates);
         self.load_osms(at_ms);
         if self.set.is_some() {
             self.sync_shown_map();
@@ -1957,6 +1989,7 @@ impl Minerva {
             fetched_at_unix_ms: self.set.as_ref().and_then(|set| set.saved_at_unix_ms),
             refresh: self.refreshes.state(),
         };
+        self.state.updates = self.updates.state(self.settings.check_for_updates);
         self.state.game_window_title =
             self.settings.game_window_title.clone().unwrap_or_else(|| GAME_WINDOW_TITLE.into());
         &self.state

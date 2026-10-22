@@ -154,7 +154,8 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU0MzBEOEU0NDVCNEY0RDEKUldUUjlMUkY1Tmd3Vk5HRXpmVlV6WjFkTUlXa0tiNHp3dVNBNVYxM1cvYldJZGZjMDZ3K1F4Z1AK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU0MzBEOEU0NDVCNEY0RDEKUldUUjlMUkY1Tmd3Vk5HRXpmVlV6WjFkTUlXa0tiNHp3dVNBNVYxM1cvYldJZGZjMDZ3K1F4Z1AK",
+      "requireSignedVersion": true
     }
   }
 }

@@ -39,8 +39,8 @@ impl ItemSearch {
     /// The items MeowDB's search gives for `name`: at once from the cache, otherwise once
     /// fetched, in the background.
     pub fn poll(&mut self, name: &str) -> Poll<Answer> {
-        if let Some((asked, arriving)) = &self.in_flight {
-            if asked == name {
+        if let Some((asked, arriving)) = &self.in_flight
+            && asked == name {
                 let Poll::Ready(items) = http::collect(arriving) else { return Poll::Pending };
                 self.in_flight = None;
                 if let Err(e) = &items {
@@ -48,7 +48,6 @@ impl ItemSearch {
                 }
                 return Poll::Ready(items);
             }
-        }
         // Read here, so a cached answer is given at once and the page opens right away.
         let path = self.file(name);
         if let Some(answer) = cached(&path, ITEM_SEARCH_FRESH_FOR) {

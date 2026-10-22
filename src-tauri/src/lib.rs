@@ -28,6 +28,7 @@ mod old_caches;
 pub mod osms;
 pub mod osms_items;
 mod pictures;
+mod updates;
 mod search;
 mod settings;
 mod setup;
@@ -40,7 +41,7 @@ use minerva_core::{
     Action, DEAL_FINDER_CAPTURE_MS, Minerva, ExpBarReader, ExpBarReading, ExpFigures, Frame, GameWindow, ItemCapture, ItemTooltipReader,
     ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
     Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, Size, StatusBarCapture, StatusBarReader, StatusBarReading,
-    TitleReader, TitleReading, VisitBest, default_title_region,
+    TitleReader, TitleReading, UpdateAnswer, VisitBest, default_title_region,
 };
 use source::WebSource;
 use bests_window::{BestsWindow, PersonalBestsView};
@@ -137,6 +138,8 @@ pub(crate) enum Command {
     OpenBestsLeaderboard { character: Option<String>, id: String },
     /// The Map Leaderboards answered the core's upload `id` (or it couldn't be made).
     LeaderboardAnswer { id: u64, answer: LeaderboardAnswer },
+    /// The core's check `id` for a newer version came to this.
+    UpdateAnswer { id: u64, answer: UpdateAnswer },
     /// The player picked the item with this MeowDB ID from the ones an Item Lookup found
     /// sharing the name it read.
     PickItem(String),
@@ -256,6 +259,9 @@ pub fn capture_title_frame(client: ScreenRect, at_ms: u64) -> Result<Frame, Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut context = tauri::generate_context!();
+    // An http feed only on this computer, for the update smoke test (ADR 0019).
+    updates::allow_local_feed(context.config_mut());
     tauri::Builder::default()
         // First, so a second launch exits before it sets anything up: only one
         // Minerva runs, and the running one shows itself instead.
@@ -265,6 +271,8 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        // Checks for a newer version (ADR 0019), driven from Rust only: no capability.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // The views last sent to our pages, managed before the windows in tauri.conf.json
         // are made: a page loads and asks for its view while the rest are still being made,
         // before `setup` below runs.
@@ -313,6 +321,8 @@ pub fn run() {
             let (prices_file, saved_prices) =
                 market_prices::MarketPricesFile::load(market_prices::path(app.handle())?);
             minerva.restore_market_prices(saved_prices);
+            // Whether this build can update in place, or only say a newer version is out.
+            minerva.on_build(updates::build());
             // Where a tool of the player's own leaves prices, taken in as the core loop runs.
             let market_imports = market_prices::imports_path(app.handle())?;
             let (commands, commands_rx) = mpsc::channel();
@@ -322,7 +332,7 @@ pub fn run() {
             // Registered only while the game or one of our windows is in front.
             let hotkeys = hotkeys::install(app, &minerva.panel_state().hotkeys, commands.clone())?;
             // The one way to quit at any time, the game open or not.
-            tray::install(app, commands.clone())?;
+            let tray = tray::install(app, commands.clone())?;
             app.manage(commands.clone());
             let (picks, picks_rx) = mpsc::channel();
             app.manage(Bridge {
@@ -380,10 +390,12 @@ pub fn run() {
                 item_card,
                 deal_badges,
                 hotkeys,
+                tray,
             };
             // The uploads to the Map Leaderboards, with the Leaderboard Key, which the core never has.
             let key = leaderboards::KeyFile::new(leaderboards::key_path(app.handle())?);
             let uploader = leaderboards::Uploader::new(key, app.state::<Sender<Command>>().inner().clone());
+            let update_checker = updates::Checker::new(app.handle().clone(), app.state::<Sender<Command>>().inner().clone());
             std::thread::Builder::new().name("core-loop".into()).spawn(move || {
                 let files = Files {
                     settings: settings_path,
@@ -391,6 +403,7 @@ pub fn run() {
                     market_prices: prices_file,
                     market_imports,
                     uploader,
+                    update_checker,
                 };
                 core_loop(handle, windows, minerva, reader, channels, files)
             })?;
@@ -431,10 +444,13 @@ pub fn run() {
             hotkey_settings::hotkeys_reset,
             hotkey_settings::hotkeys_undo_reset,
             hotkey_settings::game_data_refresh,
+            hotkey_settings::check_for_updates_set,
             setup::open_hotkey_settings,
             setup::open_site,
             setup::open_github,
             setup::open_discord,
+            setup::check_for_updates,
+            setup::open_release,
             grind_tracker::grind_tracker_set,
             grind_tracker::grind_tracker_height,
             grind_tracker::grind_tracker_view,
@@ -470,7 +486,7 @@ pub fn run() {
             deal_badges::deal_badge_open,
             deal_badges::deal_margin_set,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
 
@@ -487,6 +503,8 @@ struct Windows {
     deal_badges: DealBadgesWindow,
     /// Not a window, but registered and released as the foreground changes.
     hotkeys: hotkeys::GlobalHotkeys,
+    /// Not a window either: the owl in the tray, which shows a newer version.
+    tray: tray::Tray,
 }
 
 /// Where the core loop saves the settings, the Personal Bests and the market prices, and
@@ -498,6 +516,8 @@ struct Files {
     market_prices: market_prices::MarketPricesFile,
     market_imports: PathBuf,
     uploader: leaderboards::Uploader,
+    /// Runs the core's checks for a newer version.
+    update_checker: updates::Checker,
 }
 
 /// Save the Personal Bests if the core's bests revision moved on from `saved` (the one
@@ -686,6 +706,7 @@ fn core_loop(
 ) {
     let settings_path = files.settings;
     let mut uploader = files.uploader;
+    let mut update_checker = files.update_checker;
     // Restored at startup: saved already.
     let mut bests_saved = minerva.bests_revision();
     let mut prices_saved = minerva.market_prices_revision();
@@ -698,6 +719,7 @@ fn core_loop(
         mut item_card,
         mut deal_badges,
         mut hotkeys,
+        mut tray,
     } = windows;
     let mut saved = minerva.settings();
     let mut pending = (saved.clone(), Instant::now());
@@ -774,6 +796,9 @@ fn core_loop(
             }
             Ok(Command::LeaderboardAnswer { id, answer }) => {
                 minerva.on_leaderboard_answer(id, answer);
+            }
+            Ok(Command::UpdateAnswer { id, answer }) => {
+                minerva.on_update_answer(id, answer);
             }
             Ok(Command::PickItem(id)) => {
                 let request = minerva.pick_item(&id);
@@ -971,6 +996,8 @@ fn core_loop(
         }
         // The core asks for uploads to the Map Leaderboards on a tick: each is made once.
         uploader.sync(&minerva.panel_state().leaderboard_uploads);
+        // And for a check for a newer version: each is run once.
+        update_checker.sync(&minerva.panel_state().updates);
         // Prices a tool of the player's own left (ADR 0013), saved below like those typed.
         // Left waiting while the prices can't be saved, rather than taken in and lost.
         if Instant::now() >= next_import_check && files.market_prices.saves() {
@@ -1023,6 +1050,7 @@ fn core_loop(
         item_lookup.sync(state);
         item_card.sync(state);
         deal_badges.sync(state);
+        tray.sync(&state.updates);
 
         // Save once the settings settle, not on every move of a drag.
         let current = minerva.settings();
