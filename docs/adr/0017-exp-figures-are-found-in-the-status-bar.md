@@ -31,4 +31,4 @@ Minerva read the EXP figures ("EXP. 160 [3.81%]", ADR 0005) from the EXP Bar Reg
 - When the Status Bar is never found, "Can't read the EXP bar" says Minerva can't find the game's Status Bar, and points to a Bug Report rather than a mark.
 - Our windows keep clear of the figures where they were found, as they do of the Status Bar's level, job and name (ADR 0001).
 - The figures are read only while the Status Bar is captured: with the game window showing and no other app in front, as ADR 0016 has it. EXP tracking is off without a game window, as it was without a mark that fitted it.
-- Not yet covered: another client size or UI scale (every capture so far is about 1920 wide), and a level of one or three digits.
+- Not yet covered: another client size or UI Size (every capture so far is about 1920 wide; ADR 0020), and a level of one or three digits.

@@ -42,6 +42,10 @@ The settings view's button under Game Data that has OSMS's map set and item file
 The rectangle the player marks around the minimap title, saved relative to the game window.
 _Avoid_: minimap region, capture area
 
+**UI Size**:
+How large the game draws its windows and text, which its UI size setting (Default Ratio, or the ratio it picks for the resolution) and its window size decide together. Minerva reads the game at any UI Size.
+_Avoid_: UI scale, zoom, display scale (Windows' own setting, which Minerva's windows follow)
+
 **Portal**:
 A spot on a map that moves the player to another map (or another spot on the same map).
 

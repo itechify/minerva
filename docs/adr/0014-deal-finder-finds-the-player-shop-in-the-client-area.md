@@ -12,7 +12,7 @@ So the Deal Finder finds the shop itself: while it is on, the shell captures the
 
 ## Finding the listings
 
-- The game draws its UI at a fixed pixel size, wherever the window is and whatever the client area's size. Each listing is a light blue-grey band (202,213,223) exactly 253 px wide, with the item's name on one line and "1 for 999 mesos" 27 px below it. The list is where many scanline runs of that colour, 253 px long, start at one column. Nothing else in the game's UI draws such a stack.
+- The game draws its UI at a size it picks from a setting and the window's size, the UI Size: the reader finds the list at any, and reads it at the samples' (ADR 0020). The sizes below are the samples'. Each listing is a light blue-grey band (202,213,223) exactly 253 px wide, with the item's name on one line and "1 for 999 mesos" 27 px below it. The list is where many scanline runs of that colour, 253 px long, start at one column. Nothing else in the game's UI draws such a stack.
 - Live captures show the game's colours a little darker than screenshots do (`prep.rs`), so the band is matched at any brightness, as the minimap's panel is.
 - The text is black blended into the band, so every pixel of a clean line lies between the band's colour and black. A line with a pixel off that line is covered: by the game's pointer, by a window of ours, by the selection. Its listing reads as "?", never misread.
 - A sold-out listing is greyed: its band isn't the listing colour, so it isn't read. An empty slot is a band with no text. The listing the player selected is orange (251,167,46) from 7 px into its band, its text black as on the others: it is read the same way, against its own colour.
