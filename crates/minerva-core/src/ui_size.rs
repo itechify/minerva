@@ -20,6 +20,38 @@ const POINTER_TINT: u8 = 6;
 /// The pointer is over a line with at least this many pixels of its black in it.
 const POINTER_OUTLINE: usize = 4;
 
+/// `img`, drawn at `ui_size`, scaled to the samples' size with Catmull-Rom (ADR 0020): its
+/// weights add up to one, so the UI's flat colours stay flat, and its edges stay sharp enough
+/// for the readers' tolerances. Each pixel is kept within its neighbours in `img`.
+pub(crate) fn to_samples_size(img: &RgbImage, ui_size: f32) -> RgbImage {
+    let at = |px: u32| ((px as f32 / ui_size).round() as u32).max(1);
+    let mut scaled = image::imageops::resize(img, at(img.width()), at(img.height()), FilterType::CatmullRom);
+    within_neighbours(&mut scaled, img);
+    scaled
+}
+
+/// Keeps each pixel of `scaled`, a scaling of `source`, between the darkest and the brightest of
+/// the four pixels of `source` it lies between, channel by channel. Catmull-Rom overshoots
+/// beside a sharp edge: brighter than either side (by a Player Shop band, beside black text, a
+/// pixel near white would read as the pointer's white over the listing), or darker (a near-
+/// black fringe by the Status Bar's tiles and text).
+fn within_neighbours(scaled: &mut RgbImage, source: &RgbImage) {
+    let (sw, sh) = source.dimensions();
+    let (rx, ry) = (sw as f32 / scaled.width() as f32, sh as f32 / scaled.height() as f32);
+    let around = |at: u32, ratio: f32, size: u32| {
+        let from = ((at as f32 + 0.5) * ratio - 0.5).floor().clamp(0.0, (size - 1) as f32) as u32;
+        (from, (from + 1).min(size - 1))
+    };
+    for (x, y, p) in scaled.enumerate_pixels_mut() {
+        let ((xa, xb), (ya, yb)) = (around(x, rx, sw), around(y, ry, sh));
+        let near = [source.get_pixel(xa, ya), source.get_pixel(xb, ya), source.get_pixel(xa, yb), source.get_pixel(xb, yb)];
+        for c in 0..3 {
+            let (lo, hi) = near.iter().fold((u8::MAX, u8::MIN), |(lo, hi), q| (lo.min(q[c]), hi.max(q[c])));
+            p[c] = p[c].clamp(lo, hi);
+        }
+    }
+}
+
 /// A capture at the samples' UI Size, and the capture it was scaled from.
 pub(crate) struct AtSamplesSize<'a> {
     pub img: Cow<'a, RgbImage>,
@@ -27,17 +59,11 @@ pub(crate) struct AtSamplesSize<'a> {
 }
 
 impl<'a> AtSamplesSize<'a> {
-    /// `captured`, drawn at `ui_size`, at the samples' size: as it is, if it is theirs
-    /// already. The filter is Catmull-Rom (ADR 0020): its weights add up to one, so the UI's
-    /// flat colours stay flat, and its edges stay sharp enough for the readers' tolerances.
+    /// `captured`, drawn at `ui_size`, at the samples' size ([`to_samples_size`]): as it is, if
+    /// it is theirs already.
     pub fn new(captured: &'a RgbImage, ui_size: f32) -> Self {
-        let img = if (ui_size - 1.0).abs() <= SAMPLES_SIZE_WITHIN {
-            Cow::Borrowed(captured)
-        } else {
-            let (w, h) = captured.dimensions();
-            let at = |px: u32| ((px as f32 / ui_size).round() as u32).max(1);
-            Cow::Owned(image::imageops::resize(captured, at(w), at(h), FilterType::CatmullRom))
-        };
+        let near = (ui_size - 1.0).abs() <= SAMPLES_SIZE_WITHIN;
+        let img = if near { Cow::Borrowed(captured) } else { Cow::Owned(to_samples_size(captured, ui_size)) };
         Self { img, captured }
     }
 

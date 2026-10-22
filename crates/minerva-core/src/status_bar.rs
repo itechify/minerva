@@ -290,9 +290,9 @@ fn orange(p: [u8; 3]) -> Option<f32> {
 }
 
 /// The LV box's dark grey (47 to 50, and a shade darker at its foot) at any brightness; or
-/// darker still, of any hue. The game's filter (Default Ratio (Filter Applied)) and the
-/// resampling to the samples' size (ADR 0020) both sharpen, and leave a near-black,
-/// bluish fringe ((0,15,30)) along the tiles' edges. Never the pointer's black.
+/// darker still, of any hue: the game's filter (Default Ratio (Filter Applied)) sharpens, and
+/// leaves a near-black, bluish fringe ((0,15,30)) along the tiles' edges. Never the pointer's
+/// black.
 fn box_grey(p: [u8; 3]) -> bool {
     let max = p.iter().copied().max().unwrap_or(0);
     let min = p.iter().copied().min().unwrap_or(0);
@@ -499,9 +499,10 @@ fn slate_or_text(p: [u8; 3], scale: f32) -> bool {
     (40.0 * scale..=255.0).contains(&luma) && (-8..=24).contains(&(b - r)) && g >= r - 8 && g <= b + 8
 }
 
-/// Whether `p` is darker than the slate but has its tint: the fringe that sharpening (the
-/// game's filter, or the resampling to the samples' size) leaves along the text's edges,
-/// (0,8,17) by (255,255,255) text. The pointer's outline is black with no tint.
+/// Whether `p` is darker than the slate but has its tint: the fringe the game's filter
+/// (Default Ratio (Filter Applied)) leaves along the text's edges by sharpening it: (0,8,17) by
+/// (255,255,255) text, and a dimmer (35,36,40) at ×1.2. The pointer's outline is black with
+/// no tint.
 fn slate_fringe(p: [u8; 3]) -> bool {
     let [r, g, b] = p.map(i32::from);
     (4..=24).contains(&(b - r)) && g >= r && g <= b
@@ -509,12 +510,6 @@ fn slate_fringe(p: [u8; 3]) -> bool {
 
 /// How far from the text's ink a [`slate_fringe`] pixel may be.
 const FRINGE_REACH: u32 = 2;
-/// Where both sharpen (the game's filter, then the resampling), the fringe can go all the way
-/// to black, its tint lost: a pixel or two of it by the ink, never more. The pointer's black
-/// outline is dozens of pixels.
-const BLACK_FRINGE_PX: usize = 2;
-/// Black, for [`BLACK_FRINGE_PX`]: no channel above this.
-const BLACK_MAX: u8 = 40;
 
 /// How much `p` is the text's light grey, 0.0 (the slate) ..= 1.0.
 fn text(p: [u8; 3], scale: f32) -> f32 {
@@ -538,18 +533,14 @@ fn text_ink(img: &RgbImage, x0: u32, x1: u32, (y0, y1): (u32, u32), scale: f32) 
         let near = |v: u32, end: u32| v.saturating_sub(FRINGE_REACH)..(v + FRINGE_REACH + 1).min(end);
         near(y, h).any(|ny| near(x, w).any(|nx| inked(nx, ny)))
     };
-    let mut black = 0;
-    for y in y0..y1 {
-        for x in x0..x1 {
+    let clean = (y0..y1).all(|y| {
+        (x0..x1).all(|x| {
             let p = img.get_pixel(x, y).0;
-            if slate_or_text(p, scale) || slate_fringe(p) && by_ink(x, y) {
-                continue;
-            }
-            black += 1;
-            if black > BLACK_FRINGE_PX || p.iter().any(|&c| c > BLACK_MAX) || !by_ink(x, y) {
-                return None;
-            }
-        }
+            slate_or_text(p, scale) || slate_fringe(p) && by_ink(x, y)
+        })
+    });
+    if !clean {
+        return None;
     }
     let cols: Vec<u32> = (x0..x1).filter(|&x| (y0..y1).any(|y| inked(x, y))).collect();
     let rows: Vec<u32> = (y0..y1).filter(|&y| (x0..x1).any(|x| inked(x, y))).collect();
