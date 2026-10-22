@@ -24,7 +24,7 @@
 //!   so every frame of it read as unreadable.
 //!   The `<ui-size>-<w>x<h>` ones (2026-10-22, #132) are the figures cut by hand from the
 //!   probe's record mode at each of the game's UI Sizes (Default Ratio, with its filter or
-//!   not, and Ideal Ratio) at 1366x768 to 2560x1440: drawn at x0.64 to x1.28 of the rest.
+//!   not, and Ideal Ratio) at 1366x768 to 2560x1440: drawn at ×0.64 to ×1.28 of the rest.
 //! - `recording-*` folders are the probe's record mode (one crop a second, named by
 //!   capture time in ms) with their readings in `readings.json` (`null`: unreadable).
 //!   2026-10-07: 150 s of hunting at Lv 15, client (1005,1144) 240x32 of a 1920x1200
@@ -105,14 +105,20 @@ fn is_strip(path: &Path) -> bool {
     path.file_stem().is_some_and(|stem| stem.to_string_lossy().ends_with("-strip"))
 }
 
-#[test]
-fn every_strip_samples_status_bar_is_found_and_its_figures_read() {
+/// The PNG samples here, sorted: the strips, or the figures alone.
+fn sample_pngs(strips: bool) -> Vec<PathBuf> {
     let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
         .expect("samples dir")
         .map(|e| e.expect("dir entry").path())
-        .filter(|p| p.extension().is_some_and(|x| x == "png") && is_strip(p))
+        .filter(|p| p.extension().is_some_and(|x| x == "png") && is_strip(p) == strips)
         .collect();
     paths.sort();
+    paths
+}
+
+#[test]
+fn every_strip_samples_status_bar_is_found_and_its_figures_read() {
+    let paths = sample_pngs(true);
     assert!(!paths.is_empty(), "expected the strip samples");
 
     let mut wrong = Vec::new();
@@ -145,12 +151,7 @@ fn named_reading(name: &str) -> Option<ExpBar> {
 
 #[test]
 fn every_single_sample_reads_as_its_filename_names() {
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
-        .expect("samples dir")
-        .map(|e| e.expect("dir entry").path())
-        .filter(|p| p.extension().is_some_and(|x| x == "png") && !is_strip(p))
-        .collect();
-    paths.sort();
+    let paths = sample_pngs(false);
     assert!(paths.len() >= 3, "expected the EXP bar samples, found {}", paths.len());
 
     let mut wrong = Vec::new();
@@ -173,29 +174,48 @@ fn shows(name: &str) -> Option<ExpBar> {
     named_reading(&format!("{exp}__{percent}"))
 }
 
-/// Sizes no sample is at, to scale each sample to (ADR 0020): from about the smallest the game
-/// draws its UI at (×0.5, Default Ratio at 600 rows) to past the largest (×1.8, at 2160).
-const OTHER_UI_SIZES: [f32; 4] = [0.55, 0.8, 1.45, 1.9];
-
 #[test]
 fn every_single_sample_at_other_ui_sizes_reads_as_what_it_shows_or_as_unreadable_never_wrong() {
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
-        .expect("samples dir")
-        .map(|e| e.expect("dir entry").path())
-        .filter(|p| p.extension().is_some_and(|x| x == "png") && !is_strip(p))
-        .collect();
-    paths.sort();
-
     let mut wrong = Vec::new();
-    for path in &paths {
+    for path in sample_pngs(false) {
         let name = path.file_stem().unwrap().to_string_lossy().to_string();
-        let img = image::open(path).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
-        for size in OTHER_UI_SIZES {
-            let (w, h) = ((img.width() as f32 * size).round() as u32, (img.height() as f32 * size).round() as u32);
-            let scaled = image::imageops::resize(&img, w, h, image::imageops::FilterType::Triangle);
-            let shown = read(common::frame(&scaled, 0));
+        let img = image::open(&path).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
+        for size in common::OTHER_UI_SIZES {
+            let shown = read(common::frame(&common::scaled(&img, size), 0));
             if shown.is_some() && shown != shows(&name) {
                 wrong.push(format!("{name} ×{size}: panel shows {shown:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
+}
+
+/// Figures at each UI Size the game was seen to draw them at, filtered or not.
+const AT_EACH_UI_SIZE: [&str; 7] = [
+    "160__3.81--kerning-city-window",
+    "100300__64.49--default-ratio-filter-1920x1200",
+    "100300__64.49--ideal-ratio-1366x768",
+    "100300__64.49--default-ratio-1920x1080",
+    "100300__64.49--default-ratio-filter-1920x1080",
+    "100300__64.49--default-ratio-2560x1440",
+    "100300__64.49--ideal-ratio-2560x1440",
+];
+
+#[test]
+fn the_pointer_anywhere_over_the_figures_at_any_ui_size_never_reads_as_another_number() {
+    let mut wrong = Vec::new();
+    for name in AT_EACH_UI_SIZE {
+        let img = image::open(samples_dir().join(format!("{name}.png"))).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
+        // The pointer is the game's, the same size at any UI Size.
+        let step = (img.height() / 5).max(2) as usize;
+        for y in (0..img.height()).step_by(step) {
+            for x in (0..img.width()).step_by(step) {
+                let mut covered = img.clone();
+                common::pointer(&mut covered, (x, y), 14);
+                let shown = read(common::frame(&covered, 0));
+                if shown.is_some() && shown != shows(name) {
+                    wrong.push(format!("{name}, pointer at ({x}, {y}): panel shows {shown:?}"));
+                }
             }
         }
     }

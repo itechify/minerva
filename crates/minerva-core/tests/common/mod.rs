@@ -36,6 +36,29 @@ pub fn frame(img: &image::RgbaImage, at_ms: u64) -> Frame {
     Frame { width: img.width(), height: img.height(), rgba: img.as_raw().clone(), at_ms }
 }
 
+/// Sizes no sample is at, to scale samples to (ADR 0020): from about the smallest the game
+/// draws its UI at (×0.5, Default Ratio at 600 rows) to past the largest (×1.8, at 2160).
+pub const OTHER_UI_SIZES: [f32; 4] = [0.55, 0.8, 1.45, 1.9];
+
+/// `img` scaled by `size`, smoothly, as the game draws its UI at another UI Size.
+pub fn scaled(img: &image::RgbaImage, size: f32) -> image::RgbaImage {
+    let at = |px: u32| (px as f32 * size).round() as u32;
+    image::imageops::resize(img, at(img.width()), at(img.height()), image::imageops::FilterType::Triangle)
+}
+
+/// The game's pointer drawn over `img`, `rows` tall, its tip at `(x, y)`: white with a
+/// black outline, cut off at the image's edges.
+pub fn pointer(img: &mut image::RgbaImage, (x, y): (u32, u32), rows: u32) {
+    for dy in 0..rows {
+        for dx in 0..=dy / 2 {
+            let edge = dx == 0 || dx == dy / 2 || dy == rows - 1;
+            if x + dx < img.width() && y + dy < img.height() {
+                img.put_pixel(x + dx, y + dy, image::Rgba(if edge { [0, 0, 0, 255] } else { [255, 255, 255, 255] }));
+            }
+        }
+    }
+}
+
 /// A loading screen: the Title Region is plain black.
 pub fn black_frame(at_ms: u64) -> Frame {
     frame(&image::RgbaImage::from_pixel(560, 96, image::Rgba([0, 0, 0, 255])), at_ms)

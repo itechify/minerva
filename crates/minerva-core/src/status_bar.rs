@@ -31,7 +31,7 @@
 use crate::Frame;
 use crate::panel::{ScreenPoint, ScreenRect};
 use crate::recogniser::{Recogniser, RememberedLines, frame_to_rgb};
-use crate::ui_size;
+use crate::ui_size::{self, AtSamplesSize};
 use image::{GrayImage, Luma, RgbImage};
 use serde::{Deserialize, Serialize};
 
@@ -210,31 +210,35 @@ impl StatusBarReader {
     /// Read the bar at the samples' size (ADR 0020): measure its UI Size, scale the capture to
     /// the samples' size if it isn't at it, read that, and put what was found back on screen.
     fn read_rgb(&mut self, img: &RgbImage, origin: ScreenPoint) -> Option<StatusBar> {
-        let resampled = measure(img).and_then(|ui_size| ui_size::to_samples_size(img, ui_size));
-        let at_samples_size = resampled.as_ref().unwrap_or(img);
-        let bar = self.read_at_samples_size(at_samples_size)?;
-        let ((w, h), (rw, rh)) = (img.dimensions(), at_samples_size.dimensions());
+        let at = AtSamplesSize::new(img, measure(img)?);
+        let bar = self.read_at_samples_size(&at)?;
         let back = |r: ScreenRect| {
-            let x = |v: i32| (v as f32 * w as f32 / rw as f32).round() as i32;
-            let y = |v: i32| (v as f32 * h as f32 / rh as f32).round() as i32;
-            let (x0, y0, x1, y1) = (x(r.x), y(r.y), x(r.x + r.width as i32), y(r.y + r.height as i32));
+            let (x0, y0) = at.back(r.x as f32, r.y as f32);
+            let (x1, y1) = at.back((r.x + r.width as i32) as f32, (r.y + r.height as i32) as f32);
+            let (x0, y0, x1, y1) = (x0.round() as i32, y0.round() as i32, x1.round() as i32, y1.round() as i32);
             ScreenRect { x: origin.x + x0, y: origin.y + y0, width: (x1 - x0) as u32, height: (y1 - y0) as u32 }
         };
         Some(StatusBar { area: back(bar.area), exp_figures: bar.exp_figures.map(back), ..bar })
     }
 
     /// Read a capture at the samples' UI Size; where the bar is found, from its top-left pixel.
-    fn read_at_samples_size(&mut self, img: &RgbImage) -> Option<StatusBar> {
+    /// A line the pointer is over, in the capture as it was captured, is unreadable.
+    fn read_at_samples_size(&mut self, at: &AtSamplesSize) -> Option<StatusBar> {
+        let img = &*at.img;
         let found = find(img)?;
         let (w, h) = img.dimensions();
         let rows = |(from, to): (i32, i32)| {
             let at = |dy: i32| (found.top as i32 + dy).clamp(0, h as i32) as u32;
             (at(from), at(to))
         };
+        let clear = |columns: (u32, u32), rows: (u32, u32)| !at.pointer_over(columns, rows);
         let (x0, x1) = (found.box_right + TEXT_FROM, (found.box_right + TEXT_TO).min(w));
-        let job = text_ink(img, x0, x1, rows(JOB_ROWS), found.scale);
-        let name = text_ink(img, x0, x1, rows(NAME_ROWS), found.scale);
-        let level = level_ink(img, &found);
+        let job = text_ink(img, x0, x1, rows(JOB_ROWS), found.scale).filter(|_| clear((x0, x1), rows(JOB_ROWS)));
+        let name = text_ink(img, x0, x1, rows(NAME_ROWS), found.scale).filter(|_| clear((x0, x1), rows(NAME_ROWS)));
+        // The pointer over the tiles, or a pitch either side of them, where it may hide one.
+        let tiles = (found.tiles[0].0.saturating_sub(TILE_PITCH), (found.tiles[found.tiles.len() - 1].1 + TILE_PITCH).min(w));
+        let tile_rows = (found.top.saturating_sub(BOX_MARGIN), (found.bottom + BOX_MARGIN).min(h));
+        let level = level_ink(img, &found).filter(|_| clear(tiles, tile_rows));
         // Every line there is, read at once: the level's, the job's, the name's.
         let inks: Vec<GrayImage> = [&level.as_ref().map(|(ink, _)| ink.clone()), &job, &name]
             .into_iter()
@@ -288,11 +292,11 @@ fn orange(p: [u8; 3]) -> Option<f32> {
 /// The LV box's dark grey (47 to 50, and a shade darker at its foot) at any brightness; or
 /// darker still, of any hue. The game's filter (Default Ratio (Filter Applied)) and the
 /// resampling to the samples' size (ADR 0020) both sharpen, and leave a near-black,
-/// bluish fringe ((0,15,30)) along the tiles' edges.
+/// bluish fringe ((0,15,30)) along the tiles' edges. Never the pointer's black.
 fn box_grey(p: [u8; 3]) -> bool {
     let max = p.iter().copied().max().unwrap_or(0);
     let min = p.iter().copied().min().unwrap_or(0);
-    max - min <= 8 && (24..=72).contains(&max) || max <= BOX_FRINGE
+    max - min <= 8 && (24..=72).contains(&max) || max <= BOX_FRINGE && !ui_size::pointer_black(p)
 }
 
 /// A connected run of orange pixels: its bounding box (ends exclusive), and the brightest
@@ -389,11 +393,18 @@ fn measure(img: &RgbImage) -> Option<f32> {
         if !boxed {
             continue;
         }
-        // The box's height, down the column left of the tiles.
-        let x = x0 - margin;
-        let box_top = (0..top).rev().find(|&y| !grey(x, y)).map_or(0, |y| y + 1);
-        let box_bottom = (bottom..h).find(|&y| !grey(x, y)).unwrap_or(h);
-        return Some((box_bottom - box_top) as f32 / BOX_H);
+        // The box's height, down the columns left and right of the tiles: the same, or something
+        // is over the box.
+        let height = |x: u32| {
+            let box_top = (0..top).rev().find(|&y| !grey(x, y)).map_or(0, |y| y + 1);
+            let box_bottom = (bottom..h).find(|&y| !grey(x, y)).unwrap_or(h);
+            box_bottom - box_top
+        };
+        let (left, right) = (height(x0 - margin), height(x1 - 1 + margin));
+        if left.abs_diff(right) as f32 > size.max(1.0) {
+            continue;
+        }
+        return Some((left + right) as f32 / 2.0 / BOX_H);
     }
     None
 }
@@ -501,9 +512,9 @@ const FRINGE_REACH: u32 = 2;
 /// Where both sharpen (the game's filter, then the resampling), the fringe can go all the way
 /// to black, its tint lost: a pixel or two of it by the ink, never more. The pointer's black
 /// outline is dozens of pixels.
-const BLACK_FRINGE: usize = 2;
-/// Black, for [`BLACK_FRINGE`]: no channel above this.
-const BLACK: u8 = 40;
+const BLACK_FRINGE_PX: usize = 2;
+/// Black, for [`BLACK_FRINGE_PX`]: no channel above this.
+const BLACK_MAX: u8 = 40;
 
 /// How much `p` is the text's light grey, 0.0 (the slate) ..= 1.0.
 fn text(p: [u8; 3], scale: f32) -> f32 {
@@ -535,7 +546,7 @@ fn text_ink(img: &RgbImage, x0: u32, x1: u32, (y0, y1): (u32, u32), scale: f32) 
                 continue;
             }
             black += 1;
-            if black > BLACK_FRINGE || p.iter().any(|&c| c > BLACK) || !by_ink(x, y) {
+            if black > BLACK_FRINGE_PX || p.iter().any(|&c| c > BLACK_MAX) || !by_ink(x, y) {
                 return None;
             }
         }

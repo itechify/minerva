@@ -25,7 +25,7 @@ use crate::bug_report::cut_on_screen;
 use crate::panel::ScreenRect;
 use crate::prep::{PAD, Rect};
 use crate::recogniser::{Recogniser, frame_to_rgb};
-use crate::ui_size;
+use crate::ui_size::{self, AtSamplesSize};
 use crate::{Frame, StatusBar, StatusBarCapture};
 use image::{GrayImage, Luma, RgbImage};
 use serde::{Deserialize, Serialize};
@@ -105,8 +105,12 @@ impl ExpBarReader {
     }
 
     fn read_rgb(&self, img: &RgbImage) -> Option<ExpBar> {
-        let resampled = ui_size::to_samples_size(img, measure(img)?);
-        let prepared = prepare(resampled.as_ref().unwrap_or(img))?;
+        let at = AtSamplesSize::new(img, measure(img)?);
+        let prepared = prepare(&at.img)?;
+        // Read at the samples' size, the pointer over the figures can look like their ink.
+        if at.pointer_over(prepared.columns, prepared.rows) {
+            return None;
+        }
         let lines = self.recogniser.read_lines(&prepared.canvas, &[prepared.exp, prepared.percent])?;
         let text = |i: usize| lines.get(i)?.as_ref().map(|l| l.to_string());
         let (exp_text, percent_text) = (text(0)?, text(1)?);
@@ -179,6 +183,9 @@ fn percent(text: &str) -> Option<u32> {
 /// The figures, masked and boxed for ocrs, and how many 2s each shows.
 struct Prepared {
     canvas: GrayImage,
+    /// Where the figures are, from the EXP's first column to the "]", and the brackets' rows.
+    columns: (u32, u32),
+    rows: (u32, u32),
     exp: Rect,
     percent: Rect,
     exp_feet: usize,
@@ -226,6 +233,11 @@ const GLYPH_GAP_PER_H: f32 = 0.2;
 const SPACE_PER_H: f32 = 0.6;
 /// The "EXP." label rises this many rows above the brackets; digits never do.
 const LABEL_RISE: u32 = 3;
+/// Above that, this many rows are the slate, over the label.
+const LABEL_CLEAR: u32 = 3;
+/// Per row of bracket height, the label is this wide (35 columns by 11 rows on the samples).
+/// The pointer, taken for it or run into it, isn't: the EXP left of it may be cut short.
+const LABEL_W_PER_H: std::ops::RangeInclusive<f32> = 2.7..=3.5;
 /// Per row of bracket height: a 2's flat foot, along the brackets' bottom row, is at
 /// least this long. No other glyph's is: the rest end in a curve or a stroke, half as
 /// long or less.
@@ -313,15 +325,22 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
     let rises = |x: u32| {
         (y0.saturating_sub(LABEL_RISE)..y0).any(|y| ink(img.get_pixel(x, y).0) >= 0.5)
     };
+    // ...and no higher: the pointer's tip, taken for the label, may, its white or its black.
+    let towers = |x: u32| {
+        (1..=LABEL_CLEAR).filter(|&k| y0 >= LABEL_RISE + k).any(|k| {
+            let p = img.get_pixel(x, y0 - LABEL_RISE - k).0;
+            ink(p) >= 0.5 || ui_size::pointer_black(p)
+        })
+    };
 
     // The percentage: the ink between the brackets.
     let inside: Vec<u32> = (open.x1 + 1..close.x0).filter(|&x| inked(x)).collect();
     let (px0, px1) = (*inside.first()?, *inside.last()? + 1);
 
-    // The EXP: the clusters of ink left of "[", back to the label (any cluster of it
-    // rises above the brackets). Without the label just left of it, the EXP may go on past
-    // what was captured ("100,300" cut to "00,300", where the figures were looked for at
-    // another UI Size), or something covers it: unreadable.
+    // The EXP: the clusters of ink left of "[", back to the label (any cluster of it rises
+    // above the brackets, and it is the label's width). Without the label just left of it,
+    // the EXP may go on past what was captured ("100,300" cut to "00,300", where the figures
+    // were looked for at another UI Size), or the pointer is over it: unreadable.
     let h = (open.y1 - open.y0 + 1) as f32;
     let split = (h * GLYPH_GAP_PER_H).ceil() as usize;
     let max_gap = (h * SPACE_PER_H).ceil() as u32;
@@ -334,7 +353,7 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
             break;
         }
         if (x0..x1).any(rises) {
-            labelled = true;
+            labelled = LABEL_W_PER_H.contains(&((x1 - x0) as f32 / h)) && !(x0..x1).any(towers);
             break;
         }
         number = Some((x0, number.map_or(x1, |(_, n1)| n1)));
@@ -363,6 +382,8 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
     let feet = |x0: u32, x1: u32| flat_feet(img, open.y1, x0..x1, foot);
     Some(Prepared {
         canvas,
+        columns: (ex0, close.x1 + 1),
+        rows: (y0, y1),
         exp: line(ex0, ex1),
         percent: line(px0, px1),
         exp_feet: feet(ex0, ex1),
