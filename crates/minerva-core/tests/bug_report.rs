@@ -1036,6 +1036,30 @@ fn a_shop_with_a_listing_that_couldnt_be_read_keeps_its_list_for_the_run() {
     assert_eq!(crop.get_pixel(0, 0).0, [(551 % 256) as u8, (503 % 256) as u8, 40, 255], "its corner at (551,503)");
 }
 
+/// #130's UI Size (ADR 0020): a listing's band 162 px wide, not 253, so the crop's margin
+/// and its reach past the scroll bar are as much smaller, and none of the shop's window
+/// beyond is kept.
+#[test]
+fn a_shops_list_at_another_ui_size_is_cut_as_much_smaller() {
+    let mut shell = run_with_the_deal_finder();
+    let row = |slot: i32, name: Option<&str>| ShopRow {
+        area: ScreenRect { x: 598, y: 513 + 40 * slot, width: 162, height: 35 },
+        name: name.map(String::from),
+        price: Some(ListedPrice { quantity: 1, mesos: 999 }),
+        covered: false,
+    };
+    let list = ShopList { area: ScreenRect { x: 561, y: 513, width: 199, height: 235 }, rows: vec![row(0, Some("Bronze Ore")), row(1, None)] };
+    assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
+    shell.minerva.on_player_shop_read(shop_capture(31 * S), ShopReading { shop: Some(list), at_ms: 31 * S });
+
+    let (report, _) = shell.report();
+
+    let name = format!("crops/player-shop-{:010}.png", 31 * S);
+    let crop = image::load_from_memory(&zip_bytes(&report.zip, &name)).expect("a PNG").to_rgba8();
+    assert_eq!(crop.dimensions(), (231, 247), "the list, 6 px around it and 225 px right of it");
+    assert_eq!(crop.get_pixel(0, 0).0, [(555 % 256) as u8, (507 % 256) as u8, 40, 255], "its corner at (555,507)");
+}
+
 /// The bottom of the game's client area as the shell captures it for the Status Bar.
 fn status_bar_capture(at_ms: u64) -> StatusBarCapture {
     let strip = ScreenRect { x: 0, y: 1104, width: 1920, height: 96 };
