@@ -133,9 +133,11 @@ fn texts(notice: Option<&UpdateNotice>) -> Texts {
     let Some(UpdateNotice { version, stage, offer, quit, .. }) = notice else { return Texts::default() };
     let update = match stage {
         UpdateStage::NotifyOnly => format!("Minerva {version} is out…"),
-        UpdateStage::Out | UpdateStage::Asking | UpdateStage::DownloadFailed | UpdateStage::InstallFailed => {
-            format!("Update to {version}…")
-        }
+        UpdateStage::Out
+        | UpdateStage::Asking
+        | UpdateStage::DownloadFailed
+        | UpdateStage::InstallFailed
+        | UpdateStage::Changed => format!("Update to {version}…"),
         UpdateStage::Downloading => format!("Downloading {version}…"),
         UpdateStage::DownloadingForQuit | UpdateStage::InstallsWhenYouQuit => format!("Update to {version} now…"),
         UpdateStage::FinishingBeforeQuit => "Finishing the update before quitting…".to_string(),
@@ -146,7 +148,8 @@ fn texts(notice: Option<&UpdateNotice>) -> Texts {
         | UpdateStage::Out
         | UpdateStage::Asking
         | UpdateStage::DownloadFailed
-        | UpdateStage::InstallFailed => format!("Minerva: version {version} is out"),
+        | UpdateStage::InstallFailed
+        | UpdateStage::Changed => format!("Minerva: version {version} is out"),
         UpdateStage::Downloading => format!("Minerva: downloading version {version}"),
         UpdateStage::DownloadingForQuit | UpdateStage::InstallsWhenYouQuit => {
             format!("Minerva: version {version} installs when you quit")

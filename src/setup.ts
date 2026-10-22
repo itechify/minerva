@@ -31,7 +31,8 @@ type UpdateStage =
   | "finishingBeforeQuit"
   | "installing"
   | "downloadFailed"
-  | "installFailed";
+  | "installFailed"
+  | "changed";
 
 /** Mirror of `minerva_core::UpdateOffer`. */
 type UpdateOffer = "nothing" | "releasePage" | "update" | "choices" | "updateNow" | "tryAgain";
@@ -209,19 +210,19 @@ function render() {
   const updateState = updateText(updates);
   if ($("update-state").textContent !== updateState) $("update-state").textContent = updateState;
   $("update-state").hidden = updateState === "";
-  const { notice } = updates;
-  $("update-newer").hidden = !notice;
-  $("update-version").textContent = notice?.version ?? "";
+  const newer = updates.notice;
+  $("update-newer").hidden = !newer;
+  $("update-version").textContent = newer?.version ?? "";
   ($("update-check") as HTMLButtonElement).disabled = updates.status === "checking";
 
-  const progress = notice ? updateProgress(notice) : "";
+  const progress = newer ? updateProgress(newer) : "";
   if ($("update-progress").textContent !== progress) $("update-progress").textContent = progress;
   $("update-progress").hidden = progress === "";
-  const failed = notice ? updateFailure(notice) : "";
+  const failed = newer ? updateFailure(newer) : "";
   $("update-failed-text").textContent = failed;
   $("update-failed").hidden = failed === "";
-  $("update-ask").hidden = notice?.offer !== "choices";
-  const install = notice ? updateButton(notice.offer) : "";
+  $("update-ask").hidden = newer?.offer !== "choices";
+  const install = newer ? updateButton(newer.offer) : "";
   $("update-install").textContent = install;
   $("update-install").hidden = install === "";
 }
@@ -246,6 +247,7 @@ function updateProgress({ stage, version }: UpdateNotice): string {
     case "asking":
     case "downloadFailed":
     case "installFailed":
+    case "changed":
       return "";
   }
 }
@@ -257,6 +259,8 @@ function updateFailure({ stage, version }: UpdateNotice): string {
       return `Couldn't download Minerva ${version}, or it wasn't signed as Minerva's own, so nothing was installed.`;
     case "installFailed":
       return `Couldn't start Minerva ${version}'s installer, so this version stays.`;
+    case "changed":
+      return `The update changed since Minerva ${version} was found, so nothing was installed.`;
     default:
       return "";
   }

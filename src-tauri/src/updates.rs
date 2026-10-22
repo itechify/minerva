@@ -6,7 +6,9 @@
 //!   (the plugin's lookup, `windows-x86_64-nsis` or `-msi`), the portable `.exe` and dev builds
 //!   through `windows-x86_64-nsis`. Those never download anything.
 //! - **Downloads** ask the feed again and fetch the installer it names, which the plugin
-//!   checks against the public key built in; the core loop keeps it.
+//!   checks against the public key built in; the core loop keeps it. The feed may name
+//!   another version by then, even this one or an older one (a release deleted): the core
+//!   says to install it only if it is the newer version it offered.
 //! - **Installs** run on the core loop's thread, once it has saved whatever Quit Minerva
 //!   saves: the plugin's `install` is synchronous, starts the installer (`passive`), and ends
 //!   Minerva with `process::exit(0)`, so nothing on the quit path runs after.

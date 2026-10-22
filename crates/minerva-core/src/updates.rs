@@ -103,6 +103,10 @@ pub enum UpdateStage {
     DownloadFailed,
     /// The installer couldn't be started: this version stays.
     InstallFailed,
+    /// The download was another version than the one offered (the feed changed since it was
+    /// found: a release deleted, or a newer one out): nothing was installed, and a check says
+    /// what is out now.
+    Changed,
 }
 
 /// What choosing to update (the tray's update item, Help & Setup's button) does now.
@@ -218,6 +222,8 @@ enum Updating {
     Installing,
     DownloadFailed,
     InstallFailed,
+    /// The download was another version than the one offered.
+    Changed,
 }
 
 /// Checks for a newer version, and downloads and installs it when the player chooses: when
@@ -259,6 +265,11 @@ impl Updater {
         self.build != Build::NotifyOnly && self.newer.is_some()
     }
 
+    /// `version` is the newer version the notice offers, and newer than this one.
+    fn offers(&self, version: &str) -> bool {
+        self.newer.as_deref() == Some(version) && compare(version, MINERVA_VERSION) == Some(Ordering::Greater)
+    }
+
     /// The player chose to update (the tray's "Update to X.Y.Z…", or Help & Setup's Update),
     /// with a Session `running` or not. Returns whether it did anything, which Help & Setup
     /// shows: nothing in a build that can't install, or with no newer version known.
@@ -287,7 +298,7 @@ impl Updater {
             Updating::Downloaded => self.install(true),
             // It installs once it has downloaded.
             Updating::Downloading | Updating::Installing => {}
-            Updating::Idle | Updating::DownloadFailed | Updating::InstallFailed => self.download(),
+            Updating::Idle | Updating::DownloadFailed | Updating::InstallFailed | Updating::Changed => self.download(),
         }
     }
 
@@ -299,7 +310,7 @@ impl Updater {
         }
         self.asking = false;
         self.when_i_quit = true;
-        if matches!(self.updating, Updating::Idle | Updating::DownloadFailed | Updating::InstallFailed) {
+        if !matches!(self.updating, Updating::Downloading | Updating::Downloaded) {
             self.download();
         }
     }
@@ -339,13 +350,18 @@ impl Updater {
 
     /// Download `id` came to `answer`. Returns whether Minerva quits now: the player chose
     /// Quit Minerva while it downloaded, and it failed. One no longer under way changes
-    /// nothing.
+    /// nothing. Only the version offered installs, and only if it is newer than this one:
+    /// the shell asks the feed again to download, and the feed may name another by then.
     pub fn downloaded(&mut self, id: u64, answer: DownloadAnswer) -> bool {
         if self.job != Some(UpdateJob { id, step: UpdateStep::Download }) {
             return false;
         }
         self.job = None;
         match answer {
+            DownloadAnswer::Downloaded { version } if !self.offers(&read_version(&version)) => {
+                self.ask();
+                self.failed(Updating::Changed)
+            }
             DownloadAnswer::Downloaded { .. } => {
                 self.downloaded = Some(id);
                 self.updating = Updating::Downloaded;
@@ -425,6 +441,10 @@ impl Updater {
         match newer {
             Some(newer) => {
                 self.newer = newer;
+                // What is out now is known again.
+                if self.updating == Updating::Changed {
+                    self.updating = Updating::Idle;
+                }
                 self.status = if self.newer.is_some() { UpdateStatus::NewerVersion } else { UpdateStatus::UpToDate };
                 self.last_checked_unix_ms = wall_clock;
             }
@@ -467,6 +487,7 @@ impl Updater {
                 Updating::Idle => (UpdateStage::Out, UpdateOffer::Update),
                 Updating::DownloadFailed => (UpdateStage::DownloadFailed, UpdateOffer::TryAgain),
                 Updating::InstallFailed => (UpdateStage::InstallFailed, UpdateOffer::TryAgain),
+                Updating::Changed => (UpdateStage::Changed, UpdateOffer::TryAgain),
             }
         };
         let quit = if self.quitting {

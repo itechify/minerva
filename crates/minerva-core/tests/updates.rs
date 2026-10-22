@@ -584,3 +584,83 @@ fn choosing_to_update_with_no_newer_version_known_does_nothing() {
     assert_eq!(job(minerva.panel_state()), None);
     assert_eq!(minerva.panel_state().updates.notice, None);
 }
+
+// Only the newer version offered installs: never this one or an older one, which the feed
+// may name by the time the download asks it again (a release deleted since the check).
+
+#[test]
+fn a_download_of_another_version_than_the_one_offered_installs_nothing_and_checks_again() {
+    let mut minerva = newer_known(Build::Nsis);
+    minerva.press(PanelControl::Update);
+    let id = downloading(minerva.panel_state());
+
+    let state = minerva.on_update_download(id, got("998.0.0")).clone();
+    assert_eq!(shown(&state), (UpdateStage::Changed, UpdateOffer::TryAgain, QuitItem::Quit));
+    assert_eq!(job(&state), None);
+    assert!(!state.quit);
+
+    // The check asked at once says what is out now.
+    let state = tick(&mut minerva, S);
+    assert!(asked(&state).is_some());
+    let state = answer(&mut minerva, latest(NEWER));
+    assert_eq!(shown(&state), (UpdateStage::Out, UpdateOffer::Update, QuitItem::Quit));
+}
+
+#[test]
+fn a_download_of_this_version_or_an_older_one_never_installs() {
+    for version in [MINERVA_VERSION, OLDER] {
+        let mut minerva = newer_known(Build::Nsis);
+        minerva.press(PanelControl::Update);
+        let id = downloading(minerva.panel_state());
+
+        let state = minerva.on_update_download(id, got(version)).clone();
+        assert_eq!(notice(&state).stage, UpdateStage::Changed, "{version}");
+        assert_eq!(job(&state), None, "{version}");
+
+        // And the check after finds nothing newer: the notice goes.
+        tick(&mut minerva, S);
+        let state = answer(&mut minerva, latest(version));
+        assert_eq!(state.updates.notice, None, "{version}");
+        assert_eq!(job(&state), None, "{version}");
+    }
+}
+
+#[test]
+fn the_version_offered_named_with_a_v_installs() {
+    let mut minerva = newer_known(Build::Nsis);
+    minerva.press(PanelControl::Update);
+    let id = downloading(minerva.panel_state());
+
+    let state = minerva.on_update_download(id, got("v999.0.0")).clone();
+    assert_eq!(job(&state), Some(UpdateJob { id, step: UpdateStep::Install { relaunch: true } }));
+}
+
+#[test]
+fn a_release_withdrawn_while_it_downloads_installs_nothing() {
+    let mut minerva = newer_known(Build::Nsis);
+    minerva.press(PanelControl::Update);
+    let id = downloading(minerva.panel_state());
+
+    // A check while it downloads finds the release gone: nothing newer is out.
+    minerva.act(Action::CheckForUpdates);
+    tick(&mut minerva, S);
+    let state = answer(&mut minerva, latest(MINERVA_VERSION));
+    assert_eq!(state.updates.notice, None);
+
+    let state = minerva.on_update_download(id, got(NEWER)).clone();
+    assert_eq!(job(&state), None);
+    assert_eq!(state.updates.notice, None);
+    assert!(!state.quit);
+}
+
+#[test]
+fn quitting_while_the_update_for_when_i_quit_downloads_quits_without_it_if_another_version_comes() {
+    let mut player = hunting();
+    player.minerva.press(PanelControl::Update);
+    let id = downloading(&player.minerva.act(Action::UpdateWhenIQuit).clone());
+    player.minerva.act(Action::Quit);
+
+    let state = player.minerva.on_update_download(id, got(MINERVA_VERSION)).clone();
+    assert!(state.quit);
+    assert_eq!(job(&state), None);
+}
