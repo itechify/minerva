@@ -1,0 +1,5 @@
+[
+  { "name": "Garnet", "quantity": 1, "mesos": 500 },
+  { "name": "Emerald", "quantity": 1, "mesos": 500 },
+  { "covered": true }
+]

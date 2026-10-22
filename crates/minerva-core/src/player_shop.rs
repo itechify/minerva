@@ -17,7 +17,9 @@
 //!    that doesn't (the game's pointer, a window of ours) means the line is covered: the
 //!    row is unreadable, never misread.
 //! 3. A sold-out listing is greyed: its band isn't the listing colour, so it isn't read.
-//!    An empty slot is a band with no text. The listing the player selected is orange
+//!    An empty slot is a band with no text: one the game's tooltip covers part of has its
+//!    edge on every scanline, which isn't text, as a listing's name starts at the band's
+//!    left, [`NAME_LEFT_MAX`] px in at most. The listing the player selected is orange
 //!    (251,167,46) from 7 px into its band, its text black as on the others, and is read
 //!    as they are.
 //! 4. A slot where a listing was read before, at the same spot, that now has none and holds
@@ -136,6 +138,10 @@ const VIEW_MARGIN: u32 = 4;
 /// [`PRICE_SLACK`] (the letters' tops differ).
 const PRICE_BELOW: u32 = 27;
 const PRICE_SLACK: u32 = 3;
+/// A listing's name starts 5 to 8 px into its band, and its ink no further in than this, the
+/// pointer's over it or not: ink that starts further in, on a slot's every scanline, is the
+/// game's tooltip's edge over an empty slot (#134).
+const NAME_LEFT_MAX: u32 = 12;
 /// A listing's band starts this far above its price line's top (the "1" of "1 for", the
 /// same height in every listing), and is this tall.
 const BAND_ABOVE_PRICE: u32 = 33;
@@ -586,14 +592,16 @@ fn listings(img: &RgbImage, list: &List) -> Vec<Listing> {
     let mut i = 0;
     while i < lines.len() {
         let below = lines.get(i + 1).filter(|next| next.band == lines[i].band).map(|next| next.y0 - lines[i].y0);
+        let at_names = lines[i].x0 <= list.x0 + NAME_LEFT_MAX;
         match below {
-            Some(below) if below.abs_diff(PRICE_BELOW) <= PRICE_SLACK => {
+            Some(below) if below.abs_diff(PRICE_BELOW) <= PRICE_SLACK && at_names => {
                 let (name, price) = (lines[i], lines[i + 1]);
                 let clean = clean(img, list, &name) && clean(img, list, &price);
                 out.push(Listing { name, price, clean });
                 i += 2;
             }
-            // A line on its own: the other is covered, or it isn't a listing's.
+            // A line on its own: the other is covered, or it isn't a listing's (nor is one
+            // that doesn't start where names do).
             _ => i += 1,
         }
     }
