@@ -1,10 +1,13 @@
 //! The Status Bar reader (ADR 0016): finds the game's Status Bar at the bottom of the client
 //! area and reads the Character's level, job and name from it.
 //!
-//! The game draws its UI at a fixed pixel size, and pins the Status Bar to the bottom of the
-//! client area. The shell captures a strip there; how far up the bar sits in it isn't
+//! The game pins the Status Bar to the bottom of the client area, and draws it at the UI Size
+//! (ADR 0020). The shell captures a strip there; how far up the bar sits in it isn't
 //! assumed, it is found:
 //!
+//! 0. The bar's UI Size is measured by its LV box, found at any size (below), [`BOX_H`] rows
+//!    tall at the samples' size; a capture at another is scaled to the samples' size, read as
+//!    below, and what was found is put back where it is in the capture.
 //! 1. The level is written in orange tiles (255,148,21), one per digit, [`TILE_PITCH`] px
 //!    apart, in a dark grey box (the "LV." box). The tiles are where orange components of a
 //!    tile's size line up at that pitch, with nothing but the box around them. Live captures
@@ -28,6 +31,7 @@
 use crate::Frame;
 use crate::panel::{ScreenPoint, ScreenRect};
 use crate::recogniser::{Recogniser, RememberedLines, frame_to_rgb};
+use crate::ui_size::{self, AtSamplesSize};
 use image::{GrayImage, Luma, RgbImage};
 use serde::{Deserialize, Serialize};
 
@@ -134,9 +138,10 @@ const JOBS: &[&str] = &[
 /// The highest level a Character can have.
 pub const MAX_LEVEL: u32 = 200;
 
-/// How tall a strip of the client area's bottom the shell captures: the bar is 55 rows,
-/// pinned to the bottom, with room to spare.
-pub const STATUS_BAR_STRIP: u32 = 96;
+/// How tall a strip of the client area's bottom the shell captures: the bar is pinned to the
+/// bottom, 55 rows at the samples' UI Size and about 100 at the largest the game draws it
+/// (×1.8, Default Ratio at 2160 rows; ADR 0020), with room to spare.
+pub const STATUS_BAR_STRIP: u32 = 128;
 
 /// A level tile's orange component is about 17 px wide and 20 tall...
 const TILE_W: std::ops::RangeInclusive<u32> = 13..=21;
@@ -145,8 +150,19 @@ const TILE_H: std::ops::RangeInclusive<u32> = 16..=24;
 const TILE_PITCH: u32 = 18;
 /// At most this many digits.
 const MAX_TILES: usize = 3;
+/// At any UI Size (ADR 0020), a tile is this tall (×0.4 to ×2.4 of the samples': past the
+/// largest the game would draw, ×1.8 of the samples' at Default Ratio at 2160 rows), and
+/// about as wide as it is tall...
+const ANY_TILE_H: std::ops::RangeInclusive<u32> = 8..=48;
+const TILE_ASPECT: std::ops::RangeInclusive<f32> = 0.6..=1.15;
+/// ...where it is this tall.
+const TILE_H_AT_SAMPLES: f32 = 20.0;
+/// The LV box is this many rows tall at the samples' UI Size: what the bar's is measured by.
+const BOX_H: f32 = 47.0;
 /// The box around the tiles is this far from them at least: what is checked for its grey.
 const BOX_MARGIN: u32 = 2;
+/// Darker than this, a pixel by the box is its fringe, whatever its hue.
+const BOX_FRINGE: u8 = 40;
 /// The box ends this far right of the last tile at most (about 18 px for two digits).
 const BOX_REACH: u32 = 48;
 /// The text starts this far right of the box, and the bar's next part (HP) this far.
@@ -191,17 +207,38 @@ impl StatusBarReader {
         StatusBarReading { bar, at_ms: capture.frame.at_ms }
     }
 
+    /// Read the bar at the samples' size (ADR 0020): measure its UI Size, scale the capture to
+    /// the samples' size if it isn't at it, read that, and put what was found back on screen.
     fn read_rgb(&mut self, img: &RgbImage, origin: ScreenPoint) -> Option<StatusBar> {
+        let at = AtSamplesSize::new(img, measure(img)?);
+        let bar = self.read_at_samples_size(&at)?;
+        let back = |r: ScreenRect| {
+            let (x0, y0) = at.back(r.x as f32, r.y as f32);
+            let (x1, y1) = at.back((r.x + r.width as i32) as f32, (r.y + r.height as i32) as f32);
+            let (x0, y0, x1, y1) = (x0.round() as i32, y0.round() as i32, x1.round() as i32, y1.round() as i32);
+            ScreenRect { x: origin.x + x0, y: origin.y + y0, width: (x1 - x0) as u32, height: (y1 - y0) as u32 }
+        };
+        Some(StatusBar { area: back(bar.area), exp_figures: bar.exp_figures.map(back), ..bar })
+    }
+
+    /// Read a capture at the samples' UI Size; where the bar is found, from its top-left pixel.
+    /// A line the pointer is over, in the capture as it was captured, is unreadable.
+    fn read_at_samples_size(&mut self, at: &AtSamplesSize) -> Option<StatusBar> {
+        let img = &*at.img;
         let found = find(img)?;
         let (w, h) = img.dimensions();
         let rows = |(from, to): (i32, i32)| {
             let at = |dy: i32| (found.top as i32 + dy).clamp(0, h as i32) as u32;
             (at(from), at(to))
         };
+        let clear = |columns: (u32, u32), rows: (u32, u32)| !at.pointer_over(columns, rows);
         let (x0, x1) = (found.box_right + TEXT_FROM, (found.box_right + TEXT_TO).min(w));
-        let job = text_ink(img, x0, x1, rows(JOB_ROWS), found.scale);
-        let name = text_ink(img, x0, x1, rows(NAME_ROWS), found.scale);
-        let level = level_ink(img, &found);
+        let job = text_ink(img, x0, x1, rows(JOB_ROWS), found.scale).filter(|_| clear((x0, x1), rows(JOB_ROWS)));
+        let name = text_ink(img, x0, x1, rows(NAME_ROWS), found.scale).filter(|_| clear((x0, x1), rows(NAME_ROWS)));
+        // The pointer over the tiles, or a pitch either side of them, where it may hide one.
+        let tiles = (found.tiles[0].0.saturating_sub(TILE_PITCH), (found.tiles[found.tiles.len() - 1].1 + TILE_PITCH).min(w));
+        let tile_rows = (found.top.saturating_sub(BOX_MARGIN), (found.bottom + BOX_MARGIN).min(h));
+        let level = level_ink(img, &found).filter(|_| clear(tiles, tile_rows));
         // Every line there is, read at once: the level's, the job's, the name's.
         let inks: Vec<GrayImage> = [&level.as_ref().map(|(ink, _)| ink.clone()), &job, &name]
             .into_iter()
@@ -216,16 +253,16 @@ impl StatusBarReader {
         let left = found.box_right.saturating_sub(AREA_LEFT);
         let right = (found.box_right + AREA_RIGHT).min(w);
         let area = ScreenRect {
-            x: origin.x + left as i32,
-            y: origin.y + top as i32,
+            x: left as i32,
+            y: top as i32,
             width: right - left,
             height: bottom - top,
         };
         let (fx0, fx1) = (found.box_right + EXP_FIGURES_COLUMNS.0, found.box_right + EXP_FIGURES_COLUMNS.1);
         let (fy0, fy1) = (found.top as i32 + EXP_FIGURES_ROWS.0, found.top as i32 + EXP_FIGURES_ROWS.1);
         let exp_figures = (fx1 <= w && fy0 >= 0 && fy1 <= h as i32).then(|| ScreenRect {
-            x: origin.x + fx0 as i32,
-            y: origin.y + fy0,
+            x: fx0 as i32,
+            y: fy0,
             width: fx1 - fx0,
             height: (fy1 - fy0) as u32,
         });
@@ -252,11 +289,14 @@ fn orange(p: [u8; 3]) -> Option<f32> {
     is.then_some(r / 255.0)
 }
 
-/// The LV box's dark grey (47 to 50, and a shade darker at its foot) at any brightness.
+/// The LV box's dark grey (47 to 50, and a shade darker at its foot) at any brightness; or
+/// darker still, of any hue: the game's filter (Default Ratio (Filter Applied)) sharpens, and
+/// leaves a near-black, bluish fringe ((0,15,30)) along the tiles' edges. Never the pointer's
+/// black.
 fn box_grey(p: [u8; 3]) -> bool {
     let max = p.iter().copied().max().unwrap_or(0);
     let min = p.iter().copied().min().unwrap_or(0);
-    max - min <= 8 && (24..=72).contains(&max)
+    max - min <= 8 && (24..=72).contains(&max) || max <= BOX_FRINGE && !ui_size::pointer_black(p)
 }
 
 /// A connected run of orange pixels: its bounding box (ends exclusive), and the brightest
@@ -270,8 +310,14 @@ struct Blob {
     scale: f32,
 }
 
-/// The orange components (4-connected) of a tile's size.
+/// The orange components (4-connected) of a tile's size, at the samples' UI Size.
 fn tiles(img: &RgbImage) -> Vec<Blob> {
+    let sized = |b: &Blob| TILE_W.contains(&(b.x1 - b.x0)) && TILE_H.contains(&(b.y1 - b.y0));
+    oranges(img).into_iter().filter(sized).collect()
+}
+
+/// The orange components (4-connected), of any size.
+fn oranges(img: &RgbImage) -> Vec<Blob> {
     let (w, h) = img.dimensions();
     let mut seen = vec![false; (w * h) as usize];
     let mut out = Vec::new();
@@ -300,12 +346,67 @@ fn tiles(img: &RgbImage) -> Vec<Blob> {
                     }
                 }
             }
-            if TILE_W.contains(&(blob.x1 - blob.x0)) && TILE_H.contains(&(blob.y1 - blob.y0)) {
-                out.push(blob);
-            }
+            out.push(blob);
         }
     }
     out
+}
+
+/// The bar's UI Size (ADR 0020): its LV box's height next to the samples' [`BOX_H`]. The box
+/// is found as [`find`] finds it, but at any size: a row of tiles of one height at their
+/// pitch, with the box's grey all round them.
+fn measure(img: &RgbImage) -> Option<f32> {
+    let mut blobs: Vec<Blob> = oranges(img)
+        .into_iter()
+        .filter(|b| {
+            let (w, h) = ((b.x1 - b.x0) as f32, b.y1 - b.y0);
+            ANY_TILE_H.contains(&h) && TILE_ASPECT.contains(&(w / h as f32))
+        })
+        .collect();
+    blobs.sort_by_key(|b| (b.y0, b.x0));
+    let grey = |x: u32, y: u32| box_grey(img.get_pixel(x, y).0);
+    let (w, h) = img.dimensions();
+    for (i, first) in blobs.iter().enumerate() {
+        // How large this tile is next to the samples', and so how near its neighbours are.
+        let size = (first.y1 - first.y0) as f32 / TILE_H_AT_SAMPLES;
+        let pitch = TILE_PITCH as f32 * size;
+        let near = |a: u32, b: f32, within: f32| (a as f32 - b).abs() <= within.max(1.0);
+        // Next to it, at the pitch (give or take two px at the samples' size).
+        let in_line = |a: &Blob, b: &Blob| {
+            b.x0 > a.x0 && near(a.y0, b.y0 as f32, size) && near(a.y1, b.y1 as f32, size) && near(b.x0 - a.x0, pitch, 2.0 * size)
+        };
+        let mut group = vec![*first];
+        while let Some(next) = blobs[i + 1..].iter().find(|b| in_line(&group[group.len() - 1], b)) {
+            group.push(*next);
+            if group.len() > MAX_TILES {
+                break;
+            }
+        }
+        let (x0, x1) = (first.x0, group[group.len() - 1].x1);
+        let (top, bottom) = (group.iter().map(|b| b.y0).min()?, group.iter().map(|b| b.y1).max()?);
+        let margin = ((BOX_MARGIN as f32 * size).round() as u32).max(1);
+        if group.len() > MAX_TILES || x0 < margin || top < margin || bottom + margin >= h || x1 + margin > w {
+            continue;
+        }
+        let boxed = (x0..x1).all(|x| grey(x, top - margin) && grey(x, bottom - 1 + margin))
+            && (top..bottom).all(|y| grey(x0 - margin, y) && grey(x1 - 1 + margin, y));
+        if !boxed {
+            continue;
+        }
+        // The box's height, down the columns left and right of the tiles: the same, or something
+        // is over the box.
+        let height = |x: u32| {
+            let box_top = (0..top).rev().find(|&y| !grey(x, y)).map_or(0, |y| y + 1);
+            let box_bottom = (bottom..h).find(|&y| !grey(x, y)).unwrap_or(h);
+            box_bottom - box_top
+        };
+        let (left, right) = (height(x0 - margin), height(x1 - 1 + margin));
+        if left.abs_diff(right) as f32 > size.max(1.0) {
+            continue;
+        }
+        return Some((left + right) as f32 / 2.0 / BOX_H);
+    }
+    None
 }
 
 /// The level's tiles in the LV box: tiles in a row at their pitch, with the box's grey all
@@ -398,6 +499,18 @@ fn slate_or_text(p: [u8; 3], scale: f32) -> bool {
     (40.0 * scale..=255.0).contains(&luma) && (-8..=24).contains(&(b - r)) && g >= r - 8 && g <= b + 8
 }
 
+/// Whether `p` is darker than the slate but has its tint: the fringe the game's filter
+/// (Default Ratio (Filter Applied)) leaves along the text's edges by sharpening it: (0,8,17) by
+/// (255,255,255) text, and a dimmer (35,36,40) at ×1.2. The pointer's outline is black with
+/// no tint.
+fn slate_fringe(p: [u8; 3]) -> bool {
+    let [r, g, b] = p.map(i32::from);
+    (4..=24).contains(&(b - r)) && g >= r && g <= b
+}
+
+/// How far from the text's ink a [`slate_fringe`] pixel may be.
+const FRINGE_REACH: u32 = 2;
+
 /// How much `p` is the text's light grey, 0.0 (the slate) ..= 1.0.
 fn text(p: [u8; 3], scale: f32) -> f32 {
     let [r, g, b] = p.map(i32::from);
@@ -414,11 +527,21 @@ fn text_ink(img: &RgbImage, x0: u32, x1: u32, (y0, y1): (u32, u32), scale: f32) 
     if x1 <= x0 || y1 <= y0 {
         return None;
     }
-    let clean = (y0..y1).all(|y| (x0..x1).all(|x| slate_or_text(img.get_pixel(x, y).0, scale)));
+    let inked = |x: u32, y: u32| text(img.get_pixel(x, y).0, scale) >= 0.5;
+    let by_ink = |x: u32, y: u32| {
+        let (w, h) = img.dimensions();
+        let near = |v: u32, end: u32| v.saturating_sub(FRINGE_REACH)..(v + FRINGE_REACH + 1).min(end);
+        near(y, h).any(|ny| near(x, w).any(|nx| inked(nx, ny)))
+    };
+    let clean = (y0..y1).all(|y| {
+        (x0..x1).all(|x| {
+            let p = img.get_pixel(x, y).0;
+            slate_or_text(p, scale) || slate_fringe(p) && by_ink(x, y)
+        })
+    });
     if !clean {
         return None;
     }
-    let inked = |x: u32, y: u32| text(img.get_pixel(x, y).0, scale) >= 0.5;
     let cols: Vec<u32> = (x0..x1).filter(|&x| (y0..y1).any(|y| inked(x, y))).collect();
     let rows: Vec<u32> = (y0..y1).filter(|&y| (x0..x1).any(|x| inked(x, y))).collect();
     let (cx0, cx1) = ((*cols.first()?).saturating_sub(1).max(x0), (*cols.last()? + 2).min(x1));
@@ -451,9 +574,12 @@ fn level_of(read: &str, narrow: &[bool]) -> Option<u32> {
     (1..=MAX_LEVEL).contains(&level).then_some(level)
 }
 
-/// The job read, as the game names it, if it is one of [`JOBS`] (spaces aside).
+/// The job read, as the game names it, if it is one of [`JOBS`] (spaces aside, and a point for
+/// a comma: ocrs reads the comma of "(Fire,Poison)" as one at some UI Sizes, and no two jobs
+/// differ by one).
 fn job_of(read: &str) -> Option<String> {
-    let bare = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+    let comma = |c: char| if c == '.' { ',' } else { c };
+    let bare = |s: &str| s.chars().filter(|c| !c.is_whitespace()).map(comma).collect::<String>();
     let read = bare(read);
     JOBS.iter().find(|job| bare(job) == read).map(|job| job.to_string())
 }
@@ -495,6 +621,8 @@ mod tests {
     fn a_job_reads_only_as_one_the_game_names() {
         assert_eq!(job_of("White  Knight"), Some("White Knight".to_string()));
         assert_eq!(job_of("Wizard (Fire,Poison)"), Some("Wizard (Fire, Poison)".to_string()));
+        // ocrs reads its comma as a point at some UI Sizes.
+        assert_eq!(job_of("Wizard (Fire.Poison)"), Some("Wizard (Fire, Poison)".to_string()));
         for wrong in ["Maqician", "magician", "Magic1an", ""] {
             assert_eq!(job_of(wrong), None, "{wrong}");
         }

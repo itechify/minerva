@@ -44,6 +44,7 @@ mod shown_map;
 mod status_bar;
 mod tracker;
 mod travel_links;
+mod ui_size;
 mod updates;
 mod world;
 

@@ -7,8 +7,12 @@
 //!   down to the level and job, for a player who didn't agree to their name being kept, is
 //!   `<level>__<job>--<what>.png`: no name may be read in it. One with no Status Bar in it is
 //!   `no-status-bar--<what>.png`.
+//! - The `<ui-size>-<w>x<h>` samples (2026-10-22, #132) are the bar cut by hand from the probe's
+//!   record mode at each of the game's UI Sizes (Default Ratio, with its filter or not, and
+//!   Ideal Ratio) at 1366x768 to 2560x1440: drawn at ×0.64 to ×1.28 of the rest.
 //! - Each frame is fed as it is and as the darker colours of live captures (`prep.rs`), to a
-//!   core of its own, at the screen's origin.
+//!   core of its own, at the screen's origin; and scaled to sizes no sample is at, where it
+//!   may read as unreadable, and is found where it is at that size (ADR 0020).
 //! - The `--window` samples in `samples/minimap` are whole game windows: the bottom of their
 //!   client area, as the shell captures it, reads too.
 
@@ -71,8 +75,11 @@ fn started() -> Minerva {
     minerva
 }
 
-/// What `state` says the Status Bar read: its level, job and name, `None` where unreadable.
-fn read(state: &PanelState) -> Option<(Option<u32>, Option<String>, Option<String>)> {
+/// What a Status Bar read as: its level, job and name, `None` where unreadable.
+type Read = Option<(Option<u32>, Option<String>, Option<String>)>;
+
+/// What `state` says the Status Bar read.
+fn read(state: &PanelState) -> Read {
     let bar: &StatusBar = state.status_bar.as_ref()?;
     let job = bar.job.as_ref().map(|job| job.to_lowercase().replace(' ', "-"));
     Some((bar.level, job, bar.name.clone()))
@@ -80,7 +87,7 @@ fn read(state: &PanelState) -> Option<(Option<u32>, Option<String>, Option<Strin
 
 /// Whether `read` is what `expected` says, but for what couldn't be read; and whether all of
 /// it was read.
-fn judge(expected: &Expected, read: &Option<(Option<u32>, Option<String>, Option<String>)>) -> (bool, bool) {
+fn judge(expected: &Expected, read: &Read) -> (bool, bool) {
     match (expected, read) {
         (None, None) => (true, true),
         (None, Some(_)) => (false, false),
@@ -118,6 +125,73 @@ fn every_status_bar_sample_reads_as_its_name_says_or_as_unreadable_never_wrong()
     // The samples were all read whole when they were added: a reader that reads less of them
     // has got worse, though it says nothing wrong.
     assert!(unreadable.is_empty(), "now unreadable:\n{}", unreadable.join("\n"));
+}
+
+/// The Status Bar `img` reads as in a core of its own, at the screen's origin.
+fn bar_of(img: &image::RgbaImage) -> (Option<StatusBar>, Read) {
+    let mut minerva = started();
+    let capture = StatusBarCapture { frame: frame(img, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
+    let state = minerva.on_status_bar_capture(capture);
+    (state.status_bar.clone(), read(state))
+}
+
+#[test]
+fn every_status_bar_sample_at_other_ui_sizes_reads_as_its_name_says_or_as_unreadable_never_wrong() {
+    let mut wrong = Vec::new();
+    for file in sample_files() {
+        let expected = expected(&file);
+        let img = image::open(samples_dir().join(&file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
+        let area = bar_of(&img).0.expect("every sample reads").area;
+        for size in common::OTHER_UI_SIZES {
+            let (bar, read) = bar_of(&common::scaled(&img, size));
+            if !judge(&expected, &read).0 {
+                wrong.push(format!("{file} ×{size}: {read:?}"));
+            }
+            // What was found is put back where it is at this size, give or take 3% for the
+            // measuring and a few pixels for the finding.
+            let width = area.width as f32 * size;
+            let off = |found: i32, sample: i32| (found as f32 - sample as f32 * size).abs() > 0.03 * width;
+            let misplaced = |a: ScreenRect| off(a.x, area.x) || off(a.y, area.y) || off(a.width as i32, area.width as i32);
+            if let Some(found) = bar.map(|bar| bar.area).filter(|&a| misplaced(a)) {
+                wrong.push(format!("{file} ×{size}: found at {found:?}, at the samples' size {area:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
+}
+
+/// A sample at each UI Size the game was seen to draw the bar at, filtered or not.
+const AT_EACH_UI_SIZE: [&str; 7] = [
+    "32__wizard-(fire,-poison)__Egbert--perion-live.png",
+    "34__wizard-(fire,-poison)__Egbert--default-ratio-filter-1920x1200.png",
+    "34__wizard-(fire,-poison)__Egbert--ideal-ratio-1366x768.png",
+    "34__wizard-(fire,-poison)__Egbert--default-ratio-1920x1080.png",
+    "34__wizard-(fire,-poison)__Egbert--default-ratio-filter-1920x1080.png",
+    "34__wizard-(fire,-poison)__Egbert--default-ratio-2560x1440.png",
+    "34__wizard-(fire,-poison)__Egbert--ideal-ratio-2560x1440.png",
+];
+
+#[test]
+fn the_pointer_anywhere_over_the_bar_at_any_ui_size_never_reads_as_another() {
+    let mut wrong = Vec::new();
+    for file in AT_EACH_UI_SIZE {
+        let expected = expected(file);
+        let img = image::open(samples_dir().join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
+        let area = bar_of(&img).0.expect("every sample reads").area;
+        // The pointer is the game's, the same size at any UI Size.
+        let step = (area.height / 5).max(2);
+        for y in (area.y as u32..(area.y as u32 + area.height)).step_by(step as usize) {
+            for x in (area.x as u32..area.x as u32 + area.width).step_by(step as usize) {
+                let mut covered = img.clone();
+                common::pointer(&mut covered, (x, y), 14);
+                let read = bar_of(&covered).1;
+                if !judge(&expected, &read).0 {
+                    wrong.push(format!("{file}, pointer at ({x}, {y}): {read:?}"));
+                }
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
 }
 
 /// The minimap samples that are whole game windows: all show the Status Bar of the
@@ -160,14 +234,9 @@ fn the_status_bar_is_found_at_the_bottom_of_a_whole_client_area_wherever_it_sits
 fn a_name_under_the_pointer_is_unreadable_and_the_rest_still_reads() {
     let file = "13__magician__Egbert--kerning-city-window.png";
     let mut img = image::open(samples_dir().join(file)).expect(file).to_rgba8();
-    // The game's pointer, white with a black outline, over the "b" of "Egbert".
-    let (x, y) = (165, img.height() - 18);
-    for dy in 0..12 {
-        for dx in 0..=dy / 2 {
-            let edge = dx == 0 || dx == dy / 2 || dy == 11;
-            img.put_pixel(x + dx, y + dy, image::Rgba(if edge { [0, 0, 0, 255] } else { [255, 255, 255, 255] }));
-        }
-    }
+    // The game's pointer over the "b" of "Egbert".
+    let tip = (165, img.height() - 18);
+    common::pointer(&mut img, tip, 12);
     let mut minerva = started();
     let capture = StatusBarCapture { frame: frame(&img, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
 

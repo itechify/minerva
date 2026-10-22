@@ -43,7 +43,7 @@ The rectangle the player marks around the minimap title, saved relative to the g
 _Avoid_: minimap region, capture area
 
 **UI Size**:
-How large the game draws its windows and text, which its UI size setting (Default Ratio, or the ratio it picks for the resolution) and its window size decide together. Minerva reads the game at any UI Size.
+How large the game draws its windows and text, which its UI Size setting (Default Ratio, sharpened or not, or Ideal Ratio, which picks a size for the resolution) and its window size decide together. Minerva reads the game at any UI Size.
 _Avoid_: UI scale, zoom, display scale (Windows' own setting, which Minerva's windows follow)
 
 **Portal**:

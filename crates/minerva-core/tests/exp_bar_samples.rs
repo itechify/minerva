@@ -5,7 +5,10 @@
 //!   ([`Minerva::on_exp_bar_frame`]): they test reading the figures.
 //! - The `--window` samples in `samples/minimap` are whole game windows: the bottom of their
 //!   client area, captured as the shell captures it for the Status Bar, tests finding the
-//!   figures there too.
+//!   figures there too; so do the `-strip` samples here, the bottom of a client area at
+//!   another UI Size (ADR 0020) across its full width, fed whole as a Status Bar capture.
+//! - Each sample is also fed scaled to sizes no sample is at: there it reads as what it
+//!   shows, or as unreadable.
 //!
 //! - Single samples are named for their reading: `<exp>__<percent>[--variant].png`
 //!   ("160__3.81--kerning-city-window"), or `unreadable[--variant].png`. The
@@ -19,6 +22,9 @@
 //!   "82517__53.05--five-as-dollar" is a Bug Report's crop of the figures found in the
 //!   Status Bar (2026-10-21, a 1920x1200 client): ocrs read its "53.05%" as "$3.05%",
 //!   so every frame of it read as unreadable.
+//!   The `<ui-size>-<w>x<h>` ones (2026-10-22, #132) are the figures cut by hand from the
+//!   probe's record mode at each of the game's UI Sizes (Default Ratio, with its filter or
+//!   not, and Ideal Ratio) at 1366x768 to 2560x1440: drawn at ×0.64 to ×1.28 of the rest.
 //! - `recording-*` folders are the probe's record mode (one crop a second, named by
 //!   capture time in ms) with their readings in `readings.json` (`null`: unreadable).
 //!   2026-10-07: 150 s of hunting at Lv 15, client (1005,1144) 240x32 of a 1920x1200
@@ -94,6 +100,41 @@ fn every_window_samples_figures_are_found_in_its_status_bar_and_read() {
     assert!(wrong.is_empty(), "wrong or unread:\n{}", wrong.join("\n"));
 }
 
+/// Whether a sample is a strip across the bottom of a client area, not the figures alone.
+fn is_strip(path: &Path) -> bool {
+    path.file_stem().is_some_and(|stem| stem.to_string_lossy().ends_with("-strip"))
+}
+
+/// The PNG samples here, sorted: the strips, or the figures alone.
+fn sample_pngs(strips: bool) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
+        .expect("samples dir")
+        .map(|e| e.expect("dir entry").path())
+        .filter(|p| p.extension().is_some_and(|x| x == "png") && is_strip(p) == strips)
+        .collect();
+    paths.sort();
+    paths
+}
+
+#[test]
+fn every_strip_samples_status_bar_is_found_and_its_figures_read() {
+    let paths = sample_pngs(true);
+    assert!(!paths.is_empty(), "expected the strip samples");
+
+    let mut wrong = Vec::new();
+    for path in &paths {
+        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let strip = image::open(path).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
+        let mut minerva = started(strip.width(), strip.height());
+        let capture = StatusBarCapture { frame: common::frame(&strip, 0), origin: ScreenPoint { x: 0, y: 0 } };
+        let state = minerva.on_status_bar_capture(capture);
+        if state.status_bar.is_none() || state.exp_bar != named_reading(&name) {
+            wrong.push(format!("{name}: Status Bar {:?}, panel shows {:?}", state.status_bar, state.exp_bar));
+        }
+    }
+    assert!(wrong.is_empty(), "wrong or unread:\n{}", wrong.join("\n"));
+}
+
 /// "160__3.81" -> 160 EXP at 381 hundredths; "unreadable" -> `None`.
 fn named_reading(name: &str) -> Option<ExpBar> {
     let answer = name.split_once("--").map_or(name, |(a, _)| a);
@@ -110,12 +151,7 @@ fn named_reading(name: &str) -> Option<ExpBar> {
 
 #[test]
 fn every_single_sample_reads_as_its_filename_names() {
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
-        .expect("samples dir")
-        .map(|e| e.expect("dir entry").path())
-        .filter(|p| p.extension().is_some_and(|x| x == "png"))
-        .collect();
-    paths.sort();
+    let paths = sample_pngs(false);
     assert!(paths.len() >= 3, "expected the EXP bar samples, found {}", paths.len());
 
     let mut wrong = Vec::new();
@@ -124,6 +160,63 @@ fn every_single_sample_reads_as_its_filename_names() {
         let shown = read(frame(path));
         if shown != named_reading(&name) {
             wrong.push(format!("{name}: panel shows {shown:?}"));
+        }
+    }
+    assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
+}
+
+/// What a sample shows: its named reading, or for an unreadable one, what its name says the
+/// figures were ("unreadable--68012-71.07-seven-as-two" -> 68,012 at 71.07%).
+fn shows(name: &str) -> Option<ExpBar> {
+    let shown = name.strip_prefix("unreadable--").map_or_else(|| name.to_string(), |rest| rest.replacen('-', "__", 1));
+    let (exp, percent) = shown.split_once("__")?;
+    let percent = percent.split(['-', '_']).next()?;
+    named_reading(&format!("{exp}__{percent}"))
+}
+
+#[test]
+fn every_single_sample_at_other_ui_sizes_reads_as_what_it_shows_or_as_unreadable_never_wrong() {
+    let mut wrong = Vec::new();
+    for path in sample_pngs(false) {
+        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let img = image::open(&path).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
+        for size in common::OTHER_UI_SIZES {
+            let shown = read(common::frame(&common::scaled(&img, size), 0));
+            if shown.is_some() && shown != shows(&name) {
+                wrong.push(format!("{name} ×{size}: panel shows {shown:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
+}
+
+/// Figures at each UI Size the game was seen to draw them at, filtered or not.
+const AT_EACH_UI_SIZE: [&str; 7] = [
+    "160__3.81--kerning-city-window",
+    "100300__64.49--default-ratio-filter-1920x1200",
+    "100300__64.49--ideal-ratio-1366x768",
+    "100300__64.49--default-ratio-1920x1080",
+    "100300__64.49--default-ratio-filter-1920x1080",
+    "100300__64.49--default-ratio-2560x1440",
+    "100300__64.49--ideal-ratio-2560x1440",
+];
+
+#[test]
+fn the_pointer_anywhere_over_the_figures_at_any_ui_size_never_reads_as_another_number() {
+    let mut wrong = Vec::new();
+    for name in AT_EACH_UI_SIZE {
+        let img = image::open(samples_dir().join(format!("{name}.png"))).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
+        // The pointer is the game's, the same size at any UI Size.
+        let step = (img.height() / 5).max(2) as usize;
+        for y in (0..img.height()).step_by(step) {
+            for x in (0..img.width()).step_by(step) {
+                let mut covered = img.clone();
+                common::pointer(&mut covered, (x, y), 14);
+                let shown = read(common::frame(&covered, 0));
+                if shown.is_some() && shown != shows(name) {
+                    wrong.push(format!("{name}, pointer at ({x}, {y}): panel shows {shown:?}"));
+                }
+            }
         }
     }
     assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));

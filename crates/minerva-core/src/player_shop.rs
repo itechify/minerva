@@ -31,7 +31,8 @@ use crate::Frame;
 use crate::panel::{ScreenPoint, ScreenRect};
 use crate::prep::Rect;
 use crate::recogniser::{Recogniser, RememberedLines, frame_to_rgb};
-use image::imageops::{self, FilterType};
+use crate::ui_size;
+use image::imageops;
 use image::{GrayImage, Luma, RgbImage};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -324,9 +325,7 @@ impl<'a> View<'a> {
         let x1 = (found.x0 + found.w + out(VIEW_MARGIN)).min(capture.width());
         let y1 = (bottom + out(reach)).min(capture.height());
         let part = imageops::crop_imm(capture, x0, y0, x1 - x0, y1 - y0).to_image();
-        let at_samples = |px: u32| ((px as f32 / ui_size).round() as u32).max(1);
-        let mut img = imageops::resize(&part, at_samples(x1 - x0), at_samples(y1 - y0), FilterType::CatmullRom);
-        within_neighbours(&mut img, &part);
+        let img = ui_size::to_samples_size(&part, ui_size);
         let list = List { scaled: true, ..find_lists(&img, BAND_W..=BAND_W).into_iter().next()? };
         Some((View { img: Cow::Owned(img), x: x0, y: y0, ui_size }, list))
     }
@@ -346,27 +345,6 @@ impl<'a> View<'a> {
     fn top_from_capture(&self, top: u32) -> Option<u32> {
         let top = ((top as f32 - self.y as f32) / self.ui_size).round();
         (top >= 0.0).then_some(top as u32)
-    }
-}
-
-/// Keeps each pixel of `scaled`, a scaling of `source`, between the darkest and the brightest of
-/// the four pixels of `source` it lies between, channel by channel. Catmull-Rom overshoots
-/// beside a sharp edge, as the band's beside black text, brighter than either side: a pixel
-/// near white there would read as the pointer's white over the listing.
-fn within_neighbours(scaled: &mut RgbImage, source: &RgbImage) {
-    let (sw, sh) = source.dimensions();
-    let (rx, ry) = (sw as f32 / scaled.width() as f32, sh as f32 / scaled.height() as f32);
-    let around = |at: u32, ratio: f32, size: u32| {
-        let from = ((at as f32 + 0.5) * ratio - 0.5).floor().clamp(0.0, (size - 1) as f32) as u32;
-        (from, (from + 1).min(size - 1))
-    };
-    for (x, y, p) in scaled.enumerate_pixels_mut() {
-        let ((xa, xb), (ya, yb)) = (around(x, rx, sw), around(y, ry, sh));
-        let near = [source.get_pixel(xa, ya), source.get_pixel(xb, ya), source.get_pixel(xa, yb), source.get_pixel(xb, yb)];
-        for c in 0..3 {
-            let (lo, hi) = near.iter().fold((u8::MAX, u8::MIN), |(lo, hi), q| (lo.min(q[c]), hi.max(q[c])));
-            p[c] = p[c].clamp(lo, hi);
-        }
     }
 }
 
