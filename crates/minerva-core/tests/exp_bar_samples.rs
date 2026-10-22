@@ -161,6 +161,44 @@ fn every_single_sample_reads_as_its_filename_names() {
     assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
 }
 
+/// What a sample shows: its named reading, or for an unreadable one, what its name says the
+/// figures were ("unreadable--68012-71.07-seven-as-two" -> 68,012 at 71.07%).
+fn shows(name: &str) -> Option<ExpBar> {
+    let shown = name.strip_prefix("unreadable--").map_or_else(|| name.to_string(), |rest| rest.replacen('-', "__", 1));
+    let (exp, percent) = shown.split_once("__")?;
+    let percent = percent.split(['-', '_']).next()?;
+    named_reading(&format!("{exp}__{percent}"))
+}
+
+/// Sizes no sample is at, to scale each sample to (ADR 0020): from about the smallest the game
+/// draws its UI at (×0.5, Default Ratio at 600 rows) to past the largest (×1.8, at 2160).
+const OTHER_UI_SIZES: [f32; 4] = [0.55, 0.8, 1.45, 1.9];
+
+#[test]
+fn every_single_sample_at_other_ui_sizes_reads_as_what_it_shows_or_as_unreadable_never_wrong() {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
+        .expect("samples dir")
+        .map(|e| e.expect("dir entry").path())
+        .filter(|p| p.extension().is_some_and(|x| x == "png") && !is_strip(p))
+        .collect();
+    paths.sort();
+
+    let mut wrong = Vec::new();
+    for path in &paths {
+        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let img = image::open(path).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
+        for size in OTHER_UI_SIZES {
+            let (w, h) = ((img.width() as f32 * size).round() as u32, (img.height() as f32 * size).round() as u32);
+            let scaled = image::imageops::resize(&img, w, h, image::imageops::FilterType::Triangle);
+            let shown = read(common::frame(&scaled, 0));
+            if shown.is_some() && shown != shows(&name) {
+                wrong.push(format!("{name} ×{size}: panel shows {shown:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Expected {

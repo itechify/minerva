@@ -123,6 +123,47 @@ fn every_status_bar_sample_reads_as_its_name_says_or_as_unreadable_never_wrong()
     assert!(unreadable.is_empty(), "now unreadable:\n{}", unreadable.join("\n"));
 }
 
+/// Sizes no sample is at, to scale each sample to (ADR 0020): from about the smallest the game
+/// draws its UI at (×0.5, Default Ratio at 600 rows) to past the largest (×1.8, at 2160).
+const OTHER_UI_SIZES: [f32; 4] = [0.55, 0.8, 1.45, 1.9];
+
+#[test]
+fn every_status_bar_sample_at_other_ui_sizes_reads_as_its_name_says_or_as_unreadable_never_wrong() {
+    let mut wrong = Vec::new();
+    for file in sample_files() {
+        let expected = expected(&file);
+        let img = image::open(samples_dir().join(&file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
+        let at = |minerva: &mut Minerva, img: &image::RgbaImage| {
+            let capture = StatusBarCapture { frame: frame(img, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
+            minerva.on_status_bar_capture(capture).status_bar.clone()
+        };
+        let area = at(&mut started(), &img).expect("every sample reads").area;
+        for size in OTHER_UI_SIZES {
+            let (w, h) = ((img.width() as f32 * size).round() as u32, (img.height() as f32 * size).round() as u32);
+            let scaled = image::imageops::resize(&img, w, h, image::imageops::FilterType::Triangle);
+            let mut minerva = started();
+            let bar = at(&mut minerva, &scaled);
+            let read = read(minerva.panel_state());
+            if !judge(&expected, &read).0 {
+                wrong.push(format!("{file} ×{size}: {read:?}"));
+            }
+            // What was found is put back where it is at this size: give or take a few pixels at
+            // the samples' size (the bar's area is 331 wide there), and 2% for the measuring.
+            let ui_size = area.width as f32 * size / 331.0;
+            let off = |found: i32, sample: i32| {
+                let at = sample as f32 * size;
+                (found as f32 - at).abs() > 4.0 * ui_size + 0.02 * at
+            };
+|found: i32, at_samples: i32| (found as f32 - at_samples as f32 * size).abs() > 3.0 * size.max(1.0);
+            let placed = |a: ScreenRect| off(a.x, area.x) || off(a.y, area.y) || off(a.width as i32, area.width as i32);
+            if let Some(found) = bar.map(|bar| bar.area).filter(|&a| placed(a)) {
+                wrong.push(format!("{file} ×{size}: found at {found:?}, at the samples' size {area:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
+}
+
 /// The minimap samples that are whole game windows: all show the Status Bar of the
 /// maintainer's own Character, Egbert, a level 13 Magician.
 const WINDOWS: [&str; 4] = [
