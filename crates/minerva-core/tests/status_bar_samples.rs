@@ -155,9 +155,8 @@ fn every_status_bar_sample_at_other_ui_sizes_reads_as_its_name_says_or_as_unread
                 let at = sample as f32 * size;
                 (found as f32 - at).abs() > 4.0 * ui_size + 0.02 * at
             };
-|found: i32, at_samples: i32| (found as f32 - at_samples as f32 * size).abs() > 3.0 * size.max(1.0);
-            let placed = |a: ScreenRect| off(a.x, area.x) || off(a.y, area.y) || off(a.width as i32, area.width as i32);
-            if let Some(found) = bar.map(|bar| bar.area).filter(|&a| placed(a)) {
+            let misplaced = |a: ScreenRect| off(a.x, area.x) || off(a.y, area.y) || off(a.width as i32, area.width as i32);
+            if let Some(found) = bar.map(|bar| bar.area).filter(|&a| misplaced(a)) {
                 wrong.push(format!("{file} ×{size}: found at {found:?}, at the samples' size {area:?}"));
             }
         }
