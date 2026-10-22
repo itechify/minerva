@@ -1,15 +1,17 @@
 //! The Player Shop reader (ADR 0014): finds an open Player Shop's item list in a capture of
 //! the game's client area and reads each row's name and price, for the Deal Finder.
 //!
-//! The game draws the shop's UI at a fixed pixel size, wherever on the client area the
-//! window is and whatever the client area's size:
+//! The game draws the shop's UI at the UI Size its setting and the window's size make, wherever
+//! on the client area the window is (ADR 0020). The sizes below are the samples':
 //!
 //! 1. Each listing is a light blue-grey band (202,213,223) exactly [`BAND_W`] px wide, with
 //!    its item's name on one line and "1 for 999 mesos" on the line [`PRICE_BELOW`] px
-//!    below it. A band row is a scanline run of that colour [`BAND_W`] px long; the list is
-//!    where many such runs start at the same column. Live captures show the game's colours
-//!    a little darker than screenshots do (`prep.rs`), so the band is matched at any
-//!    brightness, as the minimap's panel is.
+//!    below it. A band row is a scanline run of that colour; the list is where many such
+//!    runs of one width end at the same column, at any width in [`BAND_WIDTHS`]: the UI Size
+//!    is that width next to [`BAND_W`]. At another UI Size than the samples', the list's part
+//!    of the capture is scaled to theirs, smoothly, and read there. Live captures show the
+//!    game's colours a little darker than screenshots do (`prep.rs`), so the band is matched
+//!    at any brightness, as the minimap's panel is.
 //! 2. The text is black, blended into the band where it doesn't cover a pixel fully, so
 //!    every pixel of a listing's lines lies between the band's colour and black. A pixel
 //!    that doesn't (the game's pointer, a window of ours) means the line is covered: the
@@ -29,9 +31,12 @@ use crate::Frame;
 use crate::panel::{ScreenPoint, ScreenRect};
 use crate::prep::Rect;
 use crate::recogniser::{Recogniser, RememberedLines, frame_to_rgb};
+use image::imageops::{self, FilterType};
 use image::{GrayImage, Luma, RgbImage};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ops::RangeInclusive;
 
 /// A capture of the game's whole client area for the Deal Finder.
 #[derive(Debug, Clone)]
@@ -77,6 +82,17 @@ pub struct ShopRow {
     pub covered: bool,
 }
 
+impl ShopList {
+    /// The UI Size it shows at, next to the samples' (ADR 0020): its listings' band width next
+    /// to theirs, or with no listing, its own width next to theirs.
+    pub fn ui_size(&self) -> f32 {
+        match self.rows.first() {
+            Some(row) => row.area.width as f32 / BAND_W as f32,
+            None => self.area.width as f32 / (PICTURE_LEFT + BAND_W) as f32,
+        }
+    }
+}
+
 fn is_false(b: &bool) -> bool {
     !*b
 }
@@ -101,13 +117,20 @@ pub struct PlayerShopReader {
     slots: Option<(u32, Vec<u32>)>,
 }
 
-/// A listing's band is this many px wide.
+/// A listing's band is this many px wide at the samples' UI Size...
 const BAND_W: u32 = 253;
 /// ...give or take this many.
 const BAND_SLACK: u32 = 2;
-/// The list is found where at least this many band rows start at one column: two
-/// listings' worth of the rows above, between and below their text.
+/// The widths it is found at, at any UI Size (ADR 0020): from #130's (162 px) and a little
+/// smaller, to past Default Ratio's at 3840x2160 (about 455 px).
+const BAND_WIDTHS: RangeInclusive<u32> = 140..=480;
+/// The list is found where at least this many band rows end at one column, at the samples' UI
+/// Size, fewer at a smaller one: two listings' worth of the rows above, between and below their
+/// text.
 const MIN_BAND_ROWS: usize = 12;
+/// Kept around the list's part of the capture when it is scaled to the samples' UI Size, past
+/// the scaling's reach (px at their size).
+const VIEW_MARGIN: u32 = 4;
 /// The price line's top is this many px below the name line's, give or take
 /// [`PRICE_SLACK`] (the letters' tops differ).
 const PRICE_BELOW: u32 = 27;
@@ -147,7 +170,7 @@ const SLOT_PITCH: f32 = 62.6;
 /// A pixel is the band's colour at its brightness within this much per channel...
 const BAND_TOL: f32 = 6.0;
 /// ...at any brightness in this range of the screenshots'.
-const BAND_SCALE: std::ops::RangeInclusive<f32> = 0.8..=1.1;
+const BAND_BRIGHTNESS: std::ops::RangeInclusive<f32> = 0.8..=1.1;
 /// A scanline is part of a listing's text when at least this share of it is the band.
 const TEXT_ROW_BAND: f32 = 0.3;
 /// A pixel is ink when it is at least this much of the way from the band to black.
@@ -170,13 +193,23 @@ impl PlayerShopReader {
         ShopReading { shop, at_ms: capture.frame.at_ms }
     }
 
-    fn read_rgb(&mut self, img: &RgbImage, origin: ScreenPoint) -> Option<ShopList> {
-        let list = find_list(img)?;
+    fn read_rgb(&mut self, capture: &RgbImage, origin: ScreenPoint) -> Option<ShopList> {
+        let found = find_list(capture, BAND_WIDTHS)?;
+        // The slots listings were read clean in at this spot (capture px).
+        let known = match &self.slots {
+            Some((x0, slots)) if *x0 == found.x0 => slots.clone(),
+            _ => Vec::new(),
+        };
+        let (view, list) = View::of(capture, found, &known)?;
+        let img = view.img.as_ref();
         let listings = listings(img, &list);
-        let on_screen = |r: Rect| ScreenRect { x: origin.x + r.x as i32, y: origin.y + r.y as i32, width: r.w, height: r.h };
+        let on_screen = |r: Rect| {
+            let r = view.to_capture(r);
+            ScreenRect { x: origin.x + r.x as i32, y: origin.y + r.y as i32, width: r.w, height: r.h }
+        };
         // Every clean line, read at once.
         let lines: Vec<&TextLine> = listings.iter().filter(|l| l.clean).flat_map(|l| [&l.name, &l.price]).collect();
-        let texts = self.read_lines(img, &lines, list.scale);
+        let texts = self.read_lines(img, &lines, list.brightness);
         let mut texts = texts.into_iter();
         let band_area = |top: u32| Rect { x: list.x0, y: top, w: BAND_W, h: BAND_H };
         let covered_row = |top: u32| ShopRow { area: on_screen(band_area(top)), name: None, price: None, covered: true };
@@ -195,10 +228,7 @@ impl PlayerShopReader {
         }
         // The slots listings were read clean in at this spot: the list's slots lie on a grid
         // every one of them is on.
-        let mut known = match self.slots.take() {
-            Some((x0, slots)) if x0 == list.x0 => slots,
-            _ => Vec::new(),
-        };
+        let mut known: Vec<u32> = known.into_iter().filter_map(|top| view.top_from_capture(top)).collect();
         // Another shop's window may open a few px higher or lower where this one was: slots
         // off the grid of those read clean now are another list's.
         if let (Some(&slot), Some(&(top, _))) = (known.first(), rows.first())
@@ -225,7 +255,7 @@ impl PlayerShopReader {
             }
         }
         known.sort_unstable();
-        self.slots = Some((list.x0, known));
+        self.slots = Some((found.x0, known.into_iter().map(|top| view.top_to_capture(top)).collect()));
         rows.sort_by_key(|&(top, _)| top);
         let rows = rows.into_iter().map(|(_, row)| row).collect();
         let x = list.x0.saturating_sub(PICTURE_LEFT);
@@ -235,20 +265,72 @@ impl PlayerShopReader {
 
     /// Read `lines` of `img` (each its own ink, black on white), remembering what each
     /// one's ink read as: one entry per line, `None` where nothing was read.
-    fn read_lines(&mut self, img: &RgbImage, lines: &[&TextLine], scale: f32) -> Vec<Option<String>> {
-        let inks: Vec<GrayImage> = lines.iter().map(|line| line_ink(img, line, scale)).collect();
+    fn read_lines(&mut self, img: &RgbImage, lines: &[&TextLine], brightness: f32) -> Vec<Option<String>> {
+        let inks: Vec<GrayImage> = lines.iter().map(|line| line_ink(img, line, brightness)).collect();
         self.read.read(&self.recogniser, &inks, UPSCALE)
     }
 }
 
-/// Where the item list is: the column its bands start at, the rows from the first band row
-/// to the last, and how bright the band is next to the screenshots' colour.
+/// Where the item list is: the column its bands start at, how wide they are, the rows from
+/// the first band row to the last, and how bright the band is next to the screenshots' colour.
 #[derive(Debug, Clone, Copy)]
 struct List {
     x0: u32,
+    w: u32,
     y0: u32,
     y1: u32,
-    scale: f32,
+    brightness: f32,
+}
+
+/// What the list is read in: the capture itself at the samples' UI Size, or else the list's
+/// part of it scaled to that size (ADR 0020), with where that part's corner is in the capture
+/// and how many capture px one of its px is.
+struct View<'a> {
+    img: Cow<'a, RgbImage>,
+    x: u32,
+    y: u32,
+    size: f32,
+}
+
+impl<'a> View<'a> {
+    /// The view of `capture` to read the list `found` there in, down to the slots `known`
+    /// (their tops), and the list in it.
+    fn of(capture: &'a RgbImage, found: List, known: &[u32]) -> Option<(Self, List)> {
+        if found.w.abs_diff(BAND_W) <= BAND_SLACK {
+            return Some((View { img: Cow::Borrowed(capture), x: 0, y: 0, size: 1.0 }, found));
+        }
+        let size = found.w as f32 / BAND_W as f32;
+        let out = |px: u32| (px as f32 * size).ceil() as u32;
+        // The pictures' column, and a selected listing above or below the bands found.
+        let reach = BAND_H + PRICE_BELOW + VIEW_MARGIN;
+        let top = known.iter().fold(found.y0, |top, &slot| top.min(slot));
+        let bottom = known.iter().fold(found.y1, |bottom, &slot| bottom.max(slot + out(BAND_H)));
+        let (x0, y0) = (found.x0.saturating_sub(out(PICTURE_LEFT + VIEW_MARGIN)), top.saturating_sub(out(reach)));
+        let x1 = (found.x0 + found.w + out(VIEW_MARGIN)).min(capture.width());
+        let y1 = (bottom + out(reach)).min(capture.height());
+        let part = imageops::crop_imm(capture, x0, y0, x1 - x0, y1 - y0);
+        let at_samples = |px: u32| ((px as f32 / size).round() as u32).max(1);
+        let img = imageops::resize(&*part, at_samples(x1 - x0), at_samples(y1 - y0), FilterType::CatmullRom);
+        let list = find_list(&img, BAND_W..=BAND_W)?;
+        Some((View { img: Cow::Owned(img), x: x0, y: y0, size }, list))
+    }
+
+    /// `r` (view px) in capture px.
+    fn to_capture(&self, r: Rect) -> Rect {
+        let px = |v: u32| (v as f32 * self.size).round() as u32;
+        Rect { x: self.x + px(r.x), y: self.y + px(r.y), w: px(r.w), h: px(r.h) }
+    }
+
+    /// A slot's top (view px) in capture px.
+    fn top_to_capture(&self, top: u32) -> u32 {
+        self.y + (top as f32 * self.size).round() as u32
+    }
+
+    /// A slot's top (capture px) in view px; `None` above the view.
+    fn top_from_capture(&self, top: u32) -> Option<u32> {
+        let top = ((top as f32 - self.y as f32) / self.size).round();
+        (top >= 0.0).then_some(top as u32)
+    }
 }
 
 /// A listing's band: the listing colour, or the selected listing's orange.
@@ -260,12 +342,12 @@ enum Band {
 
 impl Band {
     /// Its colour at the list's brightness.
-    fn rgb(self, scale: f32) -> [f32; 3] {
+    fn rgb(self, brightness: f32) -> [f32; 3] {
         match self {
             Band::Listing => BAND_RGB,
             Band::Selected => SELECTED_RGB,
         }
-        .map(|c| c * scale)
+        .map(|c| c * brightness)
     }
 
     /// How far off its band-to-black line a pixel of its text may stray.
@@ -276,14 +358,31 @@ impl Band {
         }
     }
 
-    /// Whether `p` is the light rule between its listing's lines, at the list's brightness.
-    fn rule(self, p: [u8; 3], scale: f32) -> bool {
+    /// Whether `p` is the light rule between its listing's lines, at the list's brightness, or
+    /// a blend of the rule, the band and the text's black: scaled to the samples' UI Size, the
+    /// rule runs into the rows beside it (ADR 0020). A blend lies as close to them as the text
+    /// lies to its band's line from it to black, and no brighter than the rule.
+    fn rule(self, p: [u8; 3], brightness: f32) -> bool {
         let rule = match self {
             Band::Listing => RULE_RGB,
             Band::Selected => SELECTED_RULE_RGB,
-        };
-        let (along, off) = along_and_off(p, rule.map(|c| c * scale));
-        off <= RULE_TOL && along <= RULE_BRIGHTEST
+        }
+        .map(|c| c * brightness);
+        let (along, off) = along_and_off(p, rule);
+        if off <= RULE_TOL && along <= RULE_BRIGHTEST {
+            return true;
+        }
+        let (band, p) = (self.rgb(brightness), p.map(f32::from));
+        let dot = |a: [f32; 3], b: [f32; 3]| a.iter().zip(&b).map(|(x, y)| x * y).sum::<f32>();
+        // p as so much of the band and so much of the rule, in a blend with black.
+        let (bb, rr, br, pb, pr) = (dot(band, band), dot(rule, rule), dot(band, rule), dot(p, band), dot(p, rule));
+        let det = bb * rr - br * br;
+        let (of_band, of_rule) = ((pb * rr - pr * br) / det, (pr * bb - pb * br) / det);
+        if of_band < 0.0 || of_rule < 0.0 || of_band + of_rule > RULE_BRIGHTEST {
+            return false;
+        }
+        let off: [f32; 3] = std::array::from_fn(|i| p[i] - of_band * band[i] - of_rule * rule[i]);
+        dot(off, off).sqrt() <= self.foreign()
     }
 
     /// The columns of the list that hold its band, clear of its edges.
@@ -296,56 +395,78 @@ impl Band {
     }
 }
 
-/// Which band `p` is the colour of, at the list's brightness `scale`.
-fn band_of(p: [u8; 3], scale: f32) -> Option<Band> {
-    if band_scale(p).is_some() {
+/// Which band `p` is the colour of, at the list's `brightness`.
+fn band_of(p: [u8; 3], brightness: f32) -> Option<Band> {
+    if band_brightness(p).is_some() {
         return Some(Band::Listing);
     }
-    let orange = SELECTED_RGB.map(|c| c * scale);
+    let orange = SELECTED_RGB.map(|c| c * brightness);
     (0..3).all(|i| (p[i] as f32 - orange[i]).abs() <= SELECTED_TOL).then_some(Band::Selected)
 }
 
 /// The band's brightness next to the screenshots' colour, if `p` is its colour.
-fn band_scale(p: [u8; 3]) -> Option<f32> {
+fn band_brightness(p: [u8; 3]) -> Option<f32> {
     let k = p[2] as f32 / BAND_RGB[2];
-    let close = BAND_SCALE.contains(&k) && (0..2).all(|i| (p[i] as f32 - k * BAND_RGB[i]).abs() <= BAND_TOL);
+    let close = BAND_BRIGHTNESS.contains(&k) && (0..2).all(|i| (p[i] as f32 - k * BAND_RGB[i]).abs() <= BAND_TOL);
     close.then_some(k)
 }
 
-/// The item list: the column where the most band rows start, if enough do.
-fn find_list(img: &RgbImage) -> Option<List> {
+/// The item list: where the most band rows of one width in `widths` end at one column, if
+/// enough do and no wider stack of them holds them.
+fn find_list(img: &RgbImage, widths: RangeInclusive<u32>) -> Option<List> {
     let (w, h) = img.dimensions();
-    let mut starts: HashMap<u32, Vec<(u32, f32)>> = HashMap::new();
+    let lengths = widths.start().saturating_sub(BAND_SLACK)..=widths.end() + BAND_SLACK;
+    // Each band row at least as wide as the narrowest band, by its end and its width: its
+    // scanline and brightness.
+    let mut ends: HashMap<(u32, u32), Vec<(u32, f32)>> = HashMap::new();
     for y in 0..h {
         let mut x = 0;
         while x < w {
-            let Some(k) = band_scale(img.get_pixel(x, y).0) else {
+            let Some(k) = band_brightness(img.get_pixel(x, y).0) else {
                 x += 1;
                 continue;
             };
             let start = x;
-            while x < w && band_scale(img.get_pixel(x, y).0).is_some() {
+            while x < w && band_brightness(img.get_pixel(x, y).0).is_some() {
                 x += 1;
             }
-            if (x - start).abs_diff(BAND_W) <= BAND_SLACK {
-                starts.entry(start).or_default().push((y, k));
+            if x - start >= *lengths.start() {
+                ends.entry((x, x - start)).or_default().push((y, k));
             }
         }
     }
-    // A run a pixel short at one end starts a column over: count each column with its
-    // neighbours.
-    let near = |x0: u32| (x0.saturating_sub(1)..=x0 + 1).filter_map(|x| starts.get(&x)).map(Vec::len).sum::<usize>();
-    let x0 = *starts.keys().max_by_key(|&&x0| (near(x0), starts[&x0].len()))?;
-    if near(x0) < MIN_BAND_ROWS {
-        return None;
-    }
-    let mut rows: Vec<(u32, f32)> =
-        (x0.saturating_sub(1)..=x0 + 1).filter_map(|x| starts.get(&x)).flatten().copied().collect();
+    // A run a pixel short at one end ends a column over, or is narrower: count each end and
+    // width with its neighbours.
+    let near = |end: u32, width: u32| {
+        (end.saturating_sub(1)..=end + 1)
+            .flat_map(move |e| (width.saturating_sub(BAND_SLACK)..=width + BAND_SLACK).map(move |w| (e, w)))
+            .filter_map(|key| ends.get(&key))
+    };
+    let count = |end: u32, width: u32| near(end, width).map(Vec::len).sum::<usize>();
+    let min_rows = |width: u32| (MIN_BAND_ROWS as f32 * width.min(BAND_W) as f32 / BAND_W as f32).round() as usize;
+    let stacks: Vec<(u32, u32)> = ends.keys().copied().filter(|&(end, width)| count(end, width) >= min_rows(width)).collect();
+    // A stack is a part of a wider one's bands, of any width, where it starts as they do and
+    // something covers their right ends (the game's tooltip), or where it ends as they do and
+    // has fewer rows, beside their text. The other way about, a wider stack with fewer rows
+    // that ends as the bands do is the bands run into the pictures' column, where scaling has
+    // blurred the line between them away.
+    let inside = |(end, width): (u32, u32), (wider_end, wider): (u32, u32)| {
+        let (start, wider_start) = (end - width, wider_end - wider);
+        let cut_short = wider_start.abs_diff(start) <= 1;
+        let beside_text = wider_end.abs_diff(end) <= 1 && count(wider_end, wider) > count(end, width);
+        wider > width + BAND_SLACK && (cut_short || beside_text)
+    };
+    let (end, width) = stacks
+        .iter()
+        .copied()
+        .filter(|&(end, width)| lengths.contains(&width) && !stacks.iter().any(|&other| inside((end, width), other)))
+        .max_by_key(|&(end, width)| (count(end, width), ends[&(end, width)].len(), width))?;
+    let mut rows: Vec<(u32, f32)> = near(end, width).flatten().copied().collect();
     rows.sort_by_key(|row| row.0);
-    let mut scales: Vec<f32> = rows.iter().map(|&(_, k)| k).collect();
-    scales.sort_by(f32::total_cmp);
-    let scale = scales[scales.len() / 2];
-    Some(List { x0, y0: rows.first()?.0, y1: rows.last()?.0 + 1, scale })
+    let mut brightnesses: Vec<f32> = rows.iter().map(|&(_, k)| k).collect();
+    brightnesses.sort_by(f32::total_cmp);
+    let brightness = brightnesses[brightnesses.len() / 2];
+    Some(List { x0: end - width, w: width, y0: rows.first()?.0, y1: rows.last()?.0 + 1, brightness })
 }
 
 /// A line of text in a listing: its inked columns and rows (ends exclusive), and the band
@@ -402,7 +523,7 @@ fn listings(img: &RgbImage, list: &List) -> Vec<Listing> {
     let text_row = |y: u32| {
         let (mut listing, mut selected) = (0, 0);
         for x in x0..x1 {
-            match band_of(img.get_pixel(x, y).0, list.scale) {
+            match band_of(img.get_pixel(x, y).0, list.brightness) {
                 Some(Band::Listing) => listing += 1,
                 Some(Band::Selected) => selected += 1,
                 None => {}
@@ -413,7 +534,7 @@ fn listings(img: &RgbImage, list: &List) -> Vec<Listing> {
         if listing.max(selected) as f32 <= TEXT_ROW_BAND * (bx1 - bx0) as f32 {
             return None;
         }
-        let rgb = band.rgb(list.scale);
+        let rgb = band.rgb(list.brightness);
         let inked = (bx0..bx1).any(|x| {
             let (ink, off) = ink_of(img.get_pixel(x, y).0, rgb);
             ink >= INK_MIN && off <= band.foreign()
@@ -455,7 +576,7 @@ fn listings(img: &RgbImage, list: &List) -> Vec<Listing> {
 /// The text line on scanlines `y0..y1` of the list, on `band`: its inked columns.
 fn line_extent(img: &RgbImage, list: &List, band: Band, y0: u32, y1: u32) -> TextLine {
     let (x0, x1) = band.columns(list, img.width());
-    let rgb = band.rgb(list.scale);
+    let rgb = band.rgb(list.brightness);
     let inked = |x: u32| (y0..y1).any(|y| ink_of(img.get_pixel(x, y).0, rgb).0 >= INK_MIN);
     let first = (x0..x1).find(|&x| inked(x)).unwrap_or(x0);
     let last = (x0..x1).rev().find(|&x| inked(x)).map_or(x1, |x| x + 1);
@@ -468,8 +589,8 @@ fn clean(img: &RgbImage, list: &List, line: &TextLine) -> bool {
     let band = line.band;
     let (x0, x1) = band.columns(list, img.width());
     let (y0, y1) = (line.y0.saturating_sub(1), (line.y1 + 1).min(img.height()));
-    let rgb = band.rgb(list.scale);
-    let shops = |p: [u8; 3]| ink_of(p, rgb).1 <= band.foreign() || band.rule(p, list.scale);
+    let rgb = band.rgb(list.brightness);
+    let shops = |p: [u8; 3]| ink_of(p, rgb).1 <= band.foreign() || band.rule(p, list.brightness);
     (y0..y1).all(|y| (x0..x1).all(|x| shops(img.get_pixel(x, y).0)))
 }
 
@@ -489,15 +610,15 @@ fn covered(img: &RgbImage, list: &List, top: u32) -> bool {
     let (x0, x1) = (list.x0 + EDGE, (list.x0 + BAND_W - EDGE).min(w));
     let dark = (top..(top + BAND_H).min(h)).flat_map(|y| (x0..x1).map(move |x| (x, y))).filter(|&(x, y)| {
         let [r, g, b] = img.get_pixel(x, y).0.map(f32::from);
-        0.299 * r + 0.587 * g + 0.114 * b <= COVERING_DARK * list.scale
+        0.299 * r + 0.587 * g + 0.114 * b <= COVERING_DARK * list.brightness
     });
     dark.take(COVERED_MIN).count() == COVERED_MIN
 }
 
 /// `line`'s ink, black on white.
-fn line_ink(img: &RgbImage, line: &TextLine, scale: f32) -> GrayImage {
+fn line_ink(img: &RgbImage, line: &TextLine, brightness: f32) -> GrayImage {
     let (w, h) = (line.x1 - line.x0, line.y1 - line.y0);
-    let rgb = line.band.rgb(scale);
+    let rgb = line.band.rgb(brightness);
     GrayImage::from_fn(w, h, |x, y| {
         let (ink, _) = ink_of(img.get_pixel(line.x0 + x, line.y0 + y).0, rgb);
         Luma([(255.0 * (1.0 - ink)).round() as u8])
