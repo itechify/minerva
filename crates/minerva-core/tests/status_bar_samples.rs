@@ -7,6 +7,9 @@
 //!   down to the level and job, for a player who didn't agree to their name being kept, is
 //!   `<level>__<job>--<what>.png`: no name may be read in it. One with no Status Bar in it is
 //!   `no-status-bar--<what>.png`.
+//! - The `<ui-size>-<w>x<h>` samples (2026-10-22, #132) are the bar cut by hand from the probe's
+//!   record mode at each of the game's UI Sizes (Default Ratio, with its filter or not, and
+//!   Ideal Ratio) at 1366x768 to 2560x1440: drawn at x0.64 to x1.28 of the rest.
 //! - Each frame is fed as it is and as the darker colours of live captures (`prep.rs`), to a
 //!   core of its own, at the screen's origin.
 //! - The `--window` samples in `samples/minimap` are whole game windows: the bottom of their

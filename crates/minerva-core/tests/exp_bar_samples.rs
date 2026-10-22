@@ -19,6 +19,9 @@
 //!   "82517__53.05--five-as-dollar" is a Bug Report's crop of the figures found in the
 //!   Status Bar (2026-10-21, a 1920x1200 client): ocrs read its "53.05%" as "$3.05%",
 //!   so every frame of it read as unreadable.
+//!   The `<ui-size>-<w>x<h>` ones (2026-10-22, #132) are the figures cut by hand from the
+//!   probe's record mode at each of the game's UI Sizes (Default Ratio, with its filter or
+//!   not, and Ideal Ratio) at 1366x768 to 2560x1440: drawn at x0.64 to x1.28 of the rest.
 //! - `recording-*` folders are the probe's record mode (one crop a second, named by
 //!   capture time in ms) with their readings in `readings.json` (`null`: unreadable).
 //!   2026-10-07: 150 s of hunting at Lv 15, client (1005,1144) 240x32 of a 1920x1200
