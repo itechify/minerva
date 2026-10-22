@@ -264,9 +264,12 @@ fn every_samples_listings_read_at_other_ui_sizes_as_its_readings_say_or_as_unrea
                     continue;
                 };
                 let Some(at_own) = &at_own else { continue };
+                // Within 2 px, and a px at the sample's own size: read at another UI Size than
+                // the samples' itself, its own badges are placed to a px there.
+                let slack = 2 + if (own - 1.0).abs() < 0.02 { 0 } else { factor.ceil() as u32 };
                 for (&(top, height), &(own_top, own_height)) in checked.places.iter().zip(&at_own.places) {
                     let expected = ((own_top as f32 * factor).round() as i32, (own_height as f32 * factor).round() as u32);
-                    if top.abs_diff(expected.0) > 2 || height.abs_diff(expected.1) > 2 {
+                    if top.abs_diff(expected.0) > slack || height.abs_diff(expected.1) > slack {
                         misplaced.push(format!("{label}: a badge at {top}, {height} px tall, not {}, {}", expected.0, expected.1));
                     }
                 }
