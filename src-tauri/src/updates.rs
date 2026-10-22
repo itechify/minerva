@@ -14,6 +14,7 @@
 //!   Minerva with `process::exit(0)`, so nothing on the quit path runs after.
 
 use crate::Command;
+use crate::errors::error;
 use crate::http;
 use minerva_core::{Build, DownloadAnswer, UpdateAnswer, UpdateJob, UpdateStep, Updates};
 use std::fmt;
@@ -144,38 +145,47 @@ impl Updater {
 
     /// Run the core's check under way and its download, each once, in the background; what
     /// comes of them comes back to the core loop as [`Command::UpdateAnswer`] and
-    /// [`Command::UpdateDownloaded`].
+    /// [`Command::UpdateDownload`].
     pub fn sync(&mut self, updates: &Updates) {
         if let Some(id) = updates.check.filter(|&id| id > self.checked) {
             self.checked = id;
-            let (app, build, commands) = (self.app.clone(), self.build, self.commands.clone());
-            tauri::async_runtime::spawn(async move {
+            self.spawn(move |app, build| async move {
                 let answer = match latest(&app, build).await {
                     Ok(update) => UpdateAnswer::Latest { version: update.version },
                     Err(why) => {
-                        // Shown only as Help & Setup's "Couldn't check": the answer, with
-                        // why, goes into a Bug Report.
-                        eprintln!("checking for updates: {why}");
+                        // Shown only as Help & Setup's "Couldn't check".
+                        error!("checking for updates: {why}");
                         UpdateAnswer::Failed { why }
                     }
                 };
-                let _ = commands.send(Command::UpdateAnswer { id, answer });
+                Command::UpdateAnswer { id, answer }
             });
         }
+        // Never in a build that can't install: the core asks for no download there.
         if let Some(UpdateJob { id, step: UpdateStep::Download }) = updates.job
             && id > self.downloaded
-            && self.build != Build::NotifyOnly
         {
             self.downloaded = id;
-            let (app, build, commands) = (self.app.clone(), self.build, self.commands.clone());
-            tauri::async_runtime::spawn(async move {
+            self.spawn(move |app, build| async move {
                 let fetched = download(&app, build).await;
                 if let Err(why) = &fetched {
-                    eprintln!("downloading the update: {why}");
+                    error!("downloading the update: {why}");
                 }
-                let _ = commands.send(Command::UpdateDownloaded { id, fetched });
+                Command::UpdateDownload { id, fetched }
             });
         }
+    }
+
+    /// Run `work` in the background, with the app and the build, and send the core loop the
+    /// command it comes to.
+    fn spawn<F>(&self, work: impl FnOnce(AppHandle, Build) -> F)
+    where
+        F: Future<Output = Command> + Send + 'static,
+    {
+        let (commands, work) = (self.commands.clone(), work(self.app.clone(), self.build));
+        tauri::async_runtime::spawn(async move {
+            let _ = commands.send(work.await);
+        });
     }
 
     /// Download `id` came to `fetched`: keep the installer, and say what came of it to the

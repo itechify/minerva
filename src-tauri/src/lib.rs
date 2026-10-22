@@ -28,7 +28,6 @@ mod old_caches;
 pub mod osms;
 pub mod osms_items;
 mod pictures;
-mod updates;
 mod search;
 mod settings;
 mod setup;
@@ -36,6 +35,7 @@ mod sizemove;
 pub mod source;
 mod tray;
 pub mod update_manifest;
+mod updates;
 mod view;
 
 use minerva_core::{
@@ -143,7 +143,7 @@ pub(crate) enum Command {
     UpdateAnswer { id: u64, answer: UpdateAnswer },
     /// The core's download `id` of a newer version came to this: its installer, checked
     /// against the public key, or why not.
-    UpdateDownloaded { id: u64, fetched: Result<updates::Fetched, String> },
+    UpdateDownload { id: u64, fetched: Result<updates::Fetched, String> },
     /// The player picked the item with this MeowDB ID from the ones an Item Lookup found
     /// sharing the name it read.
     PickItem(String),
@@ -402,15 +402,9 @@ pub fn run() {
             let uploader = leaderboards::Uploader::new(key, app.state::<Sender<Command>>().inner().clone());
             let updater = updates::Updater::new(app.handle().clone(), build, app.state::<Sender<Command>>().inner().clone());
             std::thread::Builder::new().name("core-loop".into()).spawn(move || {
-                let files = Files {
-                    settings: settings_path,
-                    bests: bests_file,
-                    market_prices: prices_file,
-                    market_imports,
-                    uploader,
-                    updater,
-                };
-                core_loop(handle, windows, minerva, reader, channels, files)
+                let files =
+                    Files { settings: settings_path, bests: bests_file, market_prices: prices_file, market_imports };
+                core_loop(handle, windows, minerva, reader, channels, files, Online { uploader, updater })
             })?;
             Ok(())
         })
@@ -515,35 +509,41 @@ struct Windows {
 }
 
 /// Where the core loop saves the settings, the Personal Bests and the market prices, and
-/// the folder it takes Market Imports from; and what makes its uploads to the Map
-/// Leaderboards, with the Leaderboard Key's file.
+/// the folder it takes Market Imports from.
 struct Files {
     settings: PathBuf,
     bests: bests::BestsFile,
     market_prices: market_prices::MarketPricesFile,
     market_imports: PathBuf,
+}
+
+/// What of the settings, the Personal Bests and the market prices the core loop saved last
+/// (or restored at startup): the settings themselves, and the core's revisions of the others.
+struct Saved {
+    settings: minerva_core::Settings,
+    bests: u64,
+    prices: u64,
+}
+
+/// What the core loop asks over the network for the core: the uploads to the Map
+/// Leaderboards (with the Leaderboard Key's file), and the checks for a newer version, with
+/// its downloads and installs.
+struct Online {
     uploader: leaderboards::Uploader,
-    /// Runs the core's checks for a newer version, and its downloads and installs.
     updater: updates::Updater,
 }
 
-/// Save whatever Quit Minerva saves: the Personal Bests, the market prices, and the
-/// settings if they changed since `saved`.
-fn save_for_quit(
-    minerva: &Minerva,
-    (bests, prices): (&bests::BestsFile, &market_prices::MarketPricesFile),
-    settings_path: &std::path::Path,
-    saved: &minerva_core::Settings,
-    bests_saved: &mut u64,
-    prices_saved: &mut u64,
-) {
-    save_bests(minerva, bests, bests_saved);
-    save_market_prices(minerva, prices, prices_saved);
+/// Save whatever Quit Minerva saves to `files`: the Personal Bests, the market prices, and
+/// the settings if they changed since `saved`, which then holds them.
+fn save_for_quit(minerva: &Minerva, files: &Files, saved: &mut Saved) {
+    save_bests(minerva, &files.bests, &mut saved.bests);
+    save_market_prices(minerva, &files.market_prices, &mut saved.prices);
     let current = minerva.settings();
-    if current != *saved
-        && let Err(e) = settings::save(settings_path, &current)
-    {
-        error!("saving settings failed: {e}");
+    if current != saved.settings {
+        if let Err(e) = settings::save(&files.settings, &current) {
+            error!("saving settings failed: {e}");
+        }
+        saved.settings = current;
     }
 }
 
@@ -730,16 +730,12 @@ fn core_loop(
     mut reader: ReaderThread,
     channels: Channels,
     files: Files,
+    online: Online,
 ) {
-    let settings_path = files.settings;
-    let mut uploader = files.uploader;
-    let mut updater = files.updater;
-    // The player chose Quit Minerva, and it waits for the update they chose to install
-    // when they quit to download: the windows stay hidden.
-    let mut quitting = false;
+    let Online { mut uploader, mut updater } = online;
     // Restored at startup: saved already.
-    let mut bests_saved = minerva.bests_revision();
-    let mut prices_saved = minerva.market_prices_revision();
+    let mut saved =
+        Saved { settings: minerva.settings(), bests: minerva.bests_revision(), prices: minerva.market_prices_revision() };
     let Windows {
         overlay: mut window,
         setup: mut setup_windows,
@@ -751,8 +747,7 @@ fn core_loop(
         mut hotkeys,
         mut tray,
     } = windows;
-    let mut saved = minerva.settings();
-    let mut pending = (saved.clone(), Instant::now());
+    let mut pending = (saved.settings.clone(), Instant::now());
     let mut emitted: Option<PanelState> = None;
     let mut game = None;
     let mut expanded_height = EXPANDED_HEIGHT;
@@ -830,7 +825,7 @@ fn core_loop(
             Ok(Command::UpdateAnswer { id, answer }) => {
                 minerva.on_update_answer(id, answer);
             }
-            Ok(Command::UpdateDownloaded { id, fetched }) => {
+            Ok(Command::UpdateDownload { id, fetched }) => {
                 let answer = updater.downloaded(id, fetched);
                 minerva.on_update_download(id, answer);
             }
@@ -879,14 +874,10 @@ fn core_loop(
             Ok(Command::BugReport) => bug_reports::save(&app, &mut minerva, &window.overlay),
             Ok(Command::Error { from, message }) => minerva.note_error(&from, &message),
             Ok(Command::Quit) => {
-                // The core says whether to quit now (below), or to install a newer version
-                // first, which the player chose to install when they quit.
-                if !minerva.act(Action::Quit).quit && !quitting {
-                    quitting = true;
-                    for webview in app.webview_windows().values() {
-                        let _ = webview.hide();
-                    }
-                }
+                // The core says whether to quit now (below), or to install first the newer
+                // version the player chose to install when they quit; chosen again while
+                // that waits, it quits at once.
+                minerva.act(Action::Quit);
             }
             Ok(Command::GestureStarted(gesture)) => window.gesture_started(gesture),
             Ok(Command::Resized(size)) => window.player_resized(size),
@@ -1032,18 +1023,23 @@ fn core_loop(
         // Its install, on this thread: whatever Quit Minerva saves is saved first, as the
         // installer ends Minerva with `process::exit(0)`, and nothing after runs.
         if let Some(install) = updater.install(&minerva.panel_state().updates) {
-            let why = match install {
+            let (id, why) = match install {
                 Ok(install) => {
                     let id = install.id;
-                    let files = (&files.bests, &files.market_prices);
-                    save_for_quit(&minerva, files, &settings_path, &saved, &mut bests_saved, &mut prices_saved);
-                    saved = minerva.settings();
-                    (id, install.run())
+                    save_for_quit(&minerva, &files, &mut saved);
+                    // Saved, as on the way to quitting: nothing waits to be saved again.
+                    pending = (saved.settings.clone(), Instant::now());
+                    // Nor would the owl be taken out of the tray after: it would stay there,
+                    // a ghost, until the pointer passed over it. Back if it didn't start.
+                    tray.set_visible(false);
+                    let why = install.run();
+                    tray.set_visible(true);
+                    (id, why)
                 }
                 Err(id) => (id, "its download is gone".to_string()),
             };
-            error!("starting the installer failed: {}", why.1);
-            minerva.on_update_install_failed(why.0, &why.1);
+            error!("starting the installer failed: {why}");
+            minerva.on_update_install_failed(id, &why);
         }
         // Prices a tool of the player's own left (ADR 0013), saved below like those typed.
         // Left waiting while the prices can't be saved, rather than taken in and lost.
@@ -1080,13 +1076,18 @@ fn core_loop(
         let state = minerva.panel_state();
         if state.quit {
             // Whatever the player changed last (a drag, say) is saved first.
-            let files = (&files.bests, &files.market_prices);
-            save_for_quit(&minerva, files, &settings_path, &saved, &mut bests_saved, &mut prices_saved);
+            save_for_quit(&minerva, &files, &mut saved);
             app.exit(0);
             return;
         }
-        if quitting {
-            // Waiting for the download to install: nothing shows again.
+        // Live even while Quit Minerva waits for the update: it says so, and Quit Minerva
+        // chosen again quits at once.
+        tray.sync(&state.updates);
+        if state.updates.quitting {
+            // Waiting for the download to install: no window shows again.
+            for webview in app.webview_windows().values() {
+                let _ = webview.hide();
+            }
             continue;
         }
         setup_windows.sync(state, game.map(|g| g.client));
@@ -1102,21 +1103,20 @@ fn core_loop(
         item_lookup.sync(state);
         item_card.sync(state);
         deal_badges.sync(state);
-        tray.sync(&state.updates);
 
         // Save once the settings settle, not on every move of a drag.
         let current = minerva.settings();
         if current != pending.0 {
             pending = (current, Instant::now());
         }
-        if pending.0 != saved && pending.1.elapsed() >= SAVE_DELAY {
-            if let Err(e) = settings::save(&settings_path, &pending.0) {
+        if pending.0 != saved.settings && pending.1.elapsed() >= SAVE_DELAY {
+            if let Err(e) = settings::save(&files.settings, &pending.0) {
                 error!("saving settings failed: {e}");
             }
-            saved = pending.0.clone();
+            saved.settings = pending.0.clone();
         }
-        save_bests(&minerva, &files.bests, &mut bests_saved);
-        save_market_prices(&minerva, &files.market_prices, &mut prices_saved);
+        save_bests(&minerva, &files.bests, &mut saved.bests);
+        save_market_prices(&minerva, &files.market_prices, &mut saved.prices);
     }
 }
 
