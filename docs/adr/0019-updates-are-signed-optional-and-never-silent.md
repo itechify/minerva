@@ -1,0 +1,31 @@
+---
+status: accepted
+---
+
+# Updates are signed, optional and never silent
+
+Until 0.13.0, Minerva never checked for a new version: each release had to be found and installed by hand. With releases days apart, most players stayed on versions whose bugs were already fixed. Minerva now says when a newer version is out, and installs it when the player says so (#124). It runs beside a game and reads it from outside only (ADR 0001), so how it updates matters as much as whether it does: an update must never surprise a player mid-grind, and a feed anyone could tamper with must never be able to install anything.
+
+## The decision
+
+- **Never silent, never forced.** Minerva checks at launch, then every 6 hours while it runs, and whenever the player presses Check for updates in Help & Setup. A newer version shows in the tray's menu ("Update to X.Y.Z…"), the tray's tooltip and Help & Setup's About & Credits, each with a "What's new" link to its release page. Nothing downloads until the player chooses to update. There is no "skip this version": the notice stays, quietly, until they update.
+- **Optional.** One setting, "Check for updates", on by default. Off, Minerva never checks by itself; the button still checks. A check sends the version and nothing about the player: it is a plain request for `latest.json`, with Minerva's user agent (`http.rs`).
+- **No notice on the panels.** The panels sit over the game, and what they show is for playing. The tray and Help & Setup are where the player looks after Minerva itself.
+- **The feed is GitHub's**, `releases/latest/download/latest.json`, not the site's Worker. Releases are already on GitHub, so the feed comes with them and costs nothing to serve, and "latest" there is the newest release that isn't a draft or pre-release. The Worker can be added later as a second endpoint without breaking installed copies. `MINERVA_UPDATE_ENDPOINT` replaces the feed in any build, for testing, and may be http only when it is on this computer (`127.0.0.1`, `localhost` or `[::1]`).
+- **Signed.** `tauri-plugin-updater` checks each installer against the public key built into `tauri.conf.json` before it runs, and `requireSignedVersion` binds the signature to the version the feed names, so a tampered feed can't pass an old signed installer off as new. A changed feed, an endpoint override included, can at most show a wrong notice; it can't install anything the key didn't sign.
+- **The portable `.exe` and dev builds are notify-only.** They say a newer version is out, with its release page, and never install anything. The app tells from `tauri::utils::platform::bundle_type()`: `None` means the bundler didn't patch the binary. The feed never has a bare `windows-x86_64` entry, which the portable would fall back on and run, installing a second copy beside itself; a notify-only check reads the version through the `windows-x86_64-nsis` entry.
+- **The core decides.** When a check is due, whether the version found is newer, and what the tray and Help & Setup say are `minerva-core`'s, from the clock and each check's answer as plain inputs. The shell runs the plugin and the tray. Each answer and the build are Events, and the setting and the button are Actions, so a Bug Report replays them (ADR 0009).
+- **The signing key is part of releasing.** The minisign private key is password-protected, kept in the maintainer's password manager with an offline backup, and set only for the release build (`docs/releasing.md`). If it is lost, installed copies can never update again. From the first release with the updater on, every release must carry `latest.json`: a missing one is a failed check for every player, not "no update".
+
+## Considered options
+
+- **A silent or forced update.** Rejected: it could restart Minerva in the middle of a Session, and a player who chose a version should keep it.
+- **A notice on the panel.** Rejected: the panel is for the map and the grind, and a notice would sit over the game until the player updated.
+- **The site's Worker as the feed.** Deferred: it would need its own copy of each release's files and signatures, and GitHub serves them already.
+- **Updating the portable in place.** Rejected: it has no installer of its own to run, and the setup it would fall back on installs a second copy.
+
+## Consequences
+
+- A failed check shows only as Help & Setup's "Couldn't check for updates (last checked …)"; the next check tries again. A feed that answers 404 (no `latest.json`) or lacks the entry read counts as failed.
+- Releasing gains steps: signing the installers, writing and uploading `latest.json` and the signatures, and a smoke test of updating from the previous version.
+- Players on a version from before the updater install the first one by hand, one last time.
