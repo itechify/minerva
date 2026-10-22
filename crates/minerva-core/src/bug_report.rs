@@ -33,7 +33,7 @@ use crate::leaderboards::{LeaderboardAnswer, RejectedReason};
 use crate::map_data::MapSummary;
 use crate::map_index::{Fetched, MapDataSource, SourceError};
 use crate::market_prices::{MarketImport, SavedMarketPrices};
-use crate::updates::{Build, UpdateAnswer};
+use crate::updates::{Build, DownloadAnswer, UpdateAnswer, UpdateJob, UpdateStep};
 use crate::osms::{OsmsFiles, SavedFiles};
 use crate::osms_items::{ItemFiles, SavedItemFiles};
 use crate::panel::{Action, Foreground, GameWindow, PanelSizes, ScreenPoint, ScreenRect, Size};
@@ -243,6 +243,10 @@ pub enum Event {
     UpdateAnswer { id: u64, answer: UpdateAnswer },
     /// What this build can do with a newer version: install it, or only say it is out.
     Build { build: Build },
+    /// Download `id` of a newer version came to `answer`.
+    UpdateDownload { id: u64, answer: DownloadAnswer },
+    /// The installer download `id` fetched couldn't be started, for `why`.
+    UpdateInstallFailed { id: u64, why: String },
     /// Not an input: an error the shell or one of our windows ran into (`from`), which
     /// would otherwise go nowhere.
     Error { from: String, message: String },
@@ -365,6 +369,9 @@ pub struct Line {
     /// The check for a newer version the core asked the shell for after, by its id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub update_check: Option<u64>,
+    /// The step of updating the core asked the shell for after: a download, or an install.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_job: Option<UpdateJob>,
     /// The crop of the frame read, kept in the report under this name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crop: Option<String>,
@@ -373,7 +380,19 @@ pub struct Line {
 impl Line {
     fn new(t: u64, ticked: bool, event: Event) -> Self {
         let (answers, notes, uploads) = (Vec::new(), Vec::new(), Vec::new());
-        Self { t, ticked, event, answers, notes, grind_tracker: None, map: None, uploads, update_check: None, crop: None }
+        Self {
+            t,
+            ticked,
+            event,
+            answers,
+            notes,
+            grind_tracker: None,
+            map: None,
+            uploads,
+            update_check: None,
+            update_job: None,
+            crop: None,
+        }
     }
 }
 
@@ -616,6 +635,8 @@ struct Last {
     upload_id: u64,
     /// The id of the last check for a newer version written down as asked for.
     update_check: u64,
+    /// The last step of updating written down as asked for.
+    update_job: Option<UpdateJob>,
 }
 
 /// Writes the trace down as the core takes its inputs in, and keeps the crops.
@@ -675,6 +696,7 @@ impl Recorder {
                 exp_bar_rgba: Vec::new(),
                 upload_id: 0,
                 update_check: 0,
+                update_job: None,
             },
             crops: VecDeque::new(),
             maps: BTreeSet::new(),
@@ -793,6 +815,11 @@ impl Recorder {
             if let Some(id) = outcome.state.updates.check.filter(|&id| id > self.last.update_check) {
                 line.update_check = Some(id);
                 self.last.update_check = id;
+            }
+            let job = outcome.state.updates.job;
+            if job != self.last.update_job {
+                line.update_job = job;
+                self.last.update_job = job;
             }
             self.last.state = outcome.state.clone();
         }
@@ -1517,6 +1544,12 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::Build { build } => {
                 minerva.on_build(build);
             }
+            Event::UpdateDownload { id, answer } => {
+                minerva.on_update_download(id, answer);
+            }
+            Event::UpdateInstallFailed { id, why } => {
+                minerva.on_update_install_failed(id, &why);
+            }
             Event::Error { from, message } => minerva.note_error(&from, &message),
             Event::BugReport {} => minerva.mark_bug_report(),
         }
@@ -1585,6 +1618,8 @@ impl Recording {
                     | Event::LeaderboardAnswer { .. }
                     | Event::UpdateAnswer { .. }
                     | Event::Build { .. }
+                    | Event::UpdateDownload { .. }
+                    | Event::UpdateInstallFailed { .. }
                     | Event::Error { .. }
                     | Event::BugReport {}
             );
@@ -1593,6 +1628,7 @@ impl Recording {
                 || line.map.is_some()
                 || !line.uploads.is_empty()
                 || line.update_check.is_some()
+                || line.update_job.is_some()
                 || line.answers.iter().any(Answer::is_set);
             let quiet = consequences.is_empty()
                 && matches!(
@@ -1639,6 +1675,11 @@ impl Line {
             None => format!("Map Leaderboards upload {} asked: deleting {:?}'s entries", upload.id, upload.name),
         }));
         out.extend(self.update_check.map(|id| format!("update check {id} asked")));
+        out.extend(self.update_job.map(|job| match job.step {
+            UpdateStep::Download => format!("update download {} asked", job.id),
+            UpdateStep::Install { relaunch: true } => format!("update download {}'s install asked, relaunching", job.id),
+            UpdateStep::Install { relaunch: false } => format!("update download {}'s install asked, not relaunching", job.id),
+        }));
         out
     }
 }
@@ -1848,6 +1889,13 @@ impl Event {
             Event::Build { build: Build::Nsis } => "build installed with the setup .exe: updates in place".to_string(),
             Event::Build { build: Build::Msi } => "build installed with the .msi: updates in place".to_string(),
             Event::Build { build: Build::NotifyOnly } => "portable or dev build: updates are notify-only".to_string(),
+            Event::UpdateDownload { id, answer: DownloadAnswer::Downloaded { version } } => {
+                format!("update download {id}: {version} downloaded, its signature checked")
+            }
+            Event::UpdateDownload { id, answer: DownloadAnswer::Failed { why } } => {
+                format!("update download {id} failed: {why}")
+            }
+            Event::UpdateInstallFailed { id, why } => format!("update download {id}'s installer didn't start: {why}"),
             Event::WallClock { unix_ms } => format!("wall clock {unix_ms} (ms since 1970)"),
             Event::Error { from, message } => format!("{from} error: {message}"),
             Event::BugReport {} => "Bug Report saved".to_string(),

@@ -110,7 +110,13 @@ Before tagging, check that an installed copy updates to this one. The previous v
    MINERVA_UPDATE_ENDPOINT="http://127.0.0.1:8000/latest.json" "$LOCALAPPDATA/Minerva/minerva.exe"
    ```
 
-4. Confirm that it updates to `X.Y.Z` and relaunches, that About & Credits shows `X.Y.Z`, and that settings and Personal Bests carried over. Until updating in place is in (#128), confirm instead that the notice of `X.Y.Z` shows.
+4. Choose **Update to X.Y.Z…** in the tray. Confirm that Help & Setup shows it downloading, that the installer's progress window comes and goes, that Minerva starts again, that About & Credits shows `X.Y.Z`, and that settings and Personal Bests carried over.
+
+   When the release touches updating itself, check the other paths too, each from the previous version again:
+   - **The MSI:** install the previous `.msi` instead, and update from `"$PROGRAMFILES/Minerva/minerva.exe"`. Windows asks for admin rights, then it updates and starts again.
+   - **Update when I quit:** with a Session running (gain EXP in game), choose to update; Help & Setup asks first. Choose **Update when I quit**, then **Quit Minerva** in the tray: it installs, and doesn't start again.
+   - **The portable:** run the previous portable `.exe` the same way. The tray says `X.Y.Z` is out, and choosing it opens the release page; nothing installs.
+   - **A bad signature:** change a character in `target/update-test/latest.json`'s `windows-x86_64-nsis` signature, and choose to update. Help & Setup says it couldn't download it or it wasn't signed as Minerva's own, and nothing installs.
 5. Stop the server. Upload the release's own `target/release/bundle/latest.json` at step 6, never the one in `target/update-test`.
 
 ## 4. Tag

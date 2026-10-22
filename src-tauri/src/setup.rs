@@ -301,6 +301,33 @@ pub async fn open_release(bridge: State<'_, Bridge>) -> Result<(), String> {
     bridge.commands.send(Command::Press(PanelControl::OpenRelease)).map_err(|e| e.to_string())
 }
 
+/// About & Credits' Update (or Try again): choose to update. The core asks first while a
+/// Session is running.
+#[tauri::command]
+pub async fn update(bridge: State<'_, Bridge>) -> Result<(), String> {
+    bridge.commands.send(Command::Press(PanelControl::Update)).map_err(|e| e.to_string())
+}
+
+/// About & Credits' Update now, Update when I quit or Later, when it asked before updating.
+#[tauri::command]
+pub async fn update_choice(choice: UpdateChoice, bridge: State<'_, Bridge>) -> Result<(), String> {
+    let action = match choice {
+        UpdateChoice::Now => Action::UpdateNow,
+        UpdateChoice::WhenIQuit => Action::UpdateWhenIQuit,
+        UpdateChoice::Later => Action::UpdateLater,
+    };
+    bridge.commands.send(Command::Act(action)).map_err(|e| e.to_string())
+}
+
+/// What the player chose when About & Credits asked before updating.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum UpdateChoice {
+    Now,
+    WhenIQuit,
+    Later,
+}
+
 /// Finish setup (the core only does once the test reads of what was marked succeeded).
 #[tauri::command]
 pub async fn finish_setup(bridge: State<'_, Bridge>) -> Result<(), String> {

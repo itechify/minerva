@@ -8,7 +8,14 @@
 //!   updates, setting or not. One check at a time.
 //! - **What shows**: up to date, with when it last checked; a newer version, with its release
 //!   page; or that it couldn't check. A failed check shows nothing more: a newer version found
-//!   before stays, and the next check tries again.
+//!   before stays, and the next check tries again. A check unanswered for
+//!   [`CHECK_GIVES_UP_MS`] has failed, so a later one can be asked.
+//! - **Updating** (#128): choosing to update, in a build that can install, downloads the newer
+//!   version (the shell checks its signature) and installs it, starting it again after. While
+//!   a Session is running, Help & Setup asks first: Update now, Update when I quit (the
+//!   download comes now, and Quit Minerva installs it without starting it again), or Later.
+//!   The portable `.exe` and dev builds only open the release page. A failed download or an
+//!   installer that doesn't start says so, installs nothing, and can be tried again.
 
 use crate::MINERVA_VERSION;
 use serde::{Deserialize, Serialize};
@@ -16,6 +23,9 @@ use std::cmp::Ordering;
 
 /// How often a check is due while Minerva runs: every 6 hours.
 const CHECK_EVERY_MS: u64 = 6 * 60 * 60 * 1000;
+
+/// How long a check may go unanswered before it counts as failed, so the next can be asked.
+const CHECK_GIVES_UP_MS: u64 = 2 * 60 * 1000;
 
 /// Minerva's releases, each version's page under it.
 const RELEASES_URL: &str = "https://github.com/itechify/minerva/releases";
@@ -42,6 +52,69 @@ pub struct Updates {
     /// overlay.
     #[serde(skip_serializing)]
     pub check: Option<u64>,
+    /// Where choosing to update has got to.
+    pub updating: Updating,
+    /// The player chose to update while a Session is running: Help & Setup asks first,
+    /// "Updating restarts Minerva and ends this Session", with Update now, Update when I
+    /// quit and Later.
+    pub asking: bool,
+    /// The player chose Update when I quit, for this run: Quit Minerva installs the newer
+    /// version once it has downloaded, and doesn't start it.
+    pub when_i_quit: bool,
+    /// What the shell must do to update, by its id: download the newer version, then
+    /// install it. Not sent to the pages.
+    #[serde(skip_serializing)]
+    pub job: Option<UpdateJob>,
+}
+
+/// Where choosing to update has got to, for the tray and Help & Setup.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Updating {
+    /// Not chosen, or the player chose Later.
+    #[default]
+    Idle,
+    /// The newer version is downloading, and its signature is being checked.
+    Downloading,
+    /// The newer version downloaded, and installs when the player quits.
+    Downloaded,
+    /// The installer is starting: Minerva ends once it has.
+    Installing,
+    /// The download failed, or its signature didn't check out: nothing was installed, and
+    /// the player can try again, or download it from its release page.
+    DownloadFailed,
+    /// The installer couldn't be started: this version stays, and the player can try again.
+    InstallFailed,
+}
+
+/// What the shell must do to update: download the newer version, then install it. The id
+/// stays the same from one step to the next, and grows with each download.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateJob {
+    pub id: u64,
+    pub step: UpdateStep,
+}
+
+/// A step of updating, for the shell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum UpdateStep {
+    /// Download the newer version and check its signature against the public key.
+    Download,
+    /// Save what Quit Minerva saves, then start the installer it downloaded, which ends
+    /// Minerva; and once it has installed, start the new version if `relaunch`.
+    Install { relaunch: bool },
+}
+
+/// What a download came to, as the shell tells it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum DownloadAnswer {
+    /// `version` downloaded, and its signature checks out.
+    Downloaded { version: String },
+    /// The download failed, or its signature didn't check out: why, for a Bug Report.
+    Failed { why: String },
 }
 
 /// What the last check came to, or one under way.
@@ -106,9 +179,145 @@ pub(crate) struct UpdateChecks {
     status: UpdateStatus,
     newer: Option<NewerVersion>,
     last_checked_unix_ms: Option<u64>,
+    /// When the check under way began (capture time).
+    in_flight_since: u64,
+    updating: Updating,
+    /// Help & Setup asks first, while a Session is running.
+    asking: bool,
+    /// The player chose Update when I quit.
+    when_i_quit: bool,
+    /// The player chose Quit Minerva, and it waits for the download to install.
+    quitting: bool,
+    /// The id of the last download asked for: one more with each.
+    last_job_id: u64,
+    job: Option<UpdateJob>,
+    /// The download that came, by its id, waiting to install when the player quits.
+    downloaded: Option<u64>,
 }
 
 impl UpdateChecks {
+    /// A build that can install, with a newer version to install.
+    fn can_install(&self) -> bool {
+        self.build != Build::NotifyOnly && self.newer.is_some()
+    }
+
+    /// The player chose to update (the tray's "Update to X.Y.Z…", or Help & Setup's Update),
+    /// with a Session `running` or not. Returns whether it did anything, which Help & Setup
+    /// shows: nothing in a build that can't install, or with no newer version known.
+    pub fn choose(&mut self, running: bool) -> bool {
+        if !self.can_install() {
+            return false;
+        }
+        if self.updating == Updating::Installing {
+            // Minerva ends at any moment.
+        } else if running {
+            self.asking = true;
+        } else {
+            self.update_now();
+        }
+        true
+    }
+
+    /// Update now: install as soon as it has downloaded, and start the new version.
+    pub fn update_now(&mut self) {
+        if !self.can_install() {
+            return;
+        }
+        self.asking = false;
+        self.when_i_quit = false;
+        match self.updating {
+            Updating::Downloaded => self.install(true),
+            // It installs once it has downloaded.
+            Updating::Downloading | Updating::Installing => {}
+            Updating::Idle | Updating::DownloadFailed | Updating::InstallFailed => self.download(),
+        }
+    }
+
+    /// Update when I quit: download now, and install when the player quits, without
+    /// starting the new version.
+    pub fn when_i_quit(&mut self) {
+        if !self.can_install() || self.updating == Updating::Installing {
+            return;
+        }
+        self.asking = false;
+        self.when_i_quit = true;
+        if matches!(self.updating, Updating::Idle | Updating::DownloadFailed | Updating::InstallFailed) {
+            self.download();
+        }
+    }
+
+    /// Later: nothing more for now.
+    pub fn later(&mut self) {
+        self.asking = false;
+    }
+
+    /// The player chose Quit Minerva. Returns whether Minerva quits now: not while what
+    /// they chose to install when they quit installs, or has yet to download.
+    pub fn quit(&mut self) -> bool {
+        if !self.when_i_quit {
+            return true;
+        }
+        match self.updating {
+            Updating::Downloaded => self.install(false),
+            Updating::Downloading => {}
+            _ => return true,
+        }
+        self.quitting = true;
+        false
+    }
+
+    fn download(&mut self) {
+        self.last_job_id += 1;
+        self.job = Some(UpdateJob { id: self.last_job_id, step: UpdateStep::Download });
+        self.updating = Updating::Downloading;
+        self.downloaded = None;
+    }
+
+    fn install(&mut self, relaunch: bool) {
+        let Some(id) = self.downloaded else { return };
+        self.job = Some(UpdateJob { id, step: UpdateStep::Install { relaunch } });
+        self.updating = Updating::Installing;
+    }
+
+    /// Download `id` came to `answer`. Returns whether Minerva quits now: the player chose
+    /// Quit Minerva while it downloaded, and it failed. One no longer under way changes
+    /// nothing.
+    pub fn downloaded(&mut self, id: u64, answer: DownloadAnswer) -> bool {
+        if self.job != Some(UpdateJob { id, step: UpdateStep::Download }) {
+            return false;
+        }
+        self.job = None;
+        match answer {
+            DownloadAnswer::Downloaded { .. } => {
+                self.downloaded = Some(id);
+                self.updating = Updating::Downloaded;
+                if !self.when_i_quit || self.quitting {
+                    self.install(!self.when_i_quit);
+                }
+                false
+            }
+            DownloadAnswer::Failed { .. } => self.failed(Updating::DownloadFailed),
+        }
+    }
+
+    /// The installer downloaded as `id` couldn't be started. Returns whether Minerva quits
+    /// now, as [`UpdateChecks::downloaded`]. One no longer under way changes nothing.
+    pub fn install_failed(&mut self, id: u64) -> bool {
+        if !matches!(self.job, Some(UpdateJob { id: job, step: UpdateStep::Install { .. } }) if job == id) {
+            return false;
+        }
+        self.job = None;
+        self.failed(Updating::InstallFailed)
+    }
+
+    /// Updating came to `failed`: nothing is installed, and the player can try again.
+    fn failed(&mut self, failed: Updating) -> bool {
+        self.updating = failed;
+        self.downloaded = None;
+        self.when_i_quit = false;
+        std::mem::take(&mut self.quitting)
+    }
+
     pub fn set_build(&mut self, build: Build) {
         self.build = build;
     }
@@ -121,6 +330,12 @@ impl UpdateChecks {
     /// Time passed to `at_ms`: start a check if one is due, by itself only while `on`.
     pub fn tick(&mut self, at_ms: u64, on: bool) {
         if self.in_flight.is_some() {
+            if at_ms < self.in_flight_since + CHECK_GIVES_UP_MS {
+                return;
+            }
+            // It never answered: it failed, and its answer, if it ever comes, is ignored.
+            self.in_flight = None;
+            self.status = UpdateStatus::Failed;
             return;
         }
         if self.asked || (on && at_ms >= self.due_at) {
@@ -128,6 +343,7 @@ impl UpdateChecks {
             self.due_at = at_ms + CHECK_EVERY_MS;
             self.last_id += 1;
             self.in_flight = Some(self.last_id);
+            self.in_flight_since = at_ms;
         }
     }
 
@@ -173,6 +389,10 @@ impl UpdateChecks {
             last_checked_unix_ms: self.last_checked_unix_ms,
             notify_only: self.build == Build::NotifyOnly,
             check: self.in_flight,
+            updating: self.updating,
+            asking: self.asking,
+            when_i_quit: self.when_i_quit,
+            job: self.job,
         }
     }
 }

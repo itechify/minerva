@@ -92,7 +92,7 @@ pub use setup::{
 };
 pub use shown_map::{Candidate, Candidates, FIRST_MOBS, LevelRange, Outline};
 pub use status_bar::{MAX_LEVEL, STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarReader, StatusBarReading};
-pub use updates::{Build, NewerVersion, UpdateAnswer, UpdateStatus, Updates};
+pub use updates::{Build, DownloadAnswer, NewerVersion, UpdateAnswer, UpdateJob, UpdateStatus, UpdateStep, Updates, Updating};
 pub use world::{Distance, Step, Travel};
 
 use bests_window::BestsWindow;
@@ -417,9 +417,13 @@ pub enum PanelControl {
     OpenGithub,
     /// About & Credits' Discord link: open Minerva's Discord in the browser.
     OpenDiscord,
-    /// The tray's "Update to X.Y.Z...", or Help & Setup's "What's new": open the newer
-    /// version's release page in the browser. Nothing while no newer version is known.
+    /// Help & Setup's "What's new": open the newer version's release page in the browser.
+    /// Nothing while no newer version is known.
     OpenRelease,
+    /// The tray's "Update to X.Y.Z…", or Help & Setup's Update: choose to update to the newer
+    /// version. A build that can't install opens its release page instead; one that can
+    /// opens Help & Setup, which asks first while a Session is running (ADR 0019).
+    Update,
     /// Turn the Deal Finder on or off.
     ToggleDealFinder,
 }
@@ -1020,6 +1024,10 @@ impl Minerva {
             }
             Action::CheckForUpdates => self.updates.ask(),
             Action::SetCheckForUpdates { on } => self.settings.check_for_updates = on,
+            Action::UpdateNow => self.updates.update_now(),
+            Action::UpdateWhenIQuit => self.updates.when_i_quit(),
+            Action::UpdateLater => self.updates.later(),
+            Action::Quit => self.state.quit |= self.updates.quit(),
             Action::RefreshGameData => {
                 if self.refreshes.start() {
                     // Asked for at the next tick, unless a fetch is under way: it counts.
@@ -1225,6 +1233,14 @@ impl Minerva {
             PanelControl::OpenGithub => return Some(Request::OpenInBrowser { url: GITHUB_URL.into() }),
             PanelControl::OpenDiscord => return Some(Request::OpenInBrowser { url: DISCORD_URL.into() }),
             PanelControl::OpenRelease => return self.updates.release_url().map(|url| Request::OpenInBrowser { url }),
+            PanelControl::Update => {
+                if !self.updates.choose(self.session_running()) {
+                    return self.updates.release_url().map(|url| Request::OpenInBrowser { url });
+                }
+                self.setup.request();
+                self.sync_panel();
+                return None;
+            }
         };
         self.apply(action);
         None
@@ -1329,6 +1345,23 @@ impl Minerva {
     pub fn on_update_answer(&mut self, id: u64, answer: UpdateAnswer) -> &PanelState {
         self.record(Event::UpdateAnswer { id, answer: answer.clone() });
         self.updates.answer(id, answer, self.wall_clock);
+        self.sync_panel()
+    }
+
+    /// The shell ran download `id` of [`Updates::job`], and it came to `answer`. One no longer
+    /// under way changes nothing.
+    pub fn on_update_download(&mut self, id: u64, answer: DownloadAnswer) -> &PanelState {
+        self.record(Event::UpdateDownload { id, answer: answer.clone() });
+        self.state.quit |= self.updates.downloaded(id, answer);
+        self.sync_panel()
+    }
+
+    /// The installer download `id` of [`Updates::job`] fetched couldn't be started, for
+    /// `why`: this version stays. (Once it starts, Minerva ends, and the installer shows any
+    /// error of its own.) One no longer under way changes nothing.
+    pub fn on_update_install_failed(&mut self, id: u64, why: &str) -> &PanelState {
+        self.record(Event::UpdateInstallFailed { id, why: why.to_string() });
+        self.state.quit |= self.updates.install_failed(id);
         self.sync_panel()
     }
 
@@ -2166,6 +2199,11 @@ impl Minerva {
     /// there is a game window to read the EXP figures in.
     fn tracking_on(&self) -> bool {
         self.settings.grind_tracker_on && self.panel.game.is_some()
+    }
+
+    /// A Session is running: the Grind Tracker measures one, which updating would end.
+    fn session_running(&self) -> bool {
+        self.tracking_on() && self.session.running()
     }
 }
 

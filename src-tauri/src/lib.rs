@@ -141,6 +141,9 @@ pub(crate) enum Command {
     LeaderboardAnswer { id: u64, answer: LeaderboardAnswer },
     /// The core's check `id` for a newer version came to this.
     UpdateAnswer { id: u64, answer: UpdateAnswer },
+    /// The core's download `id` of a newer version came to this: its installer, checked
+    /// against the public key, or why not.
+    UpdateDownloaded { id: u64, fetched: Result<updates::Fetched, String> },
     /// The player picked the item with this MeowDB ID from the ones an Item Lookup found
     /// sharing the name it read.
     PickItem(String),
@@ -323,7 +326,8 @@ pub fn run() {
                 market_prices::MarketPricesFile::load(market_prices::path(app.handle())?);
             minerva.restore_market_prices(saved_prices);
             // Whether this build can update in place, or only say a newer version is out.
-            minerva.on_build(updates::build());
+            let build = updates::build();
+            minerva.on_build(build);
             // Where a tool of the player's own leaves prices, taken in as the core loop runs.
             let market_imports = market_prices::imports_path(app.handle())?;
             let (commands, commands_rx) = mpsc::channel();
@@ -396,7 +400,7 @@ pub fn run() {
             // The uploads to the Map Leaderboards, with the Leaderboard Key, which the core never has.
             let key = leaderboards::KeyFile::new(leaderboards::key_path(app.handle())?);
             let uploader = leaderboards::Uploader::new(key, app.state::<Sender<Command>>().inner().clone());
-            let update_checker = updates::Checker::new(app.handle().clone(), app.state::<Sender<Command>>().inner().clone());
+            let updater = updates::Updater::new(app.handle().clone(), build, app.state::<Sender<Command>>().inner().clone());
             std::thread::Builder::new().name("core-loop".into()).spawn(move || {
                 let files = Files {
                     settings: settings_path,
@@ -404,7 +408,7 @@ pub fn run() {
                     market_prices: prices_file,
                     market_imports,
                     uploader,
-                    update_checker,
+                    updater,
                 };
                 core_loop(handle, windows, minerva, reader, channels, files)
             })?;
@@ -452,6 +456,8 @@ pub fn run() {
             setup::open_discord,
             setup::check_for_updates,
             setup::open_release,
+            setup::update,
+            setup::update_choice,
             grind_tracker::grind_tracker_set,
             grind_tracker::grind_tracker_height,
             grind_tracker::grind_tracker_view,
@@ -517,8 +523,28 @@ struct Files {
     market_prices: market_prices::MarketPricesFile,
     market_imports: PathBuf,
     uploader: leaderboards::Uploader,
-    /// Runs the core's checks for a newer version.
-    update_checker: updates::Checker,
+    /// Runs the core's checks for a newer version, and its downloads and installs.
+    updater: updates::Updater,
+}
+
+/// Save whatever Quit Minerva saves: the Personal Bests, the market prices, and the
+/// settings if they changed since `saved`.
+fn save_for_quit(
+    minerva: &Minerva,
+    (bests, prices): (&bests::BestsFile, &market_prices::MarketPricesFile),
+    settings_path: &std::path::Path,
+    saved: &minerva_core::Settings,
+    bests_saved: &mut u64,
+    prices_saved: &mut u64,
+) {
+    save_bests(minerva, bests, bests_saved);
+    save_market_prices(minerva, prices, prices_saved);
+    let current = minerva.settings();
+    if current != *saved
+        && let Err(e) = settings::save(settings_path, &current)
+    {
+        error!("saving settings failed: {e}");
+    }
 }
 
 /// Save the Personal Bests if the core's bests revision moved on from `saved` (the one
@@ -707,7 +733,10 @@ fn core_loop(
 ) {
     let settings_path = files.settings;
     let mut uploader = files.uploader;
-    let mut update_checker = files.update_checker;
+    let mut updater = files.updater;
+    // The player chose Quit Minerva, and it waits for the update they chose to install
+    // when they quit to download: the windows stay hidden.
+    let mut quitting = false;
     // Restored at startup: saved already.
     let mut bests_saved = minerva.bests_revision();
     let mut prices_saved = minerva.market_prices_revision();
@@ -801,6 +830,10 @@ fn core_loop(
             Ok(Command::UpdateAnswer { id, answer }) => {
                 minerva.on_update_answer(id, answer);
             }
+            Ok(Command::UpdateDownloaded { id, fetched }) => {
+                let answer = updater.downloaded(id, fetched);
+                minerva.on_update_download(id, answer);
+            }
             Ok(Command::PickItem(id)) => {
                 let request = minerva.pick_item(&id);
                 carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
@@ -846,17 +879,14 @@ fn core_loop(
             Ok(Command::BugReport) => bug_reports::save(&app, &mut minerva, &window.overlay),
             Ok(Command::Error { from, message }) => minerva.note_error(&from, &message),
             Ok(Command::Quit) => {
-                // Whatever the player changed last (a drag, say) is saved first.
-                save_bests(&minerva, &files.bests, &mut bests_saved);
-                save_market_prices(&minerva, &files.market_prices, &mut prices_saved);
-                let current = minerva.settings();
-                if current != saved
-                    && let Err(e) = settings::save(&settings_path, &current)
-                {
-                    error!("saving settings failed: {e}");
+                // The core says whether to quit now (below), or to install a newer version
+                // first, which the player chose to install when they quit.
+                if !minerva.act(Action::Quit).quit && !quitting {
+                    quitting = true;
+                    for webview in app.webview_windows().values() {
+                        let _ = webview.hide();
+                    }
                 }
-                app.exit(0);
-                return;
             }
             Ok(Command::GestureStarted(gesture)) => window.gesture_started(gesture),
             Ok(Command::Resized(size)) => window.player_resized(size),
@@ -997,8 +1027,24 @@ fn core_loop(
         }
         // The core asks for uploads to the Map Leaderboards on a tick: each is made once.
         uploader.sync(&minerva.panel_state().leaderboard_uploads);
-        // And for a check for a newer version: each is run once.
-        update_checker.sync(&minerva.panel_state().updates);
+        // And for a check for a newer version, and its download: each is run once.
+        updater.sync(&minerva.panel_state().updates);
+        // Its install, on this thread: whatever Quit Minerva saves is saved first, as the
+        // installer ends Minerva with `process::exit(0)`, and nothing after runs.
+        if let Some(install) = updater.install(&minerva.panel_state().updates) {
+            let why = match install {
+                Ok(install) => {
+                    let id = install.id;
+                    let files = (&files.bests, &files.market_prices);
+                    save_for_quit(&minerva, files, &settings_path, &saved, &mut bests_saved, &mut prices_saved);
+                    saved = minerva.settings();
+                    (id, install.run())
+                }
+                Err(id) => (id, "its download is gone".to_string()),
+            };
+            error!("starting the installer failed: {}", why.1);
+            minerva.on_update_install_failed(why.0, &why.1);
+        }
         // Prices a tool of the player's own left (ADR 0013), saved below like those typed.
         // Left waiting while the prices can't be saved, rather than taken in and lost.
         if Instant::now() >= next_import_check && files.market_prices.saves() {
@@ -1033,10 +1079,15 @@ fn core_loop(
         }
         let state = minerva.panel_state();
         if state.quit {
-            save_bests(&minerva, &files.bests, &mut bests_saved);
-            save_market_prices(&minerva, &files.market_prices, &mut prices_saved);
+            // Whatever the player changed last (a drag, say) is saved first.
+            let files = (&files.bests, &files.market_prices);
+            save_for_quit(&minerva, files, &settings_path, &saved, &mut bests_saved, &mut prices_saved);
             app.exit(0);
             return;
+        }
+        if quitting {
+            // Waiting for the download to install: nothing shows again.
+            continue;
         }
         setup_windows.sync(state, game.map(|g| g.client));
         if emitted.as_ref() != Some(state) {

@@ -1,17 +1,27 @@
-//! Checks for a newer version (ADR 0019): the core says when one is due, and this runs it
-//! through the updater plugin, driven from Rust only, then tells the core the version the
-//! feed names, or why the check failed. Every build is notify-only for now: the check reads
-//! the version through the feed's `windows-x86_64-nsis` entry, and nothing is downloaded.
+//! Updates (ADR 0019): the core says when a check is due and when to download or install a
+//! newer version, and this runs each through the updater plugin, driven from Rust only, then
+//! tells the core what came of it.
+//!
+//! - **Checks** read the version the feed names: an installed build through its own entry
+//!   (the plugin's lookup, `windows-x86_64-nsis` or `-msi`), the portable `.exe` and dev builds
+//!   through `windows-x86_64-nsis`. Those never download anything.
+//! - **Downloads** ask the feed again and fetch the installer it names, which the plugin
+//!   checks against the public key built in; the core loop keeps it.
+//! - **Installs** run on the core loop's thread, once it has saved whatever Quit Minerva
+//!   saves: the plugin's `install` is synchronous, starts the installer (`passive`), and ends
+//!   Minerva with `process::exit(0)`, so nothing on the quit path runs after.
 
 use crate::Command;
 use crate::http;
-use minerva_core::{Build, UpdateAnswer, Updates};
+use minerva_core::{Build, DownloadAnswer, UpdateAnswer, UpdateJob, UpdateStep, Updates};
+use std::fmt;
+use std::sync::Arc;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use tauri::AppHandle;
 use tauri::utils::config::BundleType;
 use tauri::utils::platform::bundle_type;
-use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 /// The feed: the newest release's `latest.json`, which every release carries.
 const FEED: &str = "https://github.com/itechify/minerva/releases/latest/download/latest.json";
@@ -20,12 +30,16 @@ const FEED: &str = "https://github.com/itechify/minerva/releases/latest/download
 /// against the public key built in before anything is installed.
 const ENDPOINT_VAR: &str = "MINERVA_UPDATE_ENDPOINT";
 
-/// The feed's entry the check reads: never a bare `windows-x86_64`, which `latest.json`
-/// never has (the portable would install the setup it points at beside itself).
-const TARGET: &str = "windows-x86_64-nsis";
+/// The feed's entry a build that can't install reads its version through: never a bare
+/// `windows-x86_64`, which `latest.json` never has (the portable would install the setup
+/// it points at beside itself).
+const NOTIFY_ONLY_TARGET: &str = "windows-x86_64-nsis";
 
 /// How long a check may take before it counts as failed.
 const TIMEOUT: Duration = Duration::from_secs(30);
+
+/// How long the installer's download may take, on a slow connection.
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
 /// The feed to check: `MINERVA_UPDATE_ENDPOINT`'s value when it is set, otherwise [`FEED`].
 fn endpoint(set: Option<String>) -> String {
@@ -61,59 +75,167 @@ pub fn build() -> Build {
     }
 }
 
-/// Runs the core's checks.
-pub struct Checker {
+/// The feed's entry `build` reads: `None` for the plugin's own lookup, which an installed
+/// build makes by how it was installed.
+fn target(build: Build) -> Option<&'static str> {
+    match build {
+        Build::Nsis | Build::Msi => None,
+        Build::NotifyOnly => Some(NOTIFY_ONLY_TARGET),
+    }
+}
+
+/// A newer version's installer, downloaded and checked against the public key, for the
+/// core loop to keep until the core says to install it.
+#[derive(Clone)]
+pub struct Fetched {
+    update: Box<Update>,
+    bytes: Arc<Vec<u8>>,
+}
+
+impl fmt::Debug for Fetched {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Fetched {{ version: {:?}, {} bytes }}", self.update.version, self.bytes.len())
+    }
+}
+
+/// An installer the core said to start: [`Install::run`] it once what Quit Minerva saves is
+/// saved.
+pub struct Install {
+    pub id: u64,
+    update: Box<Update>,
+    bytes: Arc<Vec<u8>>,
+    relaunch: bool,
+}
+
+impl Install {
+    /// Start the installer, which ends Minerva at once (`process::exit(0)`). Returns only if
+    /// it couldn't be started: why.
+    pub fn run(self) -> String {
+        let update = (*self.update).restart_after_install(self.relaunch);
+        match update.install(self.bytes.as_slice()) {
+            Ok(()) => "the installer started, but Minerva didn't end".to_string(),
+            Err(e) => e.to_string(),
+        }
+    }
+}
+
+/// Runs the core's checks, downloads and installs.
+pub struct Updater {
     app: AppHandle,
+    build: Build,
     /// The id of the last check run: the core's ids only grow.
-    made: u64,
+    checked: u64,
+    /// The id of the last download run, likewise.
+    downloaded: u64,
+    /// The id of the last install started.
+    installed: u64,
+    /// The installer the last download fetched, by its id.
+    fetched: Option<(u64, Fetched)>,
     /// Where the answers go, for the core loop.
     commands: Sender<Command>,
 }
 
-impl Checker {
-    pub fn new(app: AppHandle, commands: Sender<Command>) -> Self {
-        Self { app, made: 0, commands }
+impl Updater {
+    pub fn new(app: AppHandle, build: Build, commands: Sender<Command>) -> Self {
+        Self { app, build, checked: 0, downloaded: 0, installed: 0, fetched: None, commands }
     }
 
-    /// Run the core's check under way, once, in the background; its answer comes back to
-    /// the core loop as [`Command::UpdateAnswer`].
+    /// Run the core's check under way and its download, each once, in the background; what
+    /// comes of them comes back to the core loop as [`Command::UpdateAnswer`] and
+    /// [`Command::UpdateDownloaded`].
     pub fn sync(&mut self, updates: &Updates) {
-        let Some(id) = updates.check.filter(|&id| id > self.made) else { return };
-        self.made = id;
-        let (app, commands) = (self.app.clone(), self.commands.clone());
-        tauri::async_runtime::spawn(async move {
-            let answer = match latest(&app).await {
-                Ok(version) => UpdateAnswer::Latest { version },
-                Err(why) => {
-                    // Shown only as Help & Setup's "Couldn't check": the answer, with why,
-                    // goes into a Bug Report.
-                    eprintln!("checking for updates: {why}");
-                    UpdateAnswer::Failed { why }
+        if let Some(id) = updates.check.filter(|&id| id > self.checked) {
+            self.checked = id;
+            let (app, build, commands) = (self.app.clone(), self.build, self.commands.clone());
+            tauri::async_runtime::spawn(async move {
+                let answer = match latest(&app, build).await {
+                    Ok(update) => UpdateAnswer::Latest { version: update.version },
+                    Err(why) => {
+                        // Shown only as Help & Setup's "Couldn't check": the answer, with
+                        // why, goes into a Bug Report.
+                        eprintln!("checking for updates: {why}");
+                        UpdateAnswer::Failed { why }
+                    }
+                };
+                let _ = commands.send(Command::UpdateAnswer { id, answer });
+            });
+        }
+        if let Some(UpdateJob { id, step: UpdateStep::Download }) = updates.job
+            && id > self.downloaded
+            && self.build != Build::NotifyOnly
+        {
+            self.downloaded = id;
+            let (app, build, commands) = (self.app.clone(), self.build, self.commands.clone());
+            tauri::async_runtime::spawn(async move {
+                let fetched = download(&app, build).await;
+                if let Err(why) = &fetched {
+                    eprintln!("downloading the update: {why}");
                 }
-            };
-            let _ = commands.send(Command::UpdateAnswer { id, answer });
-        });
+                let _ = commands.send(Command::UpdateDownloaded { id, fetched });
+            });
+        }
+    }
+
+    /// Download `id` came to `fetched`: keep the installer, and say what came of it to the
+    /// core.
+    pub fn downloaded(&mut self, id: u64, fetched: Result<Fetched, String>) -> DownloadAnswer {
+        match fetched {
+            Ok(fetched) => {
+                let version = fetched.update.version.clone();
+                self.fetched = Some((id, fetched));
+                DownloadAnswer::Downloaded { version }
+            }
+            Err(why) => DownloadAnswer::Failed { why },
+        }
+    }
+
+    /// The installer the core says to start now, once: `Err` with the id if it is gone.
+    pub fn install(&mut self, updates: &Updates) -> Option<Result<Install, u64>> {
+        let Some(UpdateJob { id, step: UpdateStep::Install { relaunch } }) = updates.job else { return None };
+        if id <= self.installed {
+            return None;
+        }
+        self.installed = id;
+        Some(match self.fetched.take() {
+            Some((fetched_id, Fetched { update, bytes })) if fetched_id == id => {
+                Ok(Install { id, update, bytes, relaunch })
+            }
+            _ => Err(id),
+        })
     }
 }
 
-/// The version the feed names as the latest, newer or not (the core says which), or why it
+/// The update the feed names as the latest, newer or not (the core says which), or why it
 /// couldn't be had: the feed unreachable, missing (the plugin's `ReleaseNotFound`), without
-/// the entry read (`TargetsNotFound`), or not reading.
-async fn latest(app: &AppHandle) -> Result<String, String> {
+/// the build's entry (`TargetsNotFound`), or not reading.
+async fn latest(app: &AppHandle, build: Build) -> Result<Update, String> {
     let url = endpoint(std::env::var(ENDPOINT_VAR).ok());
     let url = url.parse().map_err(|e| format!("the feed {url:?}: {e}"))?;
-    let updater = app
+    let mut builder = app
         .updater_builder()
         .endpoints(vec![url])
         .and_then(|builder| builder.header(reqwest::header::USER_AGENT, http::USER_AGENT))
-        .map(|builder| builder.target(TARGET).timeout(TIMEOUT).version_comparator(|_, _| true))
-        .and_then(|builder| builder.build())
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .timeout(TIMEOUT)
+        .version_comparator(|_, _| true);
+    if let Some(target) = target(build) {
+        builder = builder.target(target);
+    }
+    let updater = builder.build().map_err(|e| e.to_string())?;
     match updater.check().await {
-        Ok(Some(update)) => Ok(update.version),
+        Ok(Some(update)) => Ok(update),
         Ok(None) => Err("the feed answered with no release".to_string()),
         Err(e) => Err(e.to_string()),
     }
+}
+
+/// The installer for the version the feed names now, downloaded and checked against the
+/// public key (and its version, `requireSignedVersion`), or why not.
+async fn download(app: &AppHandle, build: Build) -> Result<Fetched, String> {
+    let mut update = latest(app, build).await?;
+    update.timeout = Some(DOWNLOAD_TIMEOUT);
+    let bytes = update.download(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
+    Ok(Fetched { update: Box::new(update), bytes: Arc::new(bytes) })
 }
 
 #[cfg(test)]
@@ -149,5 +271,13 @@ mod tests {
     fn a_build_cargo_made_is_notify_only() {
         // Not patched by the bundler, as the portable `.exe` isn't.
         assert_eq!(build(), Build::NotifyOnly);
+    }
+
+    #[test]
+    fn an_installed_build_reads_its_own_entry_and_one_that_cannot_install_the_setups() {
+        // The plugin's lookup: `windows-x86_64-nsis` for the setup, `-msi` for the MSI.
+        assert_eq!(target(Build::Nsis), None);
+        assert_eq!(target(Build::Msi), None);
+        assert_eq!(target(Build::NotifyOnly), Some("windows-x86_64-nsis"));
     }
 }
