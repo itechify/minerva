@@ -135,7 +135,8 @@
                 <details class="qa" id="free">
                   <summary>Is Minerva free? Does it need an account?</summary>
                   <p>
-                    It's free, and you never sign up. There's no analytics and no update check. Putting a character on the
+                    It's free, and you never sign up. There's no analytics, and its check for a new version sends only the
+                    version you have (<a href="#self-update">see how</a>). Putting a character on the
                     Map Leaderboards needs no account either: a secret key Minerva makes on your PC ties the name to it
                     (<a href="#leaderboard-public">see what the site shows</a>).
                   </p>
@@ -164,10 +165,15 @@
                       The shown map's picture and its mobs' animations, once, kept until they go 30 days unused. An item's
                       picture only when a card lists it to pick from.
                     </dd>
+                    <dt>New versions</dt>
+                    <dd>
+                      A small file from GitHub naming the newest release, when you start Minerva, every 6 hours while it
+                      runs, and when you ask. <a href="#self-update">See how it updates</a>.
+                    </dd>
                   </dl>
                   <p>Item Lookup also asks MeowDB's search for an item's name: <a href="#meowdb">see below</a>.</p>
                   <p>
-                    It sends nothing but a character's bests on the
+                    It sends nothing but the version you have, with each request, and a character's bests on the
                     <a href="#leaderboard-appear">Map Leaderboards</a>, which a new character shares by default: their
                     bests go to this site, with their name, job, level and dates, and your Leaderboard Key, which the
                     site keeps only as a hash. Turn <strong>Share</strong> off under a character's name in your
@@ -280,10 +286,26 @@
                 <details class="qa" id="update">
                   <summary>How do I update Minerva?</summary>
                   <p>
-                    Quit the running Minerva first: click its owl in the notification area, by the clock, and choose
-                    <strong>Quit Minerva</strong>. Then run the new version's setup. Your settings, hotkeys and Personal
-                    Bests carry over. Minerva doesn't check for updates itself:
-                    <a href="https://github.com/itechify/minerva/releases">each release</a> says what's new.
+                    Minerva tells you when a new version is out (<a href="#self-update">see how</a>): its owl's menu says
+                    <strong>Update to</strong> the new version, which opens the release's page. Quit the running Minerva
+                    first: click its owl in the notification area, by the clock, and choose <strong>Quit Minerva</strong>.
+                    Then run the new version's setup. Your settings, hotkeys and Personal Bests carry over.
+                    <a href="https://github.com/itechify/minerva/releases">Each release</a> says what's new.
+                  </p>
+                </details>
+                <details class="qa" id="self-update">
+                  <summary>Does Minerva update itself?</summary>
+                  <p>
+                    Never without you. Minerva asks GitHub, where its releases are, whether a new version is out: when it
+                    starts, every 6 hours while it runs, and when you press <strong>Check for updates</strong> in Help &amp;
+                    Setup's About &amp; Credits. The request sends only the version you have, nothing about you or your
+                    game. A new version shows in the owl's menu and tooltip, in the notification area, and in Help &amp;
+                    Setup, with a <strong>What's new</strong> link to its release. Never on the panels over the game, and
+                    nothing is downloaded until you choose to update.
+                  </p>
+                  <p>
+                    To stop the checks, turn off <strong>Check for updates</strong> in Settings, the gear at the top of the
+                    panel. The button in Help &amp; Setup still checks when you press it.
                   </p>
                 </details>
               </div>

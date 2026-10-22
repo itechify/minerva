@@ -86,7 +86,7 @@ pub(crate) fn frame_to_rgb(frame: &Frame) -> Option<RgbImage> {
     if frame.rgba.len() != w * h * 4 {
         return None;
     }
-    let rgb = frame.rgba.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
+    let rgb = frame.rgba.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
     RgbImage::from_raw(frame.width, frame.height, rgb)
 }
 

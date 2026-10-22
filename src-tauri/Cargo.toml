@@ -25,6 +25,9 @@ tauri-plugin-global-shortcut = "2.4"
 tauri-plugin-opener = "2"
 # A second launch exits and tells the running Minerva, which shows itself.
 tauri-plugin-single-instance = "2"
+# Checks the feed for a newer version (ADR 0019), driven from Rust only. SChannel TLS like
+# reqwest's below: the default rustls backend needs NASM.
+tauri-plugin-updater = { version = "2.14", default-features = false, features = ["native-tls", "system-proxy"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # OSMS Data Explorer's files and pictures (ADR 0008), and MeowDB's search (ADR 0007).

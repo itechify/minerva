@@ -243,6 +243,14 @@
           <p class="game-data-state" id="game-data-state" role="status"></p>
           <button type="button" class="text-button" id="game-data-refresh" data-focus="game-data-refresh">Refresh</button>
         </div>
+        <div class="settings-head">
+          <h3 class="settings-heading" id="updates-heading">Updates</h3>
+          <p class="settings-intro" id="updates-intro">Minerva checks GitHub for a new version when it starts and every 6 hours, sending only its version. It never updates without you. Off, it checks only when you press Check for updates in Help &amp; Setup.</p>
+        </div>
+        <label class="grind-switch" aria-describedby="updates-intro">
+          <span class="action">Check for updates</span>
+          <input type="checkbox" id="check-for-updates-on" data-focus="check-for-updates" />
+        </label>
         <!-- What changed, for screen readers: the rows are drawn anew on every change. -->
         <p class="sr-only" id="settings-announce" aria-live="polite"></p>
       </section>

@@ -14,7 +14,7 @@ use crate::view::{LastView, ViewSender};
 use crate::Command;
 use minerva_core::{
     Action, Hotkeys, MapMark, MarkTarget, PanelControl, PanelState, Recognition, Rect, ScreenRect, SelectionDirection,
-    SetupState,
+    SetupState, Updates,
 };
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -58,6 +58,8 @@ struct SetupView<'a> {
     map_marks: &'a BTreeMap<String, MapMark>,
     /// The Grind Tracker is on (the settings view's switch): setup says how to change it.
     grind_tracker_on: bool,
+    /// Whether a newer version is out, for About & Credits.
+    updates: &'a Updates,
 }
 
 #[derive(Serialize)]
@@ -165,6 +167,7 @@ impl SetupWindows {
             invalid_hotkeys: &state.invalid_hotkeys,
             map_marks: &state.map_marks,
             grind_tracker_on: state.grind_tracker.on,
+            updates: &state.updates,
         };
         if self.view.send(&self.app, &view, &self.app.state::<SetupPageView>().0) {
             let selection = SelectionView { selection: state.setup.selection, target: state.setup.selection_target };
@@ -284,6 +287,18 @@ pub async fn open_github(bridge: State<'_, Bridge>) -> Result<(), String> {
 #[tauri::command]
 pub async fn open_discord(bridge: State<'_, Bridge>) -> Result<(), String> {
     bridge.commands.send(Command::Press(PanelControl::OpenDiscord)).map_err(|e| e.to_string())
+}
+
+/// About & Credits' Check for updates: check for a newer version now, the setting on or off.
+#[tauri::command]
+pub async fn check_for_updates(bridge: State<'_, Bridge>) -> Result<(), String> {
+    bridge.commands.send(Command::Act(Action::CheckForUpdates)).map_err(|e| e.to_string())
+}
+
+/// About & Credits' "What's new": open the newer version's release page in the browser.
+#[tauri::command]
+pub async fn open_release(bridge: State<'_, Bridge>) -> Result<(), String> {
+    bridge.commands.send(Command::Press(PanelControl::OpenRelease)).map_err(|e| e.to_string())
 }
 
 /// Finish setup (the core only does once the test reads of what was marked succeeded).

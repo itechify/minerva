@@ -192,6 +192,12 @@ pub enum Action {
     /// The settings view's Refresh: fetch OSMS's file set and item files afresh now, for
     /// new maps, mobs and items OSMS has since they were fetched.
     RefreshGameData,
+    /// Help & Setup's Check for updates: check for a newer version now, whether or not
+    /// "Check for updates" is on.
+    CheckForUpdates,
+    /// The settings view's "Check for updates": on, Minerva checks for a newer version at
+    /// launch and every 6 hours; off, only when the player presses Check for updates.
+    SetCheckForUpdates { on: bool },
     /// A click on a Deal Badge: the card of the item its listing sells shows beside it.
     /// `row` counts the listings not sold out from the top, as [`crate::DealBadge::row`].
     OpenDealItem { row: u32 },

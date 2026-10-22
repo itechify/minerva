@@ -3,7 +3,7 @@ import { soloExpHelp } from "./solo-exp-help";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { dayText } from "./dates";
+import { dayText, momentText } from "./dates";
 import { byId, cardTop, span } from "./dom";
 import { LOADING_MAP_LIST, recognitionProblem, type Recognition } from "./recognition";
 import type { ExpTracking } from "./exp-tracking";
@@ -160,6 +160,8 @@ type PanelState = {
   dealFinder: { on: boolean; dealLine: string | null; marginPercent: number; shopFound: boolean };
   /** Mirror of `minerva_core::GameData`: when the map set was fetched, and the player's Refresh. */
   gameData: { fetchedAtUnixMs: number | null; refresh: Refresh | null };
+  /** Of `minerva_core::Updates`, the settings view needs only whether "Check for updates" is on. */
+  updates: { on: boolean };
 };
 
 /** Mirror of `minerva_core::Refresh`. */
@@ -236,6 +238,7 @@ const dealState = byId("deal-state");
 const dealDetail = byId("deal-detail");
 const dealMargin = byId("deal-margin") as HTMLInputElement;
 const grindTrackerOn = byId("grind-tracker-on") as HTMLInputElement;
+const checkForUpdatesOn = byId("check-for-updates-on") as HTMLInputElement;
 const gameDataState = byId("game-data-state");
 const gameDataRefresh = byId("game-data-refresh") as HTMLButtonElement;
 const iconArt = byId("icon-art") as HTMLImageElement;
@@ -310,13 +313,6 @@ function candidateRow(id: string, outline: Outline): HTMLLIElement {
 /** "7 Oct 2026", in the player's time zone. */
 const savedOn = (unixMs: number) => dayText(new Date(unixMs), true);
 
-/** "21 Oct, 9:04 AM", in the player's time zone, with the year if it isn't this one. */
-function fetchedOn(unixMs: number): string {
-  const date = new Date(unixMs);
-  const day = dayText(date, date.getFullYear() !== new Date().getFullYear());
-  return `${day}, ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
-}
-
 /** Game Data's line: how the player's Refresh is going or what it came to, or else when
  *  the map set was fetched. */
 function gameDataText({ fetchedAtUnixMs, refresh }: PanelState["gameData"]): string {
@@ -330,7 +326,7 @@ function gameDataText({ fetchedAtUnixMs, refresh }: PanelState["gameData"]): str
     case "needsUpdate":
       return "OSMS's data changed: update Minerva to read it";
     case null:
-      return fetchedAtUnixMs === null ? "Not fetched yet" : `Fetched ${fetchedOn(fetchedAtUnixMs)}`;
+      return fetchedAtUnixMs === null ? "Not fetched yet" : `Fetched ${momentText(fetchedAtUnixMs)}`;
   }
 }
 
@@ -816,6 +812,7 @@ function renderSettingsView(panel: PanelState) {
   // The Deal Margin as saved, unless the player is typing one.
   if (document.activeElement !== dealMargin) dealMargin.value = String(panel.dealFinder.marginPercent);
   grindTrackerOn.checked = panel.grindTracker.on;
+  checkForUpdatesOn.checked = panel.updates.on;
   const gameData = gameDataText(panel.gameData);
   if (changed("game-data", gameData)) gameDataState.textContent = gameData;
   settingsNotice.textContent = view.notice ? settingsNoticeText(view.notice, hotkeys) : "";
@@ -1453,6 +1450,9 @@ dealMargin.addEventListener("keydown", (e) => {
   if (e.key === "Enter") dealMargin.blur();
 });
 grindTrackerOn.addEventListener("change", () => invoke("grind_tracker_set", { on: grindTrackerOn.checked }));
+checkForUpdatesOn.addEventListener("change", () =>
+  invoke("check_for_updates_set", { on: checkForUpdatesOn.checked }),
+);
 hotkeysReset.addEventListener("click", () => invoke("hotkeys_reset"));
 gameDataRefresh.addEventListener("click", () => invoke("game_data_refresh"));
 hotkeysUndo.addEventListener("click", () => invoke("hotkeys_undo_reset"));

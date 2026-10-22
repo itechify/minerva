@@ -13,7 +13,7 @@ use minerva_core::{
     ListedPrice, ShopCapture, ShopList, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, Rect, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
-    TitleReading, TitleRegion, TrackingState, VisitBest,
+    TitleReading, TitleRegion, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build,
 };
 
 const S: u64 = 1000;
@@ -83,11 +83,11 @@ impl Shell {
     fn play(&mut self, until: u64, map: (&str, &str), exp: impl Fn(u64) -> Option<ExpBar>) {
         while self.at < until {
             self.at += 50;
-            if self.at % 350 == 0 {
+            if self.at.is_multiple_of(350) {
                 let lines = Some(TitleLines { street: map.0.into(), map: map.1.into() });
                 self.minerva.on_reading(TitleReading { lines, at_ms: self.at });
             }
-            if self.at % S == 0 {
+            if self.at.is_multiple_of(S) {
                 self.minerva.on_exp_bar_reading(ExpBarReading { bar: exp(self.at), at_ms: self.at, place: None });
             }
             self.step();
@@ -280,6 +280,42 @@ fn showing_a_character_on_the_map_leaderboards_and_each_answer_replay_and_read_i
         "\"Egbert\" taken off the Map Leaderboards",
         "Map Leaderboards upload 3 asked: deleting \"Egbert\"'s entries",
         "Map Leaderboards upload 3 for \"Egbert\": deleted",
+    ] {
+        assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
+    }
+}
+
+#[test]
+fn update_checks_their_answers_the_build_and_the_setting_replay_and_read_in_the_timeline() {
+    // The launch check fails; with the setting turned off, the player checks by hand and a
+    // newer version is out.
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.minerva.on_build(Build::Nsis);
+    shell.play(5 * S, CONSTRUCTION_SITE, grind);
+    let id = shell.minerva.panel_state().updates.check.expect("the launch check");
+    shell.minerva.on_update_answer(id, UpdateAnswer::Failed { why: "offline".into() });
+    shell.play(10 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.act(Action::SetCheckForUpdates { on: false });
+    shell.minerva.act(Action::CheckForUpdates);
+    shell.play(15 * S, CONSTRUCTION_SITE, grind);
+    let id = shell.minerva.panel_state().updates.check.expect("the check pressed for");
+    shell.minerva.on_update_answer(id, UpdateAnswer::Latest { version: "999.0.0".into() });
+    shell.play(20 * S, CONSTRUCTION_SITE, grind);
+    assert_eq!(shell.minerva.panel_state().updates.status, UpdateStatus::NewerVersion);
+
+    let (_, recording) = shell.report();
+    let replay = bug_report::replay(&recording, Some(osms::game().files()));
+    assert_eq!(replay.divergence, None);
+    assert_eq!(replay.lines, recording.lines.len());
+    let timeline = recording.timeline(0);
+    for said in [
+        "build installed with the setup .exe: updates in place",
+        "update check 1 asked",
+        "update check 1 failed: offline",
+        "action {\"setCheckForUpdates\":{\"on\":false}}",
+        "action \"checkForUpdates\"",
+        "update check 2 asked",
+        "update check 2: the latest version is 999.0.0",
     ] {
         assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
     }

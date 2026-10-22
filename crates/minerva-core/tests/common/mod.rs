@@ -310,14 +310,14 @@ fn one_at_a_time<T>(
     polls: usize,
     answer: impl FnOnce(&str) -> Result<T, SourceError>,
 ) -> Poll<Result<T, SourceError>> {
-    if let Some((asked, arrived, left)) = in_flight.take() {
-        if asked == id {
-            if left <= 1 {
-                return Poll::Ready(arrived);
-            }
-            *in_flight = Some((asked, arrived, left - 1));
-            return Poll::Pending;
+    if let Some((asked, arrived, left)) = in_flight.take()
+        && asked == id
+    {
+        if left <= 1 {
+            return Poll::Ready(arrived);
         }
+        *in_flight = Some((asked, arrived, left - 1));
+        return Poll::Pending;
     }
     requests.lock().unwrap().push(id.to_string());
     let answer = answer(id);

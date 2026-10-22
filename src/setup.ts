@@ -5,6 +5,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hotkeyAvailable, keyLabel, type Hotkeys } from "./hotkeys";
 import { mapMark, type MapMarks } from "./map-marks";
+import { momentText } from "./dates";
 import { LOADING_MAP_LIST, recognitionProblem, type Recognition } from "./recognition";
 
 /** Mirror of `minerva_core::TestRead`. */
@@ -15,6 +16,19 @@ type TestRead =
 
 
 type SetupReason = "firstRun" | "resolutionChanged" | "requested";
+
+/** Mirror of `minerva_core::UpdateStatus`. */
+type UpdateStatus = "notChecked" | "checking" | "upToDate" | "newerVersion" | "failed";
+
+/** Mirror of `minerva_core::Updates`. */
+type Updates = {
+  /** "Check for updates" is on (the panel's Settings). */
+  on: boolean;
+  status: UpdateStatus;
+  newer: { version: string; releaseUrl: string } | null;
+  lastCheckedUnixMs: number | null;
+  notifyOnly: boolean;
+};
 
 /** Mirror of the shell's `SetupView`. */
 type SetupView = {
@@ -34,6 +48,8 @@ type SetupView = {
   hotkeys: Hotkeys;
   /** Every Map Mark, by OSMS's name for it, which a recognised map names its own by. */
   mapMarks: MapMarks;
+  /** Whether a newer version is out, for About & Credits. */
+  updates: Updates;
 };
 
 const STEPS = ["warning", "window", "requirements", "mark", "test", "exp"] as const;
@@ -170,6 +186,32 @@ function render() {
   $("change-hotkeys-note").hidden = !!game;
   $("hotkey-problem").textContent = hotkeyProblems(view);
   $("hotkey-problem").hidden = $("hotkey-problem").textContent === "";
+
+  const { updates } = view;
+  const updateState = updateText(updates);
+  if ($("update-state").textContent !== updateState) $("update-state").textContent = updateState;
+  $("update-state").hidden = updateState === "";
+  $("update-newer").hidden = !updates.newer;
+  $("update-version").textContent = updates.newer?.version ?? "";
+  ($("update-check") as HTMLButtonElement).disabled = updates.status === "checking";
+}
+
+/** About & Credits' line on updates: what the last check came to, or one under way. A newer
+ *  version has a line of its own, which a failed check after it leaves showing. */
+function updateText({ on, status, lastCheckedUnixMs }: Updates): string {
+  const lastChecked = lastCheckedUnixMs === null ? "" : ` (last checked ${momentText(lastCheckedUnixMs)})`;
+  switch (status) {
+    case "notChecked":
+      return on ? "" : "Check for updates is off in Settings: Minerva checks only when you ask.";
+    case "checking":
+      return "Checking for updates…";
+    case "upToDate":
+      return `Minerva is up to date${lastChecked}.`;
+    case "newerVersion":
+      return lastCheckedUnixMs === null ? "" : `Last checked ${momentText(lastCheckedUnixMs)}.`;
+    case "failed":
+      return `Couldn't check for updates${lastChecked}.`;
+  }
 }
 
 /** "Recognised", in the overlay's tag vocabulary. */
@@ -248,6 +290,14 @@ $("github-open").addEventListener("click", () => {
 $("discord-open").addEventListener("click", () => {
   $("action-error").hidden = true;
   invoke("open_discord").catch(actionError);
+});
+$("update-check").addEventListener("click", () => {
+  $("action-error").hidden = true;
+  invoke("check_for_updates").catch(actionError);
+});
+$("update-whats-new").addEventListener("click", () => {
+  $("action-error").hidden = true;
+  invoke("open_release").catch(actionError);
 });
 getVersion().then((version) => ($("app-version").textContent = version));
 
