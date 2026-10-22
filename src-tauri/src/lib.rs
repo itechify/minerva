@@ -35,6 +35,7 @@ mod setup;
 mod sizemove;
 pub mod source;
 mod tray;
+pub mod update_manifest;
 mod view;
 
 use minerva_core::{

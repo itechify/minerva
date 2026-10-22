@@ -142,6 +142,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "license": "MIT",
     "copyright": "Copyright © 2026 Jeffrey Davis",
     "icon": [
