@@ -430,6 +430,7 @@ pub fn run() {
             hotkey_settings::rebind_swap,
             hotkey_settings::hotkeys_reset,
             hotkey_settings::hotkeys_undo_reset,
+            hotkey_settings::game_data_refresh,
             setup::open_hotkey_settings,
             setup::open_site,
             setup::open_github,

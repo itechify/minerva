@@ -235,6 +235,14 @@
           <span class="action">Grind Tracker</span>
           <input type="checkbox" id="grind-tracker-on" data-focus="grind-tracker" />
         </label>
+        <div class="settings-head">
+          <h3 class="settings-heading" id="game-data-heading">Game Data</h3>
+          <p class="settings-intro" id="game-data-intro">Maps, mobs and items come from OSMS Data Explorer. Minerva gets them again once a day, and when it's updated. After a patch, Refresh gets them now.</p>
+        </div>
+        <div class="game-data" role="group" aria-labelledby="game-data-heading" aria-describedby="game-data-intro">
+          <p class="game-data-state" id="game-data-state" role="status"></p>
+          <button type="button" class="text-button" id="game-data-refresh" data-focus="game-data-refresh">Refresh</button>
+        </div>
         <!-- What changed, for screen readers: the rows are drawn anew on every change. -->
         <p class="sr-only" id="settings-announce" aria-live="polite"></p>
       </section>

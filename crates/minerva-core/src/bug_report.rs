@@ -42,7 +42,7 @@ use crate::recogniser::{TitleLines, TitleReading};
 use crate::session::{ExpTracking, TrackingState};
 use crate::settings::Settings;
 use crate::status_bar::{StatusBar, StatusBarCapture, StatusBarReading};
-use crate::{Minerva, Frame, PanelControl, PanelState};
+use crate::{MINERVA_VERSION, Minerva, Frame, PanelControl, PanelState};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{BTreeSet, VecDeque};
@@ -271,6 +271,26 @@ pub enum Answer {
 pub struct SavedSet {
     pub fingerprint: String,
     pub saved_at_unix_ms: u64,
+    /// The version that wrote the report down saved it. Only that counts, not the version,
+    /// so the report replays the same in a later one. A report from before saved sets said
+    /// which version saved them has every set as its own, as that version took them.
+    #[serde(default = "yes")]
+    pub this_version: bool,
+}
+
+impl SavedSet {
+    fn of(fingerprint: String, saved_at_unix_ms: u64, saved_by: Option<&str>) -> Self {
+        Self { fingerprint, saved_at_unix_ms, this_version: saved_by == Some(MINERVA_VERSION) }
+    }
+
+    /// Who saved it, as the replaying version takes it.
+    fn saved_by(&self) -> Option<String> {
+        self.this_version.then(|| MINERVA_VERSION.to_string())
+    }
+}
+
+fn yes() -> bool {
+    true
 }
 
 /// MeowDB's items for a name, and when they were saved if it couldn't be reached.
@@ -1135,13 +1155,16 @@ impl MapDataSource for RecordedSource {
         let saved = match &mut self.from {
             From::Live(source) => source.saved_osms_files(),
             From::Replay { .. } => match self.due(|a| matches!(a, Answer::SavedSet { .. })) {
-                Some(Answer::SavedSet { saved: Some(saved) }) => {
-                    self.replayed_set().map(|files| SavedFiles { files, saved_at_unix_ms: saved.saved_at_unix_ms })
-                }
+                Some(Answer::SavedSet { saved: Some(saved) }) => self.replayed_set().map(|files| SavedFiles {
+                    files,
+                    saved_at_unix_ms: saved.saved_at_unix_ms,
+                    saved_by: saved.saved_by(),
+                }),
                 _ => None,
             },
         };
-        let shape = saved.as_ref().map(|s| SavedSet { fingerprint: fingerprint(&s.files), saved_at_unix_ms: s.saved_at_unix_ms });
+        let shape =
+            saved.as_ref().map(|s| SavedSet::of(fingerprint(&s.files), s.saved_at_unix_ms, s.saved_by.as_deref()));
         self.answers.push(Answer::SavedSet { saved: shape });
         saved
     }
@@ -1207,12 +1230,12 @@ impl MapDataSource for RecordedSource {
                 Some(Answer::SavedItems { saved: Some(saved) }) => self
                     .replayed()
                     .and_then(|with| with.items.clone())
-                    .map(|files| SavedItemFiles { files, saved_at_unix_ms: saved.saved_at_unix_ms }),
+                    .map(|files| SavedItemFiles { files, saved_at_unix_ms: saved.saved_at_unix_ms, saved_by: saved.saved_by() }),
                 _ => None,
             },
         };
         let shape =
-            saved.as_ref().map(|s| SavedSet { fingerprint: item_fingerprint(&s.files), saved_at_unix_ms: s.saved_at_unix_ms });
+            saved.as_ref().map(|s| SavedSet::of(item_fingerprint(&s.files), s.saved_at_unix_ms, s.saved_by.as_deref()));
         self.answers.push(Answer::SavedItems { saved: shape });
         saved
     }
@@ -1598,7 +1621,7 @@ impl Answer {
 
     fn describe(&self) -> Option<String> {
         Some(match self {
-            Answer::SavedSet { saved: Some(saved) } => format!("OSMS's set saved earlier ({})", saved.fingerprint),
+            Answer::SavedSet { saved: Some(saved) } => format!("OSMS's set saved earlier ({}){}", saved.fingerprint, by_another(saved)),
             Answer::SavedSet { saved: None } => "no OSMS set saved earlier".to_string(),
             Answer::Set { answer: Ok(fingerprint) } => format!("OSMS's set fetched ({fingerprint})"),
             Answer::Set { answer: Err(e) } => format!("OSMS's set: {e}"),
@@ -1606,7 +1629,7 @@ impl Answer {
             Answer::Picture { path, answer: Err(e) } => format!("picture {path}: {e}"),
             Answer::ItemSearch { name, answer: Ok(answer) } => format!("MeowDB's search for {name:?}: {} items", answer.hits.len()),
             Answer::ItemSearch { name, answer: Err(e) } => format!("MeowDB's search for {name:?}: {e}"),
-            Answer::SavedItems { saved: Some(saved) } => format!("OSMS's item files saved earlier ({})", saved.fingerprint),
+            Answer::SavedItems { saved: Some(saved) } => format!("OSMS's item files saved earlier ({}){}", saved.fingerprint, by_another(saved)),
             Answer::SavedItems { saved: None } => "no OSMS item files saved earlier".to_string(),
             Answer::Items { answer: Ok(fingerprint) } => format!("OSMS's item files fetched ({fingerprint})"),
             Answer::Items { answer: Err(e) } => format!("OSMS's item files: {e}"),
@@ -1903,4 +1926,9 @@ fn is_false(b: &bool) -> bool {
 
 fn is_zero(n: &usize) -> bool {
     *n == 0
+}
+
+/// How a saved set's line ends: saying another version saved it, if one did.
+fn by_another(saved: &SavedSet) -> &'static str {
+    if saved.this_version { "" } else { ", saved by another version" }
 }

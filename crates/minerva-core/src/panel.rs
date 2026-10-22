@@ -189,6 +189,9 @@ pub enum Action {
     /// The settings view's Grind Tracker switch: on, the EXP figures are read from the Status
     /// Bar and the Session runs; off, neither, and the Grind Tracker doesn't show.
     SetGrindTracker { on: bool },
+    /// The settings view's Refresh: fetch OSMS's file set and item files afresh now, for
+    /// new maps, mobs and items OSMS has since they were fetched.
+    RefreshGameData,
     /// A click on a Deal Badge: the card of the item its listing sells shows beside it.
     /// `row` counts the listings not sold out from the top, as [`crate::DealBadge::row`].
     OpenDealItem { row: u32 },

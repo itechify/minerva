@@ -34,6 +34,9 @@ pub struct SavedItemFiles {
     pub files: ItemFiles,
     /// When they were saved (ms since the Unix epoch).
     pub saved_at_unix_ms: u64,
+    /// The Minerva version that fetched and saved them ([`crate::MINERVA_VERSION`]); `None`
+    /// for files saved before they said so.
+    pub saved_by: Option<String>,
 }
 
 /// One item, as its Item Card shows it.

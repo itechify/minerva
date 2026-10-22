@@ -35,6 +35,9 @@ One of several maps that share a Minimap Title, offered to the player when the m
 **Saved Copy**:
 Map and mob data cached earlier and shown, with its date, because its source can't be reached right now.
 
+**Refresh**:
+The settings view's button under Game Data that has OSMS's map set and item files fetched afresh now, rather than at the next daily ask, for what a patch brought. It says what it came to: up to date, OSMS unreachable, or Minerva needing an update.
+
 **Title Region**:
 The rectangle the player marks around the minimap title, saved relative to the game window.
 _Avoid_: minimap region, capture area

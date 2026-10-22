@@ -3,15 +3,17 @@
 //! request at a time and with no other pace. Nothing from OSMS is bundled.
 //!
 //! The set is saved on disk as one file, so it is swapped whole, and the file's
-//! modification time says when it was saved. The core decides when to fetch it afresh: it
-//! looks at the saved set at startup, and asks for a fresh one when that is too old, and
-//! every day after. A fetched set is saved only once the core's reader reads it. If any
-//! file fails, or the set doesn't read, nothing is saved, and the core keeps the set it
+//! modification time says when it was saved; the file says which Minerva version saved it.
+//! The core decides when to fetch it afresh: it looks at the saved set at startup, and asks
+//! for a fresh one when that is too old or another version's, every day after, and when the
+//! player presses Refresh. A fetched set is saved only once the core's reader reads it. If
+//! any file fails, or the set doesn't read, nothing is saved, and the core keeps the set it
 //! has.
 
 use crate::errors::error;
+use crate::files::Stamped;
 use crate::http;
-use minerva_core::SourceError;
+use minerva_core::{MINERVA_VERSION, SourceError};
 use minerva_core::osms::{self, OsmsFiles, SavedFiles};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Receiver;
@@ -37,13 +39,14 @@ impl OsmsSet {
         Self { client, file: cache_dir.join(SET_FILE), in_flight: None }
     }
 
-    /// The set saved, and when; `None` if none is, or it can't be read back.
+    /// The set saved, when, and by which version; `None` if none is, or it can't be read
+    /// back.
     pub fn saved(&self) -> Option<SavedFiles> {
         let json = std::fs::read(&self.file).ok()?;
-        let files = serde_json::from_slice(&json).ok()?;
+        let Stamped { files, minerva_version } = serde_json::from_slice(&json).ok()?;
         let saved_at = std::fs::metadata(&self.file).and_then(|m| m.modified()).ok()?;
         let since_epoch = saved_at.duration_since(UNIX_EPOCH).unwrap_or_default();
-        Some(SavedFiles { files, saved_at_unix_ms: since_epoch.as_millis() as u64 })
+        Some(SavedFiles { files, saved_at_unix_ms: since_epoch.as_millis() as u64, saved_by: minerva_version })
     }
 
     /// A set fetched afresh, in the background: the first call starts fetching it, later
@@ -88,9 +91,10 @@ pub fn fetch_live() -> Result<OsmsFiles, String> {
     tauri::async_runtime::block_on(fetch(&client))
 }
 
-/// Save `files` at `file`, in place of the set saved there, whole.
+/// Save `files` at `file`, in place of the set saved there, whole, as this version's.
 fn save(file: &Path, files: &OsmsFiles) {
-    let written = serde_json::to_vec(files)
+    let stamped = Stamped { files, minerva_version: Some(MINERVA_VERSION.to_string()) };
+    let written = serde_json::to_vec(&stamped)
         .map_err(std::io::Error::other)
         .and_then(|json| crate::files::write_atomically(file, &json));
     if let Err(e) = written {
@@ -104,7 +108,7 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn the_saved_set_is_read_back_with_when_it_was_saved() {
+    fn the_saved_set_is_read_back_with_when_and_by_which_version_it_was_saved() {
         let dir = std::env::temp_dir().join(format!("minerva-osms-set-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -118,7 +122,15 @@ mod tests {
         file.set_modified(saved_at).unwrap();
         drop(file);
 
-        assert_eq!(set.saved(), Some(SavedFiles { files, saved_at_unix_ms: 1_790_812_800_000 }));
+        let saved_by = Some(MINERVA_VERSION.to_string());
+        let saved = SavedFiles { files: files.clone(), saved_at_unix_ms: 1_790_812_800_000, saved_by };
+        assert_eq!(set.saved(), Some(saved));
+
+        // A set saved before sets said which version saved them.
+        std::fs::write(dir.join(SET_FILE), serde_json::to_vec(&files).unwrap()).unwrap();
+        let saved = set.saved().expect("read back");
+        assert_eq!((saved.files, saved.saved_by), (files, None));
+
         std::fs::write(dir.join(SET_FILE), b"not json").unwrap();
         assert_eq!(set.saved(), None);
         let _ = std::fs::remove_dir_all(&dir);

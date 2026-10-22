@@ -1975,6 +1975,29 @@ td:first-child {
   accent-color: var(--edit);
 }
 
+/* Game Data: when it was fetched, or how a Refresh is going, and Refresh, in the same
+   inset box. */
+.game-data {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: -3px;
+  min-height: 23px;
+  padding: 3px 5px 3px 11px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--body);
+  text-shadow: none;
+}
+
+.panel .game-data-state {
+  white-space: normal;
+  text-wrap: pretty;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
 /* Each hotkey: what it does, its keys and its Change button, in an inset box of the
    near-opaque body, like the map list. What it does wraps rather than truncates: it names
    a control. Its keys break only after a "+", and give way to it down to 8em. Change and

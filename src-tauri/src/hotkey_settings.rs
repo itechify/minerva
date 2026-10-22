@@ -1,6 +1,7 @@
-//! The settings view in the overlay, where the player rebinds the hotkeys. It takes the
-//! keyboard as the search view does (see `search.rs`), and the core releases the hotkeys
-//! while the player rebinds one, so the combination they press reaches the overlay.
+//! The settings view in the overlay, where the player rebinds the hotkeys and refreshes the
+//! game data. It takes the keyboard as the search view does (see `search.rs`), and the core
+//! releases the hotkeys while the player rebinds one, so the combination they press reaches
+//! the overlay.
 //!
 //! Every decision is the core's; this only relays the player's clicks and key presses.
 
@@ -59,4 +60,10 @@ pub fn hotkeys_reset(commands: State<'_, Sender<Command>>) {
 #[tauri::command]
 pub fn hotkeys_undo_reset(commands: State<'_, Sender<Command>>) {
     act(&commands, Action::UndoResetHotkeys);
+}
+
+/// Game Data's Refresh: fetch OSMS's data afresh now.
+#[tauri::command]
+pub fn game_data_refresh(commands: State<'_, Sender<Command>>) {
+    act(&commands, Action::RefreshGameData);
 }

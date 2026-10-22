@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended 2026-10-21 (item files another version saved are fetched afresh at launch, and Refresh fetches them with the map set)
 ---
 
 # The Item Card, from OSMS's item files, with the player's own market price
@@ -52,7 +52,7 @@ Its window (ADR 0001) is no-activate but for the market price's field, on top wh
 
 ## Consequences
 
-- OSMS's item files are fetched on the map set's schedule (a saved set under a day old is used as it is, afresh every 24 hours, a minute after OSMS couldn't be reached with none saved), but read, saved and swapped on their own, all or nothing. A card from item files over 7 days old says it is a Saved Copy, with its date. `probe osms` reads them in full with the map set.
+- OSMS's item files are fetched on the map set's schedule (a saved set under a day old that this version saved is used as it is, afresh every 24 hours and on Refresh, a minute after OSMS couldn't be reached with none saved), but read, saved and swapped on their own, all or nothing. A card from item files over 7 days old says it is a Saved Copy, with its date. `probe osms` reads them in full with the map set.
 - Item Lookup's MeowDB search now runs only when the player asks for the page: by Ctrl+Shift+U or the card's name. Among several MeowDB items with the name, the one of the card's kind opens, if just one is.
 - A Bug Report (ADR 0009) writes the card's inputs down (the drags, the market prices typed, and those restored at launch among them), with a crop of the game 400 px each way from the pointer at each item hotkey's press (from the last 10 minutes; for the run when the name couldn't be read or isn't an item's), so a tooltip read wrong can be seen and become a sample; and only the fingerprint of the item files, as of OSMS's set: a replay is given them (`probe replay --items`, or fetched live when the run had them).
 - The card credits "Data: OSMS Data Explorer · Pages: NiaMeowDB, MesoWatch". Tests write made-up item files in OSMS's shape (`tests/common/items.rs`).
