@@ -92,14 +92,16 @@ pub use setup::{
 };
 pub use shown_map::{Candidate, Candidates, FIRST_MOBS, LevelRange, Outline};
 pub use status_bar::{MAX_LEVEL, STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarReader, StatusBarReading};
-pub use updates::{Build, DownloadAnswer, NewerVersion, UpdateAnswer, UpdateJob, UpdateStatus, UpdateStep, Updates, Updating};
+pub use updates::{
+    Build, DownloadAnswer, QuitItem, UpdateAnswer, UpdateJob, UpdateNotice, UpdateOffer, UpdateStage, UpdateStatus, UpdateStep,
+    Updates,
+};
 pub use world::{Distance, Step, Travel};
 
 use bests_window::BestsWindow;
 use bug_report::{Event, MapFacts, Outcome, Press, RecordedSource, Recorder, Region};
 use deal_finder::DealFinder;
 use game_data::Refreshes;
-use updates::UpdateChecks;
 use grind_tracker::GrindTracker;
 use hotkey_settings::HotkeySettings;
 use item_card::{Editing, ItemCards, Pressed};
@@ -117,6 +119,7 @@ use session::Session;
 use setup::Setup;
 pub use recogniser::{TitleLines, TitleReader, TitleReading};
 use tracker::Tracker;
+use updates::{Chosen, Updater};
 use serde::{Deserialize, Serialize};
 use osms::MapSet;
 use std::collections::{BTreeMap, VecDeque};
@@ -547,8 +550,8 @@ pub struct Minerva {
     status_bar_area: Option<(ScreenRect, ScreenRect)>,
     /// The Characters shown on the Map Leaderboards, and the uploads for them.
     leaderboards: Leaderboards,
-    /// The checks for a newer version.
-    updates: UpdateChecks,
+    /// The checks for a newer version, and its download and install when the player chooses.
+    updater: Updater,
     /// What the shell must do that came of time passing (a page MeowDB's answer settled),
     /// for [`Minerva::take_request`].
     requests: VecDeque<Request>,
@@ -608,7 +611,7 @@ impl Minerva {
             status_bar_reader: None,
             status_bar_area: None,
             leaderboards: Leaderboards::default(),
-            updates: UpdateChecks::default(),
+            updater: Updater::default(),
             requests: VecDeque::new(),
             panel: Panel::default(),
             setup: Setup::default(),
@@ -1022,12 +1025,12 @@ impl Minerva {
                 self.hotkey_settings.close();
                 self.refreshes.forget();
             }
-            Action::CheckForUpdates => self.updates.ask(),
+            Action::CheckForUpdates => self.updater.ask(),
             Action::SetCheckForUpdates { on } => self.settings.check_for_updates = on,
-            Action::UpdateNow => self.updates.update_now(),
-            Action::UpdateWhenIQuit => self.updates.when_i_quit(),
-            Action::UpdateLater => self.updates.later(),
-            Action::Quit => self.state.quit |= self.updates.quit(),
+            Action::UpdateNow => self.updater.update_now(),
+            Action::UpdateWhenIQuit => self.updater.when_i_quit(),
+            Action::UpdateLater => self.updater.later(),
+            Action::Quit => self.state.quit |= self.updater.quit(),
             Action::RefreshGameData => {
                 if self.refreshes.start() {
                     // Asked for at the next tick, unless a fetch is under way: it counts.
@@ -1232,13 +1235,16 @@ impl Minerva {
             PanelControl::OpenSite => return Some(Request::OpenInBrowser { url: SITE_URL.into() }),
             PanelControl::OpenGithub => return Some(Request::OpenInBrowser { url: GITHUB_URL.into() }),
             PanelControl::OpenDiscord => return Some(Request::OpenInBrowser { url: DISCORD_URL.into() }),
-            PanelControl::OpenRelease => return self.updates.release_url().map(|url| Request::OpenInBrowser { url }),
+            PanelControl::OpenRelease => return self.open_release(),
             PanelControl::Update => {
-                if !self.updates.choose(self.session_running()) {
-                    return self.updates.release_url().map(|url| Request::OpenInBrowser { url });
+                match self.updater.choose(self.session_running()) {
+                    Chosen::Shown => {
+                        self.setup.request();
+                        self.sync_panel();
+                    }
+                    Chosen::ReleasePage => return self.open_release(),
+                    Chosen::Nothing => {}
                 }
-                self.setup.request();
-                self.sync_panel();
                 return None;
             }
         };
@@ -1344,7 +1350,7 @@ impl Minerva {
     /// check no longer under way changes nothing.
     pub fn on_update_answer(&mut self, id: u64, answer: UpdateAnswer) -> &PanelState {
         self.record(Event::UpdateAnswer { id, answer: answer.clone() });
-        self.updates.answer(id, answer, self.wall_clock);
+        self.updater.answer(id, answer, self.wall_clock);
         self.sync_panel()
     }
 
@@ -1352,7 +1358,7 @@ impl Minerva {
     /// under way changes nothing.
     pub fn on_update_download(&mut self, id: u64, answer: DownloadAnswer) -> &PanelState {
         self.record(Event::UpdateDownload { id, answer: answer.clone() });
-        self.state.quit |= self.updates.downloaded(id, answer);
+        self.state.quit |= self.updater.downloaded(id, answer);
         self.sync_panel()
     }
 
@@ -1361,7 +1367,7 @@ impl Minerva {
     /// error of its own.) One no longer under way changes nothing.
     pub fn on_update_install_failed(&mut self, id: u64, why: &str) -> &PanelState {
         self.record(Event::UpdateInstallFailed { id, why: why.to_string() });
-        self.state.quit |= self.updates.install_failed(id);
+        self.state.quit |= self.updater.install_failed(id);
         self.sync_panel()
     }
 
@@ -1369,7 +1375,7 @@ impl Minerva {
     /// the build was installed. Until it does, it is [`Build::NotifyOnly`].
     pub fn on_build(&mut self, build: Build) -> &PanelState {
         self.record(Event::Build { build });
-        self.updates.set_build(build);
+        self.updater.set_build(build);
         self.sync_panel()
     }
 
@@ -1820,7 +1826,7 @@ impl Minerva {
         self.session.tick(at_ms);
         // Uploads only on a tick: at launch the bests are back by the first.
         self.leaderboards.tick(at_ms, self.session.bests().history(), self.wall_clock);
-        self.updates.tick(at_ms, self.settings.check_for_updates);
+        self.updater.tick(at_ms, self.settings.check_for_updates);
         self.load_osms(at_ms);
         if self.set.is_some() {
             self.sync_shown_map();
@@ -2022,7 +2028,7 @@ impl Minerva {
             fetched_at_unix_ms: self.set.as_ref().and_then(|set| set.saved_at_unix_ms),
             refresh: self.refreshes.state(),
         };
-        self.state.updates = self.updates.state(self.settings.check_for_updates);
+        self.state.updates = self.updater.state(self.settings.check_for_updates);
         self.state.game_window_title =
             self.settings.game_window_title.clone().unwrap_or_else(|| GAME_WINDOW_TITLE.into());
         &self.state
@@ -2204,6 +2210,11 @@ impl Minerva {
     /// A Session is running: the Grind Tracker measures one, which updating would end.
     fn session_running(&self) -> bool {
         self.tracking_on() && self.session.running()
+    }
+
+    /// Open the newer version's release page in the browser: nothing while none is known.
+    fn open_release(&self) -> Option<Request> {
+        self.updater.release_url().map(|url| Request::OpenInBrowser { url })
     }
 }
 

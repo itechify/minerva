@@ -256,7 +256,7 @@ Minerva asking its feed (`latest.json` on GitHub's newest release) which version
 _Avoid_: ping, poll, auto-update (nothing installs by itself)
 
 **Update when I quit**:
-The player's choice, when Help & Setup asks before updating during a Session, to have the newer version download now and install when they choose Quit Minerva, without starting it again. It lasts for this run. The other answers are Update now (install and start it again) and Later (nothing more for now).
+The player's choice, when Help & Setup asks before updating during a Session, to have the newer version download now and install when they choose Quit Minerva, without starting it again. It lasts for this run. Quit Minerva chosen while it is still downloading waits for it; chosen again, it quits without it. The other answers are Update now (install and start it again) and Later (nothing more for now).
 
 **Notify-only**:
 A build that only says a newer version is out, with its release page, and never installs one: the portable `.exe` and dev builds, which the bundler didn't patch.

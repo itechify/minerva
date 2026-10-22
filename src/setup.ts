@@ -20,22 +20,33 @@ type SetupReason = "firstRun" | "resolutionChanged" | "requested";
 /** Mirror of `minerva_core::UpdateStatus`. */
 type UpdateStatus = "notChecked" | "checking" | "upToDate" | "newerVersion" | "failed";
 
-/** Mirror of `minerva_core::Updating`. */
-type Updating = "idle" | "downloading" | "downloaded" | "installing" | "downloadFailed" | "installFailed";
+/** Mirror of `minerva_core::UpdateStage`. */
+type UpdateStage =
+  | "notifyOnly"
+  | "out"
+  | "asking"
+  | "downloading"
+  | "downloadingForQuit"
+  | "installsWhenYouQuit"
+  | "finishingBeforeQuit"
+  | "installing"
+  | "downloadFailed"
+  | "installFailed"
+  | "changed";
+
+/** Mirror of `minerva_core::UpdateOffer`. */
+type UpdateOffer = "nothing" | "releasePage" | "update" | "choices" | "updateNow" | "tryAgain";
+
+/** Mirror of `minerva_core::UpdateNotice`: decided by the core, only put into words here. */
+type UpdateNotice = { version: string; releaseUrl: string; stage: UpdateStage; offer: UpdateOffer };
 
 /** Mirror of `minerva_core::Updates`. */
 type Updates = {
   /** "Check for updates" is on (the panel's Settings). */
-  on: boolean;
+  checksOn: boolean;
   status: UpdateStatus;
-  newer: { version: string; releaseUrl: string } | null;
   lastCheckedUnixMs: number | null;
-  notifyOnly: boolean;
-  updating: Updating;
-  /** Asked before updating, as a Session is running. */
-  asking: boolean;
-  /** Update when I quit was chosen. */
-  whenIQuit: boolean;
+  notice: UpdateNotice | null;
 };
 
 /** Mirror of the shell's `SetupView`. */
@@ -199,76 +210,85 @@ function render() {
   const updateState = updateText(updates);
   if ($("update-state").textContent !== updateState) $("update-state").textContent = updateState;
   $("update-state").hidden = updateState === "";
-  $("update-newer").hidden = !updates.newer;
-  $("update-version").textContent = updates.newer?.version ?? "";
+  const newer = updates.notice;
+  $("update-newer").hidden = !newer;
+  $("update-version").textContent = newer?.version ?? "";
   ($("update-check") as HTMLButtonElement).disabled = updates.status === "checking";
 
-  const version = updates.newer?.version ?? "";
-  const progress = updates.newer ? updateProgress(updates, version) : "";
+  const progress = newer ? updateProgress(newer) : "";
   if ($("update-progress").textContent !== progress) $("update-progress").textContent = progress;
   $("update-progress").hidden = progress === "";
-  const failed = updates.newer ? updateFailure(updates.updating, version) : "";
+  const failed = newer ? updateFailure(newer) : "";
   $("update-failed-text").textContent = failed;
   $("update-failed").hidden = failed === "";
-  $("update-ask").hidden = !updates.asking;
-  const install = updates.newer && !updates.notifyOnly && !updates.asking ? updateButton(updates) : "";
+  $("update-ask").hidden = newer?.offer !== "choices";
+  const install = newer ? updateButton(newer.offer) : "";
   $("update-install").textContent = install;
   $("update-install").hidden = install === "";
 }
 
 /** About & Credits' line on how updating is going, or, in a build that can't install, where
  *  to get the newer version. */
-function updateProgress({ notifyOnly, updating, whenIQuit }: Updates, version: string): string {
-  if (notifyOnly) return "This copy of Minerva doesn't update itself: download the new version from its release page.";
-  switch (updating) {
+function updateProgress({ stage, version }: UpdateNotice): string {
+  switch (stage) {
+    case "notifyOnly":
+      return "This copy of Minerva doesn't update itself: download the new version from its release page.";
     case "downloading":
-      return whenIQuit
-        ? `Downloading Minerva ${version}. It installs when you quit Minerva.`
-        : `Downloading Minerva ${version}…`;
-    case "downloaded":
+      return `Downloading Minerva ${version}…`;
+    case "downloadingForQuit":
+      return `Downloading Minerva ${version}. It installs when you quit Minerva.`;
+    case "installsWhenYouQuit":
       return `Minerva ${version} installs when you choose Quit Minerva in the tray.`;
+    case "finishingBeforeQuit":
+      return `Finishing Minerva ${version}'s download, then quitting to install it.`;
     case "installing":
       return `Starting Minerva ${version}'s installer. Minerva closes while it installs.`;
-    default:
+    case "out":
+    case "asking":
+    case "downloadFailed":
+    case "installFailed":
+    case "changed":
       return "";
   }
 }
 
 /** What went wrong updating, if it did: nothing was installed. */
-function updateFailure(updating: Updating, version: string): string {
-  switch (updating) {
+function updateFailure({ stage, version }: UpdateNotice): string {
+  switch (stage) {
     case "downloadFailed":
       return `Couldn't download Minerva ${version}, or it wasn't signed as Minerva's own, so nothing was installed.`;
     case "installFailed":
       return `Couldn't start Minerva ${version}'s installer, so this version stays.`;
+    case "changed":
+      return `The update changed since Minerva ${version} was found, so nothing was installed.`;
     default:
       return "";
   }
 }
 
-/** The Update button's label, or "" while it has nothing to do. */
-function updateButton({ updating, whenIQuit }: Updates): string {
-  switch (updating) {
-    case "idle":
+/** The Update button's label, or "" while it offers nothing. */
+function updateButton(offer: UpdateOffer): string {
+  switch (offer) {
+    case "update":
       return "Update";
-    case "downloadFailed":
-    case "installFailed":
+    case "updateNow":
+      return "Update now";
+    case "tryAgain":
       return "Try again";
-    case "downloading":
-    case "downloaded":
-      return whenIQuit ? "Update now" : "";
-    case "installing":
+    case "nothing":
+    case "releasePage":
+    case "choices":
       return "";
   }
 }
 
 /** About & Credits' line on updates: what the last check came to, or one under way. A newer
  *  version has a line of its own, which a failed check after it leaves showing. */
-function updateText({ on, status, lastCheckedUnixMs }: Updates): string {
+function updateText({ checksOn, status, lastCheckedUnixMs }: Updates): string {
   const lastChecked = lastCheckedUnixMs === null ? "" : ` (last checked ${momentText(lastCheckedUnixMs)})`;
   switch (status) {
     case "notChecked":
-      return on ? "" : "Check for updates is off in Settings: Minerva checks only when you ask.";
+      return checksOn ? "" : "Check for updates is off in Settings: Minerva checks only when you ask.";
     case "checking":
       return "Checking for updates…";
     case "upToDate":
@@ -316,7 +336,7 @@ function hotkeyProblems(view: SetupView): string {
 }
 
 function update(next: SetupView) {
-  const before = view?.updates;
+  const before = view?.updates.notice?.stage;
   view = next;
   const needed = view.setup.needed;
   if (needed && needed !== openedFor) {
@@ -327,10 +347,9 @@ function update(next: SetupView) {
     render();
   }
   // Choosing to update (from the tray, say) shows how it goes, or asks first, in About.
-  const { asking, updating } = view.updates;
-  const asked = asking && !before?.asking;
-  const started = updating === "downloading" && before?.updating !== "downloading";
-  if ((asked || started) && step !== "about") show("about");
+  const stage = view.updates.notice?.stage;
+  const shows = stage === "asking" || stage === "downloading" || stage === "downloadingForQuit";
+  if (shows && stage !== before && step !== "about") show("about");
 }
 
 listen<SetupView>("setup-state", (e) => update(e.payload));

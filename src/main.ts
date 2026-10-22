@@ -161,7 +161,7 @@ type PanelState = {
   /** Mirror of `minerva_core::GameData`: when the map set was fetched, and the player's Refresh. */
   gameData: { fetchedAtUnixMs: number | null; refresh: Refresh | null };
   /** Of `minerva_core::Updates`, the settings view needs only whether "Check for updates" is on. */
-  updates: { on: boolean };
+  updates: { checksOn: boolean };
 };
 
 /** Mirror of `minerva_core::Refresh`. */
@@ -812,7 +812,7 @@ function renderSettingsView(panel: PanelState) {
   // The Deal Margin as saved, unless the player is typing one.
   if (document.activeElement !== dealMargin) dealMargin.value = String(panel.dealFinder.marginPercent);
   grindTrackerOn.checked = panel.grindTracker.on;
-  checkForUpdatesOn.checked = panel.updates.on;
+  checkForUpdatesOn.checked = panel.updates.checksOn;
   const gameData = gameDataText(panel.gameData);
   if (changed("game-data", gameData)) gameDataState.textContent = gameData;
   settingsNotice.textContent = view.notice ? settingsNoticeText(view.notice, hotkeys) : "";
