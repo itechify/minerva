@@ -127,8 +127,9 @@ fn consistent(bar: ExpBar) -> bool {
     bar.percent_hundredths < 10_000 && (bar.percent_hundredths > 0 || bar.exp < 10_000)
 }
 
-/// The digits of a run of them as ocrs read it, with the letters it mistakes for digits
-/// in this font put right. `None` if anything else is in it, or nothing is.
+/// The digits of a run of them as ocrs read it, with the letters and signs it mistakes for
+/// digits in this font put right (it has read the 5 of "53.05%" as a "$"). `None` if
+/// anything else is in it, or nothing is.
 fn digits(text: &str) -> Option<String> {
     let mut out = String::new();
     for c in text.chars() {
@@ -136,6 +137,7 @@ fn digits(text: &str) -> Option<String> {
             '0'..='9' => out.push(c),
             'O' | 'o' | 'D' => out.push('0'),
             'l' | 'I' | '|' | 'i' => out.push('1'),
+            '$' => out.push('5'),
             ' ' => {}
             _ => return None,
         }
