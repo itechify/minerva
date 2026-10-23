@@ -875,10 +875,12 @@ fn clicking_a_lines_price_opens_its_field_for_the_player_to_type_in() {
     let mut minerva = started();
     let state = press_over(&mut minerva, "Bronze Ore", 1_000);
     let id = line(&state, "Your price");
+    assert!(!state.item_card_takes_keyboard, "a click on the card leaves the keyboard with the game");
 
     let state = minerva.edit_card_market_price(&id).clone();
 
     assert_eq!(editing(&state), Some(MarketEdit::Price { line: id, not_a_price: None }));
+    assert!(state.item_card_takes_keyboard, "the field takes the typing");
 }
 
 #[test]

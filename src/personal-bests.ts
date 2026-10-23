@@ -893,7 +893,7 @@ for (const th of headers) {
 
 // The shell sizes the window to the content, as the Grind Tracker's is, up to its most;
 // past that the table scrolls.
-const reportHeight = heightReporter(panelEl, "personal_bests_height");
+const reportHeight = heightReporter(panelEl, "page_height");
 // Narrowed to a smaller game, the rows lay out again, as cards at the narrowest, and the
 // ruler spaces its figures for the lane's new length.
 window.addEventListener("resize", () => {
@@ -1000,5 +1000,5 @@ document.addEventListener("click", (e) => {
   if (armed !== null && armed !== before) announce.textContent = armedWords(armed);
 });
 
-followView<BestsView>("personal-bests-state", "personal_bests_view", render);
+followView<BestsView>("personal-bests-state", "page_view", render);
 reportHeight();

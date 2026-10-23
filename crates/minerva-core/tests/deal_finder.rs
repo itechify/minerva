@@ -710,6 +710,7 @@ fn a_card_opened_from_a_badge_unfolds_from_the_edge_facing_it_and_the_badge_stay
     assert_eq!(state.item_card.as_ref().and_then(|card| card.unfold_from), Some(Edge::Right), "the card is left of the badge");
     let open: Vec<bool> = state.deal_badges.as_ref().unwrap().badges.iter().map(|b| b.open).collect();
     assert_eq!(open, [false, true]);
+    assert!(state.deal_badges_clickable);
 
     // Dragged, it no longer belongs beside the badge.
     let card = state.item_card_placement.unwrap();

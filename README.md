@@ -26,7 +26,7 @@ Needs Rust (stable, MSVC), the Visual Studio C++ Build Tools, Node and pnpm.
 
 ```sh
 cargo test                                      # core tests (the default workspace member)
-cargo test -p minerva --lib                # the app's own unit tests
+cargo test -p minerva                           # the app's and the probe's own unit tests
 pnpm install
 pnpm tauri dev                                  # run the overlay beside the game
 pnpm tauri build --debug --no-bundle            # build target/debug/minerva.exe

@@ -4,9 +4,8 @@
 //! never over a file that was there and didn't read.
 
 use crate::errors::error;
+use crate::files::{GuardedJsonFile, JsonShape};
 use minerva_core::{Minerva, SavedBests};
-use std::fs;
-use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
@@ -14,60 +13,21 @@ pub fn path(app: &AppHandle) -> tauri::Result<PathBuf> {
     Ok(app.path().app_config_dir()?.join("personal-bests.json"))
 }
 
-/// The bests file, as this launch found it.
-pub struct BestsFile {
-    path: PathBuf,
-    /// It was there but didn't read: there are no bests this launch.
-    lost: bool,
-    /// It was there but didn't read, and couldn't be set aside: it is left as it was, and
-    /// the bests aren't saved this launch.
-    left: bool,
-}
+/// The bests file, as this launch found it. A file saved in an earlier shape reads as the
+/// core takes it (version 1's bests are Unassigned), and is saved over in this one; one
+/// that was there but didn't read is what the core is told
+/// ([`minerva_core::Minerva::bests_lost`]).
+pub type BestsFile = GuardedJsonFile<SavedBests>;
 
-impl BestsFile {
-    /// The bests saved at `path`, or none when there is no file yet. A file saved in an
-    /// earlier shape reads as the core takes it (version 1's bests are Unassigned), and is
-    /// saved over in this one. A file that is there but doesn't read (reading it fails, it
-    /// isn't UTF-8 JSON as the core saves it, or it was saved in a shape this version doesn't
-    /// read, by a later one) is logged and set aside as `personal-bests.json.bad` for
-    /// diagnosis, and there are none. If it can't be set aside, it is left as it was:
-    /// [`BestsFile::save`] never writes over it.
-    pub fn load(path: PathBuf) -> (Self, SavedBests) {
-        let why = match fs::read(&path) {
-            Err(e) if e.kind() == ErrorKind::NotFound => return (Self { path, lost: false, left: false }, SavedBests::default()),
-            Err(e) => format!("unreadable ({e})"),
-            Ok(bytes) => match serde_json::from_slice::<SavedBests>(&bytes) {
-                Ok(bests) if bests.in_a_known_shape() => return (Self { path, lost: false, left: false }, bests),
-                Ok(bests) => format!("saved in shape {}", bests.version),
-                Err(e) => format!("unreadable ({e})"),
-            },
-        };
-        let left = match fs::rename(&path, path.with_extension("json.bad")) {
-            Ok(()) => {
-                error!("personal bests {why}; set aside, starting with none");
-                false
-            }
-            Err(e) => {
-                error!("personal bests {why}, and not set aside ({e}); starting with none, saving none");
-                true
-            }
-        };
-        (Self { path, lost: true, left }, SavedBests::default())
+impl JsonShape for SavedBests {
+    const WHAT: &'static str = "personal bests";
+
+    fn version(&self) -> u32 {
+        self.version
     }
 
-    /// Whether the bests file was there but didn't read, so this launch started with none:
-    /// what the core is told ([`minerva_core::Minerva::bests_lost`]).
-    pub fn lost(&self) -> bool {
-        self.lost
-    }
-
-    /// Write the bests atomically: a temp file renamed over the old one. Nothing, if the
-    /// file was left as it was at [`BestsFile::load`].
-    pub fn save(&self, bests: &SavedBests) -> std::io::Result<()> {
-        if self.left {
-            return Ok(());
-        }
-        crate::files::write_atomically(&self.path, serde_json::to_string_pretty(bests)?.as_bytes())
+    fn in_a_known_shape(&self) -> bool {
+        SavedBests::in_a_known_shape(self)
     }
 }
 
@@ -92,6 +52,7 @@ pub fn restore(minerva: &mut Minerva, (file, bests): (BestsFile, SavedBests), se
 mod tests {
     use super::*;
     use minerva_core::BESTS_VERSION;
+    use std::fs;
     use minerva_core::{LeaderboardCharacter, MapBests, Settings, VisitBest};
 
     use std::task::Poll;

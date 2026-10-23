@@ -328,7 +328,7 @@ function drawPace(trace: PaceTrace | null) {
 }
 
 // The shell sizes the window to the content, as the overlay does the panel.
-const reportHeight = heightReporter(panelEl, "grind_tracker_height");
+const reportHeight = heightReporter(panelEl, "page_height");
 // The trace and the forecast are drawn to the window's width.
 window.addEventListener("resize", () => (shown ? render(shown) : reportHeight()));
 // The height depends on the font: measure again once it has loaded.
@@ -342,5 +342,5 @@ dragByHandles();
 // window, through the core like the panel's icons.
 pressControls(panelEl);
 
-followView<TrackerView>("grind-tracker-state", "grind_tracker_view", render);
+followView<TrackerView>("grind-tracker-state", "page_view", render);
 reportHeight();

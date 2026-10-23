@@ -304,6 +304,7 @@ fn letters_the_recogniser_confuses_and_case_still_find_the_item() {
     let mut minerva = started_with(answering("Hero's Gladius"), common::set_up());
     let state = look_up(&mut minerva, "Heros GIadius", 1_000);
     assert!(matches!(line(&state), Some(ItemLookup::Choose { .. })), "punctuation and I for l: {state:?}");
+    assert!(state.item_lookup_clickable, "its items are picked with a click");
 }
 
 #[test]

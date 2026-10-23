@@ -393,6 +393,14 @@ impl Default for Panel {
     }
 }
 
+/// Whether our windows may show, on top of everything: with a game window found, while the
+/// game or one of our windows is in front (`foreground`; `None` before the shell first says,
+/// as in front). The panel's [`Layer`] follows it, and so does the shell's window watcher,
+/// which takes it to what is in front now while the shell's loop stalls.
+pub fn shows_on_top(game_found: bool, foreground: Option<Foreground>) -> bool {
+    game_found && foreground != Some(Foreground::OtherApp)
+}
+
 impl Panel {
     /// The overlay window was moved so its top-left corner is at (x, y): see
     /// [`Action::PanelMoved`].
@@ -424,11 +432,9 @@ impl Panel {
         }
     }
 
-    /// See [`Layer`]. The shell's window watcher (`keep_on_top_while_in_front`) restates
-    /// this rule as a fast path while its main loop stalls: change both together.
+    /// See [`Layer`], and [`shows_on_top`].
     pub fn layer(&self) -> Layer {
-        let in_front = self.foreground != Some(Foreground::OtherApp);
-        if self.game.is_some() && in_front { Layer::OnTop } else { Layer::Hidden }
+        if shows_on_top(self.game.is_some(), self.foreground) { Layer::OnTop } else { Layer::Hidden }
     }
 
     /// The player can drag the panel by its header: inside or detached, at any time; a

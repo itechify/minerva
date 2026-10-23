@@ -124,7 +124,7 @@ function render({ shown, line, hotkey }: AlertView) {
 }
 
 // The shell sizes the window to the alert, as the overlay does the panel.
-const reportHeight = heightReporter(alertEl, "item_lookup_height");
+const reportHeight = heightReporter(alertEl, "page_height");
 window.addEventListener("resize", reportHeight);
 // The height depends on the font: measure again once it has loaded.
 document.fonts.ready.then(reportHeight);
@@ -136,4 +136,4 @@ choices.addEventListener("click", (e) => {
   if (button?.dataset.id) invoke("pick_item", { id: button.dataset.id });
 });
 
-followView<AlertView>("item-lookup-state", "item_lookup_view", render);
+followView<AlertView>("item-lookup-state", "page_view", render);

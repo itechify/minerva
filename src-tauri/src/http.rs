@@ -1,9 +1,11 @@
 //! What the shell's data source fetches with: one HTTP client that says who is asking,
 //! and fetches that run on the async runtime and never block the caller. A source starts
-//! one with [`in_background`] and answers `Pending`, then [`collect`]s it on later calls.
+//! one with an [`InFlight`] and answers `Pending`, then collects it on later calls.
 
+use crate::errors::error;
 use minerva_core::SourceError;
-use std::sync::mpsc::{self, Receiver, TryRecvError};
+use crate::Command;
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::task::Poll;
 use std::time::Duration;
 
@@ -77,12 +79,70 @@ pub(crate) fn in_background<T: Send + 'static>(work: impl Future<Output = T> + S
     rx
 }
 
+/// Run `work` on the async runtime, and send the core loop the command it comes to.
+pub(crate) fn answer_in_background(commands: Sender<Command>, work: impl Future<Output = Command> + Send + 'static) {
+    tauri::async_runtime::spawn(async move {
+        let _ = commands.send(work.await);
+    });
+}
+
 /// What a background fetch sent, if it has finished; a fetch that ended without sending
 /// anything was abandoned.
-pub(crate) fn collect<T>(arriving: &Receiver<Result<T, SourceError>>) -> Poll<Result<T, SourceError>> {
+fn collect<T>(arriving: &Receiver<Result<T, SourceError>>) -> Poll<Result<T, SourceError>> {
     match arriving.try_recv() {
         Err(TryRecvError::Empty) => Poll::Pending,
         Ok(answer) => Poll::Ready(answer),
         Err(TryRecvError::Disconnected) => Poll::Ready(Err(SourceError::Unreachable("fetch abandoned".into()))),
+    }
+}
+
+/// A fetch on its way in the background, by what it fetches (its key: a name searched for, a
+/// picture's path, or nothing for a set of files), for a source that answers `Pending` until
+/// it has arrived. Each source says what to do while another key's fetch is on its way.
+pub(crate) struct InFlight<T> {
+    fetching: Option<(String, Receiver<Result<T, SourceError>>)>,
+}
+
+impl<T> Default for InFlight<T> {
+    fn default() -> Self {
+        Self { fetching: None }
+    }
+}
+
+impl<T: Send + 'static> InFlight<T> {
+    /// The fetch of `key`'s answer, once it has arrived (a failure reported as `what`'s), or
+    /// `Pending` while it is on its way; `None` if no fetch of `key` is (another key's is left
+    /// as it is).
+    pub fn collect(&mut self, key: &str, what: impl std::fmt::Display) -> Option<Poll<Result<T, SourceError>>> {
+        let (asked, arriving) = self.fetching.as_ref()?;
+        if asked != key {
+            return None;
+        }
+        let Poll::Ready(answer) = collect(arriving) else { return Some(Poll::Pending) };
+        self.fetching = None;
+        if let Err(e) = &answer {
+            error!("{what}: {e}");
+        }
+        Some(Poll::Ready(answer))
+    }
+
+    /// Whether another key's fetch is still on its way; one that has arrived unheard is let
+    /// go.
+    pub fn busy(&mut self) -> bool {
+        if self.fetching.as_ref().is_some_and(|(_, arriving)| collect(arriving).is_ready()) {
+            self.fetching = None;
+        }
+        self.fetching.is_some()
+    }
+
+    /// Start fetching `key` with `work` in the background, in place of any fetch on its way:
+    /// `Pending`, until [`InFlight::collect`] has its answer.
+    pub fn start(
+        &mut self,
+        key: &str,
+        work: impl Future<Output = Result<T, SourceError>> + Send + 'static,
+    ) -> Poll<Result<T, SourceError>> {
+        self.fetching = Some((key.to_string(), in_background(work)));
+        Poll::Pending
     }
 }

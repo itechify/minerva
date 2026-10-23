@@ -6,9 +6,9 @@
 //! the player's own leaves prices for Minerva to take in (ADR 0013).
 
 use crate::errors::error;
-use minerva_core::{MARKET_PRICES_VERSION, MarketImport, SavedMarketPrices};
+use crate::files::{GuardedJsonFile, JsonShape};
+use minerva_core::{MarketImport, SavedMarketPrices};
 use std::fs;
-use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
@@ -46,7 +46,7 @@ fn take_import(path: &Path) -> Option<MarketImport> {
     let why = match fs::read(&taken) {
         Err(e) => format!("unreadable ({e})"),
         Ok(bytes) => match serde_json::from_slice::<MarketImport>(&bytes) {
-            Ok(import) if import.version == MARKET_PRICES_VERSION => {
+            Ok(import) if import.in_a_known_shape() => {
                 if let Err(e) = fs::remove_file(&taken) {
                     error!("market import {name} taken in, but not deleted ({e})");
                 }
@@ -63,66 +63,26 @@ fn take_import(path: &Path) -> Option<MarketImport> {
     None
 }
 
-/// The market prices file, as this launch found it.
-pub struct MarketPricesFile {
-    path: PathBuf,
-    /// It was there but didn't read, and couldn't be set aside: it is left as it was, and
-    /// the prices aren't saved this launch.
-    left: bool,
-}
+/// The market prices file, as this launch found it. One saved before there were Market
+/// Lines (shape 1, 0.8.0) reads as the first line's prices.
+pub type MarketPricesFile = GuardedJsonFile<SavedMarketPrices>;
 
-impl MarketPricesFile {
-    /// The prices saved at `path`, or none when there is no file yet. One saved before
-    /// there were Market Lines (shape 1, 0.8.0) reads as the first line's prices. A file
-    /// that is there but doesn't read (reading it fails, it isn't JSON as the core saves
-    /// it, or it was saved in a later shape, by a later version) is logged and set aside as
-    /// `market-prices.json.bad`, and there are none. If it can't be set aside, it is left as
-    /// it was: [`MarketPricesFile::save`] never writes over it.
-    pub fn load(path: PathBuf) -> (Self, SavedMarketPrices) {
-        let why = match fs::read(&path) {
-            Err(e) if e.kind() == ErrorKind::NotFound => {
-                return (Self { path, left: false }, SavedMarketPrices::default());
-            }
-            Err(e) => format!("unreadable ({e})"),
-            Ok(bytes) => match serde_json::from_slice::<SavedMarketPrices>(&bytes) {
-                Ok(prices) if prices.version == MARKET_PRICES_VERSION => return (Self { path, left: false }, prices),
-                Ok(prices) => format!("saved in shape {}", prices.version),
-                Err(e) => format!("unreadable ({e})"),
-            },
-        };
-        let left = match fs::rename(&path, path.with_extension("json.bad")) {
-            Ok(()) => {
-                error!("market prices {why}; set aside, starting with none");
-                false
-            }
-            Err(e) => {
-                error!("market prices {why}, and not set aside ({e}); starting with none, saving none");
-                true
-            }
-        };
-        (Self { path, left }, SavedMarketPrices::default())
+impl JsonShape for SavedMarketPrices {
+    const WHAT: &'static str = "market prices";
+
+    fn version(&self) -> u32 {
+        self.version
     }
 
-    /// Whether [`MarketPricesFile::save`] writes them: not if the file was left as it was
-    /// at [`MarketPricesFile::load`].
-    pub fn saves(&self) -> bool {
-        !self.left
-    }
-
-    /// Write the prices atomically: a temp file renamed over the old one. Nothing, if the
-    /// file was left as it was at [`MarketPricesFile::load`].
-    pub fn save(&self, prices: &SavedMarketPrices) -> std::io::Result<()> {
-        if self.left {
-            return Ok(());
-        }
-        crate::files::write_atomically(&self.path, serde_json::to_string_pretty(prices)?.as_bytes())
+    fn in_a_known_shape(&self) -> bool {
+        SavedMarketPrices::in_a_known_shape(self)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use minerva_core::{MarketPrice, SavedMarketLine};
+    use minerva_core::{MARKET_PRICES_VERSION, MarketPrice, SavedMarketLine};
 
     /// `market-prices.json` in a folder of `test`'s own under the temp folder, emptied first.
     fn file(test: &str) -> PathBuf {

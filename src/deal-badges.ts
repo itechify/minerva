@@ -159,11 +159,11 @@ function render(view: BadgesView) {
 // be activated.
 list.addEventListener("click", (e) => {
   const button = e.target instanceof Element ? e.target.closest<HTMLElement>(".deal-badge[data-row]") : null;
-  if (button?.dataset.row) invoke("deal_badge_open", { row: Number(button.dataset.row) });
+  if (button?.dataset.row) invoke("act", { action: { openDealItem: { row: Number(button.dataset.row) } } });
 });
 
 let last: BadgesView | null = null;
-followView<BadgesView>("deal-badges-state", "deal_badges_view", (view) => {
+followView<BadgesView>("deal-badges-state", "page_view", (view) => {
   last = view;
   render(view);
 });

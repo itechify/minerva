@@ -29,7 +29,7 @@ pub fn look_for(title: &str) {
 }
 
 /// The title [`find_game`] looks for.
-pub fn looking_for() -> String {
+fn looking_for() -> String {
     LOOK_FOR.read().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
@@ -270,20 +270,6 @@ mod win {
         Bottom,
     }
 
-    /// Put our `window` on top of every other window, or send it to the bottom, out of
-    /// sight (`to`). Only our own window is moved, and only when it may not be where it
-    /// should be: its style says otherwise, or the caller last put it elsewhere
-    /// (`set_before`). (Tao rewrites our windows' extended style from its own flags
-    /// whenever one of them changes, without `WS_EX_TOPMOST`, so the style alone can say
-    /// a window on top isn't.) Returns whether it moved it.
-    ///
-    /// Put on top, the window first leaves the topmost band, then joins it. Coming back
-    /// from the bottom as it shows again (another app in front, then the game), Windows
-    /// can ignore a plain `HWND_TOPMOST` for it, returning success and leaving it under
-    /// the game, and goes on ignoring it however often it is asked, from the window's own
-    /// thread too; going by `HWND_NOTOPMOST` first puts it on top every time. Seen on
-    /// whichever of our windows the player clicked last.
-    ///
     /// Whether any of `others` (our own windows) is above our `window` in the z-order.
     /// Reads the window order only, walking up from `window`.
     pub fn below_any(window: HWND, others: &[HWND]) -> bool {
@@ -306,6 +292,20 @@ mod win {
         false
     }
 
+    /// Put our `window` on top of every other window, or send it to the bottom, out of
+    /// sight (`to`). Only our own window is moved, and only when it may not be where it
+    /// should be: its style says otherwise, or the caller last put it elsewhere
+    /// (`set_before`). (Tao rewrites our windows' extended style from its own flags
+    /// whenever one of them changes, without `WS_EX_TOPMOST`, so the style alone can say
+    /// a window on top isn't.) Returns whether it moved it.
+    ///
+    /// Put on top, the window first leaves the topmost band, then joins it. Coming back
+    /// from the bottom as it shows again (another app in front, then the game), Windows
+    /// can ignore a plain `HWND_TOPMOST` for it, returning success and leaving it under
+    /// the game, and goes on ignoring it however often it is asked, from the window's own
+    /// thread too; going by `HWND_NOTOPMOST` first puts it on top every time. Seen on
+    /// whichever of our windows the player clicked last.
+    ///
     /// No owner/parent link to the game (that would attach input queues across the
     /// processes, ADR 0001) and no event hook: the caller polls this.
     pub fn restack(window: HWND, to: Stacking, set_before: Option<Stacking>) -> windows::core::Result<bool> {

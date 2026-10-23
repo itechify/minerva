@@ -56,7 +56,7 @@ use std::task::Poll;
 /// How far back the trace reaches: a day.
 const TRACE_MS: u64 = 24 * 60 * 60 * 1000;
 /// How long a crop that isn't kept for the run is kept.
-const RECENT_CROPS_MS: u64 = 10 * 60_000;
+pub const RECENT_CROPS_MS: u64 = 10 * 60_000;
 /// The most the crops kept for the run take; beyond it the oldest go.
 const KEPT_CROPS_BYTES: usize = 8 * 1024 * 1024;
 /// The biggest a Bug Report gets.
@@ -141,6 +141,10 @@ pub enum Event {
         found: Option<ScreenRect>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         same: bool,
+        /// The region the capture was of, when it was no longer captured by the time it was
+        /// read (the game window moved, say): the reading was left. `None` for one taken in.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stale_region: Option<ScreenRect>,
     },
     /// The EXP figures captured at `at_ms` read as `bar` (`None`: not whole), at `place` in
     /// a Status Bar capture (`None`: a frame of the figures alone, or nowhere to read them).
@@ -177,6 +181,10 @@ pub enum Event {
         same: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         hover: Option<ShopHover>,
+        /// The region the capture was of, when it was no longer captured by the time it was
+        /// read (the game window moved, say): the reading was left. `None` for one taken in.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stale_region: Option<ScreenRect>,
     },
     /// A Status Bar capture taken at `at_ms` read as `bar` (`None`: no Status Bar), or the
     /// `same` as the reading before.
@@ -186,6 +194,10 @@ pub enum Event {
         bar: Option<StatusBar>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         same: bool,
+        /// The region the capture was of, when it was no longer captured by the time it was
+        /// read (the game window moved, say): the reading was left. `None` for one taken in.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stale_region: Option<ScreenRect>,
     },
     /// The player chose the Item Card's Market Line `line` as the Deal Line.
     ChooseDealLine { line: String },
@@ -749,16 +761,18 @@ impl Recorder {
 
     /// Start writing down `event`, an input captured or ticked at `at_ms` if it has a
     /// time, read from `frames` if it has any. What came of it is written once the next
-    /// input comes. A reading the same as the one before says so, not what it read.
+    /// input comes. A reading the same as the one before says so, not what it read; a
+    /// reading left, as for a region no longer captured, is neither the same as the one
+    /// before nor one the next can be.
     pub fn open(&mut self, mut event: Event, at_ms: Option<u64>, frames: Vec<(Region, Frame)>) {
-        if let Event::Title { lines, found, same, .. } = &mut event {
+        if let Event::Title { lines, found, same, stale_region: None, .. } = &mut event {
             *same = !changes(&mut self.last.title, &(lines.clone(), *found));
             if *same {
                 *lines = None;
                 *found = None;
             }
         }
-        if let Event::PlayerShop { shop, same, hover, .. } = &mut event {
+        if let Event::PlayerShop { shop, same, hover, stale_region: None, .. } = &mut event {
             // Off the list, no tooltip: the next one by it is new.
             if hover.is_none() {
                 self.last.shop_tooltip = None;
@@ -768,7 +782,7 @@ impl Recorder {
                 *shop = None;
             }
         }
-        if let Event::StatusBar { bar, same, .. } = &mut event {
+        if let Event::StatusBar { bar, same, stale_region: None, .. } = &mut event {
             *same = !changes(&mut self.last.status_bar, bar);
             if *same {
                 *bar = None;
@@ -1429,9 +1443,9 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::Tick {} => {
                 minerva.tick(line.t);
             }
-            Event::Title { at_ms, lines, found, same } => {
-                let (lines, found) = as_before(&mut title, (lines, found), same);
-                minerva.on_reading(TitleReading { lines, found, at_ms });
+            Event::Title { at_ms, lines, found, same, stale_region } => {
+                let (lines, found) = if stale_region.is_some() { (lines, found) } else { as_before(&mut title, (lines, found), same) };
+                minerva.title_reading_for(TitleReading { lines, found, at_ms }, stale_region);
             }
             Event::ExpBar { at_ms, bar, place } => {
                 minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place });
@@ -1481,13 +1495,13 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::ItemTooltip { reading } => {
                 minerva.on_item_tooltip_reading(reading);
             }
-            Event::PlayerShop { at_ms, shop: read, same, hover } => {
-                let shop = as_before(&mut shop, read, same);
-                minerva.on_player_shop_reading(ShopReading { shop, hover, at_ms });
+            Event::PlayerShop { at_ms, shop: read, same, hover, stale_region } => {
+                let shop = if stale_region.is_some() { read } else { as_before(&mut shop, read, same) };
+                minerva.player_shop_reading_for(ShopReading { shop, hover, at_ms }, stale_region);
             }
-            Event::StatusBar { at_ms, bar, same } => {
-                let bar = as_before(&mut status_bar, bar, same);
-                minerva.on_status_bar_reading(StatusBarReading { bar, at_ms });
+            Event::StatusBar { at_ms, bar, same, stale_region } => {
+                let bar = if stale_region.is_some() { bar } else { as_before(&mut status_bar, bar, same) };
+                minerva.status_bar_reading_for(StatusBarReading { bar, at_ms }, stale_region);
             }
             Event::ChooseDealLine { line } => {
                 minerva.choose_deal_line(&line);
@@ -1630,7 +1644,7 @@ impl Recording {
         let mut out = Vec::new();
         let mut title: Option<&TitleLines> = None;
         for line in &self.lines {
-            if let Event::Title { lines, same: false, .. } = &line.event {
+            if let Event::Title { lines, same: false, stale_region: None, .. } = &line.event {
                 title = lines.as_ref();
             }
             let consequences = line.consequences();
@@ -1788,6 +1802,23 @@ impl Note {
 }
 
 impl Event {
+    /// A reading left as for a region no longer captured: the reading as if it had been
+    /// taken in, and the region its capture was of.
+    fn left_as_stale(&self) -> Option<(Event, ScreenRect)> {
+        match self.clone() {
+            Event::Title { at_ms, lines, found, same, stale_region: Some(region) } => {
+                Some((Event::Title { at_ms, lines, found, same, stale_region: None }, region))
+            }
+            Event::PlayerShop { at_ms, shop, same, hover, stale_region: Some(region) } => {
+                Some((Event::PlayerShop { at_ms, shop, same, hover, stale_region: None }, region))
+            }
+            Event::StatusBar { at_ms, bar, same, stale_region: Some(region) } => {
+                Some((Event::StatusBar { at_ms, bar, same, stale_region: None }, region))
+            }
+            _ => None,
+        }
+    }
+
     /// When a reading's frame was captured.
     fn at_ms(&self) -> Option<u64> {
         match self {
@@ -1802,6 +1833,13 @@ impl Event {
 
     /// In words; a title read the same as the one before as what that one read, `title`.
     fn describe(&self, title: Option<&TitleLines>) -> String {
+        if let Some((read, region)) = self.left_as_stale() {
+            let ScreenRect { x, y, width, height } = region;
+            return format!(
+                "{}, for a region no longer captured ({width}x{height} at ({x}, {y})): left",
+                read.describe(title)
+            );
+        }
         match self {
             Event::Tick {} => "tick".to_string(),
             Event::Title { lines: Some(lines), .. } => format!("title read {:?} / {:?}", lines.street, lines.map),
@@ -1860,8 +1898,9 @@ impl Event {
             Event::Hotkey { pressed } => format!("hotkey {pressed}"),
             Event::SearchQuery { query } => format!("search typed {query:?}"),
             Event::ItemTooltip { reading } => format!("Item Tooltip read {}", json(reading)),
-            Event::PlayerShop { hover: Some(hover), same, shop, at_ms } => {
-                let read = Event::PlayerShop { at_ms: *at_ms, shop: shop.clone(), same: *same, hover: None }.describe(title);
+            Event::PlayerShop { hover: Some(hover), same, shop, at_ms, .. } => {
+                let read = Event::PlayerShop { at_ms: *at_ms, shop: shop.clone(), same: *same, hover: None, stale_region: None }
+                    .describe(title);
                 let tooltip = match &hover.tooltip {
                     ItemTooltip::Found { name: Some(name), .. } => format!("its tooltip {name:?}"),
                     ItemTooltip::Found { name: None, .. } => "its tooltip unreadable".to_string(),

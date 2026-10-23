@@ -9,11 +9,10 @@
 //! is deleted at launch ([`sweep`]).
 
 use crate::errors::error;
-use crate::http;
+use crate::http::InFlight;
 use minerva_core::SourceError;
 use minerva_core::osms::PICTURES_URL;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Receiver;
 use std::task::Poll;
 use std::time::{Duration, SystemTime};
 
@@ -33,14 +32,14 @@ pub struct Pictures {
     client: reqwest::Client,
     /// Where the pictures are kept.
     dir: PathBuf,
-    /// The picture being fetched, by path, and where its answer will arrive.
-    in_flight: Option<(String, Receiver<Answer>)>,
+    /// The picture being fetched, by path.
+    in_flight: InFlight<String>,
 }
 
 impl Pictures {
     /// Pictures kept under `cache_dir`, fetched with `client`.
     pub fn new(client: reqwest::Client, cache_dir: &Path) -> Self {
-        Self { client, dir: cache_dir.join(FOLDER), in_flight: None }
+        Self { client, dir: cache_dir.join(FOLDER), in_flight: InFlight::default() }
     }
 
     /// Where the overlay loads the picture at `path` from: at once if it is saved,
@@ -50,33 +49,19 @@ impl Pictures {
         let Some(file) = file(&self.dir, path) else {
             return Poll::Ready(Err(SourceError::FormatChanged(format!("picture path {path:?}"))));
         };
-        if let Some((asked, arriving)) = &self.in_flight {
-            let mine = asked == path;
-            match (http::collect(arriving), mine) {
-                (Poll::Pending, true) => return Poll::Pending,
-                (Poll::Pending, false) => {}
-                (Poll::Ready(answer), true) => {
-                    self.in_flight = None;
-                    if let Err(e) = &answer {
-                        error!("OSMS picture {path}: {e}");
-                    }
-                    return Poll::Ready(answer);
-                }
-                // Another picture's, saved unheard.
-                (Poll::Ready(_), false) => self.in_flight = None,
-            }
+        if let Some(answer) = self.in_flight.collect(path, format_args!("OSMS picture {path}")) {
+            return answer;
         }
         if file.is_file() {
             touch(&file);
             return Poll::Ready(Ok(url(path)));
         }
-        if self.in_flight.is_some() {
+        // Another picture's on its way (one that arrived unheard is saved, and let go).
+        if self.in_flight.busy() {
             return Poll::Pending;
         }
         let (client, owned) = (self.client.clone(), path.to_string());
-        let arriving = http::in_background(async move { fetch(&client, &owned, &file).await });
-        self.in_flight = Some((path.to_string(), arriving));
-        Poll::Pending
+        self.in_flight.start(path, async move { fetch(&client, &owned, &file).await })
     }
 }
 

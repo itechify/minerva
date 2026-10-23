@@ -141,7 +141,7 @@ function field(
   };
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") finish(() => enter(input.value));
-    if (e.key === "Escape") finish(() => invoke("item_card_cancel_market"));
+    if (e.key === "Escape") finish(() => invoke("act", { action: "cancelCardMarket" }));
   });
   input.addEventListener("blur", () => {
     if (input.isConnected) finish(() => onLeave(input.value));
@@ -235,7 +235,7 @@ function nameField(line: MarketLine | null, problem: NameProblem | null): HTMLEl
     "Name it, e.g. Lowest ask",
     line ? `Rename ${quoted(line.name)}` : "Name the new market line",
     enter,
-    (typed) => (typed.trim() ? enter(typed) : invoke("item_card_cancel_market")),
+    (typed) => (typed.trim() ? enter(typed) : invoke("act", { action: "cancelCardMarket" })),
   );
   row.append(input);
   if (line) {
@@ -243,7 +243,7 @@ function nameField(line: MarketLine | null, problem: NameProblem | null): HTMLEl
     const remove = iconButton(
       "M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5",
       `Remove ${quoted(line.name)}`,
-      () => invoke("item_card_ask_remove_market_line"),
+      () => invoke("act", { action: "askRemoveCardMarketLine" }),
     );
     remove.addEventListener("mousedown", () => (fieldDone = true));
     row.append(remove);
@@ -269,15 +269,15 @@ function removeQuestion(line: MarketLine, prices: number): HTMLElement {
   question.textContent = what;
   const buttons = document.createElement("div");
   buttons.className = "item-card-remove-buttons";
-  const button = (text: string, command: string) => {
+  const button = (text: string, action: string) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "text-button";
     b.textContent = text;
-    b.addEventListener("click", () => invoke(command));
+    b.addEventListener("click", () => invoke("act", { action }));
     return b;
   };
-  buttons.append(button("Remove", "item_card_remove_market_line"), button("Keep", "item_card_cancel_market"));
+  buttons.append(button("Remove", "removeCardMarketLine"), button("Keep", "cancelCardMarket"));
   box.append(question, buttons);
   return box;
 }
@@ -291,7 +291,7 @@ function marketSection(card: ItemCard): HTMLElement {
   const head = document.createElement("div");
   head.className = "item-card-market-head";
   const add = iconButton("M8 3.5v9M3.5 8h9", "Add a market line to every card", () =>
-    invoke("item_card_add_market_line"),
+    invoke("act", { action: "addCardMarketLine" }),
   );
   head.append(span("label", "Market"), add, mesoWatchButton());
   section.append(head);
@@ -425,7 +425,7 @@ cardEl.addEventListener("animationend", () => cardEl.classList.remove("unfold-le
 
 // The shell sizes the window to the card, up to its most; past that the card scrolls under
 // its bar.
-const reportHeight = heightReporter(cardEl, "item_card_height");
+const reportHeight = heightReporter(cardEl, "page_height");
 window.addEventListener("resize", reportHeight);
 // The height depends on the font, and on pictures arriving: measure again once in.
 document.fonts.ready.then(reportHeight);
@@ -436,4 +436,4 @@ new ResizeObserver(reportHeight).observe(cardEl);
 dragByHandles();
 byId("close").addEventListener("click", () => invoke("item_card_close"));
 
-followView<CardView>("item-card-state", "item_card_view", render);
+followView<CardView>("item-card-state", "page_view", render);

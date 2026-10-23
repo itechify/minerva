@@ -71,12 +71,13 @@ pub use map_data::{
     HiddenPortal, MapData, MapDataStatus, MapSummary, Mob, PerParty, Portal, PortalKind,
 };
 pub use map_index::{Fetched, MapDataSource, MapEntry, SourceError};
+pub use loader::Saved;
 pub use map_mark::MapMark;
 pub use map_preview::{Landing, Leads, MapPreview, PicturePoint, PortalMark, PreviewImage, SpawnMark};
 pub use mob_card::{DamageRange, Elements, HpPerExp, MobCard, MobDetails};
 pub use portal_overrides::PortalOverride;
 pub use panel::{
-    Action, CollapsedSections, DEFAULT_PANEL_WIDTH, Foreground, GameWindow, InsideOffset, Layer, MIN_PANEL_WIDTH, PanelSizes,
+    Action, CollapsedSections, DEFAULT_PANEL_WIDTH, Foreground, shows_on_top, GameWindow, InsideOffset, Layer, MIN_PANEL_WIDTH, PanelSizes,
     PlacementMode, ScreenPoint,
     ScreenRect, Section, Size,
 };
@@ -318,6 +319,10 @@ pub struct PanelState {
     /// The settings view, which takes over the panel while it is open; `None` while it
     /// is closed. Like the search view, it has the keyboard while it is open.
     pub settings_view: Option<SettingsView>,
+    /// The overlay takes the keyboard: the search view or the settings view is open, and
+    /// takes the typing or the combinations the player presses (ADR 0001). Otherwise a click
+    /// on it leaves the keyboard with the game.
+    pub overlay_takes_keyboard: bool,
     /// The player closed first-run setup without going through its warning, so the app
     /// quits.
     pub quit: bool,
@@ -329,12 +334,21 @@ pub struct PanelState {
     /// captured regions; `None` while there is none, no game window, or another app in
     /// front (see [`Layer`]).
     pub item_lookup_placement: Option<ScreenRect>,
+    /// The alert takes clicks: it shows, listing items to pick from. Otherwise every click
+    /// goes through it to the game.
+    pub item_lookup_clickable: bool,
+    /// The hotkey the alert names: the one the player pressed for the lookup it shows (Item
+    /// Lookup's or the Item Card's), and Item Lookup's while it shows none.
+    pub item_lookup_hotkey: String,
     /// The Item Card showing; `None` while there is none.
     pub item_card: Option<ShownItemCard>,
     /// Where the Item Card goes on screen: at the pointer, inside the game window and clear
     /// of the captured regions; `None` while there is none, no game window, or another app
     /// in front (see [`Layer`]).
     pub item_card_placement: Option<ScreenRect>,
+    /// The Item Card takes the keyboard: it shows with a price or line name field open (the
+    /// question before a line goes is answered with a click).
+    pub item_card_takes_keyboard: bool,
     /// The Deal Finder (ADR 0014), as the panel shows it.
     pub deal_finder: DealFinderView,
     /// Where on screen to capture for the Deal Finder (physical px): the game's client area,
@@ -344,6 +358,9 @@ pub struct PanelState {
     /// while the Deal Finder is off, no shop was found, or the overlay can't show, and while
     /// an Item Card or Item Lookup press's capture is taken, which it would be in.
     pub deal_badges: Option<DealBadges>,
+    /// The Deal Badges' window takes clicks: it shows badges, a click on one showing its
+    /// item's card. Otherwise every click goes through it.
+    pub deal_badges_clickable: bool,
     /// The settings view's Game Data: when OSMS's data was fetched, and the player's Refresh.
     pub game_data: GameData,
     /// Updates (ADR 0019): whether a newer version is out, for the tray and Help & Setup, and
@@ -454,6 +471,11 @@ pub enum PanelControl {
 
 /// The most the Deal Margin can be, in percent.
 const MAX_DEAL_MARGIN: u32 = 99;
+
+/// The region on screen a capture of `frame` from `origin` (its top-left pixel) was of.
+fn captured(frame: &Frame, origin: ScreenPoint) -> ScreenRect {
+    ScreenRect { x: origin.x, y: origin.y, width: frame.width, height: frame.height }
+}
 
 /// The game window's title, unless the player picked another by hand.
 pub const GAME_WINDOW_TITLE: &str = "MapleStory";
@@ -641,26 +663,50 @@ impl Minerva {
     }
 
     /// Read a capture of [`PanelState::title_capture`] and update the panel state: the same as
-    /// [`Minerva::on_title_read`] with what a [`TitleReader`] reads in it, here.
+    /// [`Minerva::on_title_read`] with what a [`TitleReader`] reads in it, here, as soon as it
+    /// was captured.
     pub fn on_title_capture(&mut self, capture: TitleCapture) -> &PanelState {
         let reading = self.reader.get_or_insert_with(TitleReader::bundled).read(&capture);
-        self.on_title_read(capture, reading)
+        self.take_title_capture(capture, reading)
     }
 
     /// Take what a title capture read as (read by a [`TitleReader`], possibly on another
     /// thread) and update the panel state.
     pub fn on_reading(&mut self, reading: TitleReading) -> &PanelState {
-        let event = Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), found: reading.found, same: false };
-        self.record_input(event, Some(reading.at_ms), None);
+        self.title_reading_for(reading, None)
+    }
+
+    /// As [`Minerva::on_reading`], with the capture read (by a [`TitleReader`], possibly on
+    /// another thread), whose crop of the title a Bug Report may keep. A capture of a region
+    /// that is no longer [`PanelState::title_capture`] by the time it is read (the game window
+    /// moved, say, or another app came in front) is written down and left: it would put the
+    /// title where it isn't.
+    pub fn on_title_read(&mut self, capture: TitleCapture, reading: TitleReading) -> &PanelState {
+        let region = captured(&capture.frame, capture.origin);
+        if self.state.title_capture != Some(region) {
+            return self.title_reading_for(reading, Some(region));
+        }
+        self.take_title_capture(capture, reading)
+    }
+
+    fn take_title_capture(&mut self, capture: TitleCapture, reading: TitleReading) -> &PanelState {
+        let crop = bug_report::title_crop(&capture, reading.found);
+        let event =
+            Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), found: reading.found, same: false, stale_region: None };
+        self.record_input(event, Some(reading.at_ms), crop);
         self.take_title_reading(reading)
     }
 
-    /// As [`Minerva::on_reading`], with the capture read, whose crop of the title a Bug
-    /// Report may keep.
-    pub fn on_title_read(&mut self, capture: TitleCapture, reading: TitleReading) -> &PanelState {
-        let crop = bug_report::title_crop(&capture, reading.found);
-        let event = Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), found: reading.found, same: false };
-        self.record_input(event, Some(reading.at_ms), crop);
+    /// Take a title reading in, as [`Minerva::on_reading`]; or, if its capture was of
+    /// `stale_region` and that is no longer captured, write it down and leave it. A Bug
+    /// Report's replay decides so again.
+    pub(crate) fn title_reading_for(&mut self, reading: TitleReading, stale_region: Option<ScreenRect>) -> &PanelState {
+        let stale_region = stale_region.filter(|&region| self.state.title_capture != Some(region));
+        let event = Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), found: reading.found, same: false, stale_region };
+        self.record_input(event, Some(reading.at_ms), None);
+        if stale_region.is_some() {
+            return &self.state;
+        }
         self.take_title_reading(reading)
     }
 
@@ -1481,19 +1527,35 @@ impl Minerva {
     /// reads in it, here.
     pub fn on_player_shop_capture(&mut self, capture: ShopCapture) -> &PanelState {
         let reading = self.shop_reader.get_or_insert_with(PlayerShopReader::bundled).read(&capture);
-        self.on_player_shop_read(capture, reading)
+        self.take_player_shop_capture(capture, reading)
     }
 
     /// As [`Minerva::on_player_shop_reading`], with the capture it was read from (by a
     /// [`PlayerShopReader`], possibly on another thread), whose shop list a Bug Report keeps
-    /// (ADR 0009).
+    /// (ADR 0009). A capture of a region that is no longer [`PanelState::deal_finder_capture`]
+    /// by the time it is read (the Deal Finder was turned off, say, or the game window moved)
+    /// is written down and left.
     pub fn on_player_shop_read(&mut self, capture: ShopCapture, reading: ShopReading) -> &PanelState {
+        let region = captured(&capture.frame, capture.origin);
+        if self.state.deal_finder_capture != Some(region) {
+            return self.player_shop_reading_for(reading, Some(region));
+        }
+        self.take_player_shop_capture(capture, reading)
+    }
+
+    fn take_player_shop_capture(&mut self, capture: ShopCapture, reading: ShopReading) -> &PanelState {
         // The list alone, and the Item Tooltip by the pointer, as their samples keep them.
         let crops = [
             bug_report::player_shop_crop(&capture, reading.shop.as_ref()),
             bug_report::shop_tooltip_crop(&capture, reading.hover.as_ref()),
         ];
-        let event = Event::PlayerShop { at_ms: reading.at_ms, shop: reading.shop.clone(), same: false, hover: reading.hover.clone() };
+        let event = Event::PlayerShop {
+            at_ms: reading.at_ms,
+            shop: reading.shop.clone(),
+            same: false,
+            hover: reading.hover.clone(),
+            stale_region: None,
+        };
         self.record_inputs(event, Some(reading.at_ms), crops.into_iter().flatten().collect());
         self.deal_finder.read(reading);
         self.sync_panel()
@@ -1502,8 +1564,25 @@ impl Minerva {
     /// Take what a Deal Finder capture read as (read by a [`PlayerShopReader`], possibly on
     /// another thread): the Player Shop's listings, whose Deal Badges show beside them.
     pub fn on_player_shop_reading(&mut self, reading: ShopReading) -> &PanelState {
-        let event = Event::PlayerShop { at_ms: reading.at_ms, shop: reading.shop.clone(), same: false, hover: reading.hover.clone() };
+        self.player_shop_reading_for(reading, None)
+    }
+
+    /// Take a Deal Finder reading in, as [`Minerva::on_player_shop_reading`]; or, if its
+    /// capture was of `stale_region` and that is no longer captured, write it down and leave
+    /// it. A Bug Report's replay decides so again.
+    pub(crate) fn player_shop_reading_for(&mut self, reading: ShopReading, stale_region: Option<ScreenRect>) -> &PanelState {
+        let stale_region = stale_region.filter(|&region| self.state.deal_finder_capture != Some(region));
+        let event = Event::PlayerShop {
+            at_ms: reading.at_ms,
+            shop: reading.shop.clone(),
+            same: false,
+            hover: reading.hover.clone(),
+            stale_region,
+        };
         self.record_input(event, Some(reading.at_ms), None);
+        if stale_region.is_some() {
+            return &self.state;
+        }
         self.deal_finder.read(reading);
         self.sync_panel()
     }
@@ -1518,7 +1597,7 @@ impl Minerva {
             let reader = self.exp_bar_reader.get_or_insert_with(ExpBarReader::bundled);
             reader.read_status_bar(&capture, reading.bar.as_ref(), figures)
         });
-        self.on_status_bar_read(capture, reading, exp)
+        self.take_status_bar_capture(capture, reading, exp)
     }
 
     /// As [`Minerva::on_status_bar_reading`], with the capture it was read from (by a
@@ -1526,10 +1605,23 @@ impl Minerva {
     /// Report keeps (ADR 0009); then as [`Minerva::on_exp_bar_reading`] with what its EXP
     /// figures read as (by [`ExpBarReader::read_status_bar`] with
     /// [`PanelState::exp_figures`]), whose crop of them it keeps too. `exp` is `None` while
-    /// the figures weren't asked for.
+    /// the figures weren't asked for. A capture of a region that is no longer
+    /// [`PanelState::status_bar_capture`] by the time it is read (the game window moved, say,
+    /// or another app came in front) is written down and left, its EXP figures with it; and
+    /// EXP figures are left once [`PanelState::exp_figures`] no longer asks for them (the
+    /// Grind Tracker was turned off).
     pub fn on_status_bar_read(&mut self, capture: StatusBarCapture, reading: StatusBarReading, exp: Option<ExpBarReading>) -> &PanelState {
+        let region = captured(&capture.frame, capture.origin);
+        if self.state.status_bar_capture != Some(region) {
+            return self.status_bar_reading_for(reading, Some(region));
+        }
+        let exp = exp.filter(|_| self.state.exp_figures.is_some());
+        self.take_status_bar_capture(capture, reading, exp)
+    }
+
+    fn take_status_bar_capture(&mut self, capture: StatusBarCapture, reading: StatusBarReading, exp: Option<ExpBarReading>) -> &PanelState {
         let crop = bug_report::status_bar_crop(&capture, reading.bar.as_ref());
-        let event = Event::StatusBar { at_ms: reading.at_ms, bar: reading.bar.clone(), same: false };
+        let event = Event::StatusBar { at_ms: reading.at_ms, bar: reading.bar.clone(), same: false, stale_region: None };
         self.record_input(event, Some(reading.at_ms), crop);
         self.take_status_bar_reading(reading);
         let Some(exp) = exp else { return self.sync_panel() };
@@ -1543,8 +1635,19 @@ impl Minerva {
     /// another thread): the Character playing, their level and job. Another Character's
     /// name starts a new Session, and another level is the one the Session learns.
     pub fn on_status_bar_reading(&mut self, reading: StatusBarReading) -> &PanelState {
-        let event = Event::StatusBar { at_ms: reading.at_ms, bar: reading.bar.clone(), same: false };
+        self.status_bar_reading_for(reading, None)
+    }
+
+    /// Take a Status Bar reading in, as [`Minerva::on_status_bar_reading`]; or, if its
+    /// capture was of `stale_region` and that is no longer captured, write it down and leave
+    /// it. A Bug Report's replay decides so again.
+    pub(crate) fn status_bar_reading_for(&mut self, reading: StatusBarReading, stale_region: Option<ScreenRect>) -> &PanelState {
+        let stale_region = stale_region.filter(|&region| self.state.status_bar_capture != Some(region));
+        let event = Event::StatusBar { at_ms: reading.at_ms, bar: reading.bar.clone(), same: false, stale_region };
         self.record_input(event, Some(reading.at_ms), None);
+        if stale_region.is_some() {
+            return &self.state;
+        }
         self.take_status_bar_reading(reading)
     }
 
@@ -2028,7 +2131,28 @@ impl Minerva {
         self.state.updates = self.updater.state(self.settings.check_for_updates);
         self.state.game_window_title =
             self.settings.game_window_title.clone().unwrap_or_else(|| GAME_WINDOW_TITLE.into());
+        self.sync_input();
         &self.state
+    }
+
+    /// Which of our windows take the keyboard, and which take clicks, as they show now.
+    fn sync_input(&mut self) {
+        let state = &mut self.state;
+        state.overlay_takes_keyboard = state.search.view.is_some() || state.settings_view.is_some();
+        let lookup = state.item_lookup.as_ref().filter(|_| state.item_lookup_placement.is_some());
+        state.item_lookup_clickable = lookup.is_some_and(|line| matches!(line.outcome, ItemLookup::Choose { .. }));
+        let hotkeys = &self.settings.hotkeys;
+        let named = match lookup.map(|line| line.hotkey) {
+            Some(Hotkey::ItemCard) => &hotkeys.item_card,
+            _ => &hotkeys.item_lookup,
+        };
+        state.item_lookup_hotkey.clone_from(named);
+        let card = state.item_card.as_ref().filter(|_| state.item_card_placement.is_some());
+        state.item_card_takes_keyboard = matches!(
+            card.map(|card| &card.view),
+            Some(ItemCardView::Card(ItemCard { market_edit: Some(MarketEdit::Price { .. } | MarketEdit::Name { .. }), .. }))
+        );
+        state.deal_badges_clickable = state.deal_badges.as_ref().is_some_and(|shown| !shown.badges.is_empty());
     }
 
     /// The Item Lookup's alert, at the top centre of the game window while it has one,

@@ -340,7 +340,7 @@ function update(next: SetupView) {
 
 listen<SetupView>("setup-state", (e) => update(e.payload));
 // The shell may have sent the state before this page was listening.
-invoke<SetupView | null>("setup_view").then((v) => {
+invoke<SetupView | null>("page_view").then((v) => {
   if (v && !view) update(v);
 });
 
@@ -348,47 +348,47 @@ $("guide-open").addEventListener("click", () => show("guide"));
 // The panel's settings view comes in front with the keyboard, its first Change focused.
 $("change-hotkeys").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("open_hotkey_settings").catch(actionError);
+  invoke("panel_press", { control: "settings" }).catch(actionError);
 });
 $("guide-back").addEventListener("click", () => show(returnStep));
 $("about-open").addEventListener("click", () => show("about"));
 $("about-back").addEventListener("click", () => show(returnStep));
 $("site-open").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("open_site").catch(actionError);
+  invoke("panel_press", { control: "openSite" }).catch(actionError);
 });
 $("github-open").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("open_github").catch(actionError);
+  invoke("panel_press", { control: "openGithub" }).catch(actionError);
 });
 $("discord-open").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("open_discord").catch(actionError);
+  invoke("panel_press", { control: "openDiscord" }).catch(actionError);
 });
 $("update-check").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("check_for_updates").catch(actionError);
+  invoke("act", { action: "checkForUpdates" }).catch(actionError);
 });
 $("update-whats-new").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("open_release").catch(actionError);
+  invoke("panel_press", { control: "openRelease" }).catch(actionError);
 });
 $("update-release").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("open_release").catch(actionError);
+  invoke("panel_press", { control: "openRelease" }).catch(actionError);
 });
 $("update-install").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("update").catch(actionError);
+  invoke("panel_press", { control: "update" }).catch(actionError);
 });
-for (const [id, choice] of [
-  ["update-now", "now"],
-  ["update-when-i-quit", "whenIQuit"],
-  ["update-later", "later"],
+for (const [id, action] of [
+  ["update-now", "updateNow"],
+  ["update-when-i-quit", "updateWhenIQuit"],
+  ["update-later", "updateLater"],
 ] as const) {
   $(id).addEventListener("click", () => {
     $("action-error").hidden = true;
-    invoke("update_choice", { choice }).catch(actionError);
+    invoke("act", { action }).catch(actionError);
   });
 }
 getVersion().then((version) => ($("app-version").textContent = version));
@@ -407,7 +407,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-action]
   });
 }
 
-$("finish").addEventListener("click", () => invoke("finish_setup").catch(actionError));
+$("finish").addEventListener("click", () => invoke("act", { action: "finishSetup" }).catch(actionError));
 
 // Picking by hand: the player has a few seconds to put the mouse over the game window.
 // Nothing is clicked or sent to the game; only the window under the pointer is read.

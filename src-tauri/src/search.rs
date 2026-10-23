@@ -8,7 +8,7 @@
 //! relays the player's typing, keys and clicks.
 
 use crate::Command;
-use minerva_core::{Action, PanelControl, Section};
+use minerva_core::PanelControl;
 use std::sync::mpsc::Sender;
 use tauri::{State, WebviewWindow};
 
@@ -50,15 +50,13 @@ pub fn give_focus_back(overlay: &WebviewWindow) {
     let _ = overlay;
 }
 
-// The player's input. Plain (not async) commands run in the order they come, so a
-// quick type-then-Enter reaches the core as typed.
-
-fn act(commands: &Sender<Command>, action: Action) {
-    let _ = commands.send(Command::Act(action));
-}
+// The player's input with a payload of its own; what is only an [`minerva_core::Action`]
+// goes through `act`. Plain (not async) commands run in the order they come, so a quick
+// type-then-Enter reaches the core as typed.
 
 /// One of the icons at the top of the panel (🔍, Help & Setup, placement and the rest):
-/// the same as its hotkey.
+/// the same as its hotkey. Or a control the setup window shares with the panel (its Change
+/// hotkeys, About & Credits' links and Update).
 #[tauri::command]
 pub fn panel_press(control: PanelControl, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::Press(control));
@@ -83,18 +81,6 @@ pub fn search_query(query: String, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::SearchQuery(query));
 }
 
-/// Up or Down: move the highlight.
-#[tauri::command]
-pub fn search_move(down: bool, commands: State<'_, Sender<Command>>) {
-    act(&commands, if down { Action::SearchNext } else { Action::SearchPrevious });
-}
-
-/// Enter: pick the highlighted match, or the highlighted map in a mob's map list.
-#[tauri::command]
-pub fn search_enter(commands: State<'_, Sender<Command>>) {
-    act(&commands, Action::SearchEnter);
-}
-
 /// A click on a matched mob, or on a map in a mob's map list (its ID): pick it.
 #[tauri::command]
 pub fn search_pick(id: String, commands: State<'_, Sender<Command>>) {
@@ -111,40 +97,4 @@ pub fn search_pick_destination(id: String, commands: State<'_, Sender<Command>>)
 #[tauri::command]
 pub fn search_pick_item(id: String, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::SearchPickItem(id));
-}
-
-/// Esc or the back arrow: back a step, with nothing changed.
-#[tauri::command]
-pub fn search_escape(commands: State<'_, Sender<Command>>) {
-    act(&commands, Action::SearchEscape);
-}
-
-/// The Navigation section's 🔍: the Hunting Target mob's map list, to pick another map.
-#[tauri::command]
-pub fn hunting_reopen(commands: State<'_, Sender<Command>>) {
-    act(&commands, Action::ReopenMapList);
-}
-
-/// The Navigation section's ×: clear the Hunting Target or the Destination.
-#[tauri::command]
-pub fn hunting_clear(commands: State<'_, Sender<Command>>) {
-    act(&commands, Action::ClearHuntingTarget);
-}
-
-/// The Taxis checkbox: count taxi rides in Distance, or stop counting them.
-#[tauri::command]
-pub fn search_toggle_taxis(commands: State<'_, Sender<Command>>) {
-    act(&commands, Action::ToggleTaxis);
-}
-
-/// The Teleport Scrolls checkbox: count Teleport Scrolls in Distance, or stop.
-#[tauri::command]
-pub fn search_toggle_teleport_scrolls(commands: State<'_, Sender<Command>>) {
-    act(&commands, Action::ToggleTeleportScrolls);
-}
-
-/// A click on the Map, Navigation or Mobs heading: collapse that section, or open it.
-#[tauri::command]
-pub fn panel_toggle_section(section: Section, commands: State<'_, Sender<Command>>) {
-    act(&commands, Action::ToggleSection(section));
 }
