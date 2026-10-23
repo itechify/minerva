@@ -80,7 +80,7 @@ pub use panel::{
     ScreenRect, Section, Size,
 };
 pub use personal_best::{BESTS_VERSION, CharacterBests, MapBests, SavedBests, VisitBest};
-pub use player_shop::{ListedPrice, PlayerShopReader, ShopCapture, ShopList, ShopReading, ShopRow};
+pub use player_shop::{ListedPrice, PlayerShopReader, ShopCapture, ShopHover, ShopList, ShopReading, ShopRow};
 pub use search::{
     DensityTier, Destination, HuntingTarget, ItemMatch, ItemsMissing, MapMatch, Matches, MobChoice, MobMatch, RouteStop,
     SearchResult, SearchState, SearchView, Trip,
@@ -1471,9 +1471,13 @@ impl Minerva {
     /// [`PlayerShopReader`], possibly on another thread), whose shop list a Bug Report keeps
     /// (ADR 0009).
     pub fn on_player_shop_read(&mut self, capture: ShopCapture, reading: ShopReading) -> &PanelState {
-        let crop = bug_report::player_shop_crop(&capture, reading.shop.as_ref());
-        let event = Event::PlayerShop { at_ms: reading.at_ms, shop: reading.shop.clone(), same: false };
-        self.record_input(event, Some(reading.at_ms), crop);
+        // The list alone, and the Item Tooltip by the pointer, as their samples keep them.
+        let crops = [
+            bug_report::player_shop_crop(&capture, reading.shop.as_ref()),
+            bug_report::shop_tooltip_crop(&capture, reading.hover.as_ref()),
+        ];
+        let event = Event::PlayerShop { at_ms: reading.at_ms, shop: reading.shop.clone(), same: false, hover: reading.hover.clone() };
+        self.record_inputs(event, Some(reading.at_ms), crops.into_iter().flatten().collect());
         self.deal_finder.read(reading);
         self.sync_panel()
     }
@@ -1481,7 +1485,7 @@ impl Minerva {
     /// Take what a Deal Finder capture read as (read by a [`PlayerShopReader`], possibly on
     /// another thread): the Player Shop's listings, whose Deal Badges show beside them.
     pub fn on_player_shop_reading(&mut self, reading: ShopReading) -> &PanelState {
-        let event = Event::PlayerShop { at_ms: reading.at_ms, shop: reading.shop.clone(), same: false };
+        let event = Event::PlayerShop { at_ms: reading.at_ms, shop: reading.shop.clone(), same: false, hover: reading.hover.clone() };
         self.record_input(event, Some(reading.at_ms), None);
         self.deal_finder.read(reading);
         self.sync_panel()
@@ -1974,9 +1978,14 @@ impl Minerva {
     /// Write `event` down for a Bug Report, after what came of the input before it: an
     /// input at `at_ms` if it has a time, read from `frame` if it has one.
     fn record_input(&mut self, event: Event, at_ms: Option<u64>, frame: Option<(Region, Frame)>) {
+        self.record_inputs(event, at_ms, frame.into_iter().collect());
+    }
+
+    /// As [`Minerva::record_input`], read from several frames.
+    fn record_inputs(&mut self, event: Event, at_ms: Option<u64>, frames: Vec<(Region, Frame)>) {
         if self.recorder.takes(&event) {
             self.close_input();
-            self.recorder.open(event, at_ms, frame);
+            self.recorder.open(event, at_ms, frames);
         }
     }
 

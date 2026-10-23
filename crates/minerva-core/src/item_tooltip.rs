@@ -11,7 +11,9 @@
 //!    taller than it, on the slate fill. The game world shows through the fill, dimmed
 //!    and tinted blue, so only bright, near-neutral pixels count as ink. The name ends
 //!    at a gap wider than a space, or at the tooltip's light border, which runs on above
-//!    and below the line where no letter does.
+//!    and below the line where no letter does. Over a light window (the Player Shop's
+//!    chat) the border isn't solid, its text showing through, and the window past it reads
+//!    as ink too: there the name ends where the column is light above the line.
 //! 3. ocrs reads the name as a black-on-white line, enlarged twice over.
 
 use crate::Frame;
@@ -19,6 +21,7 @@ use crate::panel::{ScreenPoint, ScreenRect};
 use crate::prep::{PAD, Rect};
 use crate::recogniser::{Recogniser, frame_to_rgb};
 use image::{GrayImage, Luma, RgbImage};
+use std::collections::HashMap;
 
 /// A capture of the game's whole client area for Item Lookup, and where the pointer was.
 #[derive(Debug, Clone)]
@@ -66,52 +69,91 @@ impl ItemTooltipReader {
     }
 
     pub fn read(&self, capture: &ItemCapture) -> ItemTooltipReading {
-        let tooltip = frame_to_rgb(&capture.frame).map_or(ItemTooltip::None, |img| self.read_rgb(&img, capture));
+        let read = |img: &RgbImage| find(img, capture.origin, capture.pointer, |canvas| read_canvas(&self.recogniser, canvas));
+        let tooltip = frame_to_rgb(&capture.frame).map_or(ItemTooltip::None, |img| read(&img));
         ItemTooltipReading { tooltip, pointer: capture.pointer, at_ms: capture.frame.at_ms }
     }
+}
 
-    fn read_rgb(&self, img: &RgbImage, capture: &ItemCapture) -> ItemTooltip {
-        let pointer = (capture.pointer.x - capture.origin.x, capture.pointer.y - capture.origin.y);
-        let mut bullets = bullets(img, pointer);
-        bullets.sort_by_key(|b| b.distance_sq(pointer));
-        let on_screen = |r: Rect| ScreenRect {
-            x: capture.origin.x + r.x as i32,
-            y: capture.origin.y + r.y as i32,
-            width: r.w,
-            height: r.h,
-        };
-        if let Some((bullet, line)) = bullets.iter().find_map(|b| Some((b, name_line(img, b)?))) {
-            let slack = line.y1 - line.y0;
-            let area = Rect { x: bullet.x0, y: line.y0, w: line.x1 + slack - bullet.x0, h: line.y1 - line.y0 };
-            return ItemTooltip::Found { area: on_screen(area), name: self.read_name(img, &line) };
-        }
-        // A bullet with nothing readable beside it: the name may be covered.
-        match bullets.first() {
-            Some(b) => {
-                let area = Rect { x: b.x0, y: b.y0.saturating_sub(b.h()), w: b.w() + NAMELESS_SLACK, h: 3 * b.h() };
-                ItemTooltip::Found { area: on_screen(area), name: None }
-            }
-            None => ItemTooltip::None,
-        }
+/// Reads the Item Tooltip by the pointer over a Player Shop for the Deal Finder, as
+/// [`ItemTooltipReader`] does, remembering what each name's ink read as: a tooltip left
+/// showing while the player hovers a listing costs no recognition.
+pub(crate) struct ShopTooltipReader {
+    recogniser: Recogniser,
+    read: HashMap<(u32, Vec<u8>), Option<String>>,
+}
+
+/// It remembers at most this many names; past them it starts over.
+const REMEMBERED: usize = 64;
+
+impl ShopTooltipReader {
+    pub fn bundled() -> Self {
+        Self { recogniser: Recogniser::bundled(), read: HashMap::new() }
     }
 
-    fn read_name(&self, img: &RgbImage, line: &NameLine) -> Option<String> {
-        let (w, h) = (line.x1 - line.x0, line.y1 - line.y0);
-        let mut canvas = GrayImage::from_pixel(w + 2 * PAD, h + 2 * PAD, Luma([255]));
-        for y in 0..h {
-            for x in 0..w {
-                let v = ink(img.get_pixel(line.x0 + x, line.y0 + y).0);
-                canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - v)).round() as u8]));
+    /// The Item Tooltip nearest `pointer` (on screen) in `img`, the client area whose
+    /// top-left pixel is at `origin`.
+    pub fn read(&mut self, img: &RgbImage, origin: ScreenPoint, pointer: ScreenPoint) -> ItemTooltip {
+        let (recogniser, read) = (&self.recogniser, &mut self.read);
+        find(img, origin, pointer, |canvas| {
+            let key = (canvas.width(), canvas.as_raw().clone());
+            if let Some(name) = read.get(&key) {
+                return name.clone();
             }
-        }
-        let (cw, ch) = (canvas.width() * UPSCALE, canvas.height() * UPSCALE);
-        let canvas = image::imageops::resize(&canvas, cw, ch, image::imageops::FilterType::Triangle);
-        let rect = Rect { x: PAD * UPSCALE, y: PAD * UPSCALE, w: w * UPSCALE, h: h * UPSCALE };
-        let lines = self.recogniser.read_lines(&canvas, &[rect])?;
-        let text = lines.first()?.as_ref()?.to_string();
-        let text = text.trim();
-        (!text.is_empty()).then(|| text.to_string())
+            let name = read_canvas(recogniser, canvas);
+            if read.len() >= REMEMBERED {
+                read.clear();
+            }
+            read.insert(key, name.clone());
+            name
+        })
     }
+}
+
+/// The Item Tooltip nearest `pointer` in `img`, its name read by `read` from its canvas.
+fn find(img: &RgbImage, origin: ScreenPoint, pointer: ScreenPoint, mut read: impl FnMut(&GrayImage) -> Option<String>) -> ItemTooltip {
+    let pointer = (pointer.x - origin.x, pointer.y - origin.y);
+    let mut bullets = bullets(img, pointer);
+    bullets.sort_by_key(|b| b.distance_sq(pointer));
+    let on_screen = |r: Rect| ScreenRect { x: origin.x + r.x as i32, y: origin.y + r.y as i32, width: r.w, height: r.h };
+    if let Some((bullet, line)) = bullets.iter().find_map(|b| Some((b, name_line(img, b)?))) {
+        let slack = line.y1 - line.y0;
+        let area = Rect { x: bullet.x0, y: line.y0, w: line.x1 + slack - bullet.x0, h: line.y1 - line.y0 };
+        return ItemTooltip::Found { area: on_screen(area), name: read(&name_canvas(img, &line)) };
+    }
+    // A bullet with nothing readable beside it: the name may be covered.
+    match bullets.first() {
+        Some(b) => {
+            let area = Rect { x: b.x0, y: b.y0.saturating_sub(b.h()), w: b.w() + NAMELESS_SLACK, h: 3 * b.h() };
+            ItemTooltip::Found { area: on_screen(area), name: None }
+        }
+        None => ItemTooltip::None,
+    }
+}
+
+/// The name's ink, black on white, padded as ocrs reads it.
+fn name_canvas(img: &RgbImage, line: &NameLine) -> GrayImage {
+    let (w, h) = (line.x1 - line.x0, line.y1 - line.y0);
+    let mut canvas = GrayImage::from_pixel(w + 2 * PAD, h + 2 * PAD, Luma([255]));
+    for y in 0..h {
+        for x in 0..w {
+            let v = ink(img.get_pixel(line.x0 + x, line.y0 + y).0);
+            canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - v)).round() as u8]));
+        }
+    }
+    canvas
+}
+
+/// What the name on `canvas` reads as, enlarged `UPSCALE` times.
+fn read_canvas(recogniser: &Recogniser, canvas: &GrayImage) -> Option<String> {
+    let (w, h) = (canvas.width() - 2 * PAD, canvas.height() - 2 * PAD);
+    let (cw, ch) = (canvas.width() * UPSCALE, canvas.height() * UPSCALE);
+    let canvas = image::imageops::resize(canvas, cw, ch, image::imageops::FilterType::Triangle);
+    let rect = Rect { x: PAD * UPSCALE, y: PAD * UPSCALE, w: w * UPSCALE, h: h * UPSCALE };
+    let lines = recogniser.read_lines(&canvas, &[rect])?;
+    let text = lines.first()?.as_ref()?.to_string();
+    let text = text.trim();
+    (!text.is_empty()).then(|| text.to_string())
 }
 
 /// How far from the pointer (px, either way) the name's bullet is looked for: the
@@ -134,6 +176,10 @@ const MAX_TALL: u32 = 4;
 const NAME_GAP_PER_H: f32 = 1.2;
 /// The tooltip's border runs on at least this many rows above and below the line.
 const BORDER_RISE: u32 = 4;
+/// The tooltip's edge is light on this many rows above the line, down to the one just above
+/// it: the name's letters never reach there, and a crafted item's maker line above the name
+/// doesn't come down to it.
+const EDGE_ROWS: u32 = 4;
 /// A column holds ink when its ink in the line's rows sums past this.
 const COL_MIN_INK: f32 = 0.5;
 /// A row holds ink when its ink near the name's start sums past this.
@@ -307,10 +353,21 @@ fn name_line(img: &RgbImage, bullet: &Blob) -> Option<NameLine> {
         let solid = |(a, b): (u32, u32)| b > a && (a..b).all(|y| ink(img.get_pixel(x, y).0) >= 0.5);
         solid(above) && solid(below)
     };
+    // Or the tooltip's edge: light above the line, where no letter reaches. Past it a light
+    // window (the Player Shop's chat) reads as ink too, and its text shows through the edge.
+    let light = |x: u32, y: u32| ink(img.get_pixel(x, y).0) >= 0.5;
+    let edge = |x: u32| y0 >= EDGE_ROWS && (y0 - EDGE_ROWS..y0).all(|y| light(x, y));
     let max_gap = (lh as f32 * NAME_GAP_PER_H).ceil() as u32;
     let mut x1 = x0 + 1;
     let mut x = x0 + 1;
     while x < w && x - x1 <= max_gap {
+        if edge(x) {
+            // The edge's inner side, lit above the line too, isn't the name's.
+            while x1 > x0 + 1 && light(x1 - 1, y0 - 2) {
+                x1 -= 1;
+            }
+            break;
+        }
         if col_ink(x, rows) > COL_MIN_INK {
             if border(x) {
                 break;

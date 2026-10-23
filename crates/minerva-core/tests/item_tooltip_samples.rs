@@ -142,3 +142,25 @@ fn a_tooltip_over_the_item_inventory_window_is_read() {
         minerva.close_item_card();
     }
 }
+
+/// The name ends at the tooltip's edge, not past it: where the tooltip lies over the Player
+/// Shop's chat, the light chat window past the edge isn't more of the name, though it is as
+/// light as the name's letters, and the chat's text shows through the edge. Item Lookup
+/// says the name as read.
+#[test]
+fn a_tooltip_over_a_light_window_is_read_to_its_edge() {
+    let samples = samples();
+    let mut minerva = started(&samples);
+
+    let file = "one-handed-sword-attack-scroll-greater@10,15.png";
+    let sample = samples.iter().find(|sample| sample.file == file).unwrap_or_else(|| panic!("no {file}"));
+    let img = image::open(samples_dir().join(file)).expect(file).to_rgba8();
+    let frame = Frame { width: img.width(), height: img.height(), rgba: img.into_raw(), at_ms: 1_000 };
+    assert_eq!(minerva.on_hotkey("ctrl+shift+u"), Some(Request::CaptureItemTooltip));
+    let state = minerva.on_item_capture(ItemCapture { frame, origin: ScreenPoint { x: 0, y: 0 }, pointer: sample.pointer });
+    let read = match state.item_lookup.as_ref().map(|line| &line.outcome) {
+        Some(ItemLookup::LookingUp { read } | ItemLookup::NotFound { read }) => read.clone(),
+        other => panic!("{file}: {other:?}"),
+    };
+    assert_eq!(read, "One-Handed Sword Attack Scroll: Greater");
+}

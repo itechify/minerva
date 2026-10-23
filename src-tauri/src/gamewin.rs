@@ -114,8 +114,8 @@ mod win {
         BOOL(1) // keep enumerating
     }
 
-    /// Where the mouse pointer is on screen (physical px), for Item Lookup. Only reads
-    /// window-manager state (ADR 0001).
+    /// Where the mouse pointer is on screen (physical px), for Item Lookup and the Deal
+    /// Finder. Only reads window-manager state (ADR 0001).
     pub fn cursor_position() -> Option<minerva_core::ScreenPoint> {
         let mut at = POINT::default();
         unsafe { GetCursorPos(&mut at) }.ok()?;

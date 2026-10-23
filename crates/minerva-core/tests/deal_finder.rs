@@ -18,7 +18,7 @@ use common::items::{ItemWorld, equip, etc, item_world, scroll, use_item};
 use minerva_core::{
     Action, DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Edge, Foreground, GameWindow, Hotkey, Hotkeys, ItemCardView, ListedPrice,
     MarketPrice, Minerva, PanelControl, PanelSizes, PanelState, Rect, Request, SavedMarketLine, SavedMarketPrices, ScreenRect,
-    Settings, ShopList, ShopReading, ShopRow, Size, TitleRegion, Verdict,
+    Settings, ShopHover, ShopList, ShopReading, ShopRow, Size, TitleRegion, Verdict, ItemTooltip, ScreenPoint,
 };
 use std::task::Poll;
 
@@ -120,7 +120,7 @@ fn covered(slot: u32) -> ShopRow {
 }
 
 fn shop(rows: Vec<ShopRow>, at_ms: u64) -> ShopReading {
-    ShopReading { shop: Some(ShopList { area: LIST, rows }), at_ms }
+    ShopReading { shop: Some(ShopList { area: LIST, rows }), hover: None, at_ms }
 }
 
 fn listed(quantity: u64, mesos: u64) -> ListedPrice {
@@ -148,7 +148,7 @@ fn it_is_off_at_launch_and_its_hotkey_turns_it_on_and_off() {
     assert_eq!(minerva.panel_state().deal_badges, None, "no shop read yet");
 
     // It stays on with no shop open, waiting for one.
-    minerva.on_player_shop_reading(ShopReading { shop: None, at_ms: 400 });
+    minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 400 });
     assert!(minerva.panel_state().deal_finder.on);
     assert_eq!(minerva.panel_state().deal_finder_capture, Some(GAME));
 
@@ -364,7 +364,7 @@ fn the_badges_sit_beside_the_shops_window_level_with_each_listing() {
 fn with_no_room_left_of_the_shop_the_badges_go_right_of_it() {
     let mut minerva = on();
     let list = ScreenRect { x: GAME.x + 100, ..LIST };
-    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![] }), at_ms: 400 };
+    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![] }), hover: None, at_ms: 400 };
     let state = minerva.on_player_shop_reading(reading);
     assert_eq!(state.deal_badges.as_ref().map(|b| b.placement.x), Some(list.x + 809 + 6));
 }
@@ -376,7 +376,7 @@ fn at_another_ui_size_the_shops_window_is_as_much_smaller() {
     let mut minerva = on();
     let list = ScreenRect { x: GAME.x + 100, y: 600, width: 199, height: 235 };
     let band = ShopRow { area: ScreenRect { x: list.x + 37, y: 600, width: 162, height: 35 }, ..row(0, None, None) };
-    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![band] }), at_ms: 400 };
+    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![band] }), hover: None, at_ms: 400 };
     let state = minerva.on_player_shop_reading(reading);
     let DealBadges { placement, badges } = state.deal_badges.clone().expect("badges");
     assert_eq!(placement.x, list.x + 518 + 6, "right of a window 809 × 162/253 px right of the list");
@@ -387,7 +387,7 @@ fn at_another_ui_size_the_shops_window_is_as_much_smaller() {
 fn the_badges_go_when_the_shop_closes_or_the_deal_finder_is_turned_off() {
     let mut minerva = on();
     minerva.on_player_shop_reading(shop(vec![row(0, Some("Garnet"), Some((1, 999)))], 400));
-    let state = minerva.on_player_shop_reading(ShopReading { shop: None, at_ms: 800 });
+    let state = minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 800 });
     assert_eq!(state.deal_badges, None);
     assert!(!state.deal_finder.shop_found);
 
@@ -528,7 +528,7 @@ fn once_the_list_has_changed_a_covered_listing_keeps_nothing_read_before() {
     let mut minerva = on();
     minerva.on_player_shop_reading(shop(vec![row(0, Some("Garnet"), Some((1, 999)))], 400));
     let moved = ShopRow { area: ScreenRect { x: LIST.x + 100, ..covered(0).area }, ..covered(0) };
-    let reading = ShopReading { shop: Some(ShopList { area: ScreenRect { x: LIST.x + 42, ..LIST }, rows: vec![moved] }), at_ms: 800 };
+    let reading = ShopReading { shop: Some(ShopList { area: ScreenRect { x: LIST.x + 42, ..LIST }, rows: vec![moved] }), hover: None, at_ms: 800 };
     let state = minerva.on_player_shop_reading(reading);
     assert_eq!(badge(state, 0), (true, Verdict::Unknown));
 
@@ -539,6 +539,161 @@ fn once_the_list_has_changed_a_covered_listing_keeps_nothing_read_before() {
     minerva.act(Action::ToggleDealFinder);
     let state = minerva.on_player_shop_reading(shop(vec![covered(0)], 800));
     assert_eq!(badge(state, 0), (true, Verdict::Unknown));
+}
+
+/// The name the game cuts both Pet Equip Speed Scrolls short to.
+const SPEED_SCROLL_L: &str = "Pet Equip Speed Scroll: L...";
+const LEGS: &str = "Pet Equip Speed Scroll: Legs for Made Up";
+
+/// The pointer on slot `slot`'s picture, and the game's Item Tooltip below it, its name read
+/// as `name` (`None`: unreadable).
+fn hovering(slot: u32, name: Option<&str>) -> ShopHover {
+    let band = row(slot, None, None).area;
+    let tooltip = ScreenRect { x: LIST.x + 30, y: band.y + 52, width: 420, height: 18 };
+    ShopHover { pointer: ScreenPoint { x: LIST.x + 20, y: band.y + 20 }, tooltip: ItemTooltip::Found { area: tooltip, name: name.map(String::from) } }
+}
+
+/// `rows` read with the pointer on the list, as `hover` says.
+fn hovered(rows: Vec<ShopRow>, hover: ShopHover, at_ms: u64) -> ShopReading {
+    ShopReading { hover: Some(hover), ..shop(rows, at_ms) }
+}
+
+/// A Pet Equip Speed Scroll listed for 12,999 mesos, its name cut short, in slot 0; and a
+/// Garnet in slot 1.
+fn scrolls_listed() -> Vec<ShopRow> {
+    vec![row(0, Some(SPEED_SCROLL_L), Some((1, 12_999))), row(1, Some("Garnet"), Some((1, 999)))]
+}
+
+/// The same, the game's tooltip by the pointer on the scroll's listing hiding its price.
+fn scroll_hovered() -> Vec<ShopRow> {
+    vec![row(0, Some(SPEED_SCROLL_L), None), row(1, Some("Garnet"), Some((1, 999)))]
+}
+
+fn legs_deal() -> Verdict {
+    Verdict::Deal { item: item("02048000", LEGS), listed: listed(1, 12_999), percent: -13, line_mesos: 15_000, grade: DealGrade::Good }
+}
+
+#[test]
+fn a_name_cut_short_that_starts_several_items_names_is_named_by_the_tooltip_hovered_over_it() {
+    let mut minerva = on();
+    let state = minerva.on_player_shop_reading(shop(scrolls_listed(), 400));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown), "both scrolls' names start so");
+
+    // Hovered: the tooltip names it, and hides its price, which stands as read before.
+    let state = minerva.on_player_shop_reading(hovered(scroll_hovered(), hovering(0, Some(LEGS)), 800));
+    assert_eq!(badge(state, 0), (true, legs_deal()));
+    assert_eq!(badge(state, 1), (false, garnet_deal()));
+
+    // The pointer gone, the name stands while the list does.
+    let state = minerva.on_player_shop_reading(shop(scrolls_listed(), 1_200));
+    assert_eq!(badge(state, 0), (false, legs_deal()));
+
+    // A click on its badge shows that scroll's card.
+    let state = minerva.act(Action::OpenDealItem { row: 0 });
+    match &state.item_card.as_ref().expect("a card").view {
+        ItemCardView::Card(card) => assert_eq!(card.id, "02048000"),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn a_tooltip_whose_name_doesnt_start_as_the_listings_names_nothing() {
+    let mut minerva = on();
+    minerva.on_player_shop_reading(shop(scrolls_listed(), 400));
+
+    // The last listing's tooltip, lingering; or one read wrong.
+    let state = minerva.on_player_shop_reading(hovered(
+        scroll_hovered(),
+        hovering(0, Some("Pet Equip Jump Scroll: Head for Made Up")),
+        800,
+    ));
+    assert_eq!(badge(state, 0), (true, Verdict::Unknown));
+    let state = minerva.on_player_shop_reading(shop(scrolls_listed(), 1_200));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+}
+
+#[test]
+fn a_tooltip_names_only_the_listing_the_pointer_is_on() {
+    // Between the listings' bands.
+    let mut minerva = on();
+    minerva.on_player_shop_reading(shop(scrolls_listed(), 400));
+    let mut between = hovering(0, Some(LEGS));
+    between.pointer.y = row(0, None, None).area.y + 58;
+    let state = minerva.on_player_shop_reading(hovered(scrolls_listed(), between, 800));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+
+    // On the listing below, whose name is whole.
+    let state = minerva.on_player_shop_reading(hovered(scrolls_listed(), hovering(1, Some(LEGS)), 1_200));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+    assert_eq!(badge(state, 1), (false, garnet_deal()));
+}
+
+#[test]
+fn a_tooltip_naming_items_that_dont_look_alike_names_nothing() {
+    let mut minerva = on();
+    let moon = || vec![row(0, Some("Blue Mo..."), Some((1, 9_000)))];
+    minerva.on_player_shop_reading(shop(moon(), 400));
+    let state = minerva.on_player_shop_reading(hovered(vec![row(0, Some("Blue Mo..."), None)], hovering(0, Some("Blue Moon")), 800));
+    assert_eq!(badge(state, 0), (true, Verdict::Unknown), "a top and an earring");
+}
+
+#[test]
+fn a_name_a_tooltip_gave_is_forgotten_once_the_list_changes() {
+    let named = || {
+        let mut minerva = on();
+        minerva.on_player_shop_reading(shop(scrolls_listed(), 400));
+        minerva.on_player_shop_reading(hovered(scroll_hovered(), hovering(0, Some(LEGS)), 800));
+        minerva
+    };
+
+    // Scrolled: another listing reads otherwise where it was.
+    let mut minerva = named();
+    let scrolled = vec![row(0, Some(SPEED_SCROLL_L), Some((1, 12_999))), row(1, Some("Garnet Ore"), Some((1, 900)))];
+    let state = minerva.on_player_shop_reading(shop(scrolled, 1_200));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+
+    // Its listing reads at another price: another seller's scroll, or the other scroll.
+    let mut minerva = named();
+    let state = minerva.on_player_shop_reading(shop(vec![row(0, Some(SPEED_SCROLL_L), Some((1, 14_000))), row(1, Some("Garnet"), Some((1, 999)))], 1_200));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+
+    // Bought, or sold out: gone, and nothing covers its slot.
+    let mut minerva = named();
+    minerva.on_player_shop_reading(shop(vec![row(1, Some("Garnet"), Some((1, 999)))], 1_200));
+    let state = minerva.on_player_shop_reading(shop(scrolls_listed(), 1_600));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+
+    // The shop moved: another shop's, or this one dragged.
+    let mut minerva = named();
+    let moved = |row: ShopRow| ShopRow { area: ScreenRect { x: row.area.x + 42, ..row.area }, ..row };
+    let list = ShopList { area: ScreenRect { x: LIST.x + 42, ..LIST }, rows: scrolls_listed().into_iter().map(moved).collect() };
+    let state = minerva.on_player_shop_reading(ShopReading { shop: Some(list), hover: None, at_ms: 1_200 });
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+
+    // Turned off and on again.
+    let mut minerva = named();
+    minerva.act(Action::ToggleDealFinder);
+    minerva.act(Action::ToggleDealFinder);
+    let state = minerva.on_player_shop_reading(shop(scrolls_listed(), 1_200));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+}
+
+#[test]
+fn a_listing_never_read_clean_isnt_named_until_it_is() {
+    // The pointer was on it from the first capture, covering its name: nothing to compare
+    // the tooltip's with.
+    let mut minerva = on();
+    let state = minerva.on_player_shop_reading(hovered(vec![covered(0), row(1, Some("Garnet"), Some((1, 999)))], hovering(0, Some(LEGS)), 400));
+    assert_eq!(badge(state, 0), (true, Verdict::Unknown));
+    let state = minerva.on_player_shop_reading(shop(scrolls_listed(), 800));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown), "not named by a tooltip it wasn't compared with");
+
+    // Its name read, its price hidden from the first: no price yet.
+    let mut minerva = on();
+    let state = minerva.on_player_shop_reading(hovered(scroll_hovered(), hovering(0, Some(LEGS)), 400));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+    let state = minerva.on_player_shop_reading(shop(scrolls_listed(), 800));
+    assert_eq!(badge(state, 0), (false, legs_deal()), "named while its name read, priced once it read whole");
 }
 
 #[test]
