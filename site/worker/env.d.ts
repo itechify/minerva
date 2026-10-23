@@ -9,7 +9,7 @@ declare namespace Cloudflare {
      *  it, the maintainer's routes refuse everyone. */
     ADMIN_TOKEN?: string;
     /** The Discord webhook a new #1 on a Map Leaderboard is posted to, a Worker secret
-     *  (docs/map-leaderboards-setup.md, ADR 0017). Without it, nothing is posted and
+     *  (docs/map-leaderboards-setup.md, ADR 0022). Without it, nothing is posted and
      *  uploads are unchanged. */
     DISCORD_WEBHOOK_URL?: string;
     /** The tests' made-up solo ceilings, in place of osms-ceilings.json. */

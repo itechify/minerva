@@ -10,16 +10,13 @@
 mod common;
 
 use common::items::{ItemWorld, cash, equip, item_world, use_item};
-use common::world::{SEARCH, WorldMap, map, mob, orange, world};
-use common::{FakeSource, ItemSetAnswer, arrive, tracking_with};
+use common::world::{SEARCH, WorldMap, map, mob, orange, world, on_sunset_sky_from, stops};
+use common::{ItemSetAnswer, arrive, tracking_with, SUNSET_SAMPLE, KERNING_SAMPLE, overlaps};
 use minerva_core::{
     Action, Minerva, Destination, Distance, ItemCardView, ItemsMissing, PanelSizes, PanelState, ScreenRect, SearchView,
     Size, Step,
 };
 use std::task::Poll;
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
 
 /// Sunset Sky leads to Kerning City, Kerning City to the Mushroom Field. Orange Mushrooms
 /// on the Field and the Mushroom Grove; a Mushroom Festival in the Event region.
@@ -45,14 +42,6 @@ fn mushroom_items() -> ItemWorld {
 /// A core over `maps` and `items`, both in, with the player arrived on Sunset Sky.
 fn on_sunset_sky(maps: Vec<WorldMap>, items: ItemWorld) -> Minerva {
     on_sunset_sky_from(world(maps).with_items(items))
-}
-
-fn on_sunset_sky_from(source: FakeSource) -> Minerva {
-    let mut minerva = Minerva::new(source);
-    minerva.tick(0);
-    minerva.tick(50);
-    arrive(&mut minerva, SUNSET, 100);
-    minerva
 }
 
 /// The search view open with `query` typed.
@@ -261,14 +250,7 @@ fn destination(state: &PanelState) -> &Destination {
 
 /// The Destination's route, as its map names with how each is reached.
 fn route(state: &PanelState) -> Vec<String> {
-    destination(state)
-        .route
-        .iter()
-        .map(|stop| match stop.by {
-            None => stop.map_name.clone(),
-            Some(step) => format!("{step:?}: {}", stop.map_name),
-        })
-        .collect()
+    stops(&destination(state).route)
 }
 
 #[test]
@@ -316,7 +298,7 @@ fn the_way_to_the_destination_is_worked_out_again_as_the_player_moves() {
     typed(&mut minerva, "field");
     minerva.act(Action::SearchEnter);
 
-    let state = arrive(&mut minerva, KERNING, 2_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 2_000);
 
     assert_eq!(destination(&state).distance, Distance::MapChanges(1));
     assert_eq!(route(&state), ["Kerning City", "Portal: Mushroom Field"]);
@@ -348,13 +330,13 @@ fn arriving_at_the_destination_says_so_with_the_trip_until_the_player_leaves_it(
     typed(&mut minerva, "kerning");
     minerva.act(Action::SearchEnter);
 
-    let there = arrive(&mut minerva, KERNING, 2_000);
+    let there = arrive(&mut minerva, KERNING_SAMPLE, 2_000);
     let to = destination(&there);
     assert!(to.arrived);
     let trip = to.trip.as_ref().expect("the trip");
     assert_eq!((trip.from.as_str(), trip.map_changes, trip.travel.as_slice()), ("Sunset Sky", 1, &[] as &[Step]));
 
-    let left = arrive(&mut minerva, SUNSET, 4_000);
+    let left = arrive(&mut minerva, SUNSET_SAMPLE, 4_000);
     assert_eq!(left.search.destination, None);
 }
 
@@ -368,7 +350,7 @@ fn picking_the_map_the_player_is_on_says_they_are_there_at_once_until_they_leave
     let to = destination(&state);
     assert!(to.arrived);
     assert_eq!((to.distance, to.trip.as_ref()), (Distance::MapChanges(0), None));
-    assert_eq!(arrive(&mut minerva, KERNING, 2_000).search.destination, None);
+    assert_eq!(arrive(&mut minerva, KERNING_SAMPLE, 2_000).search.destination, None);
 }
 
 #[test]
@@ -469,11 +451,6 @@ fn a_click_on_items_shows_their_card_and_closes_the_search_view() {
     assert_eq!(card.name, "Mushroom Stew");
 }
 
-/// Whether two rectangles on screen overlap.
-fn overlap(a: ScreenRect, b: ScreenRect) -> bool {
-    a.x < b.x + b.width as i32 && b.x < a.x + a.width as i32 && a.y < b.y + b.height as i32 && b.y < a.y + a.height as i32
-}
-
 #[test]
 fn a_card_from_search_keeps_off_the_grind_tracker_beside_the_panel() {
     let mut minerva = over_the_game(mushroom_roads());
@@ -485,8 +462,8 @@ fn a_card_from_search_keeps_off_the_grind_tracker_beside_the_panel() {
     let tracker = state.grind_tracker.placement.expect("the Grind Tracker beside the panel");
     let card = state.item_card_placement.expect("the card");
     let panel = state.placement.expect("the panel");
-    assert!(!overlap(card, tracker), "{card:?} over the Grind Tracker at {tracker:?}");
-    assert!(!overlap(card, panel), "{card:?} over the panel at {panel:?}");
+    assert!(!overlaps(card, tracker), "{card:?} over the Grind Tracker at {tracker:?}");
+    assert!(!overlaps(card, panel), "{card:?} over the panel at {panel:?}");
     let client = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
     assert!(card.x >= client.x && card.x + card.width as i32 <= 1920 && card.y + card.height as i32 <= 1200);
 }

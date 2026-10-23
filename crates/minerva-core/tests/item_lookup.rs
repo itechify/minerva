@@ -14,30 +14,16 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, GAME, POINTER, NAME, found, requests};
 use minerva_core::{
-    Action, BESTS_VERSION, Minerva, Foreground, GameWindow, ItemChoice, ItemHit, ItemLookup, ItemTooltip,
-    ItemTooltipReading, MapBests, OurWindow, PanelControl, PanelSizes, PanelState, Request, SavedBests,
-    ScreenPoint, ScreenRect, Settings, Size, SourceError, VisitBest, meowdb,
+    Action, BESTS_VERSION, Minerva, Foreground, ItemChoice, ItemHit, ItemLookup, ItemTooltip,
+    ItemTooltipReading, MapBests, OurWindow, PanelControl, PanelSizes, PanelState, Request, SavedBests, ScreenRect, Settings, Size, SourceError, VisitBest, meowdb,
 };
 
-const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
-const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
-/// Where the pointer is when the player presses the hotkey.
-const POINTER: ScreenPoint = ScreenPoint { x: 1000, y: 580 };
-/// Where the name line of the Item Tooltip read is on screen.
-const NAME: ScreenRect = ScreenRect { x: 1000, y: 600, width: 200, height: 19 };
 /// The Item Lookup alert's size.
 const ALERT: Size = Size { width: 420, height: 40 };
 /// Where the expanded panel is.
 const PANEL: ScreenRect = ScreenRect { x: 2376, y: 510, width: 340, height: 72 };
-
-fn settings() -> Settings {
-    Settings {
-        setup_done: true,
-        ..Settings::default()
-    }
-}
 
 /// A core over the game window, its panel's sizes known, MeowDB's search answered by
 /// `source`.
@@ -50,8 +36,7 @@ fn started_with(source: FakeSource, settings: Settings) -> Minerva {
     });
     minerva.set_grind_tracker_size(Size { width: 300, height: 150 });
     minerva.set_item_lookup_size(ALERT);
-    let frame = ScreenRect { x: GAME.x - 1, y: GAME.y - 31, width: GAME.width + 2, height: GAME.height + 32 };
-    minerva.on_game_window(Some(GameWindow { client: GAME, frame, screens: vec![SCREEN] }));
+    minerva.on_game_window(Some(common::window_on_wide_screen(GAME)));
     common::found_title(&mut minerva, common::title_on(GAME), 0);
     minerva
 }
@@ -145,7 +130,7 @@ fn made_up_meowdb() -> FakeSource {
 
 /// MeowDB's made-up answers, as soon as asked.
 fn started() -> Minerva {
-    started_with(made_up_meowdb(), settings())
+    started_with(made_up_meowdb(), common::set_up())
 }
 
 /// MeowDB's search answers whatever is asked with its made-up answer for `query`.
@@ -160,10 +145,6 @@ fn answering_items(items: &[(&str, &str)]) -> FakeSource {
         .map(|(id, name)| ItemHit { id: id.to_string(), name: name.to_string(), category: None })
         .collect();
     FakeSource::osms_offline().with_item_searches(move |_| Ok(hits.clone()))
-}
-
-fn found(name: &str, at_ms: u64) -> Option<ItemTooltipReading> {
-    Some(ItemTooltipReading { pointer: POINTER, tooltip: ItemTooltip::Found { area: NAME, name: Some(name.into()) }, at_ms })
 }
 
 /// The Item Tooltip near the pointer read as `name`, after the player pressed the hotkey.
@@ -182,11 +163,6 @@ fn opened(name: &str, id: &str) -> Option<ItemLookup> {
 
 fn not_found(read: &str) -> Option<ItemLookup> {
     Some(ItemLookup::NotFound { read: read.into() })
-}
-
-/// Everything the shell has been asked to do since it last asked.
-fn requests(minerva: &mut Minerva) -> Vec<Request> {
-    std::iter::from_fn(|| minerva.take_request()).collect()
 }
 
 fn open(id: &str) -> Request {
@@ -241,6 +217,17 @@ fn a_name_meowdb_has_opens_its_page() {
 }
 
 #[test]
+fn a_saved_copy_of_meowdbs_answer_opens_the_page_as_a_fresh_one_does() {
+    // MeowDB can't be reached, and every search is answered with a copy saved earlier.
+    let mut minerva = started_with(made_up_meowdb().serving_saved_copies(common::SAVED_AT), common::set_up());
+
+    let state = look_up(&mut minerva, "Orihalcon Ore", 1_000);
+
+    assert_eq!(line(&state), opened("Orihalcon Ore", "101"));
+    assert_eq!(requests(&mut minerva), [open("101")]);
+}
+
+#[test]
 fn every_seed_item_opens_its_own_page() {
     for (name, id) in [
         ("Orihalcon Ore", "101"),
@@ -258,7 +245,7 @@ fn every_seed_item_opens_its_own_page() {
 
 #[test]
 fn while_meowdb_is_asked_the_panel_shows_the_name_read_and_the_page_opens_when_it_answers() {
-    let mut minerva = started_with(made_up_meowdb().items_taking(2), settings());
+    let mut minerva = started_with(made_up_meowdb().items_taking(2), common::set_up());
 
     let state = look_up(&mut minerva, "Orihalcon Ore", 1_000);
     assert_eq!(line(&state), Some(ItemLookup::LookingUp { read: "Orihalcon Ore".into() }));
@@ -275,7 +262,7 @@ fn while_meowdb_is_asked_the_panel_shows_the_name_read_and_the_page_opens_when_i
 fn meowdb_is_asked_once_per_lookup() {
     let source = made_up_meowdb().items_taking(2);
     let asked = source.item_requests.clone();
-    let mut minerva = started_with(source, settings());
+    let mut minerva = started_with(source, common::set_up());
 
     look_up(&mut minerva, "Orihalcon Ore", 1_000);
     for at_ms in [1_100, 1_200, 1_300, 1_400] {
@@ -290,7 +277,7 @@ fn meowdb_is_asked_no_more_than_once_every_2_seconds() {
     // Each search goes over the network, answering on the poll after it started.
     let source = made_up_meowdb().items_taking(1);
     let asked = source.item_requests.clone();
-    let mut minerva = started_with(source, settings());
+    let mut minerva = started_with(source, common::set_up());
     look_up(&mut minerva, "Orihalcon Ore", 1_000);
     minerva.tick(1_100);
 
@@ -310,13 +297,14 @@ fn meowdb_is_asked_no_more_than_once_every_2_seconds() {
 #[test]
 fn letters_the_recogniser_confuses_and_case_still_find_the_item() {
     for read in ["0rihalcon 0re", "Orihalc0n Ore", "Oriha1con Ore", "orihalcon ore", "Orihalcon  Ore"] {
-        let mut minerva = started_with(answering("Orihalcon Ore"), settings());
+        let mut minerva = started_with(answering("Orihalcon Ore"), common::set_up());
         let state = look_up(&mut minerva, read, 1_000);
         assert_eq!(line(&state), opened("Orihalcon Ore", "101"), "{read:?}");
     }
-    let mut minerva = started_with(answering("Hero's Gladius"), settings());
+    let mut minerva = started_with(answering("Hero's Gladius"), common::set_up());
     let state = look_up(&mut minerva, "Heros GIadius", 1_000);
     assert!(matches!(line(&state), Some(ItemLookup::Choose { .. })), "punctuation and I for l: {state:?}");
+    assert!(state.item_lookup_clickable, "its items are picked with a click");
 }
 
 #[test]
@@ -332,7 +320,7 @@ fn a_name_one_letter_off_opens_the_item_far_closer_than_any_other() {
 #[test]
 fn a_name_as_close_to_two_items_opens_neither() {
     let items = [("126", "Hat MP Scroll: Greater"), ("125", "Hat HP Scroll: Greater")];
-    let mut minerva = started_with(answering_items(&items), settings());
+    let mut minerva = started_with(answering_items(&items), common::set_up());
 
     let state = look_up(&mut minerva, "Hat NP Scroll: Greater", 1_000);
 
@@ -343,7 +331,7 @@ fn a_name_as_close_to_two_items_opens_neither() {
 #[test]
 fn a_name_one_letter_closer_to_one_of_two_items_still_opens_neither() {
     let items = [("126", "Hat MP Scroll: Greater"), ("125", "Hat HP Scroll: Greater")];
-    let mut minerva = started_with(answering_items(&items), settings());
+    let mut minerva = started_with(answering_items(&items), common::set_up());
 
     let state = look_up(&mut minerva, "Hat MP Scroll: Greatr", 1_000);
 
@@ -353,7 +341,7 @@ fn a_name_one_letter_closer_to_one_of_two_items_still_opens_neither() {
 #[test]
 fn the_exact_name_wins_over_a_neighbour_one_letter_away() {
     let items = [("125", "Hat HP Scroll: Greater"), ("126", "Hat MP Scroll: Greater")];
-    let mut minerva = started_with(answering_items(&items), settings());
+    let mut minerva = started_with(answering_items(&items), common::set_up());
 
     let state = look_up(&mut minerva, "Hat MP Scroll: Greater", 1_000);
 
@@ -363,7 +351,7 @@ fn the_exact_name_wins_over_a_neighbour_one_letter_away() {
 #[test]
 fn a_name_meowdb_answers_only_with_other_items_opens_none() {
     // Silver Ore, Steel Ore and other ores, but no Bronze Ore.
-    let mut minerva = started_with(answering("Orihalcon Ore"), settings());
+    let mut minerva = started_with(answering("Orihalcon Ore"), common::set_up());
 
     let state = look_up(&mut minerva, "Bronze Ore", 1_000);
 
@@ -448,8 +436,8 @@ fn the_next_lookup_replaces_the_list() {
 
 #[test]
 fn meowdb_unreachable_says_so() {
-    let source = FakeSource::osms_offline().with_item_searches(|_| Err(SourceError::Unreachable("offline".into())));
-    let mut minerva = started_with(source, settings());
+    let source = FakeSource::osms_offline().with_item_searches(|_| Err(common::unreachable()));
+    let mut minerva = started_with(source, common::set_up());
 
     let state = look_up(&mut minerva, "Orihalcon Ore", 1_000);
 
@@ -461,7 +449,7 @@ fn meowdb_unreachable_says_so() {
 fn a_search_answer_in_another_shape_says_lookup_is_unavailable() {
     for answer in ["<!DOCTYPE html><html></html>", r#"{"results":[]}"#, r#"{"items":[{"id":101}]}"#] {
         let source = FakeSource::osms_offline().with_item_searches(move |_| meowdb::read_item_search(answer));
-        let mut minerva = started_with(source, settings());
+        let mut minerva = started_with(source, common::set_up());
         let state = look_up(&mut minerva, "Orihalcon Ore", 1_000);
         assert_eq!(line(&state), Some(ItemLookup::FormatChanged), "{answer}");
         assert!(requests(&mut minerva).is_empty(), "{answer}");
@@ -472,7 +460,7 @@ fn a_search_answer_in_another_shape_says_lookup_is_unavailable() {
 fn no_item_tooltip_near_the_pointer_says_so_and_nothing_is_looked_up() {
     let source = FakeSource::osms_offline();
     let asked = source.item_requests.clone();
-    let mut minerva = started_with(source, settings());
+    let mut minerva = started_with(source, common::set_up());
     minerva.on_hotkey("ctrl+shift+u");
 
     let state = minerva.on_item_tooltip_reading(Some(ItemTooltipReading { pointer: POINTER, tooltip: ItemTooltip::None, at_ms: 1_000 }));
@@ -505,7 +493,7 @@ fn a_name_read_as_too_little_to_be_one_is_unreadable() {
 fn our_panel_over_the_name_says_so_and_nothing_is_looked_up() {
     let source = FakeSource::osms_offline();
     let asked = source.item_requests.clone();
-    let mut minerva = started_with(source, settings());
+    let mut minerva = started_with(source, common::set_up());
     assert_eq!(minerva.panel_state().placement, Some(PANEL));
     minerva.on_hotkey("ctrl+shift+u");
 
@@ -521,7 +509,7 @@ fn our_panel_over_the_name_says_so_and_nothing_is_looked_up() {
 #[test]
 fn the_grind_tracker_over_the_name_says_so() {
     let tracking = Settings {
-        ..settings()
+        ..common::set_up()
     };
     let mut minerva = started_with(FakeSource::osms_offline(), tracking);
     let tracker = minerva.panel_state().grind_tracker.placement.expect("the Grind Tracker shows");
@@ -536,7 +524,7 @@ fn the_grind_tracker_over_the_name_says_so() {
 
 #[test]
 fn the_personal_bests_window_over_the_name_says_so() {
-    let mut minerva = started_with(FakeSource::osms_offline(), settings());
+    let mut minerva = started_with(FakeSource::osms_offline(), common::set_up());
     let visits = vec![VisitBest { exp_per_hour: 7200, ..VisitBest::default() }];
     let unassigned = vec![MapBests { id: "010003070".into(), visits }];
     minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned, characters: Vec::new() });
@@ -556,7 +544,7 @@ fn the_personal_bests_window_over_the_name_says_so() {
 fn a_scrolled_items_upgrade_count_isnt_looked_up_with_its_name() {
     let source = made_up_meowdb();
     let asked = source.item_requests.clone();
-    let mut minerva = started_with(source, settings());
+    let mut minerva = started_with(source, common::set_up());
 
     let state = look_up(&mut minerva, "Mithril Guards (+3)", 1_000);
 
@@ -622,7 +610,7 @@ fn the_alert_hides_while_another_app_is_in_front_of_the_game_and_shows_again_unt
 
 #[test]
 fn the_alert_goes_below_a_minimap_title_found_where_it_would_be() {
-    let mut minerva = started_with(FakeSource::osms_offline(), settings());
+    let mut minerva = started_with(FakeSource::osms_offline(), common::set_up());
     // A minimap title found at the top centre of the client area.
     let region = ScreenRect { x: GAME.x + 800, y: GAME.y + 40, width: 320, height: 48 };
     common::found_title(&mut minerva, region, 0);

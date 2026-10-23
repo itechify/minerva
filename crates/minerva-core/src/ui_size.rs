@@ -2,6 +2,7 @@
 //! reader measures it by a part of the UI the game draws at a known size, scales what it
 //! found to the samples' size, and reads that as it stands.
 
+use crate::ink::tint;
 use image::RgbImage;
 use image::imageops::FilterType;
 use std::borrow::Cow;
@@ -89,6 +90,5 @@ impl<'a> AtSamplesSize<'a> {
 
 /// Whether `p` is the pointer's outline: black, with no tint.
 pub(crate) fn pointer_black(p: [u8; 3]) -> bool {
-    let (max, min) = (p.iter().max().copied().unwrap_or(0), p.iter().min().copied().unwrap_or(0));
-    max <= POINTER_BLACK && max - min <= POINTER_TINT
+    p.into_iter().max().unwrap_or(0) <= POINTER_BLACK && tint(p) <= POINTER_TINT
 }

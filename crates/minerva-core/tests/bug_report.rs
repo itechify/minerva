@@ -7,18 +7,14 @@ mod common;
 
 use common::items::{ItemWorld, equip, etc, item_world, scroll};
 use common::osms;
-use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame};
+use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame, HOUR, S, MIN, percent};
 use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES};
 use minerva_core::{
     ListedPrice, ShopCapture, ShopHover, ShopList, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
-    CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
+    CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, STATUS_BAR_STRIP, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
 };
-
-const S: u64 = 1000;
-const MIN: u64 = 60 * S;
-const HOUR: u64 = 60 * MIN;
 
 /// The wall clock at capture time 0: 11 Oct 2026, 12:00 UTC.
 const WALL_AT_START: u64 = 1_791_720_000_000;
@@ -37,13 +33,13 @@ fn about() -> ReportAbout {
 
 /// The game window, at the screen's origin.
 fn game() -> GameWindow {
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    GameWindow { client: screen, frame: screen, screens: vec![screen] }
+    common::window_at_origin(1920, 1200)
 }
 
-/// The percentage the game shows for `exp` on a level of `total` EXP, to hundredths.
-fn percent(exp: u64, total: u64) -> u32 {
-    ((exp * 20_000 + total) / (2 * total)) as u32
+/// The bottom of the game's client area, where the core has the Status Bar captured.
+fn status_bar_strip() -> ScreenRect {
+    let client = game().client;
+    ScreenRect { y: client.y + (client.height - STATUS_BAR_STRIP) as i32, height: STATUS_BAR_STRIP, ..client }
 }
 
 /// The core as the shell runs it: the settings and Personal Bests restored at launch, then
@@ -57,10 +53,7 @@ struct Shell {
 impl Shell {
     fn new(source: FakeSource) -> Self {
         let mut minerva = Minerva::new(source);
-        minerva.restore(Settings {
-            setup_done: true,
-            ..Settings::default()
-        });
+        minerva.restore(common::set_up());
         minerva.restore_bests(SavedBests::default());
         let mut shell = Shell { minerva, at: 0 };
         shell.step();
@@ -528,12 +521,26 @@ fn exp_bar_frame(exp: u64, at_ms: u64) -> Frame {
     frame(&image::RgbaImage::from_pixel(224, 32, image::Rgba([shade, shade, shade, 255])), at_ms)
 }
 
-/// A Status Bar capture of `figures` alone, at (1000,1100) on screen, read as Egbert's Status
-/// Bar (found elsewhere) with the EXP figures in it read as `bar`.
+/// A Status Bar capture with `figures` at (1000,1100) on screen in the bar's plain slate, read
+/// as Egbert's Status Bar with the EXP figures in it read as `bar`.
 fn read_figures(shell: &mut Shell, figures: Frame, bar: ExpBar) {
+    read_figures_at(shell, figures, bar, ScreenPoint { x: 1000, y: 1100 });
+}
+
+/// As [`read_figures`], with the figures at `at` on screen.
+fn read_figures_at(shell: &mut Shell, figures: Frame, bar: ExpBar, at: ScreenPoint) {
     let at_ms = figures.at_ms;
-    let area = ScreenRect { x: 1000, y: 1100, width: figures.width, height: figures.height };
-    let capture = StatusBarCapture { frame: figures, origin: ScreenPoint { x: area.x, y: area.y } };
+    let area = ScreenRect { x: at.x, y: at.y, width: figures.width, height: figures.height };
+    let strip = status_bar_strip();
+    let img = image::RgbaImage::from_fn(strip.width, strip.height, |x, y| {
+        let at = ScreenPoint { x: strip.x + x as i32, y: strip.y + y as i32 };
+        if !area.holds(at) {
+            return image::Rgba([58, 67, 72, 255]);
+        }
+        let i = 4 * ((at.y - area.y) as usize * area.width as usize + (at.x - area.x) as usize);
+        image::Rgba(figures.rgba[i..i + 4].try_into().unwrap())
+    });
+    let capture = StatusBarCapture { frame: frame(&img, at_ms), origin: ScreenPoint { x: strip.x, y: strip.y } };
     let exp = ExpBarReading { bar: Some(bar), at_ms, place: Some(ExpBarPlace { area, remembered: false }) };
     shell.minerva.on_status_bar_read(capture, status_bar_reading(Some("Egbert"), at_ms), Some(exp));
 }
@@ -572,16 +579,17 @@ fn the_exp_bars_crops_are_kept_where_they_changed_for_10_minutes_and_for_the_run
     assert!((150..=153).contains(&recording.crops.len()), "{} crops", recording.crops.len());
 }
 
-/// A frame of noise, which no PNG compresses: about 470 KB.
+/// A frame of noise as big as the Status Bar strip, which no PNG compresses: about 980 KB.
 fn noise_frame(seed: u64, at_ms: u64) -> Frame {
+    let ScreenRect { width, height, .. } = status_bar_strip();
     let mut state = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
-    let rgba = (0..400 * 300 * 4)
+    let rgba = (0..width * height * 4)
         .map(|_| {
             state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
             (state >> 56) as u8
         })
         .collect();
-    Frame { width: 400, height: 300, rgba, at_ms }
+    Frame { width, height, rgba, at_ms }
 }
 
 #[test]
@@ -621,8 +629,10 @@ fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
         } else {
             ExpBar { exp: 1000 + n, percent_hundredths: percent(1000 + n, 20_000) }
         };
+        // As much of the Status Bar as is captured: a crop of the figures as big as they come.
         let figures = noise_frame(n, shell.at);
-        read_figures(&mut shell, figures, bar);
+        let strip = status_bar_strip();
+        read_figures_at(&mut shell, figures, bar, ScreenPoint { x: strip.x, y: strip.y });
         shell.step();
     }
 
@@ -1127,7 +1137,7 @@ fn a_shops_list_at_another_ui_size_is_cut_as_much_smaller() {
 
 /// The bottom of the game's client area as the shell captures it for the Status Bar.
 fn status_bar_capture(at_ms: u64) -> StatusBarCapture {
-    let strip = ScreenRect { x: 0, y: 1104, width: 1920, height: 96 };
+    let strip = status_bar_strip();
     let img = image::RgbaImage::from_fn(strip.width, strip.height, |x, y| {
         image::Rgba([(x % 256) as u8, ((y + strip.y as u32) % 256) as u8, 40, 255])
     });
@@ -1189,4 +1199,37 @@ fn a_status_bar_read_the_same_as_before_is_written_as_such_with_no_crop() {
     let crop = image::load_from_memory(&zip_bytes(&report.zip, crops[0])).expect("a PNG").to_rgba8();
     assert_eq!(crop.dimensions(), (351, 65), "the level, job and name, 10 px around them, to the client's bottom");
     assert_eq!(crop.get_pixel(0, 0).0, [(324 % 256) as u8, (1135 % 256) as u8, 40, 255], "its corner at (324,1135)");
+}
+
+#[test]
+fn readings_for_a_region_no_longer_captured_are_left_and_say_so_and_replay() {
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(5 * S, SUNSET_SKY, grind);
+    let at_ms = shell.at;
+    // The title, read in the whole client area after it was found at the minimap's top.
+    let client = game().client;
+    let blank = image::RgbaImage::new(client.width, client.height);
+    let whole = minerva_core::TitleCapture { frame: frame(&blank, at_ms), origin: ScreenPoint { x: 0, y: 0 }, ours: Vec::new() };
+    let lines = Some(TitleLines { street: CONSTRUCTION_SITE.0.into(), map: CONSTRUCTION_SITE.1.into() });
+    let state = shell.minerva.on_title_read(whole, TitleReading { lines, found: Some(common::TITLE_FOUND), at_ms });
+    assert_eq!(state.map.as_ref().map(|map| map.map_name.as_str()), Some(SUNSET_SKY.1));
+    // The Status Bar, read in a capture taken before the game window moved.
+    let capture = status_bar_capture(at_ms);
+    shell.minerva.on_game_window(Some(common::window_on_wide_screen(common::GAME)));
+    let state = shell.minerva.on_status_bar_read(capture, status_bar_reading(Some("Egbert"), at_ms), None);
+    assert_eq!(state.character, None);
+    shell.play(10 * S, SUNSET_SKY, grind);
+
+    let (_, recording) = shell.report();
+    let timeline = recording.timeline(0);
+    let left = |what: &str| timeline.iter().any(|line| line.contains(what));
+    assert!(
+        left(r#"title read "Victoria Road" / "Construction Site North of Kerning City", for a region no longer captured (1920x1200 at (0, 0)): left"#),
+        "{timeline:#?}"
+    );
+    assert!(
+        left(r#"Status Bar read: level 13, "Magician", "Egbert", for a region no longer captured (1920x128 at (0, 1072)): left"#),
+        "{timeline:#?}"
+    );
+    assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
 }

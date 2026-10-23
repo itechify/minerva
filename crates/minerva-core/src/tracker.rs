@@ -17,8 +17,6 @@ pub struct Tracker {
 /// What the latest frame means for the panel.
 pub struct Tracked {
     pub current: Option<usize>,
-    /// How well the latest frame matched the current map (0..=1), 0 when it didn't.
-    pub confidence: f32,
     pub not_sure: bool,
 }
 
@@ -31,7 +29,7 @@ impl Tracker {
         };
         if self.current == Some(snap.index) {
             self.pending = None;
-            return Tracked { current: self.current, confidence: snap.score, not_sure: false };
+            return Tracked { current: self.current, not_sure: false };
         }
         let reads = match self.pending {
             Some((index, n)) if index == snap.index => n + 1,
@@ -40,7 +38,7 @@ impl Tracker {
         if reads >= READS_TO_SWITCH {
             self.current = Some(snap.index);
             self.pending = None;
-            return Tracked { current: self.current, confidence: snap.score, not_sure: false };
+            return Tracked { current: self.current, not_sure: false };
         }
         self.pending = Some((snap.index, reads));
         self.unconfirmed()
@@ -54,6 +52,6 @@ impl Tracker {
     }
 
     fn unconfirmed(&self) -> Tracked {
-        Tracked { current: self.current, confidence: 0.0, not_sure: true }
+        Tracked { current: self.current, not_sure: true }
     }
 }

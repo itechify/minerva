@@ -1,3 +1,5 @@
+@import "./lane.css";
+
 /* The Personal Bests window: the panel's window, opened wide over the game to compare
    maps. The shell lays it out 920 CSS px wide (WIDTH in src-tauri/src/bests_window.rs),
    narrower over a narrower game, and as tall as the page reports it up to 600 px; past
@@ -96,35 +98,6 @@
 .count-actions {
   flex: none;
   margin-left: auto;
-}
-
-/* Manage: Panel Ink Steel at rest, Portal Blue and underlined under the pointer, as a map's
-   count of visits is, with the same chevron, pointing down while open. */
-.manage-toggle {
-  all: unset;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 2px;
-  font-size: 12px;
-  line-height: 17px;
-  color: var(--ink-2);
-}
-
-.manage-toggle:hover {
-  color: var(--portal);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-
-.manage-toggle:active {
-  color: var(--frame);
-}
-
-.manage-toggle[aria-expanded="true"] .chevron {
-  transform: rotate(90deg);
 }
 
 /* What Manage opens, under the picker: Merge into… and Remove, then the Characters to merge
@@ -324,13 +297,6 @@ th:not(.text) .sort {
   color: var(--frame);
 }
 
-.sort:focus-visible,
-.row-map:focus-visible,
-.visits-toggle:focus-visible {
-  outline: 2px solid var(--edit);
-  outline-offset: 2px;
-}
-
 th[aria-sort] .sort {
   font-weight: 700;
   color: var(--ink);
@@ -370,7 +336,8 @@ tbody tr:hover td {
 }
 
 /* A map's name opens its MeowDB page: ink at rest, Portal Blue and underlined under the
-   pointer, Frame Navy while pressed, as a mob's name in the panel. */
+   pointer, Frame Navy while pressed, as a mob's name in the panel (and as a map's count of
+   Visits and Manage, below). */
 .row-map {
   all: unset;
   cursor: pointer;
@@ -379,14 +346,18 @@ tbody tr:hover td {
   border-radius: 2px;
 }
 
-.row-map:hover {
+.row-map:hover,
+.visits-toggle:hover,
+.manage-toggle:hover {
   color: var(--portal);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
 
-.row-map:active {
+.row-map:active,
+.visits-toggle:active,
+.manage-toggle:active {
   color: var(--frame);
 }
 
@@ -440,11 +411,6 @@ tbody tr.board-row td {
 
 .row-leaderboard:active {
   color: var(--frame);
-}
-
-.row-leaderboard:focus-visible {
-  outline: 2px solid var(--edit);
-  outline-offset: 2px;
 }
 
 /* The shown Character's Share, under the picker: a switch, its knob left on Greyed while
@@ -509,12 +475,12 @@ tbody tr.board-row td {
   box-shadow: 0 0 0 1px var(--disabled-edge);
 }
 
-.switch[data-on="true"] .knob {
+.switch[aria-checked="true"] .knob {
   border-color: var(--edit);
   background: var(--edit);
 }
 
-.switch[data-on="true"] .knob::after {
+.switch[aria-checked="true"] .knob::after {
   left: 11px;
 }
 
@@ -539,11 +505,6 @@ tbody tr.board-row td {
 
 .text-link:active {
   color: var(--frame);
-}
-
-.text-link:focus-visible {
-  outline: 2px solid var(--edit);
-  outline-offset: 2px;
 }
 
 .exp {
@@ -574,34 +535,10 @@ td.lane-cell {
   position: relative;
 }
 
-/* The scale's lines run down every lane, the rows' and the Visits', behind the bars. */
-td.lane-cell .grid {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--lane-inset) + var(--at) * (100% - var(--lane-inset) - var(--lane-end)));
-  width: 1px;
-  background: rgba(30, 45, 90, 0.09);
-}
-
 .lane {
   position: relative;
   height: 10px;
   margin-top: 4px;
-}
-
-.lane .bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  box-sizing: border-box;
-  width: calc(var(--at) * 100%);
-  min-width: 3px;
-  height: 100%;
-  border: 1px solid var(--exp-frame);
-  border-radius: 2px;
-  background: var(--exp-fill);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 /* Where another Visit's bar would end: its right edge, a hairline in the frame's grey. */
@@ -720,8 +657,10 @@ td.lane-cell .grid {
 }
 
 /* The count: Panel Ink Steel at rest, Portal Blue and underlined under the pointer, as the
-   Grind Tracker's "Best" is, with a chevron that points down while the map is open. */
-.visits-toggle {
+   Grind Tracker's "Best" is, with a chevron that points down while the map is open. Manage
+   (under the picker) is drawn as the count is, its chevron pointing down while it's open. */
+.visits-toggle,
+.manage-toggle {
   all: unset;
   cursor: pointer;
   display: inline-flex;
@@ -731,17 +670,6 @@ td.lane-cell .grid {
   font-size: 12px;
   line-height: 17px;
   color: var(--ink-2);
-}
-
-.visits-toggle:hover {
-  color: var(--portal);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-
-.visits-toggle:active {
-  color: var(--frame);
 }
 
 .chevron {
@@ -754,7 +682,8 @@ td.lane-cell .grid {
   stroke-linejoin: round;
 }
 
-.visits-toggle[aria-expanded="true"] .chevron {
+.visits-toggle[aria-expanded="true"] .chevron,
+.manage-toggle[aria-expanded="true"] .chevron {
   transform: rotate(90deg);
 }
 

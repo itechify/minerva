@@ -17,11 +17,11 @@
 //! 3. ocrs reads the name as a black-on-white line, enlarged twice over.
 
 use crate::Frame;
+use crate::ink::{Component, black_on_white, components, luma};
 use crate::panel::{ScreenPoint, ScreenRect};
-use crate::prep::{PAD, Rect};
-use crate::recogniser::{Recogniser, frame_to_rgb};
-use image::{GrayImage, Luma, RgbImage};
-use std::collections::HashMap;
+use crate::prep::Rect;
+use crate::recogniser::{Recogniser, RememberedLines, frame_to_rgb};
+use image::{GrayImage, RgbImage};
 
 /// A capture of the game's whole client area for Item Lookup, and where the pointer was.
 #[derive(Debug, Clone)]
@@ -69,7 +69,9 @@ impl ItemTooltipReader {
     }
 
     pub fn read(&self, capture: &ItemCapture) -> ItemTooltipReading {
-        let read = |img: &RgbImage| find(img, capture.origin, capture.pointer, |canvas| read_canvas(&self.recogniser, canvas));
+        let read = |img: &RgbImage| {
+            find(img, capture.origin, capture.pointer, |ink| self.recogniser.read_stacked(&[ink], UPSCALE).pop().flatten())
+        };
         let tooltip = frame_to_rgb(&capture.frame).map_or(ItemTooltip::None, |img| read(&img));
         ItemTooltipReading { tooltip, pointer: capture.pointer, at_ms: capture.frame.at_ms }
     }
@@ -80,80 +82,47 @@ impl ItemTooltipReader {
 /// showing while the player hovers a listing costs no recognition.
 pub(crate) struct ShopTooltipReader {
     recogniser: Recogniser,
-    read: HashMap<(u32, Vec<u8>), Option<String>>,
+    read: RememberedLines,
 }
-
-/// It remembers at most this many names; past them it starts over.
-const REMEMBERED: usize = 64;
 
 impl ShopTooltipReader {
     pub fn bundled() -> Self {
-        Self { recogniser: Recogniser::bundled(), read: HashMap::new() }
+        Self { recogniser: Recogniser::bundled(), read: RememberedLines::default() }
     }
 
     /// The Item Tooltip nearest `pointer` (on screen) in `img`, the client area whose
     /// top-left pixel is at `origin`.
     pub fn read(&mut self, img: &RgbImage, origin: ScreenPoint, pointer: ScreenPoint) -> ItemTooltip {
         let (recogniser, read) = (&self.recogniser, &mut self.read);
-        find(img, origin, pointer, |canvas| {
-            let key = (canvas.width(), canvas.as_raw().clone());
-            if let Some(name) = read.get(&key) {
-                return name.clone();
-            }
-            let name = read_canvas(recogniser, canvas);
-            if read.len() >= REMEMBERED {
-                read.clear();
-            }
-            read.insert(key, name.clone());
-            name
-        })
+        find(img, origin, pointer, |ink| read.read(recogniser, std::slice::from_ref(ink), UPSCALE).pop().flatten())
     }
 }
 
-/// The Item Tooltip nearest `pointer` in `img`, its name read by `read` from its canvas.
+/// The Item Tooltip nearest `pointer` in `img`, its name read by `read` from its ink (black
+/// on white).
 fn find(img: &RgbImage, origin: ScreenPoint, pointer: ScreenPoint, mut read: impl FnMut(&GrayImage) -> Option<String>) -> ItemTooltip {
     let pointer = (pointer.x - origin.x, pointer.y - origin.y);
     let mut bullets = bullets(img, pointer);
-    bullets.sort_by_key(|b| b.distance_sq(pointer));
-    let on_screen = |r: Rect| ScreenRect { x: origin.x + r.x as i32, y: origin.y + r.y as i32, width: r.w, height: r.h };
+    bullets.sort_by_key(|b| distance_sq(b, pointer));
     if let Some((bullet, line)) = bullets.iter().find_map(|b| Some((b, name_line(img, b)?))) {
         let slack = line.y1 - line.y0;
         let area = Rect { x: bullet.x0, y: line.y0, w: line.x1 + slack - bullet.x0, h: line.y1 - line.y0 };
-        return ItemTooltip::Found { area: on_screen(area), name: read(&name_canvas(img, &line)) };
+        return ItemTooltip::Found { area: area.on_screen(origin), name: read(&name_ink(img, &line)) };
     }
     // A bullet with nothing readable beside it: the name may be covered.
     match bullets.first() {
         Some(b) => {
             let area = Rect { x: b.x0, y: b.y0.saturating_sub(b.h()), w: b.w() + NAMELESS_SLACK, h: 3 * b.h() };
-            ItemTooltip::Found { area: on_screen(area), name: None }
+            ItemTooltip::Found { area: area.on_screen(origin), name: None }
         }
         None => ItemTooltip::None,
     }
 }
 
-/// The name's ink, black on white, padded as ocrs reads it.
-fn name_canvas(img: &RgbImage, line: &NameLine) -> GrayImage {
+/// The name's ink, black on white.
+fn name_ink(img: &RgbImage, line: &NameLine) -> GrayImage {
     let (w, h) = (line.x1 - line.x0, line.y1 - line.y0);
-    let mut canvas = GrayImage::from_pixel(w + 2 * PAD, h + 2 * PAD, Luma([255]));
-    for y in 0..h {
-        for x in 0..w {
-            let v = ink(img.get_pixel(line.x0 + x, line.y0 + y).0);
-            canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - v)).round() as u8]));
-        }
-    }
-    canvas
-}
-
-/// What the name on `canvas` reads as, enlarged `UPSCALE` times.
-fn read_canvas(recogniser: &Recogniser, canvas: &GrayImage) -> Option<String> {
-    let (w, h) = (canvas.width() - 2 * PAD, canvas.height() - 2 * PAD);
-    let (cw, ch) = (canvas.width() * UPSCALE, canvas.height() * UPSCALE);
-    let canvas = image::imageops::resize(canvas, cw, ch, image::imageops::FilterType::Triangle);
-    let rect = Rect { x: PAD * UPSCALE, y: PAD * UPSCALE, w: w * UPSCALE, h: h * UPSCALE };
-    let lines = recogniser.read_lines(&canvas, &[rect])?;
-    let text = lines.first()?.as_ref()?.to_string();
-    let text = text.trim();
-    (!text.is_empty()).then(|| text.to_string())
+    black_on_white(w, h, 0, |x, y| ink(img.get_pixel(line.x0 + x, line.y0 + y).0))
 }
 
 /// How far from the pointer (px, either way) the name's bullet is looked for: the
@@ -204,10 +173,6 @@ fn fill(p: [u8; 3]) -> bool {
     luma(p) < 130.0 && b >= r
 }
 
-fn luma(p: [u8; 3]) -> f32 {
-    0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32
-}
-
 /// Name ink, 0.0 (the fill, or the world dimmed behind it) ..= 1.0 (the near-white
 /// letters, luma ~218). Only near-neutral pixels count: the fill and the edges of
 /// letters on it are blue.
@@ -223,74 +188,33 @@ const INK_MAX_TINT: i32 = 45;
 const INK_LUMA_LO: f32 = 130.0;
 const INK_LUMA_HI: f32 = 200.0;
 
-/// A bullet-coloured component's bounding box (frame px, ends exclusive).
-#[derive(Debug, Clone, Copy)]
-struct Blob {
-    x0: u32,
-    x1: u32,
-    y0: u32,
-    y1: u32,
+/// How far the middle of `blob` (frame px) is from the pointer, squared.
+fn distance_sq(blob: &Component, (px, py): (i32, i32)) -> i64 {
+    let (cx, cy) = (((blob.x0 + blob.x1) / 2) as i64, ((blob.y0 + blob.y1) / 2) as i64);
+    (cx - px as i64).pow(2) + (cy - py as i64).pow(2)
 }
 
-impl Blob {
-    fn w(&self) -> u32 {
-        self.x1 - self.x0
-    }
-
-    fn h(&self) -> u32 {
-        self.y1 - self.y0
-    }
-
-    fn distance_sq(&self, (px, py): (i32, i32)) -> i64 {
-        let (cx, cy) = (((self.x0 + self.x1) / 2) as i64, ((self.y0 + self.y1) / 2) as i64);
-        (cx - px as i64).pow(2) + (cy - py as i64).pow(2)
-    }
-}
-
-/// The bullets near the pointer: round cyan dots with the tooltip's fill left of them.
-fn bullets(img: &RgbImage, (px, py): (i32, i32)) -> Vec<Blob> {
+/// The bullets near the pointer: round cyan dots (4-connected components of bullet-coloured
+/// pixels, their bounds ends exclusive) with the tooltip's fill left of them.
+fn bullets(img: &RgbImage, (px, py): (i32, i32)) -> Vec<Component> {
     let (w, h) = img.dimensions();
     let clamp = |v: i32, max: u32| v.clamp(0, max as i32) as u32;
     let (x0, x1) = (clamp(px - SEARCH, w), clamp(px + SEARCH, w));
     let (y0, y1) = (clamp(py - SEARCH, h), clamp(py + SEARCH, h));
-    let (sw, sh) = (x1 - x0, y1 - y0);
-    let mut seen = vec![false; (sw * sh) as usize];
-    let at = |x: u32, y: u32| ((y - y0) * sw + (x - x0)) as usize;
-    let mut out = Vec::new();
-    for y in y0..y1 {
-        for x in x0..x1 {
-            if seen[at(x, y)] || !bullet_blue(img.get_pixel(x, y).0) {
-                continue;
-            }
-            let mut blob = Blob { x0: x, x1: x + 1, y0: y, y1: y + 1 };
-            let mut count = 0;
-            let mut stack = vec![(x, y)];
-            seen[at(x, y)] = true;
-            while let Some((cx, cy)) = stack.pop() {
-                count += 1;
-                blob = Blob { x0: blob.x0.min(cx), x1: blob.x1.max(cx + 1), y0: blob.y0.min(cy), y1: blob.y1.max(cy + 1) };
-                let next = [(cx.wrapping_sub(1), cy), (cx + 1, cy), (cx, cy.wrapping_sub(1)), (cx, cy + 1)];
-                for (nx, ny) in next {
-                    if (x0..x1).contains(&nx) && (y0..y1).contains(&ny) && !seen[at(nx, ny)] && bullet_blue(img.get_pixel(nx, ny).0) {
-                        seen[at(nx, ny)] = true;
-                        stack.push((nx, ny));
-                    }
-                }
-            }
-            let round = (BULLET_MIN..=BULLET_MAX).contains(&blob.w())
-                && (BULLET_MIN..=BULLET_MAX).contains(&blob.h())
-                && blob.w().abs_diff(blob.h()) <= 3
-                && 2 * count >= blob.w() * blob.h();
-            if round && filled_left_of(img, &blob) {
-                out.push(blob);
-            }
-        }
-    }
-    out
+    let round = |blob: &Component| {
+        (BULLET_MIN..=BULLET_MAX).contains(&blob.w())
+            && (BULLET_MIN..=BULLET_MAX).contains(&blob.h())
+            && blob.w().abs_diff(blob.h()) <= 3
+            && 2 * blob.pixels >= blob.w() * blob.h()
+    };
+    components(img, x0..x1, y0..y1, |p| bullet_blue(p).then_some(0.0))
+        .into_iter()
+        .filter(|blob| round(blob) && filled_left_of(img, blob))
+        .collect()
 }
 
 /// Whether the columns just left of the blob, on its middle rows, are tooltip fill.
-fn filled_left_of(img: &RgbImage, blob: &Blob) -> bool {
+fn filled_left_of(img: &RgbImage, blob: &Component) -> bool {
     let gap = 2;
     if blob.x0 < gap + FILL_COLS {
         return false;
@@ -312,7 +236,7 @@ struct NameLine {
 /// The name beside `bullet`: the ink starting just right of it, on rows taller than it
 /// and around it, up to a gap wider than a space or the tooltip's border. `None` when
 /// there is no such ink: then it isn't the name's bullet, or the name is covered.
-fn name_line(img: &RgbImage, bullet: &Blob) -> Option<NameLine> {
+fn name_line(img: &RgbImage, bullet: &Component) -> Option<NameLine> {
     let (w, h) = img.dimensions();
     let bh = bullet.h();
     let band = (bullet.y0.saturating_sub(MAX_TALL * bh), (bullet.y1 + MAX_TALL * bh).min(h));

@@ -11,14 +11,11 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, GAME};
 use minerva_core::{
-    Action, ClientOffset, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, PanelControl, PanelSizes, PanelState,
+    Action, ClientOffset, Minerva, Foreground, GameWindow, PanelControl, PanelSizes, PanelState,
     ScreenRect, Settings, Size,
 };
-
-const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
-const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
 
 fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
     ScreenRect { x, y, width, height }
@@ -26,20 +23,11 @@ fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
 
 /// The game window with this client area, framed as measured, on `SCREEN`.
 fn game(client: ScreenRect) -> Option<GameWindow> {
-    let frame = rect(client.x - 1, client.y - 31, client.width + 2, client.height + 32);
-    Some(GameWindow { client, frame, screens: vec![SCREEN] })
+    Some(common::window_on_wide_screen(client))
 }
 
 fn sizes(expanded_height: u32) -> PanelSizes {
     PanelSizes { expanded: Size { width: 340, height: expanded_height }, collapsed: Size { width: 44, height: 44 } }
-}
-
-/// Settings with setup finished.
-fn tracking_settings() -> Settings {
-    Settings {
-        setup_done: true,
-        ..Settings::default()
-    }
 }
 
 /// A core restored from `settings`, with the game window found and the windows' sizes known.
@@ -58,20 +46,19 @@ fn tracker(state: &PanelState) -> Option<ScreenRect> {
 
 /// What the shell does on restart: save the settings as JSON, load them into a new core.
 fn restart(minerva: &Minerva) -> Minerva {
-    let json = serde_json::to_string(&minerva.settings()).unwrap();
-    started(serde_json::from_str(&json).unwrap())
+    started(common::settings_after_restart(minerva))
 }
 
 #[test]
 fn with_the_grind_tracker_off_there_is_no_grind_tracker_window() {
-    let minerva = started(Settings { grind_tracker_on: false, ..tracking_settings() });
+    let minerva = started(Settings { grind_tracker_on: false, ..common::set_up() });
 
     assert_eq!(tracker(minerva.panel_state()), None);
 }
 
 #[test]
 fn with_the_exp_bar_set_it_opens_beside_the_panel_tops_level() {
-    let minerva = started(tracking_settings());
+    let minerva = started(common::set_up());
     let state = minerva.panel_state();
 
     assert!(state.grind_tracker.open);
@@ -82,7 +69,7 @@ fn with_the_exp_bar_set_it_opens_beside_the_panel_tops_level() {
 
 #[test]
 fn until_dragged_it_stays_beside_the_panel_s_top_however_tall_the_panel_grows() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
 
     // The panel grows with a map's data, down from its top, which stays: so does the
     // window.
@@ -105,7 +92,7 @@ fn until_dragged_it_stays_beside_the_panel_s_top_however_tall_the_panel_grows() 
 
 #[test]
 fn without_room_on_its_side_of_the_panel_it_goes_on_the_other() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
     // Docked left of a game window near the screen's left edge: the panel at (9,110),
     // and no room left of it for the window, which goes right of it, over the game. There
     // it would cover the Minimap Title, found at (420..1040, 150..198), so it moves the
@@ -122,7 +109,7 @@ fn without_room_on_its_side_of_the_panel_it_goes_on_the_other() {
 
 #[test]
 fn dragged_it_keeps_its_spot_relative_to_the_game_window() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
 
     let state = minerva.act(Action::GrindTrackerMoved { x: 1000, y: 300 });
     assert_eq!(tracker(state), Some(rect(1000, 300, 300, 150)));
@@ -141,7 +128,7 @@ fn dragged_it_keeps_its_spot_relative_to_the_game_window() {
 
 #[test]
 fn dragged_back_beside_the_panel_it_follows_the_panel_again() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
     minerva.act(Action::GrindTrackerMoved { x: 1000, y: 300 });
 
     // Let go within an eighth of its width (37 px) of its spot beside the panel
@@ -160,9 +147,9 @@ fn dragged_back_beside_the_panel_it_follows_the_panel_again() {
 
 #[test]
 fn dragged_onto_the_exp_bar_it_moves_off_it() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
     let area = rect(1817, 1254, 384, 32);
-    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place: Some(ExpBarPlace { area, remembered: false }) });
+    common::found_exp_figures(&mut minerva, area);
 
     // Over the top of the EXP figures found in the Status Bar (1817..2201, 1254..1286): our
     // windows show in the capture, so it moves the shortest way off them, here above.
@@ -173,7 +160,7 @@ fn dragged_onto_the_exp_bar_it_moves_off_it() {
 
 #[test]
 fn dragged_off_the_screen_it_stays_on_it() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
 
     let state = minerva.act(Action::GrindTrackerMoved { x: 3300, y: 1400 });
 
@@ -182,7 +169,7 @@ fn dragged_off_the_screen_it_stays_on_it() {
 
 #[test]
 fn its_close_button_closes_it_and_closed_it_stays_closed_after_a_restart() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
 
     assert_eq!(minerva.press(PanelControl::CloseGrindTracker), None);
     let state = minerva.panel_state();
@@ -196,7 +183,7 @@ fn its_close_button_closes_it_and_closed_it_stays_closed_after_a_restart() {
 
 #[test]
 fn the_panel_s_grind_tracker_button_and_ctrl_shift_g_open_and_close_it() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
     minerva.press(PanelControl::CloseGrindTracker);
 
     assert_eq!(minerva.press(PanelControl::ToggleGrindTracker), None);
@@ -210,7 +197,7 @@ fn the_panel_s_grind_tracker_button_and_ctrl_shift_g_open_and_close_it() {
 
 #[test]
 fn closing_it_leaves_the_session_running() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
     let reading = |exp, percent_hundredths, at_ms| minerva_core::ExpBarReading {
         bar: Some(minerva_core::ExpBar { exp, percent_hundredths }),
         at_ms,
@@ -228,7 +215,7 @@ fn closing_it_leaves_the_session_running() {
 
 #[test]
 fn it_hides_without_the_game_window_and_while_setup_is_open() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
 
     assert_eq!(tracker(minerva.on_game_window(None)), None);
     assert!(minerva.panel_state().grind_tracker.open, "hidden, not closed");
@@ -243,7 +230,7 @@ fn it_hides_without_the_game_window_and_while_setup_is_open() {
 
 #[test]
 fn it_hides_while_another_app_is_in_front_of_the_game() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
     let shown = tracker(minerva.panel_state());
     assert!(shown.is_some());
 
@@ -257,7 +244,7 @@ fn it_hides_while_another_app_is_in_front_of_the_game() {
 
 #[test]
 fn turning_tracking_off_hides_it() {
-    let mut minerva = started(tracking_settings());
+    let mut minerva = started(common::set_up());
 
     minerva.act(Action::SetGrindTracker { on: false });
 

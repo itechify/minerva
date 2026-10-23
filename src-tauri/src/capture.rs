@@ -2,6 +2,15 @@
 //! It copies screen pixels only; it never uses PrintWindow (which would send the game
 //! WM_PRINT) or any capture session tied to the game window (ADR 0001).
 
+use minerva_core::{Frame, ScreenRect};
+
+/// Capture `rect` (physical px on the virtual screen) as a frame for the core, timed by
+/// `at_ms` once its pixels are in.
+pub fn frame(rect: ScreenRect, at_ms: impl FnOnce() -> u64) -> Result<Frame, String> {
+    let rgba = capture_rgba(rect.x, rect.y, rect.width as i32, rect.height as i32)?;
+    Ok(Frame { width: rect.width, height: rect.height, rgba, at_ms: at_ms() })
+}
+
 /// Capture `w`x`h` physical pixels at virtual-screen `(x, y)` as tightly packed RGBA,
 /// top-down rows.
 #[cfg(windows)]

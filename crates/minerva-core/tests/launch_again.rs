@@ -6,10 +6,8 @@ mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    Action, Minerva, Foreground, GameWindow, PanelSizes, PlacementMode, ScreenRect, Settings, Size,
+    Action, Minerva, Foreground, PanelSizes, PlacementMode, Settings, Size,
 };
-
-const GAME: ScreenRect = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
 
 /// A core set up before, so no
 /// first-run setup is waiting, with or without the game window found.
@@ -19,11 +17,8 @@ fn set_up(game_found: bool) -> Minerva {
         expanded: Size { width: 380, height: 72 },
         collapsed: Size { width: 44, height: 44 },
     });
-    minerva.restore(Settings {
-        setup_done: true,
-        ..Settings::default()
-    });
-    let game = game_found.then(|| GameWindow { client: GAME, frame: GAME, screens: vec![GAME] });
+    minerva.restore(common::set_up());
+    let game = game_found.then(|| common::window_at_origin(1920, 1200));
     minerva.on_game_window(game);
     minerva
 }
@@ -80,7 +75,7 @@ fn launched_again_detached_without_the_game_opens_setup_too() {
 #[test]
 fn launched_again_during_first_run_setup_leaves_setup_as_it_is() {
     let mut minerva = Minerva::new(FakeSource::osms_offline());
-    minerva.on_game_window(Some(GameWindow { client: GAME, frame: GAME, screens: vec![GAME] }));
+    minerva.on_game_window(Some(common::window_at_origin(1920, 1200)));
     let before = minerva.panel_state().setup.clone();
     assert!(before.window_open);
 

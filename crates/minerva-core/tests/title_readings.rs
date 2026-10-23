@@ -6,17 +6,11 @@
 mod common;
 
 use common::osms;
-use common::{FakeSource, sample_frame};
-use minerva_core::{Minerva, PanelState, ScreenPoint, TitleCapture, TitleLines, TitleReader, TitleReading};
-
-const KERNING: &str = "victoria-road__kerning-city--window";
+use common::{FakeSource, sample_frame, KERNING_SAMPLE, read_as};
+use minerva_core::{Minerva, PanelState, ScreenPoint, TitleCapture, TitleReader, TitleReading};
 
 fn shown(state: &PanelState) -> Option<(&str, &str)> {
     state.map.as_ref().map(|m| (m.id.as_str(), m.map_name.as_str()))
-}
-
-fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 #[test]
@@ -24,7 +18,7 @@ fn frames_read_on_another_thread_switch_the_map_like_frames_fed_to_the_core() {
     let readings = std::thread::spawn(|| {
         let mut reader = TitleReader::bundled();
         let origin = ScreenPoint { x: 0, y: 0 };
-        [0, 333].map(|at_ms| reader.read(&TitleCapture { frame: sample_frame(KERNING, at_ms), origin, ours: Vec::new() }))
+        [0, 333].map(|at_ms| reader.read(&TitleCapture { frame: sample_frame(KERNING_SAMPLE, at_ms), origin, ours: Vec::new() }))
     })
     .join()
     .unwrap();

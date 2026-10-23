@@ -9,26 +9,11 @@
 mod common;
 
 use common::osms::{self, SUNSET_SKY, map};
-use common::{FakeSource, OsmsAnswer, arrive, fresh, fresh_files, sample_frame};
+use common::{FakeSource, OsmsAnswer, arrive, fresh, sample_frame, SUNSET_SAMPLE, SAVED_AT, DAY, osms_unreachable, osms_changed_format, shown_map_name};
 use minerva_core::osms::OsmsFiles;
-use minerva_core::{Minerva, MapDataStatus, PanelState, Recognition, SourceError};
+use minerva_core::{Minerva, MapDataStatus, PanelState, Recognition};
 use std::sync::atomic::Ordering;
 use std::task::Poll;
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-
-/// When a saved copy was made: 2026-10-01 00:00 UTC, in ms since the Unix epoch.
-const SAVED_AT: u64 = 1_790_812_800_000;
-const DAY_MS: u64 = 24 * 60 * 60 * 1000;
-
-fn unreachable() -> OsmsAnswer {
-    Poll::Ready(Err(SourceError::Unreachable("offline".into())))
-}
-
-/// A set that doesn't read.
-fn changed_format() -> OsmsAnswer {
-    fresh_files(OsmsFiles { maps: "<html>".into(), ..osms::game().files() })
-}
 
 /// OSMS can't be reached, and the game world was saved at [`SAVED_AT`].
 fn saved_and_offline() -> FakeSource {
@@ -44,7 +29,7 @@ fn on_sunset_sky(answers: Vec<OsmsAnswer>, now_unix_ms: u64) -> (Minerva, PanelS
 fn on_sunset_sky_from(source: FakeSource, now_unix_ms: u64) -> (Minerva, PanelState) {
     let mut minerva = Minerva::new(source);
     minerva.on_wall_clock(now_unix_ms);
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
     (minerva, state)
 }
 
@@ -69,7 +54,7 @@ fn a_set_saved_under_a_day_ago_is_used_at_launch_without_fetching_it() {
     let source = FakeSource::with_world(with_blue_snails(9)).with_saved_set(with_blue_snails(6), SAVED_AT);
     let requests = source.osms_requests.clone();
 
-    let (_, state) = on_sunset_sky_from(source, SAVED_AT + DAY_MS - 60_000);
+    let (_, state) = on_sunset_sky_from(source, SAVED_AT + DAY - 60_000);
 
     assert_eq!(requests.load(Ordering::SeqCst), 0);
     assert_eq!(state.recognition, Recognition::Ready);
@@ -81,7 +66,7 @@ fn a_set_saved_over_a_day_ago_is_fetched_afresh_at_launch() {
     let source = FakeSource::with_world(with_blue_snails(9)).with_saved_set(with_blue_snails(6), SAVED_AT);
     let requests = source.osms_requests.clone();
 
-    let (_, state) = on_sunset_sky_from(source, SAVED_AT + DAY_MS + 60_000);
+    let (_, state) = on_sunset_sky_from(source, SAVED_AT + DAY + 60_000);
 
     assert_eq!(requests.load(Ordering::SeqCst), 1);
     assert_eq!(blue_snails(&state), Some(9));
@@ -95,8 +80,8 @@ fn a_set_used_at_launch_is_fetched_afresh_at_the_next_daily_ask() {
     let requests = source.osms_requests.clone();
     let (mut minerva, _) = on_sunset_sky_from(source, SAVED_AT + 60_000);
 
-    minerva.tick(DAY_MS);
-    let state = minerva.on_frame(sample_frame(SUNSET, DAY_MS + 333));
+    minerva.tick(DAY);
+    let state = minerva.on_frame(sample_frame(SUNSET_SAMPLE, DAY + 333));
 
     assert_eq!(requests.load(Ordering::SeqCst), 1);
     assert_eq!(blue_snails(state), Some(9));
@@ -110,7 +95,7 @@ fn without_the_wall_clock_a_saved_set_is_fetched_afresh() {
     let requests = source.osms_requests.clone();
     let mut minerva = Minerva::new(source);
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     assert_eq!(requests.load(Ordering::SeqCst), 1);
     assert_eq!(blue_snails(&state), Some(9));
@@ -123,23 +108,23 @@ fn while_a_set_saved_over_a_day_ago_is_fetched_afresh_the_panel_waits_for_it() {
     let source = FakeSource::answering_osms(vec![Poll::Pending, fresh(with_blue_snails(9))])
         .with_saved_set(with_blue_snails(6), SAVED_AT);
     let mut minerva = Minerva::new(source);
-    minerva.on_wall_clock(SAVED_AT + 2 * DAY_MS);
+    minerva.on_wall_clock(SAVED_AT + 2 * DAY);
 
     let state = minerva.tick(0);
     assert_eq!(state.recognition, Recognition::Starting);
     minerva.tick(400);
 
-    let state = arrive(&mut minerva, SUNSET, 500);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 500);
     assert_eq!(blue_snails(&state), Some(9));
 }
 
 /// The set saved is fallen back on whether OSMS can't be reached or its set doesn't read.
 #[test]
 fn a_set_saved_over_a_day_ago_is_used_when_a_fresh_one_cannot_be_had_or_does_not_read() {
-    for (how, fetched) in [("OSMS unreachable", unreachable()), ("format changed", changed_format())] {
+    for (how, fetched) in [("OSMS unreachable", osms_unreachable()), ("format changed", osms_changed_format())] {
         let source = FakeSource::answering_osms(vec![fetched]).with_saved_set(with_blue_snails(6), SAVED_AT);
 
-        let (_, state) = on_sunset_sky_from(source, SAVED_AT + 2 * DAY_MS);
+        let (_, state) = on_sunset_sky_from(source, SAVED_AT + 2 * DAY);
 
         assert_eq!(state.recognition, Recognition::Ready, "{how}");
         assert_eq!(blue_snails(&state), Some(6), "{how}");
@@ -180,7 +165,7 @@ fn with_osms_unreachable_a_set_another_version_saved_is_used() {
 #[test]
 fn a_saved_set_that_does_not_read_is_as_good_as_none() {
     let unreadable = OsmsFiles { maps: "<html>".into(), ..osms::game().files() };
-    for (fetched, recognition) in [(fresh(osms::game()), Recognition::Ready), (unreachable(), Recognition::Unavailable)] {
+    for (fetched, recognition) in [(fresh(osms::game()), Recognition::Ready), (osms_unreachable(), Recognition::Unavailable)] {
         let source = FakeSource::answering_osms(vec![fetched]).with_saved_files(unreadable.clone(), SAVED_AT);
         let requests = source.osms_requests.clone();
 
@@ -193,7 +178,7 @@ fn a_saved_set_that_does_not_read_is_as_good_as_none() {
 
 #[test]
 fn a_saved_copy_under_7_days_old_is_shown_without_a_notice() {
-    let (_, state) = on_sunset_sky_from(saved_and_offline(), SAVED_AT + 6 * DAY_MS);
+    let (_, state) = on_sunset_sky_from(saved_and_offline(), SAVED_AT + 6 * DAY);
 
     assert_eq!(state.recognition, Recognition::Ready);
     assert!(matches!(&state.data, MapDataStatus::Ready(data) if data.mobs.len() == 5));
@@ -201,7 +186,7 @@ fn a_saved_copy_under_7_days_old_is_shown_without_a_notice() {
 
 #[test]
 fn a_saved_copy_over_7_days_old_is_shown_with_its_date() {
-    let (_, state) = on_sunset_sky_from(saved_and_offline(), SAVED_AT + 8 * DAY_MS);
+    let (_, state) = on_sunset_sky_from(saved_and_offline(), SAVED_AT + 8 * DAY);
 
     assert_eq!(state.recognition, Recognition::SavedCopy { saved_at_unix_ms: SAVED_AT });
     let MapDataStatus::SavedCopy { data, saved_at_unix_ms } = &state.data else { panic!("{:?}", state.data) };
@@ -212,10 +197,10 @@ fn a_saved_copy_over_7_days_old_is_shown_with_its_date() {
 /// A long session: the saved copy turns 7 days old while the player plays.
 #[test]
 fn a_saved_copy_that_turns_7_days_old_while_running_gets_its_notice_then() {
-    let (mut minerva, state) = on_sunset_sky_from(saved_and_offline(), SAVED_AT + 7 * DAY_MS - 1000);
+    let (mut minerva, state) = on_sunset_sky_from(saved_and_offline(), SAVED_AT + 7 * DAY - 1000);
     assert_eq!(state.recognition, Recognition::Ready);
 
-    minerva.on_wall_clock(SAVED_AT + 7 * DAY_MS + 1000);
+    minerva.on_wall_clock(SAVED_AT + 7 * DAY + 1000);
     let state = minerva.tick(2000);
 
     assert_eq!(state.recognition, Recognition::SavedCopy { saved_at_unix_ms: SAVED_AT });
@@ -226,7 +211,7 @@ fn a_saved_copy_that_turns_7_days_old_while_running_gets_its_notice_then() {
 /// status and date beside it, and the map list says so with its date.
 #[test]
 fn the_overlay_receives_a_saved_copy_with_its_date_beside_the_data() {
-    let (_, state) = on_sunset_sky_from(saved_and_offline(), SAVED_AT + 8 * DAY_MS);
+    let (_, state) = on_sunset_sky_from(saved_and_offline(), SAVED_AT + 8 * DAY);
 
     let json = serde_json::to_value(&state).unwrap();
 
@@ -243,13 +228,13 @@ fn the_file_set_is_asked_for_again_every_24_hours() {
     let mut minerva = Minerva::new(source);
     minerva.tick(0);
 
-    minerva.tick(DAY_MS - 1);
+    minerva.tick(DAY - 1);
     assert_eq!(requests.load(Ordering::SeqCst), 1);
-    minerva.tick(DAY_MS);
+    minerva.tick(DAY);
     assert_eq!(requests.load(Ordering::SeqCst), 2);
-    minerva.tick(2 * DAY_MS - 1);
+    minerva.tick(2 * DAY - 1);
     assert_eq!(requests.load(Ordering::SeqCst), 2);
-    minerva.tick(2 * DAY_MS);
+    minerva.tick(2 * DAY);
     assert_eq!(requests.load(Ordering::SeqCst), 3);
 }
 
@@ -264,21 +249,21 @@ fn a_new_set_a_day_later_replaces_the_old_one_whole_and_the_player_stays_on_thei
     let (mut minerva, state) = on_sunset_sky(vec![fresh(with_blue_snails(6)), fresh(patched_first)], SAVED_AT);
     assert_eq!(blue_snails(&state), Some(6));
 
-    minerva.tick(DAY_MS);
-    let state = minerva.on_frame(sample_frame(SUNSET, DAY_MS + 333));
+    minerva.tick(DAY);
+    let state = minerva.on_frame(sample_frame(SUNSET_SAMPLE, DAY + 333));
 
-    assert_eq!(state.map.as_ref().map(|m| m.map_name.as_str()), Some("Sunset Sky"));
+    assert_eq!(shown_map_name(state), Some("Sunset Sky"));
     assert!(!state.not_sure);
     assert_eq!(blue_snails(state), Some(9));
 }
 
 #[test]
 fn a_set_that_cannot_be_had_or_does_not_read_a_day_later_leaves_the_one_in_use() {
-    for (how, later) in [("OSMS unreachable", unreachable()), ("format changed", changed_format())] {
+    for (how, later) in [("OSMS unreachable", osms_unreachable()), ("format changed", osms_changed_format())] {
         let (mut minerva, _) = on_sunset_sky(vec![fresh(with_blue_snails(6)), later], SAVED_AT);
 
-        minerva.tick(DAY_MS);
-        let state = minerva.on_frame(sample_frame(SUNSET, DAY_MS + 333));
+        minerva.tick(DAY);
+        let state = minerva.on_frame(sample_frame(SUNSET_SAMPLE, DAY + 333));
 
         assert_eq!(state.recognition, Recognition::Ready, "{how}");
         assert_eq!(blue_snails(state), Some(6), "{how}");
@@ -289,14 +274,14 @@ fn a_set_that_cannot_be_had_or_does_not_read_a_day_later_leaves_the_one_in_use()
 /// update: asking again won't change that before OSMS changes again, so it waits a day.
 #[test]
 fn with_no_set_to_fall_back_on_a_changed_format_says_so_and_is_asked_again_a_day_later() {
-    let source = FakeSource::answering_osms(vec![changed_format(), fresh(osms::game())]);
+    let source = FakeSource::answering_osms(vec![osms_changed_format(), fresh(osms::game())]);
     let requests = source.osms_requests.clone();
     let mut minerva = Minerva::new(source);
 
     let state = minerva.tick(0);
     assert_eq!(state.recognition, Recognition::FormatChanged);
 
-    minerva.tick(DAY_MS - 1);
+    minerva.tick(DAY - 1);
     assert_eq!(requests.load(Ordering::SeqCst), 1);
-    assert_eq!(minerva.tick(DAY_MS).recognition, Recognition::Ready);
+    assert_eq!(minerva.tick(DAY).recognition, Recognition::Ready);
 }

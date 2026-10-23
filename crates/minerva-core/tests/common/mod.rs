@@ -10,16 +10,23 @@ pub mod world;
 use minerva_core::osms::{OsmsFiles, SavedFiles};
 use minerva_core::osms_items::{ItemFiles, SavedItemFiles};
 use minerva_core::{
-    MINERVA_VERSION, Minerva, Fetched, Frame, GameWindow, ItemHit, MapDataSource, PanelState,
-    ScreenRect, Settings, SourceError, TitleReading,
+    ExpBar, ExpBarPlace, ExpBarReading, Fetched, Frame, GameWindow, ItemHit, ItemTooltip, ItemTooltipReading, MINERVA_VERSION,
+    MapDataSource, Minerva, PanelState, Request, ScreenPoint, ScreenRect, Settings, SourceError, TitleCapture, TitleLines,
+    TitleReading,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
+/// The folder of one kind of sample under `samples/`: "minimap", "exp-bar", "status-bar",
+/// "item-tooltip" or "player-shop".
+pub fn samples_in(kind: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples").join(kind)
+}
+
 pub fn samples_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/minimap")
+    samples_in("minimap")
 }
 
 pub fn fixtures_dir() -> PathBuf {
@@ -105,12 +112,8 @@ pub fn tracking() -> Minerva {
 /// As [`tracking`], with OSMS's file set from `source`.
 pub fn tracking_with(source: FakeSource) -> Minerva {
     let mut minerva = Minerva::new(source);
-    minerva.restore(Settings {
-        setup_done: true,
-        ..Settings::default()
-    });
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    minerva.restore(set_up());
+    minerva.on_game_window(Some(window_at_origin(1920, 1200)));
     minerva
 }
 
@@ -295,7 +298,8 @@ impl FakeSource {
     }
 }
 
-fn unreachable() -> SourceError {
+/// OSMS or MeowDB can't be reached.
+pub fn unreachable() -> SourceError {
     SourceError::Unreachable("offline".into())
 }
 
@@ -387,3 +391,165 @@ pub fn found_title(minerva: &mut Minerva, area: ScreenRect, at_ms: u64) {
 /// Where readings made up in these tests found the Minimap Title, on a game window at the
 /// screen's top-left: the open minimap's top, at the samples' UI Size.
 pub const TITLE_FOUND: ScreenRect = ScreenRect { x: 0, y: 4, width: 720, height: 110 };
+
+// Time, in the ms the core counts in.
+pub const S: u64 = 1000;
+pub const MIN: u64 = 60 * S;
+pub const HOUR: u64 = 60 * MIN;
+pub const DAY: u64 = 24 * HOUR;
+
+/// When a saved copy was made: 2026-10-01 00:00 UTC, in ms since the Unix epoch.
+pub const SAVED_AT: u64 = 1_790_812_800_000;
+
+// The window samples the tests arrive on, named as `sample_frame` loads them.
+pub const SUNSET_SAMPLE: &str = "victoria-road__sunset-sky--window";
+pub const KERNING_SAMPLE: &str = "victoria-road__kerning-city--window";
+pub const CONSTRUCTION_SAMPLE: &str = "victoria-road__construction-site-north-of-kerning-city--window";
+
+/// A made-up map whose data the tests give, on a street of its own.
+pub const FIELD: u64 = 100_000_000;
+
+/// `img`'s pixels as a frame at 1,000 ms, their colours times `brightness` (as the game
+/// draws a dimmed screen).
+pub fn dimmed(img: &image::RgbaImage, brightness: f32) -> Frame {
+    let mut rgba = img.as_raw().clone();
+    for (i, channel) in rgba.iter_mut().enumerate() {
+        if i % 4 != 3 {
+            *channel = (*channel as f32 * brightness).round() as u8;
+        }
+    }
+    Frame { width: img.width(), height: img.height(), rgba, at_ms: 1_000 }
+}
+
+/// The game's client area (physical px) in the tests' usual spot: 1920x1200 at (812,110).
+pub const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
+/// The tests' usual screen: one 3440x1440 monitor.
+pub const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
+
+/// The game window's frame as the shell measures it around `client`: 1 px each side and 31
+/// above.
+pub fn framed(client: ScreenRect) -> ScreenRect {
+    ScreenRect { x: client.x - 1, y: client.y - 31, width: client.width + 2, height: client.height + 32 }
+}
+
+/// The game window as the shell reports it, with this client area, framed as measured, on
+/// [`SCREEN`].
+pub fn window_on_wide_screen(client: ScreenRect) -> GameWindow {
+    GameWindow { client, frame: framed(client), screens: vec![SCREEN] }
+}
+
+/// The game window at the screen's origin, `width` by `height`, with no frame around it, on
+/// a screen of its size.
+pub fn window_at_origin(width: u32, height: u32) -> GameWindow {
+    let screen = ScreenRect { x: 0, y: 0, width, height };
+    GameWindow { client: screen, frame: screen, screens: vec![screen] }
+}
+
+/// The client area of a window sample shown at (812,110).
+pub fn game_of(sample: &str) -> ScreenRect {
+    let client = client_of(&load(sample));
+    ScreenRect { x: 812, y: 110, width: client.width(), height: client.height() }
+}
+
+/// The capture the core asks for, taken of `sample`'s client area shown at [`game_of`] it.
+pub fn title_capture(minerva: &Minerva, sample: &str, at_ms: u64) -> TitleCapture {
+    let client = client_of(&load(sample));
+    let region = minerva.panel_state().title_capture.expect("a title capture with the game in front");
+    let ours = minerva.panel_state().our_windows.clone();
+    TitleCapture { frame: capture(&client, game_of(sample), region, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ours }
+}
+
+/// Settings with setup finished.
+pub fn set_up() -> Settings {
+    Settings { setup_done: true, ..Settings::default() }
+}
+
+/// What the shell does on restart: the settings saved as JSON, then loaded back.
+pub fn settings_after_restart(minerva: &Minerva) -> Settings {
+    let json = serde_json::to_string(&minerva.settings()).unwrap();
+    serde_json::from_str(&json).unwrap()
+}
+
+/// The Minimap Title read as `street` and `map` at `at_ms`, found where readings made up in
+/// these tests find it ([`TITLE_FOUND`]).
+pub fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
+    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(TITLE_FOUND), at_ms }
+}
+
+/// Two confident readings of a title the minimap samples don't show, over `world`.
+pub fn on_title(world: osms::World, street: &str, name: &str) -> PanelState {
+    let mut minerva = Minerva::new(FakeSource::with_world(world));
+    minerva.on_reading(read_as(street, name, 0));
+    minerva.on_reading(read_as(street, name, 333)).clone()
+}
+
+/// The percentage the game shows for `exp` on a level of `total` EXP, rounded to hundredths.
+pub fn percent(exp: u64, total: u64) -> u32 {
+    ((exp * 20_000 + total) / (2 * total)) as u32
+}
+
+/// The EXP bar read as `exp [percent_hundredths / 100 %]` at `at_ms`.
+pub fn read(minerva: &mut Minerva, at_ms: u64, exp: u64, percent_hundredths: u32) -> PanelState {
+    let bar = Some(ExpBar { exp, percent_hundredths });
+    minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place: None }).clone()
+}
+
+/// A frame of the EXP bar at `at_ms` whose figures don't read whole.
+pub fn unread(minerva: &mut Minerva, at_ms: u64) -> PanelState {
+    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms, place: None }).clone()
+}
+
+/// The EXP figures read as unreadable where they were found, at `area`.
+pub fn found_exp_figures(minerva: &mut Minerva, area: ScreenRect) {
+    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place: Some(ExpBarPlace { area, remembered: false }) });
+}
+
+/// Whether two rectangles on screen overlap.
+pub fn overlaps(a: ScreenRect, b: ScreenRect) -> bool {
+    a.x < b.x + b.width as i32 && b.x < a.x + a.width as i32 && a.y < b.y + b.height as i32 && b.y < a.y + a.height as i32
+}
+
+/// The Personal Best the Best row shows.
+pub fn best_row(state: &PanelState) -> Option<u64> {
+    state.exp_tracking.personal_best
+}
+
+/// The shown map's ID.
+pub fn shown_id(state: &PanelState) -> Option<&str> {
+    state.map.as_ref().map(|m| m.id.as_str())
+}
+
+/// The shown map's name.
+pub fn shown_map_name(state: &PanelState) -> Option<&str> {
+    state.map.as_ref().map(|m| m.map_name.as_str())
+}
+
+/// Where the pointer is when the player presses an Item Tooltip hotkey.
+pub const POINTER: ScreenPoint = ScreenPoint { x: 1000, y: 580 };
+/// Where the name line of the Item Tooltip read is on screen.
+pub const NAME: ScreenRect = ScreenRect { x: 1000, y: 600, width: 200, height: 19 };
+
+/// The Item Tooltip at [`POINTER`] read as `name`, its name line at [`NAME`].
+pub fn found(name: &str, at_ms: u64) -> Option<ItemTooltipReading> {
+    Some(ItemTooltipReading { pointer: POINTER, tooltip: ItemTooltip::Found { area: NAME, name: Some(name.into()) }, at_ms })
+}
+
+/// Everything the shell has been asked to do since it last asked.
+pub fn requests(minerva: &mut Minerva) -> Vec<Request> {
+    std::iter::from_fn(|| minerva.take_request()).collect()
+}
+
+/// OSMS's file set can't be reached.
+pub fn osms_unreachable() -> OsmsAnswer {
+    Poll::Ready(Err(unreachable()))
+}
+
+/// A set that doesn't read.
+pub fn osms_changed_format() -> OsmsAnswer {
+    fresh_files(OsmsFiles { maps: "<html>".into(), ..osms::game().files() })
+}
+
+/// OSMS's item files can't be reached.
+pub fn items_unreachable() -> ItemSetAnswer {
+    Poll::Ready(Err(unreachable()))
+}

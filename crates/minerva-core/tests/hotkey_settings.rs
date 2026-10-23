@@ -67,10 +67,12 @@ fn the_settings_view_and_the_search_view_take_each_others_place() {
     minerva.press(PanelControl::Search);
     assert!(minerva.panel_state().search.view.is_some());
     assert_eq!(minerva.panel_state().settings_view, None);
+    assert!(minerva.panel_state().overlay_takes_keyboard);
 
     minerva.press(PanelControl::Settings);
     assert_eq!(minerva.panel_state().search.view, None);
     assert!(minerva.panel_state().settings_view.is_some());
+    assert!(minerva.panel_state().overlay_takes_keyboard);
 }
 
 #[test]
@@ -78,6 +80,7 @@ fn the_back_arrow_or_collapsing_the_panel_closes_the_settings_view() {
     let mut minerva = settings_open();
     minerva.act(Action::CloseSettings);
     assert_eq!(minerva.panel_state().settings_view, None);
+    assert!(!minerva.panel_state().overlay_takes_keyboard);
 
     minerva.press(PanelControl::Settings);
     minerva.on_hotkey("ctrl+shift+c");
@@ -111,7 +114,7 @@ fn a_rebound_hotkey_is_saved_and_the_others_are_kept() {
     let saved = minerva.settings().hotkeys;
     assert_eq!(saved, Hotkeys { item_lookup: "alt+f5".into(), ..Hotkeys::default() });
     let mut later = Minerva::new(FakeSource::osms());
-    later.restore(serde_json::from_str(&serde_json::to_string(&minerva.settings()).unwrap()).unwrap());
+    later.restore(common::settings_after_restart(&minerva));
     assert_eq!(later.panel_state().hotkeys.item_lookup, "alt+f5", "and kept at the next launch");
 }
 
@@ -338,7 +341,7 @@ fn a_hotkey_turned_off_stays_off_at_the_next_launch_and_can_be_turned_on_again()
     minerva.rebind_key(press("", "Delete"));
 
     let mut later = Minerva::new(FakeSource::osms());
-    later.restore(serde_json::from_str(&serde_json::to_string(&minerva.settings()).unwrap()).unwrap());
+    later.restore(common::settings_after_restart(&minerva));
     assert_eq!(later.panel_state().hotkeys.item_lookup, "", "still off");
     assert!(later.panel_state().hotkeys.all().iter().all(|hotkey| !hotkey.is_empty()));
 

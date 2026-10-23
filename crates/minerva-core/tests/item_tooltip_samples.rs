@@ -13,14 +13,9 @@ mod common;
 use common::FakeSource;
 use common::items::{ItemWorld, etc, item_world};
 use minerva_core::{
-    Minerva, Frame, GameWindow, ItemCapture, ItemCardView, ItemLookup, PanelState, Request, ScreenPoint, ScreenRect,
+    Minerva, Frame, ItemCapture, ItemCardView, ItemLookup, PanelState, Request, ScreenPoint,
     Settings, Size,
 };
-use std::path::{Path, PathBuf};
-
-fn samples_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/item-tooltip")
-}
 
 /// A sample: the item its name says (`None` for `no-tooltip`), and where the pointer is.
 struct Sample {
@@ -30,7 +25,7 @@ struct Sample {
 }
 
 fn samples() -> Vec<Sample> {
-    let mut files: Vec<String> = std::fs::read_dir(samples_dir())
+    let mut files: Vec<String> = std::fs::read_dir(common::samples_in("item-tooltip"))
         .expect("samples/item-tooltip")
         .map(|entry| entry.expect("dir entry").file_name().to_string_lossy().to_string())
         .filter(|name| name.ends_with(".png"))
@@ -79,7 +74,7 @@ fn sample_items(samples: &[Sample]) -> ItemWorld {
 /// What the core shows for a sample pressed with Ctrl+Shift+I: the card of the item it read,
 /// or the alert.
 fn press(minerva: &mut Minerva, sample: &Sample) -> PanelState {
-    let img = image::open(samples_dir().join(&sample.file)).unwrap_or_else(|e| panic!("{}: {e}", sample.file)).to_rgba8();
+    let img = image::open(common::samples_in("item-tooltip").join(&sample.file)).unwrap_or_else(|e| panic!("{}: {e}", sample.file)).to_rgba8();
     let frame = Frame { width: img.width(), height: img.height(), rgba: img.into_raw(), at_ms: 1_000 };
     assert_eq!(minerva.on_hotkey("ctrl+shift+i"), Some(Request::CaptureItemTooltip));
     minerva.on_item_capture(ItemCapture { frame, origin: ScreenPoint { x: 0, y: 0 }, pointer: sample.pointer }).clone()
@@ -89,8 +84,7 @@ fn press(minerva: &mut Minerva, sample: &Sample) -> PanelState {
 fn started(samples: &[Sample]) -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms_offline().with_items(sample_items(samples)));
     minerva.restore(Settings::default());
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    minerva.on_game_window(Some(common::window_at_origin(1920, 1200)));
     minerva.set_item_card_size(Size { width: 280, height: 160 });
     minerva.tick(0);
     minerva
@@ -154,7 +148,7 @@ fn a_tooltip_over_a_light_window_is_read_to_its_edge() {
 
     let file = "one-handed-sword-attack-scroll-greater@10,15.png";
     let sample = samples.iter().find(|sample| sample.file == file).unwrap_or_else(|| panic!("no {file}"));
-    let img = image::open(samples_dir().join(file)).expect(file).to_rgba8();
+    let img = image::open(common::samples_in("item-tooltip").join(file)).expect(file).to_rgba8();
     let frame = Frame { width: img.width(), height: img.height(), rgba: img.into_raw(), at_ms: 1_000 };
     assert_eq!(minerva.on_hotkey("ctrl+shift+u"), Some(Request::CaptureItemTooltip));
     let state = minerva.on_item_capture(ItemCapture { frame, origin: ScreenPoint { x: 0, y: 0 }, pointer: sample.pointer });

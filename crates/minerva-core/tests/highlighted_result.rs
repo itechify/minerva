@@ -3,12 +3,9 @@
 
 mod common;
 
-use common::arrive;
-use common::world::{WorldMap, map, mob, orange, search_for, world};
-use minerva_core::{Action, Minerva, PanelState};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
+use common::{arrive, KERNING_SAMPLE};
+use common::world::{WorldMap, map, mob, orange, search_for, on_sunset_sky, highlighted_map};
+use minerva_core::Action;
 
 /// Sunset Sky leads to the Near Field, the Near Field to the Far Field, and the Far
 /// Field to Kerning City; Orange Mushrooms on both fields, Blue Snails on the Far Field.
@@ -21,27 +18,13 @@ fn fields() -> Vec<WorldMap> {
     ]
 }
 
-/// A core over `maps`, its file set in hand, with the player arrived on Sunset Sky.
-fn on_sunset_sky(maps: Vec<WorldMap>) -> Minerva {
-    let mut minerva = Minerva::new(world(maps));
-    minerva.tick(0);
-    minerva.tick(50);
-    arrive(&mut minerva, SUNSET, 100);
-    minerva
-}
-
-/// The highlighted map's name.
-fn highlighted(state: &PanelState) -> Option<&str> {
-    state.search.highlighted_result.map(|at| state.search.results[at].map_name.as_str())
-}
-
 #[test]
 fn a_picked_mobs_first_map_is_highlighted() {
     let mut minerva = on_sunset_sky(fields());
 
     let state = search_for(&mut minerva, "orange");
 
-    assert_eq!(highlighted(&state), Some("Near Field"));
+    assert_eq!(highlighted_map(&state), Some("Near Field"));
 }
 
 #[test]
@@ -49,10 +32,10 @@ fn the_arrows_move_the_highlight_through_the_map_list_stopping_at_either_end() {
     let mut minerva = on_sunset_sky(fields());
     search_for(&mut minerva, "orange");
 
-    assert_eq!(highlighted(minerva.act(Action::SearchNext)), Some("Far Field"));
-    assert_eq!(highlighted(minerva.act(Action::SearchNext)), Some("Far Field"), "it stops at the last");
-    assert_eq!(highlighted(minerva.act(Action::SearchPrevious)), Some("Near Field"));
-    assert_eq!(highlighted(minerva.act(Action::SearchPrevious)), Some("Near Field"), "it stops at the first");
+    assert_eq!(highlighted_map(minerva.act(Action::SearchNext)), Some("Far Field"));
+    assert_eq!(highlighted_map(minerva.act(Action::SearchNext)), Some("Far Field"), "it stops at the last");
+    assert_eq!(highlighted_map(minerva.act(Action::SearchPrevious)), Some("Near Field"));
+    assert_eq!(highlighted_map(minerva.act(Action::SearchPrevious)), Some("Near Field"), "it stops at the first");
 }
 
 #[test]
@@ -61,10 +44,10 @@ fn the_highlight_stays_on_its_map_when_a_map_change_reorders_the_list() {
     search_for(&mut minerva, "orange");
     minerva.act(Action::SearchNext);
 
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
 
     assert_eq!(state.search.results[0].map_name, "Far Field", "the Far Field is now nearer");
-    assert_eq!(highlighted(&state), Some("Far Field"));
+    assert_eq!(highlighted_map(&state), Some("Far Field"));
 }
 
 #[test]
@@ -73,11 +56,11 @@ fn picking_another_mob_highlights_its_first_map() {
     search_for(&mut minerva, "orange");
     minerva.act(Action::SearchNext);
     let state = search_for(&mut minerva, "orange");
-    assert_eq!(highlighted(&state), Some("Near Field"), "picked afresh");
+    assert_eq!(highlighted_map(&state), Some("Near Field"), "picked afresh");
 
     let state = search_for(&mut minerva, "snail");
 
-    assert_eq!(highlighted(&state), Some("Far Field"));
+    assert_eq!(highlighted_map(&state), Some("Far Field"));
 }
 
 #[test]

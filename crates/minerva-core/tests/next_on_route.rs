@@ -8,12 +8,9 @@
 
 mod common;
 
-use common::arrive;
-use common::world::{WorldMap, map, orange, search_for, world};
+use common::{arrive, SUNSET_SAMPLE, KERNING_SAMPLE};
+use common::world::{WorldMap, map, orange, world, hunt_orange_on};
 use minerva_core::{Action, Minerva, PanelState, PortalKind};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
 
 /// Sunset Sky leads to Kerning City by two portals and a Quest Portal, and to the Back
 /// Street by a Hidden Portal; Kerning City leads on to the Mushroom Field and back to
@@ -35,14 +32,8 @@ fn roads_to_the_mushrooms() -> Vec<WorldMap> {
 fn on_sunset_sky(maps: Vec<WorldMap>) -> Minerva {
     let mut minerva = Minerva::new(world(maps));
     minerva.tick(0);
-    arrive(&mut minerva, SUNSET, 100);
+    arrive(&mut minerva, SUNSET_SAMPLE, 100);
     minerva
-}
-
-/// Make the Orange Mushroom on map `map_id` the Hunting Target.
-fn hunt_orange_on(minerva: &mut Minerva, map_id: &str) -> PanelState {
-    search_for(minerva, "orange");
-    minerva.search_pick(map_id).clone()
 }
 
 /// Each mark's destination and kind, and whether it is next on the route.
@@ -87,7 +78,7 @@ fn the_marks_follow_the_route_as_the_player_moves() {
     let mut minerva = on_sunset_sky(roads_to_the_mushrooms());
     hunt_orange_on(&mut minerva, "100000002");
 
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
 
     assert_eq!(marks(&state), [("Sunset Sky", PortalKind::Visible, false), ("Mushroom Field", PortalKind::Visible, true)]);
 }
@@ -97,7 +88,7 @@ fn once_the_player_has_arrived_no_portal_is_next_on_the_route() {
     let mut minerva = on_sunset_sky(roads_to_the_mushrooms());
     hunt_orange_on(&mut minerva, "100000001");
 
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
 
     assert!(state.search.hunting.as_ref().is_some_and(|target| target.arrived));
     assert_eq!(next_on_route(&state), Vec::<&str>::new());

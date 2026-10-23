@@ -3,7 +3,8 @@
 // The pages' scripts (search.ts, map.ts) only fetch and draw what this gives them.
 
 import { dayText } from "../../src/dates.ts";
-import { levels, rate } from "../../src/figures.ts";
+import { levels, rate, short, whole } from "../../src/figures.ts";
+import { type BandAnswer, isMap, isName, type Ranked } from "../entries.ts";
 import { bandOf, levelsOf } from "../level-bands.ts";
 import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts";
 
@@ -11,6 +12,7 @@ import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts
 // takes everything it shows from this module.
 export { mapNames, placeOf };
 export type { MapNameRow, MapNames, MapPlace } from "../map-names.ts";
+export type { BandAnswer, Ranked } from "../entries.ts";
 
 /** A map's page as its address names it: `/leaderboards/map/?map=<ID>&band=<first level>&name=<name>`.
  *  Any part may be missing, or dropped for not being one. */
@@ -29,7 +31,9 @@ const TOP_LEVEL = 200;
 /** The map a link names, as its 9-digit ID: the map names fixture writes IDs as numbers,
  *  without their leading zeros, so a shorter one is padded. */
 function mapIn(value: string | null): string | null {
-  return value !== null && /^\d{1,9}$/.test(value) ? value.padStart(9, "0") : null;
+  if (value === null || value === "") return null;
+  const id = value.padStart(9, "0");
+  return isMap(id) ? id : null;
 }
 
 /** The Level Band a link names, or the one holding the level it names. */
@@ -40,7 +44,7 @@ function bandIn(value: string | null): number | null {
 }
 
 function nameIn(value: string | null): string | null {
-  return value !== null && /^[A-Za-z0-9]{1,16}$/.test(value) ? value : null;
+  return value !== null && isName(value) ? value : null;
 }
 
 /** Where a map page's address (its `location.search`) opens. */
@@ -128,18 +132,18 @@ export function searchSaid(query: string, found: { maps: MapPlace[]; more: numbe
   if (query.trim() === "") return "Type part of a map's name as the game writes it, like Ant Tunnel.";
   if (found.maps.length === 0) return `No map's name holds “${query.trim()}”.`;
   const shown = counted(found.maps.length, "map");
-  const all = found.more === 0 ? shown : `${shown}, and ${found.more.toLocaleString("en-US")} more: type more of the name`;
+  const all = found.more === 0 ? shown : `${shown}, and ${whole(found.more)} more: type more of the name`;
   return `${all}. Enter opens ${found.maps[0].name}.`;
 }
 
 /** `count` of `thing`, plural when it isn't 1: "1 map", "12 maps". */
 function counted(count: number, thing: string): string {
-  return `${count.toLocaleString("en-US")} ${thing}${count === 1 ? "" : "s"}`;
+  return `${whole(count)} ${thing}${count === 1 ? "" : "s"}`;
 }
 
 /** How many entries, the one word the pages count a Map Leaderboard in: "1 entry", "12 entries". */
 function entriesCounted(count: number): string {
-  return `${count.toLocaleString("en-US")} ${count === 1 ? "entry" : "entries"}`;
+  return `${whole(count)} ${count === 1 ? "entry" : "entries"}`;
 }
 
 /** GET /api/maps: every map with entries, the most first. */
@@ -239,27 +243,6 @@ export function mapPage(link: Link, names: MapNames, answer: MapAnswer): MapPage
 }
 
 /** An entry as the API ranks it: one Character's best Visit on the map in the band. */
-export interface Ranked {
-  rank: number;
-  name: string;
-  job: string;
-  level: number;
-  expPerHour: number;
-  /** When the Visit set it, in ms since the Unix epoch. */
-  setAt: number;
-}
-
-/** GET /api/maps/<map>/bands/<band>?name=<name>: the band's top 50, and the named
- *  Character's entry with its rank, wherever it is (`null` with none there). */
-export interface BandAnswer {
-  map: string;
-  band: number;
-  levels: [number, number];
-  total: number;
-  entries: Ranked[];
-  character: Ranked | null;
-}
-
 /** An entry as a band's table writes it. */
 export interface Row {
   rank: string;
@@ -315,13 +298,6 @@ function rulerTo(top: number): RulerStep[] {
   return steps.map((n) => ({ at: n / top, text: short(n) }));
 }
 
-/** A step on a ruler as the Personal Bests window writes it: 0, 500, 20k, 1.25M. */
-function short(n: number): string {
-  if (n >= 1_000_000) return `${Number((n / 1_000_000).toFixed(2))}M`;
-  if (n >= 1_000) return `${Number((n / 1_000).toFixed(1))}k`;
-  return String(n);
-}
-
 /** A band's table from the API's answer, for the Character `name` the link names (if
  *  any), with dates written as of `now`. */
 export function bandTable(answer: BandAnswer, name: string | null, now: Date): BandTable {
@@ -342,7 +318,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
   };
   const rows = answer.entries.map(row);
   const at = bandLevels(answer.band);
-  const total = answer.total.toLocaleString("en-US");
+  const total = whole(answer.total);
   let note: string | null = null;
   if (yours !== null) note = `${yours.name} is #${yours.rank} of ${total} at ${at}.`;
   else if (name !== null) note = `${name} has no entry here at ${at} any more.`;
@@ -352,7 +328,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
     rows.length === 0 ? null : answer.total > rows.length ? `Top ${rows.length} of ${total} at ${at}` : `${entriesCounted(rows.length)} at ${at}`;
   return {
     rows,
-    gap: between > 0 ? `${between.toLocaleString("en-US")} more ${between === 1 ? "entry" : "entries"}` : null,
+    gap: between > 0 ? `${whole(between)} more ${between === 1 ? "entry" : "entries"}` : null,
     yours: below ? row(yours) : null,
     note,
     caption,

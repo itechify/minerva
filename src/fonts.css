@@ -1,0 +1,19 @@
+/* The app's typeface, apart from its tokens (theme.css), which the site takes without it:
+   the site serves WOFF2 copies of these files (site/site.css).
+   NEXON's Maplestory typeface, in its two weights (see assets/fonts/NOTICE.md): Light
+   for regular text and Bold for bold. Bundled with the app, so it loads at once; `block`
+   keeps text from drawing in Arial first and changing width. Arial stands in for the
+   few characters it lacks: the en and em dash and the minus sign. */
+@font-face {
+  font-family: "Maplestory";
+  src: url("../assets/fonts/Maplestory-Light.ttf") format("truetype");
+  font-weight: 100 500;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Maplestory";
+  src: url("../assets/fonts/Maplestory-Bold.ttf") format("truetype");
+  font-weight: 600 900;
+  font-display: block;
+}

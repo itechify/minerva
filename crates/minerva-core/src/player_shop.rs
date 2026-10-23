@@ -36,10 +36,11 @@ use crate::Frame;
 use crate::item_tooltip::{ItemTooltip, ShopTooltipReader};
 use crate::panel::{ScreenPoint, ScreenRect};
 use crate::prep::Rect;
+use crate::ink::{at_brightness, black_on_white, luma};
 use crate::recogniser::{Recogniser, RememberedLines, frame_to_rgb};
 use crate::ui_size;
 use image::imageops;
-use image::{GrayImage, Luma, RgbImage};
+use image::{GrayImage, RgbImage};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -99,7 +100,7 @@ pub struct ShopRow {
     /// Its price as read; `None`: unreadable, covered, or not in the game's shape.
     pub price: Option<ListedPrice>,
     /// Something covers it, so neither was read: the pointer, or the game's tooltip by it.
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub covered: bool,
 }
 
@@ -116,20 +117,10 @@ impl ShopList {
     /// Where it is on screen down to every listing: a covered or selected one may lie past
     /// the bands found, as the last one showing does under the pointer, which breaks its band.
     pub(crate) fn span(&self) -> ScreenRect {
-        let bottom = |r: ScreenRect| r.y + r.height as i32;
         let top = self.rows.iter().map(|row| row.area.y).fold(self.area.y, i32::min);
-        let end = self.rows.iter().map(|row| bottom(row.area)).fold(bottom(self.area), i32::max);
-        ScreenRect { y: top, height: (end - top) as u32, ..self.area }
+        let end = self.rows.iter().map(|row| row.area.bottom()).fold(self.area.bottom(), i64::max);
+        ScreenRect { y: top, height: (end - i64::from(top)) as u32, ..self.area }
     }
-}
-
-/// Whether `point` lies in `rect`.
-pub(crate) fn holds(rect: ScreenRect, point: ScreenPoint) -> bool {
-    (rect.x..rect.x + rect.width as i32).contains(&point.x) && (rect.y..rect.y + rect.height as i32).contains(&point.y)
-}
-
-fn is_false(b: &bool) -> bool {
-    !*b
 }
 
 /// A listing's price: `quantity` of the item for `mesos`.
@@ -214,10 +205,9 @@ const COVERING_DARK: f32 = 90.0;
 const SAME_SLOT: u32 = 3;
 /// The slots' tops are this far apart on average: 63 and 62 px in turn.
 const SLOT_PITCH: f32 = 62.6;
-/// A pixel is the band's colour at its brightness within this much per channel...
+/// A pixel is the band's colour at its brightness within this much per channel, at any
+/// brightness ([`crate::ink::at_brightness`]).
 const BAND_TOL: f32 = 6.0;
-/// ...at any brightness in this range of the screenshots'.
-const BAND_BRIGHTNESS: RangeInclusive<f32> = 0.8..=1.1;
 /// A scanline is part of a listing's text when at least this share of it is the band.
 const TEXT_ROW_BAND: f32 = 0.3;
 /// A pixel is ink when it is at least this much of the way from the band to black.
@@ -241,7 +231,7 @@ impl PlayerShopReader {
         let shop = img.as_ref().and_then(|img| self.read_rgb(img, capture.origin));
         // Only on the list: off it, no listing is hovered, and the search for the tooltip
         // costs as much again as finding the list.
-        let on_list = |pointer: &ScreenPoint| shop.as_ref().is_some_and(|shop| holds(shop.span(), *pointer));
+        let on_list = |pointer: &ScreenPoint| shop.as_ref().is_some_and(|shop| shop.span().holds(*pointer));
         let hover = img.as_ref().zip(capture.pointer.filter(on_list)).map(|(img, pointer)| ShopHover {
             pointer,
             tooltip: self.tooltips.read(img, capture.origin, pointer),
@@ -271,10 +261,7 @@ impl PlayerShopReader {
         }
         let (found, known, view, list, listings) = chosen.or(first)?;
         let img = view.img.as_ref();
-        let on_screen = |r: Rect| {
-            let r = view.to_capture(r);
-            ScreenRect { x: origin.x + r.x as i32, y: origin.y + r.y as i32, width: r.w, height: r.h }
-        };
+        let on_screen = |r: Rect| view.to_capture(r).on_screen(origin);
         // Every clean line, read at once.
         let lines: Vec<&TextLine> = listings.iter().filter(|l| l.clean).flat_map(|l| [&l.name, &l.price]).collect();
         let texts = self.read_lines(img, &lines, list.brightness);
@@ -482,9 +469,7 @@ fn band_of(p: [u8; 3], brightness: f32) -> Option<Band> {
 
 /// The band's brightness next to the screenshots' colour, if `p` is its colour.
 fn band_brightness(p: [u8; 3]) -> Option<f32> {
-    let k = p[2] as f32 / BAND_RGB[2];
-    let close = BAND_BRIGHTNESS.contains(&k) && (0..2).all(|i| (p[i] as f32 - k * BAND_RGB[i]).abs() <= BAND_TOL);
-    close.then_some(k)
+    at_brightness(p, BAND_RGB, BAND_TOL)
 }
 
 /// Where the item list may be, likeliest first: where band rows of one width in `widths` end
@@ -696,10 +681,9 @@ fn on_grid(anchor: u32, top: u32) -> u32 {
 fn covered(img: &RgbImage, list: &List, top: u32) -> bool {
     let (w, h) = img.dimensions();
     let (x0, x1) = (list.x0 + EDGE, (list.x0 + BAND_W - EDGE).min(w));
-    let dark = (top..(top + BAND_H).min(h)).flat_map(|y| (x0..x1).map(move |x| (x, y))).filter(|&(x, y)| {
-        let [r, g, b] = img.get_pixel(x, y).0.map(f32::from);
-        0.299 * r + 0.587 * g + 0.114 * b <= COVERING_DARK * list.brightness
-    });
+    let dark = (top..(top + BAND_H).min(h))
+        .flat_map(|y| (x0..x1).map(move |x| (x, y)))
+        .filter(|&(x, y)| luma(img.get_pixel(x, y).0) <= COVERING_DARK * list.brightness);
     dark.take(COVERED_MIN).count() == COVERED_MIN
 }
 
@@ -707,15 +691,12 @@ fn covered(img: &RgbImage, list: &List, top: u32) -> bool {
 fn line_ink(img: &RgbImage, line: &TextLine, brightness: f32) -> GrayImage {
     let (w, h) = (line.x1 - line.x0, line.y1 - line.y0);
     let rgb = line.band.rgb(brightness);
-    GrayImage::from_fn(w, h, |x, y| {
-        let (ink, _) = ink_of(img.get_pixel(line.x0 + x, line.y0 + y).0, rgb);
-        Luma([(255.0 * (1.0 - ink)).round() as u8])
-    })
+    black_on_white(w, h, 0, |x, y| ink_of(img.get_pixel(line.x0 + x, line.y0 + y).0, rgb).0)
 }
 
 /// A price line as the game writes it: "<quantity> for <mesos> mesos", the mesos grouped in
 /// threes with commas ("1 for 12,999 mesos"). `None` for anything else.
-pub(crate) fn parse_price(read: &str) -> Option<ListedPrice> {
+fn parse_price(read: &str) -> Option<ListedPrice> {
     let words: Vec<&str> = read.split_whitespace().collect();
     let [quantity, "for", mesos, "mesos"] = words[..] else { return None };
     let quantity: u64 = digits(quantity)?;

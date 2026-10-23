@@ -18,17 +18,14 @@
 //! grey text on the bar's light grey: "ink" is how dark a neutral pixel is. It is split at the
 //! colon found in the ink, into the same two lines ([`prepare_one_line`]).
 
-use image::{GrayImage, Luma, RgbImage};
+use crate::ink::{self, at_brightness, black_on_white, luma, tint};
+use crate::panel::{ScreenPoint, ScreenRect};
+use image::{GrayImage, RgbImage};
 
-/// Panel background colour (as in the sample screenshots) and per-channel tolerance.
-/// Live GDI captures show the same colour uniformly darker, (153,187,204) ≈ 0.935×, so
-/// the panel test matches the colour at any brightness within `PANEL_SCALE`.
+/// Panel background colour (as in the sample screenshots) and per-channel tolerance: matched
+/// at any brightness ([`ink::at_brightness`]), as live captures show it darker.
 const PANEL_RGB: [f32; 3] = [164.0, 200.0, 218.0];
 const PANEL_TOL: f32 = 10.0;
-const PANEL_SCALE: std::ops::RangeInclusive<f32> = 0.8..=1.1;
-/// Search only this top-left area of a frame for the minimap.
-const SEARCH_W: u32 = 900;
-const SEARCH_H: u32 = 400;
 /// The widest panel-colour row of the band has at least this many pixels.
 const BAND_MIN_PANEL_PX: u32 = 120;
 /// Every row of the title band has at least this many panel-colour pixels (rows
@@ -119,14 +116,16 @@ pub struct Numeral {
     pub strokes: usize,
 }
 
-fn luma(p: [u8; 3]) -> f32 {
-    0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32
+impl Rect {
+    /// Where it is on screen, in an image whose top-left pixel is at `origin` there.
+    pub fn on_screen(self, origin: ScreenPoint) -> ScreenRect {
+        ScreenRect { x: origin.x + self.x as i32, y: origin.y + self.y as i32, width: self.w, height: self.h }
+    }
 }
 
+/// The panel colour, at any brightness.
 fn is_panel(p: [u8; 3]) -> bool {
-    // Brightness relative to the reference panel colour, taken from the blue channel.
-    let k = p[2] as f32 / PANEL_RGB[2];
-    PANEL_SCALE.contains(&k) && (0..2).all(|i| (p[i] as f32 - k * PANEL_RGB[i]).abs() <= PANEL_TOL)
+    at_brightness(p, PANEL_RGB, PANEL_TOL).is_some()
 }
 
 /// 0.0 (background) ..= 1.0 (title text).
@@ -138,15 +137,15 @@ fn ink(p: [u8; 3]) -> f32 {
     ((INK_BR_HI - br) / INK_BR_SPAN).clamp(0.0, 1.0)
 }
 
-/// Find the title band (panel rows, trimmed to the panel's x extent).
+/// Find the title band (panel rows, trimmed to the panel's x extent) anywhere in `img`: the
+/// part of a capture around a WORLD button, at the samples' size (`minimap_title`).
 fn locate_title(img: &RgbImage) -> Option<Rect> {
-    let sw = img.width().min(SEARCH_W);
-    let sh = img.height().min(SEARCH_H);
+    let (sw, sh) = img.dimensions();
     let counts: Vec<u32> = (0..sh)
         .map(|y| (0..sw).filter(|&x| is_panel(img.get_pixel(x, y).0)).count() as u32)
         .collect();
     let on: Vec<bool> = counts.iter().map(|&c| c >= BAND_ROW_MIN_PX).collect();
-    let (y0, y1) = runs(&on).into_iter().find(|&(a, b)| {
+    let (y0, y1) = ink::runs(&on, 1).into_iter().find(|&(a, b)| {
         b - a >= BAND_MIN_H && counts[a as usize..b as usize].iter().any(|&c| c >= BAND_MIN_PANEL_PX)
     })?;
     let h = y1 - y0;
@@ -156,24 +155,6 @@ fn locate_title(img: &RgbImage) -> Option<Rect> {
         .collect();
     let (x0, x1) = (*cols.first()?, *cols.last()? + 1);
     Some(Rect { x: x0, y: y0, w: x1 - x0, h })
-}
-
-/// Group consecutive indices where `on[i]` into (start, end_exclusive) runs.
-fn runs(on: &[bool]) -> Vec<(u32, u32)> {
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < on.len() {
-        if on[i] {
-            let s = i;
-            while i < on.len() && on[i] {
-                i += 1;
-            }
-            out.push((s as u32, i as u32));
-        } else {
-            i += 1;
-        }
-    }
-    out
 }
 
 /// Locate, trim, mask and split a frame. `None` means unreadable.
@@ -210,7 +191,7 @@ pub fn prepare(img: &RgbImage) -> Option<Prepared> {
     // Lines: horizontal projection; keep the two tallest runs, top to bottom.
     let row_on: Vec<bool> =
         (0..th).map(|y| (0..tw).map(|x| at(x, y)).sum::<f32>() > LINE_MIN_INK).collect();
-    let mut row_runs = runs(&row_on);
+    let mut row_runs = ink::runs(&row_on, 1);
     if row_runs.len() < 2 {
         return None; // not a two-line title
     }
@@ -227,12 +208,7 @@ pub fn prepare(img: &RgbImage) -> Option<Prepared> {
     let lines = vec![line(row_runs[0])?, line(row_runs[1])?];
     let numeral = trailing_numeral(&at, lines[1]);
 
-    let mut canvas = GrayImage::from_pixel(tw + 2 * PAD, th + 2 * PAD, Luma([255]));
-    for y in 0..th {
-        for x in 0..tw {
-            canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - at(x, y))).round() as u8]));
-        }
-    }
+    let canvas = black_on_white(tw, th, PAD, at);
     Some(Prepared { canvas, lines, left: rx, numeral })
 }
 
@@ -241,8 +217,7 @@ pub fn prepare(img: &RgbImage) -> Option<Prepared> {
 /// anti-aliased between them, and a bar the game draws darker (as a map fades in) has its text
 /// as much darker.
 fn bar_ink(p: [u8; 3], bar: f32) -> f32 {
-    let (max, min) = (p.iter().max().copied().unwrap_or(0), p.iter().min().copied().unwrap_or(0));
-    if max - min > BAR_TINT {
+    if tint(p) > BAR_TINT {
         return 0.0;
     }
     ((BAR_INK_FROM - luma(p) * BAR_LUMA / bar) / BAR_INK_SPAN).clamp(0.0, 1.0)
@@ -250,8 +225,7 @@ fn bar_ink(p: [u8; 3], bar: f32) -> f32 {
 
 /// The bar's light grey, at any brightness.
 fn is_bar(p: [u8; 3]) -> bool {
-    let (max, min) = (p.iter().max().copied().unwrap_or(0), p.iter().min().copied().unwrap_or(0));
-    max - min <= BAR_TINT && luma(p) >= BAR_MIN_LUMA
+    tint(p) <= BAR_TINT && luma(p) >= BAR_MIN_LUMA
 }
 
 /// The one-line layout's title in `img`, at the samples' UI Size: dark grey text on the bar,
@@ -284,7 +258,7 @@ pub fn prepare_one_line(img: &RgbImage, rows: (u32, u32), right: u32, clear: [u3
     // The letters' runs of columns, up to the first gap too wide for one between words: past
     // it is the edge of the bar's first small button (a collapsed minimap's bar is wider than
     // a short title).
-    let mut letters = runs(&col_on);
+    let mut letters = ink::runs(&col_on, 1);
     let end = letters.windows(2).position(|w| w[1].0 - w[0].1 >= BAR_TEXT_END_GAP).map_or(letters.len(), |i| i + 1);
     letters.truncate(end);
     let colon = letters.iter().position(|&run| is_colon(&at, run, th))?;
@@ -298,12 +272,7 @@ pub fn prepare_one_line(img: &RgbImage, rows: (u32, u32), right: u32, clear: [u3
     };
     let lines = vec![line(street)?, line(map)?];
     let numeral = trailing_numeral(&at, lines[1]);
-    let mut canvas = GrayImage::from_pixel(tw + 2 * PAD, th + 2 * PAD, Luma([255]));
-    for y in 0..th {
-        for x in 0..tw {
-            canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - at(x, y))).round() as u8]));
-        }
-    }
+    let canvas = black_on_white(tw, th, PAD, at);
     Some(Prepared { canvas, lines, left, numeral })
 }
 
@@ -311,7 +280,7 @@ pub fn prepare_one_line(img: &RgbImage, rows: (u32, u32), right: u32, clear: [u3
 /// wider than one, and two dots, one above the other.
 fn is_colon(at: &impl Fn(u32, u32) -> f32, (x0, x1): (u32, u32), th: u32) -> bool {
     let row_on: Vec<bool> = (0..th).map(|y| (x0..x1).map(|x| at(x, y)).sum::<f32>() > COLON_DOT_INK).collect();
-    let dots = runs(&row_on);
+    let dots = ink::runs(&row_on, 1);
     x1 - x0 <= COLON_MAX_W && dots.len() == 2 && dots.iter().all(|(a, b)| b - a <= COLON_DOT_H)
 }
 
@@ -337,7 +306,7 @@ fn trailing_numeral(at: &impl Fn(u32, u32) -> f32, line: Rect) -> Option<Numeral
         return None;
     }
     let on: Vec<bool> = word.clone().map(stroke).collect();
-    let strokes = runs(&on);
+    let strokes = ink::runs(&on, 1);
     let fits = (1..=NUMERAL_MAX_STROKES).contains(&strokes.len())
         && strokes.iter().all(|(a, b)| b - a <= STROKE_MAX_W);
     fits.then_some(Numeral { x: word_start + PAD, strokes: strokes.len() })

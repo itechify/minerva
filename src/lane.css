@@ -1,0 +1,27 @@
+/* A lane, as the Personal Bests window draws a map's best and the site's Map Leaderboards
+   an entry's: its EXP/h as the game's EXP gauge draws the bar, lime in its grey frame, as
+   far along the lane as `--at` (0 to 1) says, and the scale's lines running down every lane
+   behind the bars. The lane's cell says how far in the lane starts and ends
+   (`--lane-inset`, `--lane-end`). */
+.lane-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: calc(var(--at) * 100%);
+  min-width: 3px;
+  height: 100%;
+  border: 1px solid var(--exp-frame);
+  border-radius: 2px;
+  background: var(--exp-fill);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.lane-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--lane-inset) + var(--at) * (100% - var(--lane-inset) - var(--lane-end)));
+  width: 1px;
+  background: rgba(30, 45, 90, 0.09);
+}

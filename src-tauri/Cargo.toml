@@ -36,11 +36,18 @@ serde_json = { workspace = true }
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "http2", "charset", "system-proxy", "gzip"] }
 # The Leaderboard Key, made from the OS's random numbers.
 getrandom = "0.3"
-# Reads the trusted comment of an updater `.sig` (`probe update-manifest`).
-base64 = "0.22"
 
 [dev-dependencies]
 image = { workspace = true, features = ["png"] }
+# Reads the trusted comment of an updater `.sig` (`probe update-manifest`): only the probe.
+base64 = "0.22"
+
+# The probe, its modes in a folder of their own; its `update-manifest` tests run with the
+# app's (`cargo test -p minerva`).
+[[example]]
+name = "probe"
+path = "examples/probe/main.rs"
+test = true
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "=0.62.2", features = [

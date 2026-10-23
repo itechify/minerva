@@ -9,12 +9,9 @@
 mod common;
 
 use common::osms;
-use common::world::{WorldMap, map, orange, search_for};
-use common::{FakeSource, arrive};
-use minerva_core::{Minerva, Distance, PanelState, PortalKind, SearchResult, Step};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
+use common::world::{WorldMap, map, orange, search_for, distances, route_of};
+use common::{FakeSource, arrive, SUNSET_SAMPLE, KERNING_SAMPLE};
+use minerva_core::{Minerva, Distance, PanelState, PortalKind, Step};
 
 const SOUTHPERRY: &str = "000000060";
 const LITH_HARBOR: &str = "010000000";
@@ -26,21 +23,8 @@ const ORBIS_TICKETING_BOOTH: &str = "020000010";
 fn searched_from_sunset_sky(maps: Vec<WorldMap>) -> PanelState {
     let mut minerva = Minerva::new(common::world::world(maps));
     minerva.tick(0);
-    arrive(&mut minerva, SUNSET, 100);
+    arrive(&mut minerva, SUNSET_SAMPLE, 100);
     search_for(&mut minerva, "orange")
-}
-
-/// Each result as "Map: Distance".
-fn distances(state: &PanelState) -> Vec<String> {
-    state
-        .search
-        .results
-        .iter()
-        .map(|r| match r.distance {
-            Distance::MapChanges(n) => format!("{}: {n}", r.map_name),
-            other => format!("{}: {other:?}", r.map_name),
-        })
-        .collect()
 }
 
 /// Sunset Sky leads to Southperry; Shanks sails on to Lith Harbor, next to the Mushroom
@@ -61,25 +45,12 @@ fn a_ship_ride_is_one_map_change() {
     assert_eq!(distances(&state), ["Mushroom Field: 3"]);
 }
 
-/// A result's route as "Start, portal: Next, ship: Then…".
-fn route(result: &SearchResult) -> String {
-    result
-        .route
-        .iter()
-        .map(|stop| match stop.by {
-            None => stop.map_name.clone(),
-            Some(step) => format!("{step:?}: {}", stop.map_name),
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
 #[test]
 fn a_result_reached_by_ship_has_its_route_and_says_it_takes_a_ship() {
     let state = searched_from_sunset_sky(by_ship_to_the_mushroom_field());
 
     let result = &state.search.results[0];
-    assert_eq!(route(result), "Sunset Sky, Portal: Southperry, Ship: Lith Harbor, Portal: Mushroom Field");
+    assert_eq!(route_of(result), "Sunset Sky, Portal: Southperry, Ship: Lith Harbor, Portal: Mushroom Field");
     assert_eq!(result.travel, [Step::Ship]);
 }
 
@@ -93,13 +64,13 @@ fn the_ship_runs_from_the_real_southperry_to_the_real_lith_harbor() {
         .changing(10_000_000, |m| m.spawns(9, 10));
     let mut minerva = Minerva::new(FakeSource::with_world(world));
     minerva.tick(0);
-    arrive(&mut minerva, KERNING, 100);
+    arrive(&mut minerva, KERNING_SAMPLE, 100);
 
     let state = search_for(&mut minerva, "orange");
 
     let result = &state.search.results[0];
     assert_eq!(result.distance, Distance::MapChanges(2));
-    assert_eq!(route(result), "Kerning City, Portal: Southperry, Ship: Lith Harbor");
+    assert_eq!(route_of(result), "Kerning City, Portal: Southperry, Ship: Lith Harbor");
     assert_eq!(result.travel, [Step::Ship]);
 }
 
@@ -143,7 +114,7 @@ fn a_result_reached_by_portals_alone_has_its_route_and_no_travel_marker() {
     ]);
 
     let result = &state.search.results[0];
-    assert_eq!(route(result), "Sunset Sky, Portal: Road, Portal: Mushroom Field");
+    assert_eq!(route_of(result), "Sunset Sky, Portal: Road, Portal: Mushroom Field");
     assert_eq!(result.travel, []);
 }
 
@@ -156,7 +127,7 @@ fn of_two_equally_short_routes_the_one_by_portals_is_taken() {
     ]);
 
     let result = &state.search.results[0];
-    assert_eq!(route(result), "Sunset Sky, Portal: Lith Harbor");
+    assert_eq!(route_of(result), "Sunset Sky, Portal: Lith Harbor");
     assert_eq!(result.travel, []);
 }
 
@@ -164,7 +135,7 @@ fn of_two_equally_short_routes_the_one_by_portals_is_taken() {
 fn on_the_map_with_the_mob_the_route_is_that_map_alone() {
     let state = searched_from_sunset_sky(vec![map("100000000", "Sunset Sky", 100, vec![orange(10)])]);
 
-    assert_eq!(route(&state.search.results[0]), "Sunset Sky");
+    assert_eq!(route_of(&state.search.results[0]), "Sunset Sky");
 }
 
 #[test]

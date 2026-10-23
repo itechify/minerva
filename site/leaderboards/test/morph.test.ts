@@ -1,24 +1,13 @@
 // Switching a map's page from one Level Band to another: the Characters with an entry in
 // both are the rows that slide to their new rank, each by a name of its own.
 import { describe, expect, it } from "vitest";
-import { bandTable, morphNames, type BandAnswer, type Ranked } from "../leaderboards.ts";
-
-const NOW = new Date(Date.UTC(2026, 9, 14, 12));
-
-function ranked(rank: number, name: string): Ranked {
-  return { rank, name, job: "Magician", level: 23, expPerHour: 100_000 - rank * 1_000, setAt: Date.UTC(2026, 9, 3, 12) };
-}
+import { bandTable, morphNames, type Ranked } from "../leaderboards.ts";
+import { answer, NOW, ranked } from "./common.ts";
 
 function rows(band: number, names: string[], character: Ranked | null = null) {
-  const answer: BandAnswer = {
-    map: "100000000",
-    band,
-    levels: [band, band + 9],
-    total: names.length + (character === null ? 0 : 1),
-    entries: names.map((name, i) => ranked(i + 1, name)),
-    character,
-  };
-  const table = bandTable(answer, character?.name ?? null, NOW);
+  const entries = names.map((name, i) => ranked(i + 1, name));
+  const total = names.length + (character === null ? 0 : 1);
+  const table = bandTable(answer(entries, character, total, band), character?.name ?? null, NOW);
   return table.yours === null ? table.rows : [...table.rows, table.yours];
 }
 

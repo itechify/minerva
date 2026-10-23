@@ -6,13 +6,11 @@
 
 mod common;
 
-use common::{FakeSource, arrive};
+use common::{FakeSource, arrive, SUNSET_SAMPLE};
 use minerva_core::{
-    Minerva, ExpBar, ExpBarReading, Foreground, GameWindow, Hotkeys, PanelControl,
-    PlacementMode, Request, ScreenRect, Settings, SetupReason, TrackingState,
+    Minerva, ExpBar, ExpBarReading, Foreground, Hotkeys, PanelControl,
+    PlacementMode, Request, Settings, SetupReason, TrackingState,
 };
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
 
 fn ctrl_shift(letter: &str) -> String {
     format!("ctrl+shift+{letter}")
@@ -104,8 +102,7 @@ fn rebound_item_hotkeys_are_the_ones_that_show_the_card_and_look_the_item_up() {
     let mut minerva = Minerva::new(FakeSource::osms());
     let hotkeys = Hotkeys { item_card: "ctrl+shift+j".into(), item_lookup: "ctrl+shift+k".into(), ..Hotkeys::default() };
     minerva.restore(Settings { hotkeys, ..Settings::default() });
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    minerva.on_game_window(Some(common::window_at_origin(1920, 1200)));
 
     assert_eq!(minerva.on_hotkey("ctrl+shift+i"), None);
     assert_eq!(minerva.on_hotkey("ctrl+shift+u"), None);
@@ -262,7 +259,7 @@ fn ctrl_shift_m_opens_the_shown_maps_meowdb_page_and_nothing_without_a_map() {
     let mut minerva = Minerva::new(FakeSource::osms());
     assert_eq!(minerva.on_hotkey("ctrl+shift+m"), None);
 
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     assert_eq!(
         minerva.on_hotkey("ctrl+shift+m"),
@@ -273,7 +270,7 @@ fn ctrl_shift_m_opens_the_shown_maps_meowdb_page_and_nothing_without_a_map() {
 #[test]
 fn ctrl_shift_s_opens_setup_again() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.restore(Settings { setup_done: true, ..Settings::default() });
+    minerva.restore(common::set_up());
     assert!(!minerva.panel_state().setup.window_open);
 
     minerva.on_hotkey("ctrl+shift+s");
@@ -395,13 +392,8 @@ fn a_hotkey_reported_unavailable_stays_listed_while_the_hotkeys_are_not_live() {
 /// these hotkeys.
 fn tracking_with(hotkeys: Hotkeys) -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.restore(Settings {
-        setup_done: true,
-        hotkeys,
-        ..Settings::default()
-    });
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    minerva.restore(Settings { hotkeys, ..common::set_up() });
+    minerva.on_game_window(Some(common::window_at_origin(1920, 1200)));
     minerva
 }
 

@@ -5,25 +5,17 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, FIELD};
 use common::osms::{self, KERNING_CITY, map};
-use minerva_core::{MapDataStatus, Minerva, PanelState, PicturePoint, SpawnMark, TitleLines, TitleReading};
+use minerva_core::{MapDataStatus, Minerva, PanelState, PicturePoint, SpawnMark};
 
-/// A made-up map whose spawn points the tests give, on a street of its own.
-const FIELD: u64 = 100_000_000;
 const BLUE_SNAIL: u64 = 3;
 const SLIME: u64 = 7;
-
-fn read_as(at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: "Made-up Street".into(), map: "Field".into() }), found: Some(common::TITLE_FOUND), at_ms }
-}
 
 /// The panel on the made-up Field, with the game's maps and mobs around it.
 fn on_field(change: impl FnOnce(osms::Map) -> osms::Map) -> PanelState {
     let world = osms::game().with(change(map(FIELD, "Made-up Street", "Field").portal("east00", 2, KERNING_CITY)));
-    let mut minerva = Minerva::new(FakeSource::with_world(world));
-    minerva.on_reading(read_as(0));
-    minerva.on_reading(read_as(333)).clone()
+    common::on_title(world, "Made-up Street", "Field")
 }
 
 fn spawns(state: &PanelState) -> &[SpawnMark] {
@@ -66,8 +58,8 @@ fn a_spawn_point_of_a_mob_folded_into_another_is_dotted_with_that_mob() {
         .folding(99, BLUE_SNAIL)
         .with(map(FIELD, "Made-up Street", "Field").spawn_at(BLUE_SNAIL, 412, 520).spawn_at(99, 903, 611).portal("east00", 2, KERNING_CITY));
     let mut minerva = Minerva::new(FakeSource::with_world(world));
-    minerva.on_reading(read_as(0));
-    let state = minerva.on_reading(read_as(333));
+    minerva.on_reading(common::read_as("Made-up Street", "Field", 0));
+    let state = minerva.on_reading(common::read_as("Made-up Street", "Field", 333));
 
     assert_eq!(spawns(state), [dot(412, 520, BLUE_SNAIL), dot(903, 611, BLUE_SNAIL)]);
 }

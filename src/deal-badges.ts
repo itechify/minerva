@@ -1,8 +1,8 @@
 import "./errors";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { byId, span } from "./dom";
 import { signed, whole } from "./figures";
+import { followView } from "./shell";
 
 /** Mirror of `minerva_core::ListedPrice`: `quantity` of the item for `mesos`. */
 type ListedPrice = { quantity: number; mesos: number };
@@ -159,20 +159,13 @@ function render(view: BadgesView) {
 // be activated.
 list.addEventListener("click", (e) => {
   const button = e.target instanceof Element ? e.target.closest<HTMLElement>(".deal-badge[data-row]") : null;
-  if (button?.dataset.row) invoke("deal_badge_open", { row: Number(button.dataset.row) });
+  if (button?.dataset.row) invoke("act", { action: { openDealItem: { row: Number(button.dataset.row) } } });
 });
 
 let last: BadgesView | null = null;
-listen<BadgesView>("deal-badges-state", (e) => {
-  last = e.payload;
-  render(e.payload);
+followView<BadgesView>("deal-badges-state", "page_view", (view) => {
+  last = view;
+  render(view);
 });
 // A move to a display of another scale lays the badges out afresh.
 window.addEventListener("resize", () => last && render(last));
-// The badges may have been sent before the page was listening.
-invoke<BadgesView | null>("deal_badges_view").then((view) => {
-  if (view) {
-    last = view;
-    render(view);
-  }
-});

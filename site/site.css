@@ -1,8 +1,13 @@
 /* The Minerva site: one of the game's windows opened wide, in setup's opaque language
    and a reading size of its own, standing on the overlay's glass periwinkle as the Personal
    Bests page does. Its raised tabs are its pages: Home, the Map Leaderboards and the FAQ. The tokens are the
-   app's (theme.css, without its TTF faces); see DESIGN.md. No motion: the game's windows
-   don't animate. */
+   app's (theme.css; the app's TTF faces are in fonts.css, which the site doesn't take); see
+   DESIGN.md. Nothing moves on its own, as the game's windows don't: the hero's film and the
+   minimap's dot run with the scroll, and a Level Band's switch slides at a click; with
+   reduced motion, none of it animates. */
+
+/* The lanes, as the Personal Bests window draws them. */
+@import "../src/lane.css";
 
 /* NEXON's Maplestory typeface (assets/fonts/NOTICE.md), as WOFF2 copies of the files the
    app bundles without their Korean, which the site never shows. Over the web it may arrive
@@ -1598,8 +1603,8 @@ button.icon-button:active {
 /* ---- The Map Leaderboards (leaderboards/): finding a map, and a map's bands and entries,
    set into the body as the hotkey table is ---- */
 
-/* Hidden from the eye, kept for screen readers. */
-.visually-hidden {
+/* Hidden from the eye, kept for screen readers, as the app's is. */
+.sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1912,7 +1917,8 @@ button.icon-button:active {
 /* Each entry's lane, the Personal Bests window's: its EXP/h drawn as the game's EXP gauge
    draws the bar, lime in its grey frame, from 0 to the band's #1, whose lane runs full.
    Read down the page, the table is a chart. The ruler's lines run down every lane behind
-   the bars, and the linked Character's lane is on the same scale as everyone's. */
+   the bars, and the linked Character's lane is on the same scale as everyone's. The bar and
+   the lines are the window's own (src/lane.css). */
 .lb-table .lb-lane {
   --lane-inset: 14px;
   --lane-end: 20px;
@@ -1921,31 +1927,10 @@ button.icon-button:active {
   padding-left: var(--lane-inset);
   padding-right: var(--lane-end);
 }
-.lb-grid {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--lane-inset) + var(--at) * (100% - var(--lane-inset) - var(--lane-end)));
-  width: 1px;
-  background: rgba(30, 45, 90, 0.09);
-}
 .lb-lane-track {
   position: relative;
   display: block;
   height: 10px;
-}
-.lb-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  box-sizing: border-box;
-  width: calc(var(--at) * 100%);
-  min-width: 3px;
-  height: 100%;
-  border: 1px solid var(--exp-frame);
-  border-radius: 2px;
-  background: var(--exp-fill);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 /* The lane under the figure, for a page too narrow for the lanes' column: shown there
    only. */
@@ -1998,7 +1983,7 @@ button.icon-button:active {
 }
 /* A Level Band switched by a click: the lanes regrow from the left, as the rows that stay
    slide to their new rank (the view transition below). */
-.lb-grow .lb-bar {
+.lb-grow .lane-bar {
   transform-origin: left;
   animation: lb-grow 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -2025,7 +2010,7 @@ html.lb-morph::view-transition-group(lb-head) {
 /* With reduced motion the switch is at once: script doesn't start it, and nothing here
    would move if it did. */
 @media (prefers-reduced-motion: reduce) {
-  .lb-grow .lb-bar,
+  .lb-grow .lane-bar,
   html.lb-morph::view-transition-group(*),
   html.lb-morph::view-transition-old(*),
   html.lb-morph::view-transition-new(*) {
@@ -2520,7 +2505,7 @@ button.button {
   .lb-table tbody tr > .lb-lane {
     padding-top: 6px;
   }
-  .lb-grid {
+  .lane-grid {
     display: none;
   }
   .lb-lane-track {

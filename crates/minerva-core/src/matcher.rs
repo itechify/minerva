@@ -17,7 +17,7 @@ const CONFIDENT: f32 = 0.8;
 const UNKNOWN: char = '?';
 
 /// A map from the index, with its names trimmed and normalised for matching.
-pub struct KnownMap {
+struct KnownMap {
     pub entry: MapEntry,
     street_key: Vec<char>,
     map_key: Vec<char>,
@@ -27,11 +27,10 @@ pub struct KnownMap {
     numeral_key: Vec<char>,
 }
 
-/// A confident match: which map, and how well it matched (0..=1).
+/// A confident match: which map.
 #[derive(Debug, Clone, Copy)]
 pub struct Snap {
     pub index: usize,
-    pub score: f32,
 }
 
 /// What a reading matches.
@@ -41,7 +40,7 @@ pub enum Match {
     Sure(Snap),
     /// One of these maps, whose names differ only in a trailing Roman numeral that
     /// the reading doesn't make out. One map stands for each title, as in [`Snap`].
-    OneOf { maps: Vec<usize>, score: f32 },
+    OneOf { maps: Vec<usize> },
 }
 
 pub struct Matcher {
@@ -116,13 +115,13 @@ impl Matcher {
             return None;
         }
         if titles.len() == 1 {
-            return Some(Match::Sure(Snap { index: titles[0], score }));
+            return Some(Match::Sure(Snap { index: titles[0] }));
         }
         let read = read_numeral(&map, &self.maps[best].stem_key);
         let numbered = |i: usize| read.as_ref() == Some(&self.maps[i].numeral_key);
         match titles.iter().find(|&&i| numbered(i) && scores[i] >= CONFIDENT) {
-            Some(&index) => Some(Match::Sure(Snap { index, score: scores[index] })),
-            None => Some(Match::OneOf { maps: titles, score }),
+            Some(&index) => Some(Match::Sure(Snap { index })),
+            None => Some(Match::OneOf { maps: titles }),
         }
     }
 

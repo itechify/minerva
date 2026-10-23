@@ -15,9 +15,12 @@
 //! - The trace reaches back to launch, but no further than [`TRACE_MS`]; the lines that
 //!   set the run up (the settings and Personal Bests restored) are kept even then. It is
 //!   held compressed.
-//! - Crops: the EXP figures' from the last [`RECENT_CROPS_MS`], where they changed, and
-//!   the Minimap Title's where its reading changed; for the whole run, those behind a
-//!   reading the core found unusual ([`Note::is_unusual`]) or that changed the map shown.
+//! - Crops, from the last [`RECENT_CROPS_MS`]: the EXP figures' where they changed; the
+//!   Minimap Title's, the Status Bar's and the Player Shop's where their reading changed;
+//!   the Item Tooltip's at each press, and by the pointer on a Player Shop's list where its
+//!   name changed. For the whole run, those behind a reading the core found unusual
+//!   ([`Note::is_unusual`]), that changed the map shown, or that found a part but couldn't
+//!   read it (it may have been misread).
 //! - A report is at most [`MAX_REPORT_BYTES`]: crops are left out to keep it so, the
 //!   oldest ordinary ones first, then the oldest kept for the run. The text never is.
 //! - OSMS's file set isn't in a report (ADR 0008), only its fingerprint: a replay is given
@@ -53,7 +56,7 @@ use std::task::Poll;
 /// How far back the trace reaches: a day.
 const TRACE_MS: u64 = 24 * 60 * 60 * 1000;
 /// How long a crop that isn't kept for the run is kept.
-const RECENT_CROPS_MS: u64 = 10 * 60_000;
+pub const RECENT_CROPS_MS: u64 = 10 * 60_000;
 /// The most the crops kept for the run take; beyond it the oldest go.
 const KEPT_CROPS_BYTES: usize = 8 * 1024 * 1024;
 /// The biggest a Bug Report gets.
@@ -66,8 +69,6 @@ const CHUNK_BYTES: usize = 256 * 1024;
 const WALL_CLOCK_DRIFT_MS: u64 = 1000;
 /// How many notes and errors `summary.txt` lists, the latest.
 const NOTABLE_LINES: usize = 200;
-/// The shape of a Bug Report's files, `report.json`'s `format`. Bumped whenever it changes.
-pub const REPORT_FORMAT: u32 = 1;
 
 /// The level's total EXP as the Session learned it from the bar: `lo..=hi`, `hi`
 /// unbounded (`None`) while only 0.00% has been read.
@@ -138,8 +139,12 @@ pub enum Event {
         lines: Option<TitleLines>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         found: Option<ScreenRect>,
-        #[serde(default, skip_serializing_if = "is_false")]
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         same: bool,
+        /// The region the capture was of, when it was no longer captured by the time it was
+        /// read (the game window moved, say): the reading was left. `None` for one taken in.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stale_region: Option<ScreenRect>,
     },
     /// The EXP figures captured at `at_ms` read as `bar` (`None`: not whole), at `place` in
     /// a Status Bar capture (`None`: a frame of the figures alone, or nowhere to read them).
@@ -172,10 +177,14 @@ pub enum Event {
         at_ms: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         shop: Option<ShopList>,
-        #[serde(default, skip_serializing_if = "is_false")]
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         same: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         hover: Option<ShopHover>,
+        /// The region the capture was of, when it was no longer captured by the time it was
+        /// read (the game window moved, say): the reading was left. `None` for one taken in.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stale_region: Option<ScreenRect>,
     },
     /// A Status Bar capture taken at `at_ms` read as `bar` (`None`: no Status Bar), or the
     /// `same` as the reading before.
@@ -183,8 +192,12 @@ pub enum Event {
         at_ms: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         bar: Option<StatusBar>,
-        #[serde(default, skip_serializing_if = "is_false")]
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         same: bool,
+        /// The region the capture was of, when it was no longer captured by the time it was
+        /// read (the game window moved, say): the reading was left. `None` for one taken in.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stale_region: Option<ScreenRect>,
     },
     /// The player chose the Item Card's Market Line `line` as the Deal Line.
     ChooseDealLine { line: String },
@@ -354,7 +367,7 @@ pub struct Line {
     /// time it ticked to.
     pub t: u64,
     /// The core ticked to `t` just before, and nothing came of that.
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub ticked: bool,
     #[serde(flatten)]
     pub event: Event,
@@ -419,8 +432,7 @@ pub struct AskedUpload {
 }
 
 /// What the shell knows of the run that the core doesn't, for a Bug Report.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ReportAbout {
     /// Minerva's version.
     pub version: String,
@@ -447,8 +459,6 @@ pub struct MapFacts {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReportFile {
-    /// [`REPORT_FORMAT`].
-    pub format: u32,
     pub version: String,
     pub os: String,
     pub display_scale: f64,
@@ -557,9 +567,18 @@ fn cut(frame: &Frame, (x0, y0): (u32, u32), (x1, y1): (u32, u32)) -> Frame {
     Frame { width: x1 - x0, height: y1 - y0, rgba, at_ms: frame.at_ms }
 }
 
+/// What of `frame`, its top-left pixel at `origin` on screen, lies in `rect` on screen, grown
+/// by `margin` px each way; `None` if nothing does, or the frame is short of pixels.
+pub(crate) fn rect_crop(frame: &Frame, origin: ScreenPoint, rect: ScreenRect, margin: u32) -> Option<Frame> {
+    let margin = margin as i32;
+    let top_left = (rect.x - margin, rect.y - margin);
+    let bottom_right = (rect.x + rect.width as i32 + margin, rect.y + rect.height as i32 + margin);
+    cut_on_screen(frame, origin, top_left, bottom_right)
+}
+
 /// What of `frame`, its top-left pixel at `origin` on screen, lies between the screen points
 /// `top_left` and `bottom_right`; `None` if nothing does, or the frame is short of pixels.
-pub(crate) fn cut_on_screen(frame: &Frame, origin: ScreenPoint, top_left: (i32, i32), bottom_right: (i32, i32)) -> Option<Frame> {
+fn cut_on_screen(frame: &Frame, origin: ScreenPoint, top_left: (i32, i32), bottom_right: (i32, i32)) -> Option<Frame> {
     if frame.rgba.len() < (frame.width * frame.height * 4) as usize {
         return None;
     }
@@ -593,9 +612,7 @@ pub(crate) fn player_shop_crop(capture: &ShopCapture, shop: Option<&ShopList>) -
 /// a sample of it in `samples/minimap` keeps it, and none of the rest of the client area.
 /// `None` with no title found.
 pub(crate) fn title_crop(capture: &TitleCapture, found: Option<ScreenRect>) -> Option<(Region, Frame)> {
-    let found = found?;
-    let bottom_right = (found.x + found.width as i32, found.y + found.height as i32);
-    Some((Region::Title, cut_on_screen(&capture.frame, capture.origin, (found.x, found.y), bottom_right)?))
+    Some((Region::Title, rect_crop(&capture.frame, capture.origin, found?, 0)?))
 }
 
 /// How far the crop of a Status Bar capture reaches around the bar's level, job and name
@@ -606,11 +623,7 @@ const STATUS_BAR_MARGIN: u32 = 10;
 /// `samples/status-bar` keeps them: none of the rest of the bar, nor the game above it.
 /// `None` with no Status Bar.
 pub(crate) fn status_bar_crop(capture: &StatusBarCapture, bar: Option<&StatusBar>) -> Option<(Region, Frame)> {
-    let area = bar?.area;
-    let margin = STATUS_BAR_MARGIN as i32;
-    let top_left = (area.x - margin, area.y - margin);
-    let bottom_right = (area.x + area.width as i32 + margin, area.y + area.height as i32 + margin);
-    Some((Region::StatusBar, cut_on_screen(&capture.frame, capture.origin, top_left, bottom_right)?))
+    Some((Region::StatusBar, rect_crop(&capture.frame, capture.origin, bar?.area, STATUS_BAR_MARGIN)?))
 }
 
 /// A crop of a captured region, as a PNG.
@@ -647,6 +660,7 @@ pub(crate) struct Outcome<'a> {
 }
 
 /// The last of everything a line is written against.
+#[derive(Default)]
 struct Last {
     state: PanelState,
     grind_tracker: Map<String, Value>,
@@ -661,8 +675,8 @@ struct Last {
     personal_bests_size: Option<Size>,
     foreground: Option<Foreground>,
     unavailable_hotkeys: Option<(Vec<String>, Vec<String>)>,
-    title_lines: Option<Option<TitleLines>>,
-    title_found: Option<Option<ScreenRect>>,
+    /// What the last title capture read as, and where the title was found.
+    title: Option<(Option<TitleLines>, Option<ScreenRect>)>,
     shop: Option<Option<ShopList>>,
     /// What the Item Tooltip by the pointer on the shop's list said in the last Deal Finder
     /// capture with one: its name as read (`None`: unreadable).
@@ -678,6 +692,7 @@ struct Last {
 }
 
 /// Writes the trace down as the core takes its inputs in, and keeps the crops.
+#[derive(Default)]
 pub(crate) struct Recorder {
     chunks: VecDeque<Chunk>,
     /// The trace's text since the last chunk.
@@ -703,58 +718,30 @@ pub(crate) struct Recorder {
     notable: VecDeque<String>,
 }
 
+/// Whether `value` isn't what was `last` written down, which it is from now on.
+fn changes<T: PartialEq + Clone>(last: &mut Option<T>, value: &T) -> bool {
+    if last.as_ref() == Some(value) {
+        return false;
+    }
+    *last = Some(value.clone());
+    true
+}
+
 impl Recorder {
+    /// A recorder for a run starting from `state`: lines are written against it.
     pub fn new(state: &PanelState) -> Self {
-        Self {
-            chunks: VecDeque::new(),
-            text: String::new(),
-            launch: String::new(),
-            truncated: false,
-            open: None,
-            idle_tick: None,
-            now: 0,
-            wall_clock: None,
-            last: Last {
-                state: state.clone(),
-                grind_tracker: fields(&state.exp_tracking),
-                map: ShownMap::of(state),
-                bests_revision: 0,
-                game: None,
-                panel_sizes: None,
-                item_lookup_size: None,
-                item_card_size: None,
-                deal_badges_size: None,
-                grind_tracker_size: None,
-                personal_bests_size: None,
-                foreground: None,
-                unavailable_hotkeys: None,
-                title_lines: None,
-                title_found: None,
-                shop: None,
-                shop_tooltip: None,
-                status_bar: None,
-                exp_bar_rgba: Vec::new(),
-                upload_id: 0,
-                update_check: 0,
-                update_job: None,
-            },
-            crops: VecDeque::new(),
-            maps: BTreeSet::new(),
-            sets: Vec::new(),
-            notable: VecDeque::new(),
-        }
+        let last = Last {
+            state: state.clone(),
+            grind_tracker: fields(&state.exp_tracking),
+            map: ShownMap::of(state),
+            ..Last::default()
+        };
+        Self { last, ..Self::default() }
     }
 
     /// Whether `event` is to be written down: an input that only sets a value is, only
     /// when the value changes.
     pub fn takes(&mut self, event: &Event) -> bool {
-        fn changes<T: PartialEq + Clone>(last: &mut Option<T>, value: &T) -> bool {
-            if last.as_ref() == Some(value) {
-                return false;
-            }
-            *last = Some(value.clone());
-            true
-        }
         let last = &mut self.last;
         match event {
             Event::GameWindow { game } => changes(&mut last.game, game),
@@ -774,36 +761,31 @@ impl Recorder {
 
     /// Start writing down `event`, an input captured or ticked at `at_ms` if it has a
     /// time, read from `frames` if it has any. What came of it is written once the next
-    /// input comes.
+    /// input comes. A reading the same as the one before says so, not what it read; a
+    /// reading left, as for a region no longer captured, is neither the same as the one
+    /// before nor one the next can be.
     pub fn open(&mut self, mut event: Event, at_ms: Option<u64>, frames: Vec<(Region, Frame)>) {
-        if let Event::Title { lines, found, same, .. } = &mut event {
-            if self.last.title_lines.as_ref() == Some(lines) && self.last.title_found == Some(*found) {
-                *same = true;
+        if let Event::Title { lines, found, same, stale_region: None, .. } = &mut event {
+            *same = !changes(&mut self.last.title, &(lines.clone(), *found));
+            if *same {
                 *lines = None;
                 *found = None;
-            } else {
-                self.last.title_lines = Some(lines.clone());
-                self.last.title_found = Some(*found);
             }
         }
-        if let Event::PlayerShop { shop, same, hover, .. } = &mut event {
+        if let Event::PlayerShop { shop, same, hover, stale_region: None, .. } = &mut event {
             // Off the list, no tooltip: the next one by it is new.
             if hover.is_none() {
                 self.last.shop_tooltip = None;
             }
-            if self.last.shop.as_ref() == Some(shop) {
-                *same = true;
+            *same = !changes(&mut self.last.shop, shop);
+            if *same {
                 *shop = None;
-            } else {
-                self.last.shop = Some(shop.clone());
             }
         }
-        if let Event::StatusBar { bar, same, .. } = &mut event {
-            if self.last.status_bar.as_ref() == Some(bar) {
-                *same = true;
+        if let Event::StatusBar { bar, same, stale_region: None, .. } = &mut event {
+            *same = !changes(&mut self.last.status_bar, bar);
+            if *same {
                 *bar = None;
-            } else {
-                self.last.status_bar = Some(bar.clone());
             }
         }
         let line = match (&event, at_ms) {
@@ -995,7 +977,7 @@ impl Recorder {
         if let Some(id) = line.map.as_ref().and_then(|map| map.id.as_ref()) {
             self.maps.insert(id.clone());
         }
-        let title = self.last.title_lines.as_ref().and_then(Option::as_ref);
+        let title = self.last.title.as_ref().and_then(|(lines, _)| lines.as_ref());
         let notable = match &line.event {
             Event::Error { .. } | Event::BugReport {} => Some(line.event.describe(title)),
             event if !line.notes.is_empty() => {
@@ -1063,7 +1045,6 @@ impl Recorder {
             _ => 0,
         };
         let file = |crops: usize, crops_left_out: usize| ReportFile {
-            format: REPORT_FORMAT,
             version: about.version.clone(),
             os: about.os.clone(),
             display_scale: about.display_scale,
@@ -1155,7 +1136,8 @@ impl Recorder {
         out += "  report.json  the run's facts: version, system, regions, the maps shown and their Map Summaries\n";
         out += "  trace.jsonl  every input the core took in, a JSON object a line (t: ms since launch),\n";
         out += "               with what came of it: answers, notes, what the Grind Tracker and map showed\n";
-        out += "  crops/       the EXP figures', the Minimap Title's and the Status Bar's crops, named by capture time (ms since launch)\n";
+        out += "  crops/       the EXP figures', the Minimap Title's, the Status Bar's, the Item Tooltip's and the Player Shop's crops,\n";
+        out += "               named by capture time (ms since launch)\n";
         out
     }
 }
@@ -1253,8 +1235,14 @@ impl RecordedSource {
         }
     }
 
+    /// In a replay, OSMS's file set replayed with, if one was given.
     fn replayed_set(&self) -> Option<OsmsFiles> {
         self.replayed()?.osms.clone()
+    }
+
+    /// In a replay, OSMS's item files replayed with, if they were given.
+    fn replayed_items(&self) -> Option<ItemFiles> {
+        self.replayed()?.items.clone()
     }
 }
 
@@ -1335,10 +1323,11 @@ impl MapDataSource for RecordedSource {
         let saved = match &mut self.from {
             From::Live(source) => source.saved_item_files(),
             From::Replay { .. } => match self.due(|a| matches!(a, Answer::SavedItems { .. })) {
-                Some(Answer::SavedItems { saved: Some(saved) }) => self
-                    .replayed()
-                    .and_then(|with| with.items.clone())
-                    .map(|files| SavedItemFiles { files, saved_at_unix_ms: saved.saved_at_unix_ms, saved_by: saved.saved_by() }),
+                Some(Answer::SavedItems { saved: Some(saved) }) => self.replayed_items().map(|files| SavedItemFiles {
+                    files,
+                    saved_at_unix_ms: saved.saved_at_unix_ms,
+                    saved_by: saved.saved_by(),
+                }),
                 _ => None,
             },
         };
@@ -1353,9 +1342,7 @@ impl MapDataSource for RecordedSource {
             From::Live(source) => source.fetch_item_files(),
             From::Replay { .. } => match self.due(|a| matches!(a, Answer::Items { .. })) {
                 Some(Answer::Items { answer: Ok(_) }) => Poll::Ready(
-                    self.replayed()
-                        .and_then(|with| with.items.clone())
-                        .ok_or_else(|| SourceError::Unreachable("not in the Bug Report".into())),
+                    self.replayed_items().ok_or_else(|| SourceError::Unreachable("not in the Bug Report".into())),
                 ),
                 Some(Answer::Items { answer: Err(e) }) => Poll::Ready(Err(e)),
                 _ => Poll::Pending,
@@ -1440,8 +1427,8 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
     // The wall clock as last written down, and the capture time then: the shell tells the
     // core it with every tick.
     let mut wall_clock: Option<(u64, u64)> = None;
-    let mut title_lines: Option<TitleLines> = None;
-    let mut title_found: Option<ScreenRect> = None;
+    // The last readings, which a line the same as the one before stands for.
+    let mut title: (Option<TitleLines>, Option<ScreenRect>) = (None, None);
     let mut shop: Option<ShopList> = None;
     let mut status_bar: Option<StatusBar> = None;
     for line in &recording.lines {
@@ -1456,11 +1443,9 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::Tick {} => {
                 minerva.tick(line.t);
             }
-            Event::Title { at_ms, lines, found, same } => {
-                let (lines, found) = if same { (title_lines.clone(), title_found) } else { (lines, found) };
-                title_lines.clone_from(&lines);
-                title_found = found;
-                minerva.on_reading(TitleReading { lines, found, at_ms });
+            Event::Title { at_ms, lines, found, same, stale_region } => {
+                let (lines, found) = if stale_region.is_some() { (lines, found) } else { as_before(&mut title, (lines, found), same) };
+                minerva.title_reading_for(TitleReading { lines, found, at_ms }, stale_region);
             }
             Event::ExpBar { at_ms, bar, place } => {
                 minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place });
@@ -1510,15 +1495,13 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::ItemTooltip { reading } => {
                 minerva.on_item_tooltip_reading(reading);
             }
-            Event::PlayerShop { at_ms, shop: read, same, hover } => {
-                let read = if same { shop.clone() } else { read };
-                shop.clone_from(&read);
-                minerva.on_player_shop_reading(ShopReading { shop: read, hover, at_ms });
+            Event::PlayerShop { at_ms, shop: read, same, hover, stale_region } => {
+                let shop = if stale_region.is_some() { read } else { as_before(&mut shop, read, same) };
+                minerva.player_shop_reading_for(ShopReading { shop, hover, at_ms }, stale_region);
             }
-            Event::StatusBar { at_ms, bar, same } => {
-                let bar = if same { status_bar.clone() } else { bar };
-                status_bar.clone_from(&bar);
-                minerva.on_status_bar_reading(StatusBarReading { bar, at_ms });
+            Event::StatusBar { at_ms, bar, same, stale_region } => {
+                let bar = if stale_region.is_some() { bar } else { as_before(&mut status_bar, bar, same) };
+                minerva.status_bar_reading_for(StatusBarReading { bar, at_ms }, stale_region);
             }
             Event::ChooseDealLine { line } => {
                 minerva.choose_deal_line(&line);
@@ -1644,6 +1627,15 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
     Replay { lines: recording.lines.len(), divergence }
 }
 
+/// A reading as a replayed line has it: `read`, or what was read `last` if the line says it
+/// read the `same`; the last from then on.
+fn as_before<T: Clone>(last: &mut T, read: T, same: bool) -> T {
+    if !same {
+        *last = read;
+    }
+    last.clone()
+}
+
 impl Recording {
     /// The trace as lines to read: what came in and what came of it. Before `from_ms`,
     /// only the lines the core made something of, changed the map, or the player acted
@@ -1652,7 +1644,7 @@ impl Recording {
         let mut out = Vec::new();
         let mut title: Option<&TitleLines> = None;
         for line in &self.lines {
-            if let Event::Title { lines, same: false, .. } = &line.event {
+            if let Event::Title { lines, same: false, stale_region: None, .. } = &line.event {
                 title = lines.as_ref();
             }
             let consequences = line.consequences();
@@ -1672,6 +1664,8 @@ impl Recording {
                     | Event::Restore { .. }
                     | Event::RestoreBests { .. }
                     | Event::BestsLost {}
+                    | Event::RestoreMarketPrices { .. }
+                    | Event::ImportMarketPrices { .. }
                     | Event::RemoveVisit { .. }
                     | Event::MoveVisit { .. }
                     | Event::AssignUnassigned { .. }
@@ -1775,12 +1769,12 @@ impl Note {
     /// Whether the reading it came of is one to look at again: a misread, or one taken as
     /// a level-up, a death, another character or a level learned wrong. Not a Session
     /// starting or a Visit, which every run has.
-    pub fn is_unusual(&self) -> bool {
+    fn is_unusual(&self) -> bool {
         !matches!(self, Note::SessionStarted | Note::Visit)
     }
 
     /// In words.
-    pub fn describe(&self) -> String {
+    fn describe(&self) -> String {
         match self {
             Note::SessionStarted => "the Session started".to_string(),
             Note::LevelUp { gain, level: l } => format!("level-up: {} EXP counted, from a level of {}", signed(*gain), level(*l)),
@@ -1808,6 +1802,23 @@ impl Note {
 }
 
 impl Event {
+    /// A reading left as for a region no longer captured: the reading as if it had been
+    /// taken in, and the region its capture was of.
+    fn left_as_stale(&self) -> Option<(Event, ScreenRect)> {
+        match self.clone() {
+            Event::Title { at_ms, lines, found, same, stale_region: Some(region) } => {
+                Some((Event::Title { at_ms, lines, found, same, stale_region: None }, region))
+            }
+            Event::PlayerShop { at_ms, shop, same, hover, stale_region: Some(region) } => {
+                Some((Event::PlayerShop { at_ms, shop, same, hover, stale_region: None }, region))
+            }
+            Event::StatusBar { at_ms, bar, same, stale_region: Some(region) } => {
+                Some((Event::StatusBar { at_ms, bar, same, stale_region: None }, region))
+            }
+            _ => None,
+        }
+    }
+
     /// When a reading's frame was captured.
     fn at_ms(&self) -> Option<u64> {
         match self {
@@ -1822,6 +1833,13 @@ impl Event {
 
     /// In words; a title read the same as the one before as what that one read, `title`.
     fn describe(&self, title: Option<&TitleLines>) -> String {
+        if let Some((read, region)) = self.left_as_stale() {
+            let ScreenRect { x, y, width, height } = region;
+            return format!(
+                "{}, for a region no longer captured ({width}x{height} at ({x}, {y})): left",
+                read.describe(title)
+            );
+        }
         match self {
             Event::Tick {} => "tick".to_string(),
             Event::Title { lines: Some(lines), .. } => format!("title read {:?} / {:?}", lines.street, lines.map),
@@ -1880,8 +1898,9 @@ impl Event {
             Event::Hotkey { pressed } => format!("hotkey {pressed}"),
             Event::SearchQuery { query } => format!("search typed {query:?}"),
             Event::ItemTooltip { reading } => format!("Item Tooltip read {}", json(reading)),
-            Event::PlayerShop { hover: Some(hover), same, shop, at_ms } => {
-                let read = Event::PlayerShop { at_ms: *at_ms, shop: shop.clone(), same: *same, hover: None }.describe(title);
+            Event::PlayerShop { hover: Some(hover), same, shop, at_ms, .. } => {
+                let read = Event::PlayerShop { at_ms: *at_ms, shop: shop.clone(), same: *same, hover: None, stale_region: None }
+                    .describe(title);
                 let tooltip = match &hover.tooltip {
                     ItemTooltip::Found { name: Some(name), .. } => format!("its tooltip {name:?}"),
                     ItemTooltip::Found { name: None, .. } => "its tooltip unreadable".to_string(),
@@ -2076,10 +2095,6 @@ fn level(level: Level) -> String {
         Some(hi) => format!("{}–{} EXP", thousands(level.lo), thousands(hi)),
         None => format!("at least {} EXP", thousands(level.lo)),
     }
-}
-
-fn is_false(b: &bool) -> bool {
-    !b
 }
 
 fn is_zero(n: &usize) -> bool {

@@ -5,12 +5,9 @@
 
 mod common;
 
-use common::arrive;
+use common::{arrive, SUNSET_SAMPLE, KERNING_SAMPLE, shown_map_name};
 use common::world::{loaded, map, orange, world};
 use minerva_core::{Action, CollapsedSections, Minerva, Section, Settings};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
 
 #[test]
 fn every_section_starts_open() {
@@ -52,13 +49,13 @@ fn a_collapsed_section_stays_collapsed_on_the_next_map() {
         map("100", "Sunset Sky", 100, vec![orange(5)]),
         map("103", "Kerning City", 100, vec![]),
     ]);
-    arrive(&mut minerva, SUNSET, 100);
+    arrive(&mut minerva, SUNSET_SAMPLE, 100);
     minerva.act(Action::ToggleSection(Section::Mobs));
     minerva.act(Action::ToggleSection(Section::Navigation));
 
-    let state = arrive(&mut minerva, KERNING, 2_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 2_000);
 
-    assert_eq!(state.map.as_ref().map(|m| m.map_name.as_str()), Some("Kerning City"));
+    assert_eq!(shown_map_name(&state), Some("Kerning City"));
     assert!(state.collapsed_sections.mobs, "still collapsed after the map changed");
     assert!(state.collapsed_sections.navigation, "still collapsed after the map changed");
     assert!(!state.collapsed_sections.hidden_portals);

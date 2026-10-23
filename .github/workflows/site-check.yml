@@ -8,7 +8,11 @@ on:
     paths:
       - site/**
       - src/theme.css
+      # The Map Leaderboards' lanes are the Personal Bests window's.
+      - src/lane.css
       - src/hotkeys.ts
+      # The pages draw with the app's small DOM helpers.
+      - src/dom.ts
       # The Map Leaderboards pages write figures and dates as the app does, and name maps
       # from the map names fixture.
       - src/figures.ts

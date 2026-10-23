@@ -92,12 +92,6 @@ impl Item {
         self
     }
 
-    /// Another stat, as OSMS writes it.
-    pub fn stat(mut self, name: &str, value: Value) -> Self {
-        self.stats.insert(name.into(), value);
-        self
-    }
-
     fn json(&self) -> Value {
         let mut item = Object::new();
         item.insert("id".into(), json!(self.id));

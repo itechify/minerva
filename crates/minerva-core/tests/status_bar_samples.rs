@@ -18,13 +18,8 @@
 
 mod common;
 
-use common::{FakeSource, client_of};
-use minerva_core::{Frame, GameWindow, Minerva, PanelState, ScreenPoint, ScreenRect, Settings, StatusBar, StatusBarCapture};
-use std::path::{Path, PathBuf};
-
-fn samples_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/status-bar")
-}
+use common::{FakeSource, client_of, SUNSET_SAMPLE, KERNING_SAMPLE, CONSTRUCTION_SAMPLE};
+use minerva_core::{Minerva, PanelState, ScreenPoint, ScreenRect, Settings, StatusBar, StatusBarCapture};
 
 /// What a sample's name says it shows: `None` for no Status Bar, else its level, its job
 /// (as the file names it) and its name, if the crop keeps it.
@@ -45,7 +40,7 @@ fn expected(file: &str) -> Expected {
 }
 
 fn sample_files() -> Vec<String> {
-    let mut files: Vec<String> = std::fs::read_dir(samples_dir())
+    let mut files: Vec<String> = std::fs::read_dir(common::samples_in("status-bar"))
         .expect("samples/status-bar")
         .map(|entry| entry.expect("dir entry").file_name().to_string_lossy().to_string())
         .filter(|name| name.ends_with(".png"))
@@ -54,23 +49,11 @@ fn sample_files() -> Vec<String> {
     files
 }
 
-/// `img`'s pixels, their colours times `brightness`.
-fn frame(img: &image::RgbaImage, brightness: f32) -> Frame {
-    let mut rgba = img.as_raw().clone();
-    for (i, channel) in rgba.iter_mut().enumerate() {
-        if i % 4 != 3 {
-            *channel = (*channel as f32 * brightness).round() as u8;
-        }
-    }
-    Frame { width: img.width(), height: img.height(), rgba, at_ms: 1_000 }
-}
-
 /// A core over a 1920x1200 game window at the screen's origin.
 fn started() -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms_offline());
     minerva.restore(Settings::default());
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    minerva.on_game_window(Some(common::window_at_origin(1920, 1200)));
     minerva.tick(0);
     minerva
 }
@@ -109,10 +92,10 @@ fn every_status_bar_sample_reads_as_its_name_says_or_as_unreadable_never_wrong()
     let mut unreadable = Vec::new();
     for file in &files {
         let expected = expected(file);
-        let img = image::open(samples_dir().join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
+        let img = image::open(common::samples_in("status-bar").join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
         for brightness in [1.0, 0.935] {
             let mut minerva = started();
-            let capture = StatusBarCapture { frame: frame(&img, brightness), origin: ScreenPoint { x: 0, y: 0 } };
+            let capture = StatusBarCapture { frame: common::dimmed(&img, brightness), origin: ScreenPoint { x: 0, y: 0 } };
             let read = read(minerva.on_status_bar_capture(capture));
             match judge(&expected, &read) {
                 (false, _) => wrong.push(format!("{file} ×{brightness}: {read:?}")),
@@ -130,7 +113,7 @@ fn every_status_bar_sample_reads_as_its_name_says_or_as_unreadable_never_wrong()
 /// The Status Bar `img` reads as in a core of its own, at the screen's origin.
 fn bar_of(img: &image::RgbaImage) -> (Option<StatusBar>, Read) {
     let mut minerva = started();
-    let capture = StatusBarCapture { frame: frame(img, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
+    let capture = StatusBarCapture { frame: common::dimmed(img, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
     let state = minerva.on_status_bar_capture(capture);
     (state.status_bar.clone(), read(state))
 }
@@ -140,7 +123,7 @@ fn every_status_bar_sample_at_other_ui_sizes_reads_as_its_name_says_or_as_unread
     let mut wrong = Vec::new();
     for file in sample_files() {
         let expected = expected(&file);
-        let img = image::open(samples_dir().join(&file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
+        let img = image::open(common::samples_in("status-bar").join(&file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
         let area = bar_of(&img).0.expect("every sample reads").area;
         for size in common::OTHER_UI_SIZES {
             let (bar, read) = bar_of(&common::scaled(&img, size));
@@ -176,7 +159,7 @@ fn the_pointer_anywhere_over_the_bar_at_any_ui_size_never_reads_as_another() {
     let mut wrong = Vec::new();
     for file in AT_EACH_UI_SIZE {
         let expected = expected(file);
-        let img = image::open(samples_dir().join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
+        let img = image::open(common::samples_in("status-bar").join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8();
         let area = bar_of(&img).0.expect("every sample reads").area;
         // The pointer is the game's, the same size at any UI Size.
         let step = (area.height / 5).max(2);
@@ -198,9 +181,9 @@ fn the_pointer_anywhere_over_the_bar_at_any_ui_size_never_reads_as_another() {
 /// maintainer's own Character, Egbert, a level 13 Magician.
 const WINDOWS: [&str; 4] = [
     "hidden-street__northern-top-of-construction-site--window",
-    "victoria-road__construction-site-north-of-kerning-city--window",
-    "victoria-road__kerning-city--window",
-    "victoria-road__sunset-sky--window",
+    CONSTRUCTION_SAMPLE,
+    KERNING_SAMPLE,
+    SUNSET_SAMPLE,
 ];
 
 /// A window sample's client area, on screen at the origin: the shell's capture for the
@@ -208,13 +191,12 @@ const WINDOWS: [&str; 4] = [
 fn captured(window: &str, brightness: f32) -> (Minerva, StatusBarCapture) {
     let client = client_of(&common::load(window));
     let mut minerva = started();
-    let screen = ScreenRect { x: 0, y: 0, width: client.width(), height: client.height() };
-    minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    minerva.on_game_window(Some(common::window_at_origin(client.width(), client.height())));
     let strip = minerva.panel_state().status_bar_capture.expect("the Status Bar is captured with the game in front");
     assert_eq!((strip.x, strip.width), (0, client.width()), "{window}: the whole width");
     assert_eq!(strip.y as u32 + strip.height, client.height(), "{window}: down to the bottom");
     let crop = image::imageops::crop_imm(&client, 0, strip.y as u32, strip.width, strip.height).to_image();
-    let capture = StatusBarCapture { frame: frame(&crop, brightness), origin: ScreenPoint { x: strip.x, y: strip.y } };
+    let capture = StatusBarCapture { frame: common::dimmed(&crop, brightness), origin: ScreenPoint { x: strip.x, y: strip.y } };
     (minerva, capture)
 }
 
@@ -233,12 +215,12 @@ fn the_status_bar_is_found_at_the_bottom_of_a_whole_client_area_wherever_it_sits
 #[test]
 fn a_name_under_the_pointer_is_unreadable_and_the_rest_still_reads() {
     let file = "13__magician__Egbert--kerning-city-window.png";
-    let mut img = image::open(samples_dir().join(file)).expect(file).to_rgba8();
+    let mut img = image::open(common::samples_in("status-bar").join(file)).expect(file).to_rgba8();
     // The game's pointer over the "b" of "Egbert".
     let tip = (165, img.height() - 18);
     common::pointer(&mut img, tip, 12);
     let mut minerva = started();
-    let capture = StatusBarCapture { frame: frame(&img, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
+    let capture = StatusBarCapture { frame: common::dimmed(&img, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
 
     let read = read(minerva.on_status_bar_capture(capture));
 
@@ -251,7 +233,7 @@ fn the_top_of_a_client_area_has_no_status_bar() {
         let client = client_of(&common::load(window));
         let top = image::imageops::crop_imm(&client, 0, 0, client.width(), 96).to_image();
         let mut minerva = started();
-        let capture = StatusBarCapture { frame: frame(&top, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
+        let capture = StatusBarCapture { frame: common::dimmed(&top, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
         assert_eq!(minerva.on_status_bar_capture(capture).status_bar, None, "{window}");
     }
 }

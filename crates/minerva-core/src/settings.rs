@@ -156,24 +156,23 @@ impl Hotkeys {
         if self.item_lookup != lookup_default {
             self.item_card = std::mem::replace(&mut self.item_lookup, lookup_default);
         }
-        let taken = Hotkey::ALL
-            .into_iter()
-            .filter(|&hotkey| hotkey != Hotkey::ItemLookup)
-            .any(|hotkey| crate::same_hotkey(self.get(hotkey), &self.item_lookup));
-        if taken {
-            self.item_lookup.clear();
-        }
+        self.free(Hotkey::ItemLookup);
     }
 
     /// A file's hotkeys from before the Deal Finder (version 5 and earlier), which gave it
     /// its default: off, if another hotkey has that.
     pub(crate) fn free_deal_finder(&mut self) {
+        self.free(Hotkey::DealFinder);
+    }
+
+    /// Turn `hotkey` off if another hotkey has its combination.
+    fn free(&mut self, hotkey: Hotkey) {
         let taken = Hotkey::ALL
             .into_iter()
-            .filter(|&hotkey| hotkey != Hotkey::DealFinder)
-            .any(|hotkey| crate::same_hotkey(self.get(hotkey), &self.deal_finder));
+            .filter(|&other| other != hotkey)
+            .any(|other| crate::same_hotkey(self.get(other), self.get(hotkey)));
         if taken {
-            self.deal_finder.clear();
+            self.set(hotkey, String::new());
         }
     }
 

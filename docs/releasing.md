@@ -21,7 +21,7 @@ How a Minerva version is numbered, made and published as a GitHub Release. Follo
 
 - **`main` holds everything for the release, and passes its checks:**
   - `cargo test`
-  - `cargo test -p minerva --lib`
+  - `cargo test -p minerva`
   - `cargo clippy --workspace --all-targets -- -D warnings`
   - `pnpm build`
   - `pnpm site:test`

@@ -8,10 +8,9 @@
 //! one the core can't read.
 
 use crate::errors::error;
-use crate::http;
+use crate::http::{self, InFlight};
 use minerva_core::{Fetched, ItemHit, SourceError, meowdb};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Receiver;
 use std::task::Poll;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -25,29 +24,22 @@ type Answer = Result<Fetched<Vec<ItemHit>>, SourceError>;
 pub struct ItemSearch {
     client: reqwest::Client,
     cache_dir: PathBuf,
-    /// The item name being searched for, and where MeowDB's items will arrive.
-    in_flight: Option<(String, Receiver<Answer>)>,
+    /// The item name being searched for.
+    in_flight: InFlight<Fetched<Vec<ItemHit>>>,
 }
 
 impl ItemSearch {
     /// A search caching under `cache_dir` (created when first written), fetched with
     /// `client`.
     pub fn new(client: reqwest::Client, cache_dir: &Path) -> Self {
-        Self { client, cache_dir: cache_dir.to_path_buf(), in_flight: None }
+        Self { client, cache_dir: cache_dir.to_path_buf(), in_flight: InFlight::default() }
     }
 
     /// The items MeowDB's search gives for `name`: at once from the cache, otherwise once
     /// fetched, in the background.
     pub fn poll(&mut self, name: &str) -> Poll<Answer> {
-        if let Some((asked, arriving)) = &self.in_flight
-            && asked == name
-        {
-            let Poll::Ready(items) = http::collect(arriving) else { return Poll::Pending };
-            self.in_flight = None;
-            if let Err(e) = &items {
-                error!("item search {name:?}: {e}");
-            }
-            return Poll::Ready(items);
+        if let Some(items) = self.in_flight.collect(name, format_args!("item search {name:?}")) {
+            return items;
         }
         // Read here, so a cached answer is given at once and the page opens right away.
         let path = self.file(name);
@@ -58,10 +50,9 @@ impl ItemSearch {
             Ok(url) => url.to_string(),
             Err(e) => return Poll::Ready(Err(SourceError::FormatChanged(format!("search URL: {e}")))),
         };
+        // In place of another name's search on its way: the latest lookup's is the one asked for.
         let client = self.client.clone();
-        let arriving = http::in_background(async move { settle(&path, http::text(&client, &url).await) });
-        self.in_flight = Some((name.to_string(), arriving));
-        Poll::Pending
+        self.in_flight.start(name, async move { settle(&path, http::text(&client, &url).await) })
     }
 
     fn file(&self, name: &str) -> PathBuf {

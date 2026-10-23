@@ -2,7 +2,7 @@
 //! It shows the Session's figures beside the panel, in a window of its own that the
 //! player drags anywhere and closes with its ×.
 
-use crate::panel::{GameWindow, PlacementMode, ScreenRect, Size, contains, in_view, screen_at};
+use crate::panel::{GameWindow, PlacementMode, ScreenRect, Size, in_view, screen_at};
 use serde::{Deserialize, Serialize};
 
 /// A window's top-left corner relative to the game client's top-left corner (physical
@@ -90,6 +90,6 @@ impl GrindTracker {
         };
         let (first, second) = if leftwards { (left, right) } else { (right, left) };
         let screen = screen_at(game, panel.x, panel.y);
-        [first, second].into_iter().find(|spot| contains(screen, *spot)).unwrap_or(first)
+        [first, second].into_iter().find(|spot| screen.contains(*spot)).unwrap_or(first)
     }
 }

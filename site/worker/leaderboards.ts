@@ -1,5 +1,6 @@
 // The Map Leaderboards: each Character's entries, mirrored whole from the app, and each
 // map's Level Bands ranked from them.
+import { isMap, isName } from "../entries";
 import { bandOf, levelsOf } from "../level-bands";
 import { type Top, takenTops, tell } from "./announce";
 import { type Answer, badRequest, body } from "./http";
@@ -66,11 +67,6 @@ function entriesOf(body: unknown, now: number): Upload[] | string {
     entries.push({ map, band, level, job, expPerHour, setAt });
   }
   return entries;
-}
-
-/** Whether `name` can be a Character's: 1 to 16 letters and digits. */
-function isName(name: string): boolean {
-  return /^[A-Za-z0-9]{1,16}$/.test(name);
 }
 
 /** An entry an upload held that isn't on the Map Leaderboards, and why. */
@@ -190,7 +186,7 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
   // Only an entry that is new, or higher than the one it replaces, can take a top spot, so
   // the top spots are read for those places alone. `takenTops` would turn the rest down
   // anyway; this is what keeps the reads off almost every upload, since the app uploads a
-  // Character's whole set as each Visit ends and nearly all of it is unchanged (ADR 0017).
+  // Character's whole set as each Visit ends and nearly all of it is unchanged (ADR 0022).
   const held = new Map(had.results.map((r) => [`${r.map_id} ${r.band}`, r.exp_per_hour]));
   const improved: Place[] = accepted.filter((e) => (held.get(`${e.map} ${e.band}`) ?? 0) < e.expPerHour);
   const before = improved.length === 0 ? [] : await topsAt(env, improved);
@@ -221,11 +217,6 @@ export async function optOut(env: Env, request: Request, name: string): Promise<
   if (!("nameKey" in claimed)) return claimed;
   await env.DB.prepare(`DELETE FROM entries WHERE name_key = ?1 AND ${HELD}`).bind(claimed.nameKey, claimed.keyHash).run();
   return { status: 204 };
-}
-
-/** Whether `map` is a 9-digit map ID. */
-function isMap(map: string): boolean {
-  return /^\d{9}$/.test(map);
 }
 
 interface Row {

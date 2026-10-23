@@ -3,10 +3,8 @@
 
 mod common;
 
-use common::{FakeSource, arrive};
-use minerva_core::{Minerva, PanelControl, PlacementMode, Request, Settings, SetupReason};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
+use common::{FakeSource, arrive, SUNSET_SAMPLE};
+use minerva_core::{Minerva, PanelControl, PlacementMode, Request, SetupReason};
 
 #[test]
 fn the_collapse_icon_collapses_the_panel_like_ctrl_shift_c() {
@@ -32,7 +30,7 @@ fn the_meowdb_icon_opens_the_shown_maps_page_like_ctrl_shift_m_and_nothing_witho
     let mut minerva = Minerva::new(FakeSource::osms());
     assert_eq!(minerva.press(PanelControl::OpenMeowdbPage), None);
 
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     assert_eq!(
         minerva.press(PanelControl::OpenMeowdbPage),
@@ -43,7 +41,7 @@ fn the_meowdb_icon_opens_the_shown_maps_page_like_ctrl_shift_m_and_nothing_witho
 #[test]
 fn the_help_icon_opens_setup_like_ctrl_shift_s() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.restore(Settings { setup_done: true, ..Settings::default() });
+    minerva.restore(common::set_up());
 
     minerva.press(PanelControl::Setup);
 
@@ -74,8 +72,8 @@ fn a_button_and_its_hotkey_land_in_the_same_state() {
     for (control, hotkey) in presses {
         let mut clicked = Minerva::new(FakeSource::osms());
         let mut typed = Minerva::new(FakeSource::osms());
-        arrive(&mut clicked, SUNSET, 0);
-        arrive(&mut typed, SUNSET, 0);
+        arrive(&mut clicked, SUNSET_SAMPLE, 0);
+        arrive(&mut typed, SUNSET_SAMPLE, 0);
 
         let by_click = clicked.press(control);
         let by_key = typed.on_hotkey(hotkey);

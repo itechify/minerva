@@ -1,20 +1,8 @@
 // A Level Band on a map's page: its top 50, as GET /api/maps/<map>/bands/<band> ranks them,
 // and the linked Character's entry with its rank, even outside them.
 import { describe, expect, it } from "vitest";
-import { bandTable, type BandAnswer, type Ranked } from "../leaderboards.ts";
-
-const FIELD = "100000000";
-/** Noon UTC, so the day is the same in any time zone the tests run in. */
-const OCT_3 = Date.UTC(2026, 9, 3, 12);
-const NOW = new Date(Date.UTC(2026, 9, 14, 12));
-
-function ranked(rank: number, name: string, expPerHour: number, setAt = OCT_3): Ranked {
-  return { rank, name, job: "Magician", level: 23, expPerHour, setAt };
-}
-
-function answer(entries: Ranked[], character: Ranked | null = null, total = entries.length): BandAnswer {
-  return { map: FIELD, band: 20, levels: [20, 29], total, entries, character };
-}
+import { bandTable } from "../leaderboards.ts";
+import { answer, NOW, OCT_3, ranked } from "./common.ts";
 
 /** A band's top 50: 157,000 EXP/h at #1, 73,400 at #50. */
 const TOP_50 = Array.from({ length: 50 }, (_, i) => ranked(i + 1, `Player${i + 1}`, i === 49 ? 73_400 : 157_000 - i * 1_000));

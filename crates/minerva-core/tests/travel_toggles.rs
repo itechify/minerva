@@ -8,47 +8,15 @@
 
 mod common;
 
-use common::arrive;
-use common::world::{WorldMap, map, nearest, orange, search_for, world};
-use minerva_core::{Action, Minerva, Distance, PanelState, SearchResult, Settings, Step, Travel};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
+use common::world::{WorldMap, map, nearest, orange, search_for, world, on_sunset_sky, distances, route_of};
+use minerva_core::{Action, Minerva, Distance, Settings, Step, Travel};
 
 /// A core over `maps`, its file set in hand, with the player arrived on the map named
 /// Sunset Sky and the Orange Mushroom picked.
 fn searched_from_sunset_sky(maps: Vec<WorldMap>) -> Minerva {
-    let mut minerva = Minerva::new(world(maps));
-    minerva.tick(0);
-    minerva.tick(50);
-    arrive(&mut minerva, SUNSET, 100);
+    let mut minerva = on_sunset_sky(maps);
     search_for(&mut minerva, "orange");
     minerva
-}
-
-/// Each result as "Map: Distance".
-fn distances(state: &PanelState) -> Vec<String> {
-    state
-        .search
-        .results
-        .iter()
-        .map(|r| match r.distance {
-            Distance::MapChanges(n) => format!("{}: {n}", r.map_name),
-            other => format!("{}: {other:?}", r.map_name),
-        })
-        .collect()
-}
-
-/// A result's route as "Start, Portal: Next, Taxi: Then…".
-fn route(result: &SearchResult) -> String {
-    result
-        .route
-        .iter()
-        .map(|stop| match stop.by {
-            None => stop.map_name.clone(),
-            Some(step) => format!("{step:?}: {}", stop.map_name),
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 #[test]
@@ -126,14 +94,14 @@ fn a_taxi_between_towns_shortens_a_route_only_while_taxis_are_on() {
     let state = minerva.act(Action::ToggleTaxis).clone();
 
     assert_eq!(distances(&state), ["Ellinia: 2"]);
-    assert_eq!(route(&state.search.results[0]), "Sunset Sky, Portal: Henesys, Taxi: Ellinia");
+    assert_eq!(route_of(&state.search.results[0]), "Sunset Sky, Portal: Henesys, Taxi: Ellinia");
     assert_eq!(state.search.results[0].travel, [Step::Taxi]);
 
     let state = minerva.act(Action::ToggleTaxis).clone();
 
     assert_eq!(distances(&state), ["Ellinia: 4"]);
     assert_eq!(
-        route(&state.search.results[0]),
+        route_of(&state.search.results[0]),
         "Sunset Sky, Portal: Henesys, Portal: Road One, Portal: Road Two, Portal: Ellinia"
     );
     assert_eq!(state.search.results[0].travel, []);
@@ -176,7 +144,7 @@ fn of_two_equally_short_routes_the_one_by_portals_is_taken_over_a_taxi() {
 
     let state = minerva.act(Action::ToggleTaxis);
 
-    assert_eq!(route(&state.search.results[0]), "Sunset Sky, Portal: Ellinia");
+    assert_eq!(route_of(&state.search.results[0]), "Sunset Sky, Portal: Ellinia");
     assert_eq!(state.search.results[0].travel, []);
 }
 
@@ -201,7 +169,7 @@ fn a_teleport_scroll_takes_the_player_from_any_map_to_each_named_town_only_while
     for (_, name) in towns {
         let result = state.search.results.iter().find(|r| r.map_name == name).unwrap();
         assert_eq!(result.distance, Distance::MapChanges(1), "{name}");
-        assert_eq!(route(result), format!("Sunset Sky, TeleportScroll: {name}"));
+        assert_eq!(route_of(result), format!("Sunset Sky, TeleportScroll: {name}"));
         assert_eq!(result.travel, [Step::TeleportScroll]);
     }
     let field = state.search.results.iter().find(|r| r.map_name == "Mushroom Field").unwrap();
@@ -282,7 +250,7 @@ fn a_nearest_town_scroll_takes_the_player_to_their_own_maps_nearest_town() {
     let state = minerva.act(Action::ToggleTeleportScrolls).clone();
 
     assert_eq!(distances(&state), ["Amherst: 1", "Other Town: NoRoute"]);
-    assert_eq!(route(&state.search.results[0]), "Sunset Sky, TeleportScroll: Amherst");
+    assert_eq!(route_of(&state.search.results[0]), "Sunset Sky, TeleportScroll: Amherst");
     assert_eq!(state.search.results[0].travel, [Step::TeleportScroll]);
     assert_eq!(nearest(&state).unwrap().map_name, "Amherst");
 }
@@ -313,7 +281,7 @@ fn a_nearest_town_scroll_can_be_read_partway_along_a_route() {
     let state = minerva.act(Action::ToggleTeleportScrolls);
 
     assert_eq!(
-        route(&state.search.results[0]),
+        route_of(&state.search.results[0]),
         "Sunset Sky, Portal: Deep Cave, TeleportScroll: Amherst, Portal: Amherst Field"
     );
 }

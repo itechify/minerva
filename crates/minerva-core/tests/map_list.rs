@@ -4,13 +4,10 @@
 mod common;
 
 use common::osms::{self, KERNING_CITY, SUNSET_SKY, map};
-use common::{FakeSource, black_frame, sample_frame};
-use minerva_core::{Minerva, PanelState, Recognition, TitleLines, TitleReading};
+use common::{FakeSource, black_frame, sample_frame, KERNING_SAMPLE, SUNSET_SAMPLE, read_as};
+use minerva_core::{Minerva, PanelState, Recognition};
 use std::sync::atomic::Ordering;
 use std::task::Poll;
-
-const KERNING: &str = "victoria-road__kerning-city--window";
-const SUNSET: &str = "victoria-road__sunset-sky--window";
 
 fn shown(state: &PanelState) -> Option<(&str, &str, &str)> {
     state.map.as_ref().map(|m| (m.id.as_str(), m.street_name.as_str(), m.map_name.as_str()))
@@ -19,9 +16,9 @@ fn shown(state: &PanelState) -> Option<(&str, &str, &str)> {
 #[test]
 fn a_title_is_recognised_as_the_map_osms_lists_under_its_zero_padded_id() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.on_frame(sample_frame(KERNING, 0));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 0));
 
-    let state = minerva.on_frame(sample_frame(KERNING, 333));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 333));
 
     assert_eq!(state.recognition, Recognition::Ready);
     assert_eq!(shown(state), Some(("010003000", "Victoria Road", "Kerning City")));
@@ -31,15 +28,11 @@ fn a_title_is_recognised_as_the_map_osms_lists_under_its_zero_padded_id() {
 fn names_osms_gives_with_spaces_around_them_are_trimmed() {
     let world = osms::game().changing(SUNSET_SKY, |m| map(m.id, "  Victoria Road ", "Sunset Sky   "));
     let mut minerva = Minerva::new(FakeSource::with_world(world));
-    minerva.on_frame(sample_frame(SUNSET, 0));
+    minerva.on_frame(sample_frame(SUNSET_SAMPLE, 0));
 
-    let state = minerva.on_frame(sample_frame(SUNSET, 333));
+    let state = minerva.on_frame(sample_frame(SUNSET_SAMPLE, 333));
 
     assert_eq!(shown(state), Some(("010003070", "Victoria Road", "Sunset Sky")));
-}
-
-fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 /// OSMS lists one map with neither a name nor a street. A map missing either can't be
@@ -63,9 +56,9 @@ fn a_map_without_a_name_or_a_street_is_not_in_the_map_list() {
 #[test]
 fn a_title_that_matches_no_known_map_is_not_shown_as_a_map() {
     let mut minerva = Minerva::new(FakeSource::with_world(osms::game().without(KERNING_CITY)));
-    minerva.on_frame(sample_frame(KERNING, 0));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 0));
 
-    let state = minerva.on_frame(sample_frame(KERNING, 333));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 333));
 
     assert_eq!(state.recognition, Recognition::Ready);
     assert_eq!(state.map, None);
@@ -75,9 +68,9 @@ fn a_title_that_matches_no_known_map_is_not_shown_as_a_map() {
 #[test]
 fn when_osms_cannot_be_reached_and_nothing_is_saved_recognition_is_unavailable_and_no_map_is_shown() {
     let mut minerva = Minerva::new(FakeSource::osms_offline());
-    minerva.on_frame(sample_frame(KERNING, 0));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 0));
 
-    let state = minerva.on_frame(sample_frame(KERNING, 333));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 333));
 
     assert_eq!(state.recognition, Recognition::Unavailable);
     assert_eq!(state.map, None);
@@ -104,7 +97,7 @@ fn the_file_set_is_asked_for_once_not_on_every_frame() {
     let mut minerva = Minerva::new(source);
 
     for i in 0..5 {
-        minerva.on_frame(sample_frame(KERNING, 333 * i));
+        minerva.on_frame(sample_frame(KERNING_SAMPLE, 333 * i));
     }
     minerva.on_frame(black_frame(2000));
 
@@ -128,12 +121,12 @@ fn with_nothing_saved_an_unreachable_osms_is_asked_again_after_a_minute_not_on_e
 
 #[test]
 fn recognition_starts_working_once_asking_again_finds_the_file_set() {
-    let unreachable = Poll::Ready(Err(minerva_core::SourceError::Unreachable("offline".into())));
+    let unreachable = Poll::Ready(Err(common::unreachable()));
     let mut minerva = Minerva::new(FakeSource::answering_osms(vec![unreachable, common::fresh(osms::game())]));
-    minerva.on_frame(sample_frame(KERNING, 0));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 0));
 
-    minerva.on_frame(sample_frame(KERNING, 60_000));
-    let state = minerva.on_frame(sample_frame(KERNING, 60_333));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 60_000));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 60_333));
 
     assert_eq!(state.recognition, Recognition::Ready);
     assert_eq!(shown(state).map(|(id, _, _)| id), Some("010003000"));
@@ -147,12 +140,12 @@ fn a_slow_file_set_never_holds_up_the_panel_and_recognition_starts_once_it_arriv
         Minerva::new(FakeSource::answering_osms(vec![Poll::Pending, Poll::Pending, common::fresh(osms::game())]));
 
     assert_eq!(minerva.tick(0).recognition, Recognition::Starting);
-    let state = minerva.on_frame(sample_frame(KERNING, 333));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 333));
     assert_eq!(state.recognition, Recognition::Starting);
     assert_eq!(state.map, None);
     assert_eq!(minerva.tick(400).recognition, Recognition::Ready);
 
-    minerva.on_frame(sample_frame(KERNING, 666));
-    let state = minerva.on_frame(sample_frame(KERNING, 1000));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 666));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 1000));
     assert_eq!(shown(state).map(|(id, _, _)| id), Some("010003000"));
 }

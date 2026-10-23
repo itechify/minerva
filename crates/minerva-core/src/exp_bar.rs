@@ -21,13 +21,14 @@
 //!    under the pointer breaks it), and a 2 read wherever the mask has a 2's flat foot,
 //!    and nowhere else (ocrs has read the 7 of "71.07%" as a 2).
 
-use crate::bug_report::cut_on_screen;
+use crate::bug_report::rect_crop;
+use crate::ink::{Component, black_on_white, components, luma, ocr_digit, runs};
 use crate::panel::ScreenRect;
 use crate::prep::{PAD, Rect};
 use crate::recogniser::{Recogniser, frame_to_rgb};
 use crate::ui_size::{self, AtSamplesSize};
 use crate::{Frame, StatusBar, StatusBarCapture};
-use image::{GrayImage, Luma, RgbImage};
+use image::{GrayImage, RgbImage};
 use serde::{Deserialize, Serialize};
 
 /// What the EXP bar shows: the EXP gained in the current level, and how much of the
@@ -125,8 +126,7 @@ impl ExpBarReader {
 
 /// The figures at `place` in a Status Bar capture; `None` if the capture doesn't hold them.
 pub(crate) fn figures_frame(capture: &StatusBarCapture, place: ExpBarPlace) -> Option<Frame> {
-    let a = place.area;
-    cut_on_screen(&capture.frame, capture.origin, (a.x, a.y), (a.x + a.width as i32, a.y + a.height as i32))
+    rect_crop(&capture.frame, capture.origin, place.area, 0)
 }
 
 /// A reading that could be on an EXP bar: under 100%, and no EXP at 0.00% unless the
@@ -141,10 +141,8 @@ fn consistent(bar: ExpBar) -> bool {
 fn digits(text: &str) -> Option<String> {
     let mut out = String::new();
     for c in text.chars() {
-        match c {
-            '0'..='9' => out.push(c),
-            'O' | 'o' | 'D' => out.push('0'),
-            'l' | 'I' | '|' | 'i' => out.push('1'),
+        match ocr_digit(c) {
+            c @ '0'..='9' => out.push(c),
             '$' => out.push('5'),
             ' ' => {}
             _ => return None,
@@ -198,10 +196,6 @@ fn bracket(p: [u8; 3]) -> bool {
     g >= 120 && g - b >= 60 && g - r >= 25
 }
 
-fn luma(p: [u8; 3]) -> f32 {
-    0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32
-}
-
 /// Digit ink, 0.0 (the dark slate bar, luma ~80) ..= 1.0 (the light grey digits, ~215).
 /// Only near-neutral pixels count: the bar's edges are bluish, the brackets green.
 fn ink(p: [u8; 3]) -> f32 {
@@ -248,59 +242,19 @@ const FOOT_PER_H: f32 = 0.6;
 /// each misread some, as did spacing the glyphs apart; step 4 catches them.
 const UPSCALE: u32 = 2;
 
-/// A connected run of bracket-coloured pixels: its bounding box.
-#[derive(Debug, Clone, Copy)]
-struct Blob {
-    x0: u32,
-    x1: u32,
-    y0: u32,
-    y1: u32,
-}
-
-/// Bounding boxes of the bracket-coloured components (4-connected).
-fn blobs(img: &RgbImage) -> Vec<Blob> {
+/// The "[" and "]" of the figures: the rightmost pair of bracket-shaped components
+/// (4-connected runs of bracket-coloured pixels, their bounds ends exclusive) with the same
+/// top and bottom and room for a digit between them (a stray component on other rows between
+/// them doesn't break the pair). Brackets are at most `max_w` wide and at least `min_h` tall.
+fn brackets(img: &RgbImage, (max_w, min_h): (u32, u32)) -> Option<(Component, Component)> {
     let (w, h) = img.dimensions();
-    let mut seen = vec![false; (w * h) as usize];
-    let mut out = Vec::new();
-    for y in 0..h {
-        for x in 0..w {
-            if seen[(y * w + x) as usize] || !bracket(img.get_pixel(x, y).0) {
-                continue;
-            }
-            let mut blob = Blob { x0: x, x1: x, y0: y, y1: y };
-            let mut stack = vec![(x, y)];
-            seen[(y * w + x) as usize] = true;
-            while let Some((cx, cy)) = stack.pop() {
-                blob = Blob { x0: blob.x0.min(cx), x1: blob.x1.max(cx), y0: blob.y0.min(cy), y1: blob.y1.max(cy) };
-                let next = [(cx.wrapping_sub(1), cy), (cx + 1, cy), (cx, cy.wrapping_sub(1)), (cx, cy + 1)];
-                for (nx, ny) in next {
-                    if nx < w && ny < h && !seen[(ny * w + nx) as usize] && bracket(img.get_pixel(nx, ny).0) {
-                        seen[(ny * w + nx) as usize] = true;
-                        stack.push((nx, ny));
-                    }
-                }
-            }
-            out.push(blob);
-        }
-    }
-    out
-}
-
-/// The "[" and "]" of the figures: the rightmost pair of bracket-shaped components with
-/// the same top and bottom and room for a digit between them (a stray component on
-/// other rows between them doesn't break the pair).
-/// Brackets are at most `max_w` wide and at least `min_h` tall.
-fn brackets(img: &RgbImage, (max_w, min_h): (u32, u32)) -> Option<(Blob, Blob)> {
-    let mut shaped: Vec<Blob> = blobs(img)
+    let mut shaped: Vec<Component> = components(img, 0..w, 0..h, |p| bracket(p).then_some(0.0))
         .into_iter()
-        .filter(|b| {
-            let (w, h) = (b.x1 - b.x0 + 1, b.y1 - b.y0 + 1);
-            w <= max_w && h >= min_h && h >= 2 * w
-        })
+        .filter(|b| b.w() <= max_w && b.h() >= min_h && b.h() >= 2 * b.w())
         .collect();
     shaped.sort_by_key(|b| b.x0);
-    let pairs = |open: &Blob, close: &Blob| {
-        open.y0.abs_diff(close.y0) <= 1 && open.y1.abs_diff(close.y1) <= 1 && close.x0 > open.x1 + 3
+    let pairs = |open: &Component, close: &Component| {
+        open.y0.abs_diff(close.y0) <= 1 && open.y1.abs_diff(close.y1) <= 1 && close.x0 > open.x1 + 2
     };
     shaped.iter().rev().find_map(|close| {
         let open = shaped.iter().rev().find(|open| pairs(open, close))?;
@@ -311,15 +265,14 @@ fn brackets(img: &RgbImage, (max_w, min_h): (u32, u32)) -> Option<(Blob, Blob)> 
 /// The figures' UI Size: their brackets' height next to the samples'.
 fn measure(img: &RgbImage) -> Option<f32> {
     let (open, close) = brackets(img, (u32::MAX, ANY_BRACKET_MIN_H))?;
-    let h = (open.y1 - open.y0).max(close.y1 - close.y0) + 1;
-    Some(h as f32 / BRACKET_H as f32)
+    Some(open.h().max(close.h()) as f32 / BRACKET_H as f32)
 }
 
 fn prepare(img: &RgbImage) -> Option<Prepared> {
     let (open, close) = brackets(img, (BRACKET_MAX_W, BRACKET_MIN_H))?;
     // The digits' rows: the brackets', with a row either side for anti-aliasing.
     let y0 = open.y0.min(close.y0).saturating_sub(1);
-    let y1 = (open.y1.max(close.y1) + 2).min(img.height());
+    let y1 = (open.y1.max(close.y1) + 1).min(img.height());
     let col_ink = |x: u32| (y0..y1).map(|y| ink(img.get_pixel(x, y).0)).sum::<f32>();
     let inked = |x: u32| col_ink(x) > COL_MIN_INK;
     let rises = |x: u32| {
@@ -334,21 +287,21 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
     };
 
     // The percentage: the ink between the brackets.
-    let inside: Vec<u32> = (open.x1 + 1..close.x0).filter(|&x| inked(x)).collect();
+    let inside: Vec<u32> = (open.x1..close.x0).filter(|&x| inked(x)).collect();
     let (px0, px1) = (*inside.first()?, *inside.last()? + 1);
 
     // The EXP: the clusters of ink left of "[", back to the label (any cluster of it rises
     // above the brackets, and it is the label's width). Without the label just left of it,
     // the EXP may go on past what was captured ("100,300" cut to "00,300", where the figures
     // were looked for at another UI Size), or the pointer is over it: unreadable.
-    let h = (open.y1 - open.y0 + 1) as f32;
+    let h = open.h() as f32;
     let split = (h * GLYPH_GAP_PER_H).ceil() as usize;
     let max_gap = (h * SPACE_PER_H).ceil() as u32;
     let foot = (h * FOOT_PER_H).ceil() as u32;
     let on: Vec<bool> = (0..open.x0).map(inked).collect();
     let mut number: Option<(u32, u32)> = None;
     let mut labelled = false;
-    for (x0, x1) in clusters(&on, split).into_iter().rev() {
+    for (x0, x1) in runs(&on, split).into_iter().rev() {
         if number.is_some_and(|(n0, _)| n0 - x1 > max_gap) {
             break;
         }
@@ -360,16 +313,12 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
     }
     let (ex0, ex1) = number.filter(|_| labelled)?;
 
-    // Black on white, from the EXP's first column to the percentage's last.
+    // Black on white, from the EXP's first column to the percentage's last, the "[" left out.
     let (cx0, cw, ch) = (ex0, px1 - ex0, y1 - y0);
-    let mut canvas = GrayImage::from_pixel(cw + 2 * PAD, ch + 2 * PAD, Luma([255]));
-    for y in 0..ch {
-        for x in 0..cw {
-            let skip = (open.x0..=open.x1).contains(&(cx0 + x));
-            let v = if skip { 0.0 } else { ink(img.get_pixel(cx0 + x, y0 + y).0) };
-            canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - v)).round() as u8]));
-        }
-    }
+    let canvas = black_on_white(cw, ch, PAD, |x, y| {
+        let skip = (open.x0..open.x1).contains(&(cx0 + x));
+        if skip { 0.0 } else { ink(img.get_pixel(cx0 + x, y0 + y).0) }
+    });
     let (w, h) = (canvas.width() * UPSCALE, canvas.height() * UPSCALE);
     let canvas = image::imageops::resize(&canvas, w, h, image::imageops::FilterType::Triangle);
     let line = |x0: u32, x1: u32| Rect {
@@ -379,10 +328,10 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
         h: ch * UPSCALE,
     };
     // The 2s: their flat feet, on the brackets' bottom row.
-    let feet = |x0: u32, x1: u32| flat_feet(img, open.y1, x0..x1, foot);
+    let feet = |x0: u32, x1: u32| flat_feet(img, open.y1 - 1, x0..x1, foot);
     Some(Prepared {
         canvas,
-        columns: (ex0, close.x1 + 1),
+        columns: (ex0, close.x1),
         rows: (y0, y1),
         exp: line(ex0, ex1),
         percent: line(px0, px1),
@@ -404,18 +353,4 @@ fn flat_feet(img: &RgbImage, y: u32, columns: std::ops::Range<u32>, foot: u32) -
         }
     }
     feet + usize::from(run >= foot)
-}
-
-/// Runs of `on` columns as (start, end_exclusive), joining runs fewer than `split`
-/// columns apart.
-fn clusters(on: &[bool], split: usize) -> Vec<(u32, u32)> {
-    let mut out: Vec<(u32, u32)> = Vec::new();
-    for (x, _) in on.iter().enumerate().filter(|(_, on)| **on) {
-        let x = x as u32;
-        match out.last_mut() {
-            Some((_, end)) if (x - *end) < split as u32 => *end = x + 1,
-            _ => out.push((x, x + 1)),
-        }
-    }
-    out
 }

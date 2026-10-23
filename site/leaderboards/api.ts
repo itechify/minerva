@@ -1,6 +1,7 @@
 // The Map Leaderboards pages' reads of the site's API (ADR 0015), and the few DOM helpers
 // both pages draw with.
 import fixture from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
+import { make } from "../../src/dom.ts";
 import { mapNames, type MapNames, type Said } from "./leaderboards.ts";
 
 /** The maps the committed map names fixture names, as the panel names them. */
@@ -21,13 +22,6 @@ export async function read<T>(path: string): Promise<T | null> {
 
 export function byId<T extends HTMLElement>(id: string): T {
   return document.getElementById(id) as T;
-}
-
-export function make<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
 }
 
 /** A map in a list of maps: its name in bold over its street, a link to its page, and

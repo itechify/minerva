@@ -11,15 +11,12 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, HOUR, S};
 use common::player::Player;
 use minerva_core::{
     Action, Build, DownloadAnswer, MINERVA_VERSION, Minerva, PanelControl, PanelState, QuitItem, Request, Settings,
     UpdateAnswer, UpdateJob, UpdateNotice, UpdateOffer, UpdateStage, UpdateStatus, UpdateStep,
 };
-
-const S: u64 = 1000;
-const HOUR: u64 = 60 * 60 * S;
 
 /// The wall clock at capture time 0: 21 Oct 2026, 16:00 UTC.
 const WALL: u64 = 1_792_598_400_000;

@@ -3,7 +3,7 @@
 ## Build and test
 
 - `cargo test`: runs the `minerva-core` tests. The core is the default workspace member, so this never builds Tauri.
-- `cargo test -p minerva --lib`: runs the app's own unit tests, which `cargo test` leaves out.
+- `cargo test -p minerva`: runs the app's own unit tests and the probe's (`update-manifest`'s), which `cargo test` leaves out.
 - `cargo clippy --workspace --all-targets -- -D warnings`: lint everything.
 - `pnpm install` then `pnpm tauri build --debug --no-bundle`: build the app. `pnpm tauri dev` runs it.
 - `pnpm site:dev` runs the site (`site/`, the player site at owlofminerva.app); `pnpm site:build` builds it, and fails while a screenshot it shows is missing or the home page names a FAQ question there isn't.

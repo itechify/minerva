@@ -27,7 +27,7 @@ mod market_prices;
 mod meowdb;
 mod old_caches;
 pub mod osms;
-pub mod osms_items;
+mod panel_window;
 mod pictures;
 mod search;
 mod settings;
@@ -35,25 +35,21 @@ mod setup;
 mod sizemove;
 pub mod source;
 mod tray;
-pub mod update_manifest;
 mod updates;
 mod view;
 
 use minerva_core::{
-    Action, DEAL_FINDER_CAPTURE_MS, Minerva, ExpBarReader, ExpBarReading, ExpFigures, Frame, GameWindow, ItemCapture, ItemTooltipReader,
+    Action, DEAL_FINDER_CAPTURE_MS, Minerva, ExpBarReader, ExpBarReading, ExpFigures, GameWindow, ItemCapture, ItemTooltipReader,
     ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
-    Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, Size, StatusBarCapture, StatusBarReader, StatusBarReading,
+    Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, StatusBarCapture, StatusBarReader, StatusBarReading,
     TITLE_READ_MS, TITLE_SEARCH_MS, TitleCapture, TitleReader, TitleReading, UpdateAnswer, VisitBest,
 };
 use source::WebSource;
-use bests_window::{BestsWindow, PersonalBestsView};
-use deal_badges::{DealBadgesView, DealBadgesWindow};
 use errors::error;
-use grind_tracker::{GrindTrackerView, GrindTrackerWindow};
-use item_card::{ItemCardView, ItemCardWindow, OFF_SCREEN_SETTLE};
-use item_lookup::{ItemLookupView, ItemLookupWindow};
-use setup::{Bridge, SetupPageView, SetupWindows};
-use sizemove::{Gesture, SizeMove};
+use item_card::OFF_SCREEN_SETTLE;
+use panel_window::{PanelWindow, keep_on_top, physical, place};
+use setup::SetupWindows;
+use sizemove::{Gesture, GestureTracker, SizeMove};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -74,7 +70,7 @@ const DEAL_FINDER_TICK: Duration = Duration::from_millis(DEAL_FINDER_CAPTURE_MS)
 /// Game window and foreground check rate: a docked panel follows a moving game window,
 /// and our windows show within ~50 ms of the game coming to the front, and are out of
 /// sight within ~50 ms of another app doing so (their watchers check at this rate too).
-const WINDOW_TICK: Duration = Duration::from_millis(50);
+pub(crate) const WINDOW_TICK: Duration = Duration::from_millis(50);
 /// How often the `market-imports` folder is looked in (ADR 0013): a tool's prices show
 /// within a couple of seconds.
 const IMPORT_TICK: Duration = Duration::from_secs(2);
@@ -89,9 +85,6 @@ const EXPANDED_HEIGHT: f64 = 72.0;
 const MIN_EXPANDED_HEIGHT: f64 = 44.0;
 const MAX_EXPANDED_HEIGHT: f64 = 600.0;
 const COLLAPSED: (f64, f64) = (44.0, 44.0);
-/// A drag or resize the player started whose move or size loop hasn't started within this
-/// long never will (the mouse was let go first): the shell places the panel again.
-pub(crate) const LOOP_START_GRACE: Duration = Duration::from_secs(1);
 
 /// What the core loop is asked to do.
 #[derive(Debug, Clone)]
@@ -151,8 +144,9 @@ pub(crate) enum Command {
     /// The player picked the item with this MeowDB ID from the ones an Item Lookup found
     /// sharing the name it read.
     PickItem(String),
-    /// The expanded panel's content is this tall (CSS px).
-    PanelHeight(f64),
+    /// The page in our window with this label (the overlay's, the Grind Tracker's, the
+    /// Personal Bests', the Item Lookup alert's or the Item Card's) is this tall (CSS px).
+    Height(String, f64),
     /// The overlay window moved here (its outer top-left corner). The player's move only
     /// during a drag; otherwise the shell's own, or the system's (a DPI or monitor
     /// change).
@@ -168,18 +162,9 @@ pub(crate) enum Command {
     SizeMoveStarted,
     /// Windows' move or size loop on the overlay ended: the player let go of the mouse.
     SizeMoveEnded,
-    /// The Grind Tracker's content is this tall (CSS px).
-    GrindTrackerHeight(f64),
-    /// Windows told of a drag of the Grind Tracker's window.
-    GrindTrackerSizeMove(SizeMove),
-    /// The Personal Bests window's content is this tall (CSS px).
-    PersonalBestsHeight(f64),
-    /// Windows told of a drag of the Personal Bests window.
-    PersonalBestsSizeMove(SizeMove),
-    /// The Item Lookup alert is this tall (CSS px).
-    ItemLookupHeight(f64),
-    /// The Item Card is this tall (CSS px).
-    ItemCardHeight(f64),
+    /// Windows told of a drag of our window with this label (the Grind Tracker's, the
+    /// Personal Bests' or the Item Card's).
+    SizeMove(&'static str, SizeMove),
     /// The player clicked the Item Card's ×.
     CloseItemCard,
     /// The player picked the item with this game ID from those the Item Card lists.
@@ -198,8 +183,6 @@ pub(crate) enum Command {
     EnterCardMarketLine(String),
     /// The player chose the Item Card's Market Line with this ID as the Deal Line.
     ChooseDealLine(String),
-    /// Windows told of a drag of the Item Card's window.
-    ItemCardSizeMove(SizeMove),
     /// The player chose Quit in the tray icon's menu: save the settings and exit.
     Quit,
     /// The player chose Bug Report in the tray icon's menu: save one, and open the bug
@@ -209,26 +192,26 @@ pub(crate) enum Command {
     Error { from: String, message: String },
     /// The player started Minerva again; that one exited, and this one shows itself.
     LaunchedAgain,
+    /// The player picked the game window with this title by hand, in setup: it is looked for
+    /// at once.
+    PickGameWindow(String),
     /// A watcher took one of our windows out of sight, with another app in front, while
     /// the core still showed it: check the game window and the foreground now.
     CheckForeground,
-    /// The reader is done with a capture of `region` for the Minimap Title: the capture and
-    /// what it read, or `None` if the capture failed.
-    Read { region: ScreenRect, reading: Option<(Box<TitleCapture>, TitleReading)> },
+    /// The reader is done with a capture for the Minimap Title: the capture (which says
+    /// where it was of) and what it read, or `None` if the capture failed.
+    Read { reading: Option<(Box<TitleCapture>, TitleReading)> },
 
     /// The reader is done with an Item Card's or Item Lookup's capture: the capture, and
     /// what it read.
     ReadItemTooltip { capture: Box<ItemCapture>, reading: ItemTooltipReading },
-    /// The reader is done with a Deal Finder capture of `region` (the game's client area):
-    /// the capture and what it read, or `None` if the capture failed.
-    ReadShop { region: ScreenRect, reading: Option<(Box<ShopCapture>, ShopReading)> },
-    /// The reader is done with a capture of `region` (the bottom of the game's client area)
-    /// for the Status Bar: the capture, what it read, and what its EXP figures read as (if
-    /// they were asked for), or `None` if the capture failed.
-    ReadStatusBar {
-        region: ScreenRect,
-        reading: Option<(Box<StatusBarCapture>, StatusBarReading, Option<ExpBarReading>)>,
-    },
+    /// The reader is done with a Deal Finder capture (of the game's client area): the
+    /// capture and what it read, or `None` if the capture failed.
+    ReadShop { reading: Option<(Box<ShopCapture>, ShopReading)> },
+    /// The reader is done with a capture of the bottom of the game's client area for the
+    /// Status Bar: the capture, what it read, and what its EXP figures read as (if they were
+    /// asked for), or `None` if the capture failed.
+    ReadStatusBar { reading: Option<(Box<StatusBarCapture>, StatusBarReading, Option<ExpBarReading>)> },
 }
 
 /// The overlay's drags and resizes, as the core loop hears them.
@@ -240,10 +223,20 @@ fn overlay_size_move(what: SizeMove) -> Command {
     }
 }
 
-/// The overlay reports how tall its expanded content is, so the window fits it.
+/// Something the player did in one of our pages, for the core: any [`Action`], as JSON in
+/// its own shape (`"searchEnter"`, `{ "setGrindTracker": { "on": true } }`). Plain (not
+/// async), so commands run in the order they come: a quick type-then-Enter reaches the core
+/// as typed.
 #[tauri::command]
-fn panel_height(height: f64, commands: tauri::State<'_, Sender<Command>>) {
-    let _ = commands.send(Command::PanelHeight(height));
+fn act(action: Action, commands: tauri::State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::Act(action));
+}
+
+/// A page reports how tall its content is, so its window fits it: the overlay's expanded
+/// panel, the Grind Tracker, the Personal Bests, the Item Lookup alert and the Item Card.
+#[tauri::command]
+fn page_height(window: tauri::Window, height: f64, commands: tauri::State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::Height(window.label().to_string(), height));
 }
 
 /// Where OSMS's file set and pictures, and MeowDB's search answers, are cached. WebView2
@@ -255,8 +248,7 @@ fn cache_dir(app: &AppHandle) -> tauri::Result<PathBuf> {
 /// Capture the game's whole client area for the Minimap Title, as the app does while it looks
 /// for it (ADR 0021): for the probe.
 pub fn capture_title(client: ScreenRect, at_ms: u64) -> Result<TitleCapture, String> {
-    let rgba = capture::capture_rgba(client.x, client.y, client.width as i32, client.height as i32)?;
-    let frame = Frame { width: client.width, height: client.height, rgba, at_ms };
+    let frame = capture::frame(client, || at_ms)?;
     Ok(TitleCapture { frame, origin: ScreenPoint { x: client.x, y: client.y }, ours: Vec::new() })
 }
 
@@ -279,12 +271,7 @@ pub fn run() {
         // The views last sent to our pages, managed before the windows in tauri.conf.json
         // are made: a page loads and asks for its view while the rest are still being made,
         // before `setup` below runs.
-        .manage(SetupPageView::default())
-        .manage(GrindTrackerView::default())
-        .manage(PersonalBestsView::default())
-        .manage(ItemLookupView::default())
-        .manage(ItemCardView::default())
-        .manage(DealBadgesView::default())
+        .manage(view::PageViews::default())
         // OSMS's pictures, such as the Mob Cards' animations, from our saved copies.
         .register_uri_scheme_protocol(pictures::SCHEME, |ctx, request| match cache_dir(ctx.app_handle()) {
             Ok(dir) => pictures::serve(&dir, &request),
@@ -311,6 +298,7 @@ pub fn run() {
                 pictures::sweep(&swept);
             })?;
             let source = WebSource::new(cache)?;
+            let client = source.client();
             let mut minerva = Minerva::new(source);
             let settings_path = settings::path(app.handle())?;
             // The core brings older settings up to date (hotkeys included).
@@ -338,23 +326,17 @@ pub fn run() {
             // The one way to quit at any time, the game open or not.
             let tray = tray::install(app, commands.clone())?;
             app.manage(commands.clone());
-            let (picks, picks_rx) = mpsc::channel();
-            app.manage(Bridge { commands: commands.clone(), picks });
-            let setup_windows = SetupWindows::new(app.handle())?;
+            let setup_windows = SetupWindows::new(app.handle());
             // Without it the player's drags and resizes don't stick, but the panel works.
             if let Err(e) =
-                sizemove::watch(&overlay, commands.clone(), overlay_size_move, sizemove::overlay_resizable())
+                sizemove::watch(&overlay, commands.clone(), overlay_size_move, Some(&sizemove::OVERLAY_RESIZABLE))
             {
                 error!("{e}");
             }
-            let grind_tracker = GrindTrackerWindow::new(app.handle(), commands.clone());
-            // After the overlay and the Grind Tracker's window, which it stays above.
-            let personal_bests = BestsWindow::new(app.handle(), commands.clone());
-            // The page earlier versions wrote for the browser, which this window replaces.
+            let panels = Panels::new(app.handle(), &commands);
+            // The page earlier versions wrote for the browser, which the Personal Bests
+            // window replaces.
             let _ = std::fs::remove_file(app.path().app_config_dir()?.join("personal-bests.html"));
-            let item_lookup = ItemLookupWindow::new(app.handle(), commands.clone());
-            let item_card = ItemCardWindow::new(app.handle(), commands.clone());
-            let deal_badges = DealBadgesWindow::new(app.handle(), commands.clone());
             let overlay_window = OverlayWindow::new(overlay.clone(), commands.clone());
             overlay.on_window_event(move |event| match event {
                 // Only moves during a drag the overlay started are the player's.
@@ -380,73 +362,38 @@ pub fn run() {
             // Both off the UI thread. Spawned from setup, so the process is already
             // Per-Monitor-V2 DPI aware.
             let reader = ReaderThread::spawn(app.state::<Sender<Command>>().inner().clone())?;
-            let channels = Channels { commands: commands_rx, picks: picks_rx };
             let windows = Windows {
                 overlay: overlay_window,
                 setup: setup_windows,
-                grind_tracker,
-                personal_bests,
-                item_lookup,
-                item_card,
-                deal_badges,
+                panels,
                 hotkeys,
                 tray,
             };
             // The uploads to the Map Leaderboards, with the Leaderboard Key, which the core never has.
             let key = leaderboards::KeyFile::new(leaderboards::key_path(app.handle())?);
-            let uploader = leaderboards::Uploader::new(key, app.state::<Sender<Command>>().inner().clone());
+            let uploader = leaderboards::Uploader::new(key, client, app.state::<Sender<Command>>().inner().clone());
             let updater = updates::Updater::new(app.handle().clone(), build, app.state::<Sender<Command>>().inner().clone());
             std::thread::Builder::new().name("core-loop".into()).spawn(move || {
                 let files =
                     Files { settings: settings_path, bests: bests_file, market_prices: prices_file, market_imports };
-                core_loop(handle, windows, minerva, reader, channels, files, Online { uploader, updater })
+                core_loop(handle, windows, minerva, reader, commands_rx, files, Online { uploader, updater })
             })?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            panel_height,
+            act,
+            page_height,
+            view::page_view,
             errors::window_error,
-            setup::setup_view,
             setup::pick_game_window,
-            setup::finish_setup,
             search::panel_press,
             search::open_mob_page,
             search::pick_item,
             search::search_query,
-            search::search_move,
-            search::search_enter,
             search::search_pick,
             search::search_pick_destination,
             search::search_pick_item,
-            search::search_escape,
-            search::hunting_reopen,
-            search::hunting_clear,
-            search::search_toggle_taxis,
-            search::search_toggle_teleport_scrolls,
-            search::panel_toggle_section,
-            hotkey_settings::settings_close,
-            hotkey_settings::rebind_begin,
             hotkey_settings::rebind_key,
-            hotkey_settings::rebind_cancel,
-            hotkey_settings::rebind_turn_off,
-            hotkey_settings::rebind_swap,
-            hotkey_settings::hotkeys_reset,
-            hotkey_settings::hotkeys_undo_reset,
-            hotkey_settings::game_data_refresh,
-            hotkey_settings::check_for_updates_set,
-            setup::open_hotkey_settings,
-            setup::open_site,
-            setup::open_github,
-            setup::open_discord,
-            setup::check_for_updates,
-            setup::open_release,
-            setup::update,
-            setup::update_choice,
-            grind_tracker::grind_tracker_set,
-            grind_tracker::grind_tracker_height,
-            grind_tracker::grind_tracker_view,
-            bests_window::personal_bests_height,
-            bests_window::personal_bests_view,
             bests_window::personal_bests_open_map,
             bests_window::personal_bests_remove_visit,
             bests_window::personal_bests_move_visit,
@@ -456,46 +403,70 @@ pub fn run() {
             bests_window::personal_bests_merge_characters,
             bests_window::personal_bests_show_on_leaderboards,
             bests_window::personal_bests_open_leaderboard,
-            item_lookup::item_lookup_height,
-            item_lookup::item_lookup_view,
-            item_card::item_card_height,
-            item_card::item_card_view,
             item_card::item_card_close,
             item_card::item_card_pick,
             item_card::item_card_open_meowdb,
             item_card::item_card_open_mesowatch,
             item_card::item_card_edit_market,
             item_card::item_card_enter_market,
-            item_card::item_card_cancel_market,
             item_card::item_card_edit_market_line,
             item_card::item_card_enter_market_line,
-            item_card::item_card_add_market_line,
-            item_card::item_card_ask_remove_market_line,
-            item_card::item_card_remove_market_line,
             item_card::item_card_choose_deal_line,
-            deal_badges::deal_badges_view,
-            deal_badges::deal_badge_open,
-            deal_badges::deal_margin_set,
         ])
         .run(context)
         .expect("error while running tauri application");
 }
 
-/// Our windows: the overlay (with Search in it), setup, the
-/// Grind Tracker's, the Personal Bests window, the Item Lookup alert's, the Item Card's and
-/// the Deal Badges'.
+/// Our windows: the overlay (with Search in it), setup, and the windows over the game.
 struct Windows {
     overlay: OverlayWindow,
     setup: SetupWindows,
-    grind_tracker: GrindTrackerWindow,
-    personal_bests: BestsWindow,
-    item_lookup: ItemLookupWindow,
-    item_card: ItemCardWindow,
-    deal_badges: DealBadgesWindow,
+    panels: Panels,
     /// Not a window, but registered and released as the foreground changes.
     hotkeys: hotkeys::GlobalHotkeys,
     /// Not a window either: the owl in the tray, which shows a newer version.
     tray: tray::Tray,
+}
+
+/// Our windows over the game but the overlay, each kept by a [`PanelWindow`] as its spec says.
+struct Panels {
+    grind_tracker: PanelWindow,
+    personal_bests: PanelWindow,
+    item_lookup: PanelWindow,
+    item_card: PanelWindow,
+    deal_badges: PanelWindow,
+}
+
+impl Panels {
+    /// The Personal Bests window after the overlay and the Grind Tracker's, which it stays
+    /// above.
+    fn new(app: &AppHandle, commands: &Sender<Command>) -> Self {
+        Self {
+            grind_tracker: PanelWindow::new(app, &grind_tracker::SPEC, commands.clone()),
+            personal_bests: PanelWindow::new(app, &bests_window::SPEC, commands.clone()),
+            item_lookup: PanelWindow::new(app, &item_lookup::SPEC, commands.clone()),
+            item_card: PanelWindow::new(app, &item_card::SPEC, commands.clone()),
+            deal_badges: PanelWindow::new(app, &deal_badges::SPEC, commands.clone()),
+        }
+    }
+
+    fn all_mut(&mut self) -> [&mut PanelWindow; 5] {
+        [&mut self.grind_tracker, &mut self.personal_bests, &mut self.item_lookup, &mut self.item_card, &mut self.deal_badges]
+    }
+
+    /// The window with this label.
+    fn by_label(&mut self, label: &str) -> Option<&mut PanelWindow> {
+        self.all_mut().into_iter().find(|panel| panel.label() == label)
+    }
+
+    /// Show each window as the panel state says, and send its page its view.
+    fn sync(&mut self, state: &PanelState) {
+        grind_tracker::sync(&mut self.grind_tracker, state);
+        bests_window::sync(&mut self.personal_bests, state);
+        item_lookup::sync(&mut self.item_lookup, state);
+        item_card::sync(&mut self.item_card, state);
+        deal_badges::sync(&mut self.deal_badges, state);
+    }
 }
 
 /// Where the core loop saves the settings, the Personal Bests and the market prices, and
@@ -526,8 +497,7 @@ struct Online {
 /// Save whatever Quit Minerva saves to `files`: the Personal Bests, the market prices, and
 /// the settings if they changed since `saved`, which then holds them.
 fn save_for_quit(minerva: &Minerva, files: &Files, saved: &mut Saved) {
-    save_bests(minerva, &files.bests, &mut saved.bests);
-    save_market_prices(minerva, &files.market_prices, &mut saved.prices);
+    save_bests_and_prices(minerva, files, saved);
     let current = minerva.settings();
     if current != saved.settings {
         if let Err(e) = settings::save(&files.settings, &current) {
@@ -537,46 +507,30 @@ fn save_for_quit(minerva: &Minerva, files: &Files, saved: &mut Saved) {
     }
 }
 
-/// Save the Personal Bests if the core's bests revision moved on from `saved` (the one
-/// last saved, or restored at startup). At once, not once they settle: the Visit under
-/// way's best is kept as it changes, so however Minerva closes, it keeps it. Never
-/// over a file that didn't read at startup and couldn't be set aside.
-fn save_bests(minerva: &Minerva, file: &bests::BestsFile, saved: &mut u64) {
-    let revision = minerva.bests_revision();
+/// Save the Personal Bests or the market prices the player keeps (what `saving` gives) to
+/// `file` if the core's `revision` of them moved on from `saved` (the one last saved, or
+/// restored at startup). At once, not once they settle: the Visit under way's best is kept
+/// as it changes, so however Minerva closes, it keeps it. Never over a file that didn't read
+/// at startup and couldn't be set aside.
+fn save_revised<T: files::JsonShape>(file: &files::GuardedJsonFile<T>, revision: u64, saved: &mut u64, saving: impl FnOnce() -> T) {
     if *saved == revision {
         return;
     }
     *saved = revision;
-    if let Err(e) = file.save(&minerva.bests()) {
-        error!("saving personal bests failed: {e}");
+    if let Err(e) = file.save(&saving()) {
+        error!("saving {} failed: {e}", T::WHAT);
     }
 }
 
-/// Save the market prices the player keeps if the core's revision of them moved on from
-/// `saved`, at once, as the Personal Bests are. Never over a file that didn't read at
-/// startup and couldn't be set aside.
-fn save_market_prices(minerva: &Minerva, file: &market_prices::MarketPricesFile, saved: &mut u64) {
-    let revision = minerva.market_prices_revision();
-    if *saved == revision {
-        return;
-    }
-    *saved = revision;
-    if let Err(e) = file.save(&minerva.market_prices()) {
-        error!("saving market prices failed: {e}");
-    }
+/// Save the Personal Bests and the market prices, each if it changed since `saved`.
+fn save_bests_and_prices(minerva: &Minerva, files: &Files, saved: &mut Saved) {
+    save_revised(&files.bests, minerva.bests_revision(), &mut saved.bests, || minerva.bests());
+    save_revised(&files.market_prices, minerva.market_prices_revision(), &mut saved.prices, || minerva.market_prices());
 }
 
 /// The wall clock, in ms since the Unix epoch.
 fn unix_now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64)
-}
-
-/// What the core loop hears from hotkeys, the overlay, the setup window and the
-/// reader thread.
-struct Channels {
-    commands: Receiver<Command>,
-    /// Titles of game windows the player picked by hand.
-    picks: Receiver<String>,
 }
 
 /// A region for the reader thread to capture and read, or an Item Lookup's capture,
@@ -625,11 +579,8 @@ impl ReaderThread {
             let mut shop_reader = PlayerShopReader::bundled();
             // So does this one: an unchanged Status Bar costs no recognition.
             let mut status_bar_reader = StatusBarReader::bundled();
-            let grab = |r: ScreenRect| match capture::capture_rgba(r.x, r.y, r.width as i32, r.height as i32) {
-                Ok(rgba) => {
-                    let at_ms = start.elapsed().as_millis() as u64;
-                    Some(Frame { width: r.width, height: r.height, rgba, at_ms })
-                }
+            let grab = |r: ScreenRect| match capture::frame(r, || start.elapsed().as_millis() as u64) {
+                Ok(frame) => Some(frame),
                 Err(e) => {
                     error!("capture failed: {e}");
                     None
@@ -643,7 +594,7 @@ impl ReaderThread {
                             let read = title_reader.read(&capture);
                             (Box::new(capture), read)
                         });
-                        Command::Read { region, reading }
+                        Command::Read { reading }
                     }
 
                     Capture::Item(capture) => {
@@ -658,7 +609,7 @@ impl ReaderThread {
                             let read = shop_reader.read(&capture);
                             (Box::new(capture), read)
                         });
-                        Command::ReadShop { region, reading }
+                        Command::ReadShop { reading }
                     }
                     Capture::StatusBar(region, figures) => {
                         let reading = grab(region).map(|frame| {
@@ -667,7 +618,7 @@ impl ReaderThread {
                             let exp = figures.map(|figures| exp_bar_reader.read_status_bar(&capture, read.bar.as_ref(), figures));
                             (Box::new(capture), read, exp)
                         });
-                        Command::ReadStatusBar { region, reading }
+                        Command::ReadStatusBar { reading }
                     }
                 };
                 if commands.send(command).is_err() {
@@ -708,8 +659,7 @@ impl ReaderThread {
     fn read_item_tooltip(&self) -> Result<(), String> {
         let pointer = gamewin::cursor_position().ok_or("no pointer position")?;
         let client = gamewin::find_game_client().ok_or("no game window")?;
-        let rgba = capture::capture_rgba(client.x, client.y, client.width as i32, client.height as i32)?;
-        let frame = Frame { width: client.width, height: client.height, rgba, at_ms: self.now_ms() };
+        let frame = capture::frame(client, || self.now_ms())?;
         let capture = ItemCapture { frame, origin: ScreenPoint { x: client.x, y: client.y }, pointer };
         self.captures.send(Capture::Item(Box::new(capture))).map_err(|_| "the reader has stopped".to_string())
     }
@@ -724,7 +674,7 @@ fn core_loop(
     windows: Windows,
     mut minerva: Minerva,
     mut reader: ReaderThread,
-    channels: Channels,
+    commands: Receiver<Command>,
     files: Files,
     online: Online,
 ) {
@@ -735,11 +685,7 @@ fn core_loop(
     let Windows {
         overlay: mut window,
         setup: mut setup_windows,
-        mut grind_tracker,
-        mut personal_bests,
-        mut item_lookup,
-        mut item_card,
-        mut deal_badges,
+        mut panels,
         mut hotkeys,
         mut tray,
     } = windows;
@@ -755,17 +701,17 @@ fn core_loop(
     loop {
         // Wait for the player until the next check is due, so hotkeys act at once.
         let due = next_capture.min(next_exp_bar_capture).min(next_window_check);
-        match channels.commands.recv_timeout(due.saturating_duration_since(Instant::now())) {
+        match commands.recv_timeout(due.saturating_duration_since(Instant::now())) {
             Ok(Command::Act(action)) => {
                 minerva.act(action);
             }
             Ok(Command::Hotkey(pressed)) => {
                 let request = minerva.on_hotkey(&pressed);
-                carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
+                carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, request);
             }
             Ok(Command::Press(control)) => {
                 let request = minerva.press(control);
-                carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
+                carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, request);
             }
             Ok(Command::SearchQuery(query)) => {
                 minerva.search_query(&query);
@@ -784,11 +730,11 @@ fn core_loop(
             }
             Ok(Command::OpenMobPage(id)) => {
                 let request = minerva.open_mob_page(&id);
-                carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
+                carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, request);
             }
             Ok(Command::OpenBestsMapPage(id)) => {
                 let request = minerva.open_bests_map_page(&id);
-                carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
+                carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, request);
             }
             Ok(Command::RemoveVisit { character, map, visit }) => {
                 minerva.remove_visit(character.as_deref(), &map, &visit);
@@ -813,7 +759,7 @@ fn core_loop(
             }
             Ok(Command::OpenBestsLeaderboard { character, id }) => {
                 let request = minerva.open_bests_leaderboard(character.as_deref(), &id);
-                carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
+                carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, request);
             }
             Ok(Command::LeaderboardAnswer { id, answer }) => {
                 minerva.on_leaderboard_answer(id, answer);
@@ -827,7 +773,7 @@ fn core_loop(
             }
             Ok(Command::PickItem(id)) => {
                 let request = minerva.pick_item(&id);
-                carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
+                carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, request);
             }
             Ok(Command::CloseItemCard) => {
                 minerva.close_item_card();
@@ -856,17 +802,29 @@ fn core_loop(
             }
             Ok(Command::OpenCardMesowatch) => {
                 let request = minerva.open_card_mesowatch();
-                carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, request);
+                carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, request);
             }
-            Ok(Command::PanelHeight(height)) => {
-                expanded_height = height.clamp(MIN_EXPANDED_HEIGHT, MAX_EXPANDED_HEIGHT);
-                set_panel_sizes(&mut minerva, &window.overlay, expanded_height);
-            }
+            Ok(Command::Height(label, height)) => match label.as_str() {
+                "overlay" => {
+                    expanded_height = height.clamp(MIN_EXPANDED_HEIGHT, MAX_EXPANDED_HEIGHT);
+                    set_panel_sizes(&mut minerva, &window.overlay, expanded_height);
+                }
+                label => {
+                    if let Some(panel) = panels.by_label(label) {
+                        panel.set_height(height);
+                        panel.tell_size(&mut minerva);
+                    }
+                }
+            },
             Ok(Command::LaunchedAgain) => {
                 minerva.act(Action::LaunchedAgain);
                 setup_windows.bring_to_front();
             }
             Ok(Command::CheckForeground) => next_window_check = Instant::now(),
+            Ok(Command::PickGameWindow(title)) => {
+                minerva.pick_game_window(title);
+                next_window_check = Instant::now(); // look for it at once
+            }
             Ok(Command::BugReport) => bug_reports::save(&app, &mut minerva, &window.overlay),
             Ok(Command::Error { from, message }) => minerva.note_error(&from, &message),
             Ok(Command::Quit) => {
@@ -897,50 +855,18 @@ fn core_loop(
                     minerva.act(Action::PanelMoved { x: to.x, y: to.y });
                 }
             }
-            Ok(Command::GrindTrackerHeight(height)) => {
-                grind_tracker.set_height(height);
-                if let Some(size) = grind_tracker.size() {
-                    minerva.set_grind_tracker_size(size);
+            Ok(Command::SizeMove(label, what)) => {
+                // Once the player lets go, where they left it.
+                if let Some(moved) = panels.by_label(label).and_then(|panel| panel.size_move(what)) {
+                    minerva.act(moved);
                 }
             }
-            Ok(Command::ItemLookupHeight(height)) => {
-                item_lookup.set_height(height);
-                if let Some(size) = item_lookup.size() {
-                    minerva.set_item_lookup_size(size);
-                }
-            }
-            Ok(Command::ItemCardHeight(height)) => {
-                item_card.set_height(height);
-                if let Some(size) = item_card.size() {
-                    minerva.set_item_card_size(size);
-                }
-            }
-            Ok(Command::GrindTrackerSizeMove(what)) => {
-                if let Some(at) = grind_tracker.size_move(what) {
-                    minerva.act(Action::GrindTrackerMoved { x: at.x, y: at.y });
-                }
-            }
-            Ok(Command::PersonalBestsHeight(height)) => {
-                personal_bests.set_height(height);
-                if let Some(size) = personal_bests.size() {
-                    minerva.set_personal_bests_size(size);
-                }
-            }
-            Ok(Command::ItemCardSizeMove(what)) => {
-                if let Some(at) = item_card.size_move(what) {
-                    minerva.act(Action::ItemCardMoved { x: at.x, y: at.y });
-                }
-            }
-            Ok(Command::PersonalBestsSizeMove(what)) => {
-                if let Some(at) = personal_bests.size_move(what) {
-                    minerva.act(Action::PersonalBestsMoved { x: at.x, y: at.y });
-                }
-            }
-            Ok(Command::Read { region, reading }) => {
+            // A reading of a region no longer captured (the game window moved, say) the core
+            // leaves, and writes down that it did; as it does a Deal Finder reading once it is
+            // off, and EXP figures once the Grind Tracker is.
+            Ok(Command::Read { reading }) => {
                 reader.title_busy = false;
-                // A reading of a region no longer captured (the game window moved, say) would
-                // put the title where it isn't.
-                if let (Some((capture, reading)), true) = (reading, minerva.panel_state().title_capture == Some(region)) {
+                if let Some((capture, reading)) = reading {
                     minerva.on_title_read(*capture, reading);
                 }
             }
@@ -949,28 +875,20 @@ fn core_loop(
                 // With the capture, whose part around the pointer a Bug Report keeps.
                 minerva.on_item_capture_read(*capture, reading);
             }
-            Ok(Command::ReadShop { region, reading }) => {
+            Ok(Command::ReadShop { reading }) => {
                 reader.shop_busy = false;
-                // Not once the Deal Finder is off, or the game window moved.
-                if let (Some((capture, reading)), true) = (reading, minerva.panel_state().deal_finder_capture == Some(region)) {
+                if let Some((capture, reading)) = reading {
                     minerva.on_player_shop_read(*capture, reading);
                 }
             }
-            Ok(Command::ReadStatusBar { region, reading }) => {
+            Ok(Command::ReadStatusBar { reading }) => {
                 reader.status_bar_busy = false;
-                // Not once the game window moved, or another app came in front.
-                if let (Some((capture, reading, exp)), true) = (reading, minerva.panel_state().status_bar_capture == Some(region)) {
-                    // Nor the EXP figures once the Grind Tracker is off.
-                    let exp = exp.filter(|_| minerva.panel_state().exp_figures.is_some());
+                if let Some((capture, reading, exp)) = reading {
                     minerva.on_status_bar_read(*capture, reading, exp);
                 }
             }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => return,
-        }
-        while let Ok(title) = channels.picks.try_recv() {
-            minerva.pick_game_window(title);
-            next_window_check = Instant::now(); // look for it at once
         }
         gamewin::look_for(&minerva.panel_state().game_window_title);
         // Checked after every wake-up, so a stream of drag moves can't starve them.
@@ -978,20 +896,8 @@ fn core_loop(
             next_window_check = Instant::now() + WINDOW_TICK;
             game = find_game(&mut minerva, &window.overlay, expanded_height);
             // For the display they are on now.
-            if let Some(size) = grind_tracker.size() {
-                minerva.set_grind_tracker_size(size);
-            }
-            if let Some(size) = personal_bests.size() {
-                minerva.set_personal_bests_size(size);
-            }
-            if let Some(size) = item_lookup.size() {
-                minerva.set_item_lookup_size(size);
-            }
-            if let Some(size) = item_card.size() {
-                minerva.set_item_card_size(size);
-            }
-            if let Some(size) = deal_badges.size() {
-                minerva.set_deal_badges_size(size);
+            for panel in panels.all_mut() {
+                panel.tell_size(&mut minerva);
             }
             // The hotkeys are live, and our windows show, only while the game or one of our
             // windows is in front.
@@ -1010,7 +916,7 @@ fn core_loop(
         minerva.tick(reader.now_ms());
         // An Item Lookup's page, once MeowDB has answered.
         while let Some(request) = minerva.take_request() {
-            carry_out(&app, &window.overlay, &mut item_card, &mut deal_badges, &reader, &mut minerva, Some(request));
+            carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, Some(request));
         }
         // The core asks for uploads to the Map Leaderboards on a tick: each is made once.
         uploader.sync(&minerva.panel_state().leaderboard_uploads);
@@ -1095,11 +1001,7 @@ fn core_loop(
             emitted = Some(state.clone());
         }
         window.show(state);
-        grind_tracker.sync(state);
-        personal_bests.sync(state);
-        item_lookup.sync(state);
-        item_card.sync(state);
-        deal_badges.sync(state);
+        panels.sync(state);
 
         // Save once the settings settle, not on every move of a drag.
         let current = minerva.settings();
@@ -1112,8 +1014,7 @@ fn core_loop(
             }
             saved.settings = pending.0.clone();
         }
-        save_bests(&minerva, &files.bests, &mut saved.bests);
-        save_market_prices(&minerva, &files.market_prices, &mut saved.prices);
+        save_bests_and_prices(&minerva, &files, &mut saved);
     }
 }
 
@@ -1146,8 +1047,7 @@ fn set_panel_sizes(minerva: &mut Minerva, overlay: &WebviewWindow, expanded_heig
 fn carry_out(
     app: &AppHandle,
     overlay: &WebviewWindow,
-    item_card: &mut ItemCardWindow,
-    deal_badges: &mut DealBadgesWindow,
+    panels: &mut Panels,
     reader: &ReaderThread,
     minerva: &mut Minerva,
     request: Option<Request>,
@@ -1159,8 +1059,8 @@ fn carry_out(
             // The Item Card and the Deal Badges show in our captures: they would be read in
             // place of the Item Tooltip they cover. The capture waits for the screen to be
             // drawn without them.
-            let card_moved = item_card.out_of_the_capture();
-            if deal_badges.out_of_the_capture() || card_moved {
+            let card_moved = panels.item_card.out_of_the_capture();
+            if panels.deal_badges.out_of_the_capture() || card_moved {
                 std::thread::sleep(OFF_SCREEN_SETTLE);
             }
             if let Err(e) = reader.read_item_tooltip() {
@@ -1179,20 +1079,6 @@ fn open_in_browser(app: &AppHandle, url: &str) {
     }
 }
 
-/// CSS px to physical px, rounded up so the panel's content is never clipped.
-pub(crate) fn physical((width, height): (f64, f64), scale: f64) -> Size {
-    Size { width: (width * scale).ceil() as u32, height: (height * scale).ceil() as u32 }
-}
-
-/// The player's drag or resize: it runs in Windows' move or size loop until the mouse is
-/// let go.
-#[derive(Debug, Clone, Copy)]
-struct PlayerGesture {
-    gesture: Gesture,
-    /// When the player pressed the mouse to start it, until Windows' loop has started too.
-    starting_since: Option<Instant>,
-}
-
 /// The overlay window, kept in line with the panel state. Window properties are only
 /// set when they change.
 struct OverlayWindow {
@@ -1209,7 +1095,7 @@ struct OverlayWindow {
     shows_on_top: Arc<AtomicBool>,
     /// The player's drag or resize, from the mouse press that starts it until Windows'
     /// move or size loop ends.
-    gesture: Option<PlayerGesture>,
+    gesture: GestureTracker,
     /// The size the player's resize last gave the overlay.
     resized_to: Option<PhysicalSize<u32>>,
     /// Whether the window's minimum size is the expanded panel's (or none, collapsed).
@@ -1227,7 +1113,7 @@ impl OverlayWindow {
             in_taskbar: None,
             takes_keyboard: false,
             shows_on_top,
-            gesture: None,
+            gesture: GestureTracker::default(),
             resized_to: None,
             min_size_expanded: None,
         }
@@ -1235,45 +1121,27 @@ impl OverlayWindow {
 
     /// The player pressed the mouse to drag or resize the overlay.
     fn gesture_started(&mut self, gesture: Gesture) {
-        self.gesture = Some(PlayerGesture { gesture, starting_since: Some(Instant::now()) });
+        self.gesture.pressed(gesture, Instant::now());
         self.resized_to = None;
     }
 
     /// Windows' move or size loop started: the drag or resize the player started is
     /// running. Any other loop isn't the player's.
     fn size_move_started(&mut self) {
-        self.under_way();
-        if let Some(player) = &mut self.gesture {
-            player.starting_since = None;
-        }
+        self.gesture.loop_started(Instant::now());
     }
 
     /// Windows' move or size loop ended: the player let go of the mouse. The size their
     /// resize left the overlay, once (when it changed anything).
     fn size_move_ended(&mut self) -> Option<PhysicalSize<u32>> {
-        let ended = self.gesture.take_if(|player| player.starting_since.is_none())?;
-        if ended.gesture == Gesture::Resize { self.resized_to.take() } else { None }
-    }
-
-    /// The player's drag or resize, from the mouse press until they let go. One
-    /// whose loop hasn't started within `LOOP_START_GRACE` never will.
-    fn under_way(&mut self) -> Option<Gesture> {
-        let starting_since = self.gesture.and_then(|player| player.starting_since);
-        if starting_since.is_some_and(|at| at.elapsed() >= LOOP_START_GRACE) {
-            self.gesture = None;
-        }
-        self.gesture.map(|player| player.gesture)
-    }
-
-    /// The player's drag or resize while Windows' loop runs it.
-    fn running(&self) -> Option<Gesture> {
-        self.gesture.filter(|player| player.starting_since.is_none()).map(|player| player.gesture)
+        let ended = self.gesture.loop_ended()?;
+        if ended == Gesture::Resize { self.resized_to.take() } else { None }
     }
 
     /// The overlay window is now `size`: the player's, while they resize it. Any other
     /// size is the shell's own.
     fn player_resized(&mut self, size: PhysicalSize<u32>) {
-        if self.running() == Some(Gesture::Resize) {
+        if self.gesture.running() == Some(Gesture::Resize) {
             self.resized_to = Some(size);
         }
     }
@@ -1281,7 +1149,7 @@ impl OverlayWindow {
     /// The overlay window moved: whether that was the player's drag. Any other move is
     /// the shell's own or the system's, and the core never hears of it.
     fn player_moved(&self) -> bool {
-        self.running() == Some(Gesture::Drag)
+        self.gesture.running() == Some(Gesture::Drag)
     }
 
     fn show(&mut self, state: &PanelState) {
@@ -1299,7 +1167,7 @@ impl OverlayWindow {
         // Only the open search view takes the typing, and the open settings view the
         // combinations the player presses. Otherwise the overlay can't be activated
         // (WS_EX_NOACTIVATE), so a click on it leaves the keyboard with the game.
-        let takes_keyboard = state.search.view.is_some() || state.settings_view.is_some();
+        let takes_keyboard = state.overlay_takes_keyboard;
         if self.focusable != Some(takes_keyboard) {
             self.focusable = Some(takes_keyboard);
             let _ = self.overlay.set_focusable(takes_keyboard);
@@ -1325,14 +1193,14 @@ impl OverlayWindow {
         self.takes_keyboard = takes_keyboard;
         // Expanded, the player can't resize the panel narrower than the core allows;
         // collapsed, the window is the icon's size, and they can't resize it.
-        sizemove::set_resizable(state.expanded);
+        sizemove::set_overlay_resizable(state.expanded);
         if self.min_size_expanded != Some(state.expanded) {
             self.min_size_expanded = Some(state.expanded);
             let min = LogicalSize::new(f64::from(MIN_PANEL_WIDTH), MIN_EXPANDED_HEIGHT);
             let _ = self.overlay.set_min_size(state.expanded.then_some(min));
         }
         // While the player resizes it the size (and position) is theirs too.
-        let gesture = self.under_way();
+        let gesture = self.gesture.under_way(Instant::now());
         if let Some(placement) = state.placement
             && gesture != Some(Gesture::Resize)
         {
@@ -1343,104 +1211,59 @@ impl OverlayWindow {
     }
 }
 
-/// Keep our `window` on top of every other window while the core shows it (the flag
-/// returned, which the core loop sets) and the game or one of our windows is in front,
-/// and out of sight otherwise: on a thread of its own (named `name`), at its own steady
-/// pace. On top, it stays above our windows `beneath` too. The core decides what shows, but the core loop can stall for a while (setting
-/// window sizes and positions), and a window on top of everything must not sit over
-/// another app meanwhile: this watcher checks what is in front itself, takes the window
-/// out of sight within a tick of another app coming to the front, and tells the minerva
-/// loop (`commands`) to check the foreground at once. It gets the window's handle once,
-/// here: asking Tauri for it from another thread waits on the main thread's event loop,
-/// which can leave the watcher idle for seconds while another app is in front.
-pub(crate) fn keep_on_top(
-    window: &WebviewWindow,
-    name: &str,
-    commands: Sender<Command>,
-    beneath: &[WebviewWindow],
-) -> Arc<AtomicBool> {
-    let shows = Arc::new(AtomicBool::new(false));
-    #[cfg(windows)]
-    match window.hwnd() {
-        Ok(hwnd) => {
-            let (handle, watcher_flag) = (hwnd.0 as isize, shows.clone());
-            let beneath: Vec<isize> = beneath.iter().filter_map(|w| w.hwnd().ok()).map(|h| h.0 as isize).collect();
-            let spawned = std::thread::Builder::new()
-                .name(name.into())
-                .spawn(move || keep_on_top_while_in_front(handle, beneath, watcher_flag, commands));
-            if let Err(e) = spawned {
-                error!("{name} watcher not started: {e}");
-            }
-        }
-        Err(e) => error!("{name} watcher not started: no {} window handle: {e}", window.label()),
-    }
-    #[cfg(not(windows))]
-    let _ = (window, name, commands, beneath);
-    shows
-}
+#[cfg(test)]
+mod tests {
+    use minerva_core::{Action, Hotkey, PanelControl, Section};
 
-/// Every `WINDOW_TICK`, put our window (its handle) on top of everything if `shows` is
-/// set and the game or one of our windows is in front, and at the bottom, out of sight,
-/// if not; on top, back above our windows `beneath` should one have come over it. Nothing
-/// here waits on the main thread.
-///
-/// The core alone decides what shows (`Panel::layer` in minerva-core's panel.rs: a game
-/// window, and the game or one of ours in front), and `shows` is its last word. The
-/// watcher restates that rule against what is in front now, as a fast path: the minerva
-/// loop reports the foreground to the core every tick but can stall (setting window
-/// sizes and positions), and a window on top of everything must not sit over another
-/// app while it does. So the rule here must agree with the core's: never show what the
-/// core wouldn't. Should they part, change both.
-#[cfg(windows)]
-fn keep_on_top_while_in_front(window: isize, beneath: Vec<isize>, shows: Arc<AtomicBool>, commands: Sender<Command>) {
-    use minerva_core::Foreground;
-    use gamewin::Stacking;
-    use windows::Win32::Foundation::HWND;
-    let window = HWND(window as *mut _);
-    let beneath: Vec<HWND> = beneath.into_iter().map(|handle| HWND(handle as *mut _)).collect();
-    let mut last_error = None;
-    // On top or at the bottom, as this watcher last put it: the window's style alone can't
-    // be trusted to say (see `gamewin::restack`).
-    let mut set_before = None;
-    loop {
-        std::thread::sleep(WINDOW_TICK);
-        let shows = shows.load(Ordering::Relaxed);
-        // The core's rule (`Panel::layer`), from what is in front now rather than at the
-        // core loop's last report, which a stall can leave behind.
-        let in_front = || {
-            gamewin::find_game().is_some_and(|game| gamewin::foreground(Some(game.handle)) != Foreground::OtherApp)
-        };
-        let to = if shows && in_front() { Stacking::OnTop } else { Stacking::Bottom };
-        // One of `beneath` came over it (on top again after another app, say): on top
-        // afresh.
-        let covered = to == Stacking::OnTop && gamewin::below_any(window, &beneath);
-        let moved = gamewin::restack(window, to, if covered { None } else { set_before });
-        if moved.is_ok() {
-            set_before = Some(to);
+    /// What our pages send `act` and `panel_press`, written as they write it (`src/*.ts`):
+    /// a typo there reaches no type check, so each must read as the core's.
+    #[test]
+    fn what_the_pages_send_reads_as_the_cores_actions_and_controls() {
+        let actions = [
+            (r#""searchNext""#, Action::SearchNext),
+            (r#""searchPrevious""#, Action::SearchPrevious),
+            (r#""searchEnter""#, Action::SearchEnter),
+            (r#""searchEscape""#, Action::SearchEscape),
+            (r#""reopenMapList""#, Action::ReopenMapList),
+            (r#""clearHuntingTarget""#, Action::ClearHuntingTarget),
+            (r#""toggleTaxis""#, Action::ToggleTaxis),
+            (r#""toggleTeleportScrolls""#, Action::ToggleTeleportScrolls),
+            (r#"{"toggleSection":"hiddenPortals"}"#, Action::ToggleSection(Section::HiddenPortals)),
+            (r#""closeSettings""#, Action::CloseSettings),
+            (r#"{"beginRebind":"itemCard"}"#, Action::BeginRebind(Hotkey::ItemCard)),
+            (r#""cancelRebind""#, Action::CancelRebind),
+            (r#""turnOffHotkey""#, Action::TurnOffHotkey),
+            (r#""swapHotkeys""#, Action::SwapHotkeys),
+            (r#""resetHotkeys""#, Action::ResetHotkeys),
+            (r#""undoResetHotkeys""#, Action::UndoResetHotkeys),
+            (r#""refreshGameData""#, Action::RefreshGameData),
+            (r#"{"setCheckForUpdates":{"on":true}}"#, Action::SetCheckForUpdates { on: true }),
+            (r#""cancelCardMarket""#, Action::CancelCardMarket),
+            (r#""addCardMarketLine""#, Action::AddCardMarketLine),
+            (r#""askRemoveCardMarketLine""#, Action::AskRemoveCardMarketLine),
+            (r#""removeCardMarketLine""#, Action::RemoveCardMarketLine),
+            (r#"{"openDealItem":{"row":2}}"#, Action::OpenDealItem { row: 2 }),
+            (r#"{"setDealMargin":{"percent":15}}"#, Action::SetDealMargin { percent: 15 }),
+            (r#"{"setGrindTracker":{"on":false}}"#, Action::SetGrindTracker { on: false }),
+            (r#""checkForUpdates""#, Action::CheckForUpdates),
+            (r#""updateNow""#, Action::UpdateNow),
+            (r#""updateWhenIQuit""#, Action::UpdateWhenIQuit),
+            (r#""updateLater""#, Action::UpdateLater),
+            (r#""finishSetup""#, Action::FinishSetup),
+        ];
+        for (sent, action) in actions {
+            assert_eq!(serde_json::from_str::<Action>(sent).ok(), Some(action), "{sent}");
         }
-        // The core still shows it, over another app: the core loop is behind.
-        let behind = shows && to == Stacking::Bottom && matches!(moved, Ok(true));
-        if behind && commands.send(Command::CheckForeground).is_err() {
-            return;
+        let controls = [
+            (r#""settings""#, PanelControl::Settings),
+            (r#""openSite""#, PanelControl::OpenSite),
+            (r#""openGithub""#, PanelControl::OpenGithub),
+            (r#""openDiscord""#, PanelControl::OpenDiscord),
+            (r#""openRelease""#, PanelControl::OpenRelease),
+            (r#""update""#, PanelControl::Update),
+        ];
+        for (sent, control) in controls {
+            assert_eq!(serde_json::from_str::<PanelControl>(sent).ok(), Some(control), "{sent}");
         }
-        // Polled 20 times a second: report a failure once, not every time.
-        let error = moved.err().map(|e| e.to_string());
-        if error.is_some() && error != last_error {
-            error!("putting our window on top or out of sight failed: {}", error.as_deref().unwrap_or_default());
-        }
-        last_error = error;
-    }
-}
-
-/// Size our window to the core's placement, and move it there unless the player is
-/// dragging it.
-pub(crate) fn place(overlay: &WebviewWindow, placement: ScreenRect, player_drags_it: bool) {
-    let size = PhysicalSize::new(placement.width, placement.height);
-    if overlay.inner_size().ok() != Some(size) {
-        let _ = overlay.set_size(size);
-    }
-    let to = PhysicalPosition::new(placement.x, placement.y);
-    if !player_drags_it && overlay.outer_position().ok() != Some(to) {
-        let _ = overlay.set_position(to);
     }
 }

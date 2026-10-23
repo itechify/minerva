@@ -1,5 +1,5 @@
-/** How Minerva writes its figures, wherever they show: the panel, the Grind Tracker
- *  and the Personal Bests window. */
+/** How Minerva writes its figures, wherever they show: the panel, the Grind Tracker, the
+ *  Personal Bests window, the Item Card and the Deal Badges, and the site's Map Leaderboards. */
 
 /** Mirror of `minerva_core::LevelRange`. */
 export type LevelRange = { lowest: number; highest: number };
@@ -25,6 +25,14 @@ export const sharePercent = (hundredths: number) => percent(hundredths, hundredt
  *  compares Last 5 min with the Best row as written here, so it never shows beside two
  *  that read the same. */
 export const rate = (n: number) => whole(Number(n.toPrecision(3)));
+
+/** A step on a scale of EXP/h as its ruler writes it, in the Personal Bests window and on
+ *  the Map Leaderboards: 0, 500, 20k, 1.25M. */
+export function short(n: number): string {
+  if (n >= 1_000_000) return `${Number((n / 1_000_000).toFixed(2))}M`;
+  if (n >= 1_000) return `${Number((n / 1_000).toFixed(1))}k`;
+  return String(n);
+}
 
 /** Mob levels: "Lv 2–14", or "Lv 8" for one level. */
 export const levels = ({ lowest, highest }: LevelRange) =>

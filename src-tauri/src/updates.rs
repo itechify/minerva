@@ -182,10 +182,7 @@ impl Updater {
     where
         F: Future<Output = Command> + Send + 'static,
     {
-        let (commands, work) = (self.commands.clone(), work(self.app.clone(), self.build));
-        tauri::async_runtime::spawn(async move {
-            let _ = commands.send(work.await);
-        });
+        http::answer_in_background(self.commands.clone(), work(self.app.clone(), self.build));
     }
 
     /// Download `id` came to `fetched`: keep the installer, and say what came of it to the

@@ -1,9 +1,9 @@
 import "./errors";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { dayText } from "./dates";
-import { byId, span } from "./dom";
+import { byId, reducedMotion, span, svgEl } from "./dom";
+import { whole } from "./figures";
+import { dragByHandles, followView, heightReporter } from "./shell";
 
 /** Mirror of `minerva_core::ShopPrice`. */
 type ShopPrice = { status: "sells"; mesos: number } | { status: "notSold" } | { status: "cash" } | { status: "unknown" };
@@ -54,7 +54,7 @@ const cardEl = byId("card");
 const title = byId("title");
 const body = byId("body");
 
-const mesos = (amount: number) => `${amount.toLocaleString("en-US")} mesos`;
+const mesos = (amount: number) => `${whole(amount)} mesos`;
 
 /** One figure: its label at the left, its value right-aligned, as the Mob Card sets them. */
 function figure(label: string, value: Node | string, quiet = false): HTMLDivElement {
@@ -100,12 +100,8 @@ function iconButton(path: string, label: string, onClick: () => void): HTMLButto
   button.className = "icon-button light";
   button.setAttribute("aria-label", label);
   button.title = label;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 16 16");
-  svg.setAttribute("aria-hidden", "true");
-  const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  line.setAttribute("d", path);
-  svg.append(line);
+  const svg = svgEl("svg", { viewBox: "0 0 16 16", "aria-hidden": "true" });
+  svg.append(svgEl("path", { d: path }));
   button.append(svg);
   button.addEventListener("click", onClick);
   return button;
@@ -145,7 +141,7 @@ function field(
   };
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") finish(() => enter(input.value));
-    if (e.key === "Escape") finish(() => invoke("item_card_cancel_market"));
+    if (e.key === "Escape") finish(() => invoke("act", { action: "cancelCardMarket" }));
   });
   input.addEventListener("blur", () => {
     if (input.isConnected) finish(() => onLeave(input.value));
@@ -215,7 +211,7 @@ function priceField(card: ItemCard, line: MarketLine, notAPrice: string | null):
   row.className = "item-card-line editing";
   const input = field(
     "price",
-    notAPrice ?? (line.price ? line.price.mesos.toLocaleString("en-US") : ""),
+    notAPrice ?? (line.price ? whole(line.price.mesos) : ""),
     "450,000 or 450k",
     `Your ${line.name} for ${card.name}`,
     (typed) => invoke("item_card_enter_market", { typed }),
@@ -239,7 +235,7 @@ function nameField(line: MarketLine | null, problem: NameProblem | null): HTMLEl
     "Name it, e.g. Lowest ask",
     line ? `Rename ${quoted(line.name)}` : "Name the new market line",
     enter,
-    (typed) => (typed.trim() ? enter(typed) : invoke("item_card_cancel_market")),
+    (typed) => (typed.trim() ? enter(typed) : invoke("act", { action: "cancelCardMarket" })),
   );
   row.append(input);
   if (line) {
@@ -247,7 +243,7 @@ function nameField(line: MarketLine | null, problem: NameProblem | null): HTMLEl
     const remove = iconButton(
       "M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5",
       `Remove ${quoted(line.name)}`,
-      () => invoke("item_card_ask_remove_market_line"),
+      () => invoke("act", { action: "askRemoveCardMarketLine" }),
     );
     remove.addEventListener("mousedown", () => (fieldDone = true));
     row.append(remove);
@@ -268,20 +264,20 @@ function removeQuestion(line: MarketLine, prices: number): HTMLElement {
   const what =
     prices === 0
       ? `Remove ${quoted(line.name)}? It has no prices yet.`
-      : `Remove ${quoted(line.name)} and its prices on ${prices.toLocaleString("en-US")} ${prices === 1 ? "item" : "items"}?`;
+      : `Remove ${quoted(line.name)} and its prices on ${whole(prices)} ${prices === 1 ? "item" : "items"}?`;
   const question = document.createElement("p");
   question.textContent = what;
   const buttons = document.createElement("div");
   buttons.className = "item-card-remove-buttons";
-  const button = (text: string, command: string) => {
+  const button = (text: string, action: string) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "text-button";
     b.textContent = text;
-    b.addEventListener("click", () => invoke(command));
+    b.addEventListener("click", () => invoke("act", { action }));
     return b;
   };
-  buttons.append(button("Remove", "item_card_remove_market_line"), button("Keep", "item_card_cancel_market"));
+  buttons.append(button("Remove", "removeCardMarketLine"), button("Keep", "cancelCardMarket"));
   box.append(question, buttons);
   return box;
 }
@@ -295,7 +291,7 @@ function marketSection(card: ItemCard): HTMLElement {
   const head = document.createElement("div");
   head.className = "item-card-market-head";
   const add = iconButton("M8 3.5v9M3.5 8h9", "Add a market line to every card", () =>
-    invoke("item_card_add_market_line"),
+    invoke("act", { action: "addCardMarketLine" }),
   );
   head.append(span("label", "Market"), add, mesoWatchButton());
   section.append(head);
@@ -324,14 +320,6 @@ function itemIcon(url: string | null): HTMLSpanElement {
   return icon;
 }
 
-const SVG = "http://www.w3.org/2000/svg";
-
-function svgShape(tag: string, attributes: Record<string, string>) {
-  const shape = document.createElementNS(SVG, tag);
-  for (const [name, value] of Object.entries(attributes)) shape.setAttribute(name, value);
-  return shape;
-}
-
 /** The credit as the main window's info icon at the card's foot, its words in its tooltip. */
 function creditFooter(text: string) {
   const footer = document.createElement("footer");
@@ -340,12 +328,10 @@ function creditFooter(text: string) {
   credit.setAttribute("role", "img");
   credit.title = text;
   credit.setAttribute("aria-label", text);
-  const svg = document.createElementNS(SVG, "svg");
-  svg.setAttribute("viewBox", "0 0 16 16");
-  svg.setAttribute("aria-hidden", "true");
-  const ring = svgShape("circle", { cx: "8", cy: "8", r: "6.25" });
-  const stem = svgShape("path", { d: "M8 7.4v3.9" });
-  const dot = svgShape("circle", { class: "dot", cx: "8", cy: "4.9", r: ".95" });
+  const svg = svgEl("svg", { viewBox: "0 0 16 16", "aria-hidden": "true" });
+  const ring = svgEl("circle", { cx: "8", cy: "8", r: "6.25" });
+  const stem = svgEl("path", { d: "M8 7.4v3.9" });
+  const dot = svgEl("circle", { class: "dot", cx: "8", cy: "4.9", r: ".95" });
   svg.append(ring, stem, dot);
   credit.append(svg);
   footer.append(credit);
@@ -387,7 +373,7 @@ function renderChoice(name: string, items: ItemCardChoice[]) {
       button.type = "button";
       button.className = "item-card-choice";
       button.title = `The ${item.kind} ${name}`;
-      button.append(itemIcon(item.icon), span("kind", item.kind));
+      button.append(itemIcon(item.icon), span("", item.kind));
       button.addEventListener("click", () => invoke("item_card_pick", { id: item.id }));
       row.append(button);
       return row;
@@ -431,25 +417,15 @@ function render({ shown, card }: CardView) {
 let unfoldedCard = -1;
 function unfold(from: "left" | "right" | undefined) {
   cardEl.classList.remove("unfold-left", "unfold-right");
-  if (!from || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (!from || reducedMotion().matches) return;
   void cardEl.offsetWidth;
   cardEl.classList.add(`unfold-${from}`);
 }
 cardEl.addEventListener("animationend", () => cardEl.classList.remove("unfold-left", "unfold-right"));
 
 // The shell sizes the window to the card, up to its most; past that the card scrolls under
-// its bar. The card is no taller than the window, so it is measured without that limit, or
-// the window could never grow.
-let reportedHeight = 0;
-function reportHeight() {
-  cardEl.classList.add("measuring");
-  const height = Math.ceil(cardEl.getBoundingClientRect().height);
-  cardEl.classList.remove("measuring");
-  if (height > 0 && height !== reportedHeight) {
-    reportedHeight = height;
-    invoke("item_card_height", { height });
-  }
-}
+// its bar.
+const reportHeight = heightReporter(cardEl, "page_height");
 window.addEventListener("resize", reportHeight);
 // The height depends on the font, and on pictures arriving: measure again once in.
 document.fonts.ready.then(reportHeight);
@@ -457,15 +433,7 @@ new ResizeObserver(reportHeight).observe(cardEl);
 
 // Dragged by its bar, never by its button. The window takes clicks only while a card
 // shows, and the keyboard only while a price or line name field is open.
-document.addEventListener("mousedown", (e) => {
-  const target = e.target instanceof Element ? e.target : null;
-  const onBar = !!target?.closest(".drag-handle") && !target?.closest("button");
-  if (e.button === 0 && onBar) getCurrentWindow().startDragging();
-});
+dragByHandles();
 byId("close").addEventListener("click", () => invoke("item_card_close"));
 
-listen<CardView>("item-card-state", (e) => render(e.payload));
-// The card may have been sent before the page was listening.
-invoke<CardView | null>("item_card_view").then((view) => {
-  if (view) render(view);
-});
+followView<CardView>("item-card-state", "page_view", render);

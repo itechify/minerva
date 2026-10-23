@@ -55,6 +55,8 @@
 //! `nsis/` and `msi/` under the bundle folder, `target/release/bundle` by default). It refuses a bare `windows-x86_64` key, and a `.sig` that is missing or was signed as
 //! another version. No game window is needed.
 
+mod update_manifest;
+
 use minerva_core::{Minerva, GAME_WINDOW_TITLE, PortalKind, Rect, TitleReader};
 use minerva_lib::{capture, capture_title, gamewin, source::WebSource};
 use std::io::Write;
@@ -62,52 +64,28 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+/// A mode: its name, what it runs on the arguments after it, and its usage (`None`: it takes
+/// none, and its failing is no misuse).
+type Mode = (&'static str, fn(&[String]) -> Result<(), String>, Option<&'static str>);
+
+const MODES: [Mode; 6] = [
+    ("record", record, Some("probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>]")),
+    ("osms", |_| osms(), None),
+    ("ceilings", ceilings, Some("probe ceilings <out.json> [--osms <osms-set.json>]")),
+    ("update-manifest", update_manifest, Some("probe update-manifest <out> [--bundle-dir <dir>] [--base-url <url>]")),
+    ("replay", replay, Some("probe replay <report.zip> [--all] [--osms <osms-set.json>]")),
+    ("item", item, Some("probe item <out-dir> \"<item name>\" [--desc <tag>] [--delay <seconds>]")),
+];
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.first().map(String::as_str) == Some("record") {
-        if let Err(e) = record(&args[1..]) {
+    if let Some((_, run, usage)) = MODES.iter().find(|(name, ..)| args.first().map(String::as_str) == Some(*name)) {
+        if let Err(e) = run(&args[1..]) {
             eprintln!("{e}");
-            eprintln!("usage: probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>]");
-            std::process::exit(2);
-        }
-        return;
-    }
-    if args.first().map(String::as_str) == Some("osms") {
-        if let Err(e) = osms() {
-            eprintln!("{e}");
-            std::process::exit(1);
-        }
-        return;
-    }
-    if args.first().map(String::as_str) == Some("ceilings") {
-        if let Err(e) = ceilings(&args[1..]) {
-            eprintln!("{e}");
-            eprintln!("usage: probe ceilings <out.json> [--osms <osms-set.json>]");
-            std::process::exit(2);
-        }
-        return;
-    }
-    if args.first().map(String::as_str) == Some("update-manifest") {
-        if let Err(e) = update_manifest(&args[1..]) {
-            eprintln!("{e}");
-            eprintln!("usage: probe update-manifest <out> [--bundle-dir <dir>] [--base-url <url>]");
-            std::process::exit(2);
-        }
-        return;
-    }
-    if args.first().map(String::as_str) == Some("replay") {
-        if let Err(e) = replay(&args[1..]) {
-            eprintln!("{e}");
-            eprintln!("usage: probe replay <report.zip> [--all] [--osms <osms-set.json>]");
-            std::process::exit(2);
-        }
-        return;
-    }
-    if args.first().map(String::as_str) == Some("item") {
-        if let Err(e) = item(&args[1..]) {
-            eprintln!("{e}");
-            eprintln!("usage: probe item <out-dir> \"<item name>\" [--desc <tag>] [--delay <seconds>]");
-            std::process::exit(2);
+            if let Some(usage) = usage {
+                eprintln!("usage: {usage}");
+            }
+            std::process::exit(if usage.is_some() { 2 } else { 1 });
         }
         return;
     }
@@ -158,7 +136,7 @@ fn main() {
 
 /// Fetch OSMS's live set, read it in full, and report its counts.
 fn osms() -> Result<(), String> {
-    let files = minerva_lib::osms::fetch_live()?;
+    let files = minerva_lib::osms::fetch_live::<minerva_core::osms::OsmsFiles>()?;
     let sizes = [&files.maps, &files.portals, &files.monsters, &files.map_manifest, &files.lookups];
     for (name, text) in minerva_core::osms::OsmsFiles::NAMES.iter().zip(sizes) {
         println!("{name:>18}: {} KB", text.len() / 1024);
@@ -208,7 +186,7 @@ fn osms() -> Result<(), String> {
     println!("Hidden Portal rows: {} (to a Hidden Street: {})", hidden.len(), hidden.iter().filter(|p| p.to_hidden_street).count());
     println!("Mobs spawning: {}", mobs.len());
 
-    let files = minerva_lib::osms_items::fetch_live()?;
+    let files = minerva_lib::osms::fetch_live::<minerva_core::osms_items::ItemFiles>()?;
     let sizes = [&files.items, &files.cash_shop];
     for (name, text) in minerva_core::osms_items::ItemFiles::NAMES.iter().zip(sizes) {
         println!("{name:>18}: {} KB", text.len() / 1024);
@@ -240,7 +218,7 @@ fn ceilings(args: &[String]) -> Result<(), String> {
             let json = std::fs::read(file).map_err(|e| format!("{file}: {e}"))?;
             serde_json::from_slice::<minerva_core::osms::OsmsFiles>(&json).map_err(|e| format!("{file}: {e}"))?
         }
-        None => minerva_lib::osms::fetch_live()?,
+        None => minerva_lib::osms::fetch_live::<minerva_core::osms::OsmsFiles>()?,
     };
     let set = minerva_core::osms::read(&files).map_err(|e| format!("OSMS's set doesn't read: {e}"))?;
     let ceilings = set.solo_ceilings();
@@ -252,7 +230,7 @@ fn ceilings(args: &[String]) -> Result<(), String> {
 
 /// `<out> [--bundle-dir <dir>] [--base-url <url>]`: write `latest.json` from the built installers' `.sig`s.
 fn update_manifest(args: &[String]) -> Result<(), String> {
-    use minerva_lib::update_manifest::{installers, manifest};
+    use update_manifest::{installers, manifest};
     let mut rest = args.iter();
     let out = rest.next().ok_or("no file to write")?;
     let mut bundle = Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/release/bundle");
@@ -285,7 +263,7 @@ fn update_manifest(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// `<report.zip> [--all] [--osms <osms-set.json>]`
+/// `<report.zip> [--all] [--osms <osms-set.json>] [--items <osms-items.json>]`
 fn replay(args: &[String]) -> Result<(), String> {
     use minerva_core::bug_report;
     let mut rest = args.iter();
@@ -312,7 +290,7 @@ fn replay(args: &[String]) -> Result<(), String> {
         println!("  map {} · {} ({}): {ceiling}", map.street_name, map.map_name, map.id);
     }
     println!();
-    let from = if all { 0 } else { report.saved_at_ms.saturating_sub(10 * 60_000) };
+    let from = if all { 0 } else { report.saved_at_ms.saturating_sub(minerva_core::bug_report::RECENT_CROPS_MS) };
     for line in recording.timeline(from) {
         println!("{line}");
     }
@@ -322,7 +300,7 @@ fn replay(args: &[String]) -> Result<(), String> {
             let json = std::fs::read(file).map_err(|e| format!("{file}: {e}"))?;
             Some(serde_json::from_slice::<minerva_core::osms::OsmsFiles>(&json).map_err(|e| format!("{file}: {e}"))?)
         }
-        None => match minerva_lib::osms::fetch_live() {
+        None => match minerva_lib::osms::fetch_live::<minerva_core::osms::OsmsFiles>() {
             Ok(files) => Some(files),
             Err(e) => {
                 println!("OSMS's set couldn't be fetched ({e}): replaying without it.");
@@ -344,7 +322,7 @@ fn replay(args: &[String]) -> Result<(), String> {
             Some(serde_json::from_slice::<minerva_core::osms_items::ItemFiles>(&json).map_err(|e| format!("{file}: {e}"))?)
         }
         None if had(|a| matches!(a, bug_report::Answer::Items { answer: Ok(_) } | bug_report::Answer::SavedItems { saved: Some(_) })) => {
-            match minerva_lib::osms_items::fetch_live() {
+            match minerva_lib::osms::fetch_live::<minerva_core::osms_items::ItemFiles>() {
                 Ok(files) => Some(files),
                 Err(e) => {
                     println!("OSMS's item files couldn't be fetched ({e}): replaying without them.");
@@ -406,8 +384,8 @@ fn item(args: &[String]) -> Result<(), String> {
     if x < 0 || y < 0 || x >= client.width as i32 || y >= client.height as i32 {
         return Err("the pointer is outside the game's client area: nothing saved".into());
     }
-    let rgba = capture::capture_rgba(client.x, client.y, client.width as i32, client.height as i32)?;
-    let img = image::RgbaImage::from_raw(client.width, client.height, rgba).ok_or("capture size")?;
+    let frame = capture::frame(client, || 0)?;
+    let img = image::RgbaImage::from_raw(frame.width, frame.height, frame.rgba).ok_or("capture size")?;
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
     let tag = desc.map(|d| format!("--{d}")).unwrap_or_default();
     let path = out.join(format!("{item}@{x},{y}{tag}.png"));

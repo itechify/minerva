@@ -132,6 +132,10 @@ pub(crate) struct ItemLookups {
     lookups: u32,
     /// The latest time heard (capture time).
     now_ms: u64,
+    /// MeowDB's pace, kept by the searches.
+    pace: Pace,
+    /// The alert's size, in physical px for the current display.
+    pub size: Size,
 }
 
 impl ItemLookups {
@@ -166,7 +170,6 @@ impl ItemLookups {
         reading: Option<ItemTooltipReading>,
         ours: &[(OurWindow, ScreenRect)],
         source: &mut dyn MapDataSource,
-        pace: &mut Pace,
     ) -> Option<String> {
         self.capturing = false;
         self.searching = None;
@@ -177,7 +180,7 @@ impl ItemLookups {
         let outcome = match reading.map(|r| r.tooltip) {
             Some(ItemTooltip::None) => ItemLookup::NoTooltip,
             Some(ItemTooltip::Found { area, name }) => {
-                match ours.iter().find(|(_, window)| overlaps(*window, area)) {
+                match ours.iter().find(|(_, window)| window.overlaps(area)) {
                     Some((by, _)) => ItemLookup::Covered { by: *by },
                     None => match name.as_deref().and_then(item_name) {
                         Some(read) => {
@@ -192,31 +195,24 @@ impl ItemLookups {
             None => ItemLookup::Unreadable,
         };
         self.show(outcome);
-        self.poll(source, pace, at_ms)
+        self.poll(source, at_ms)
     }
 
     /// The player clicked the Item Card's name, `name`: look it up as if read from an Item
     /// Tooltip, preferring the MeowDB item of category `kind` among several with the name.
     /// Returns the page to open, if MeowDB answered at once.
-    pub fn look_up(
-        &mut self,
-        name: String,
-        kind: String,
-        source: &mut dyn MapDataSource,
-        pace: &mut Pace,
-        at_ms: u64,
-    ) -> Option<String> {
+    pub fn look_up(&mut self, name: String, kind: String, source: &mut dyn MapDataSource, at_ms: u64) -> Option<String> {
         self.lookups += 1;
         self.now_ms = self.now_ms.max(at_ms);
         self.searching = Some((name.clone(), false));
         self.prefer = Some(kind);
         self.show(ItemLookup::LookingUp { read: name });
-        self.poll(source, pace, at_ms)
+        self.poll(source, at_ms)
     }
 
     /// Time passed: check on the search in flight, and let the line go when its time is
     /// up. Returns the page to open, once MeowDB has answered.
-    pub fn poll(&mut self, source: &mut dyn MapDataSource, pace: &mut Pace, at_ms: u64) -> Option<String> {
+    pub fn poll(&mut self, source: &mut dyn MapDataSource, at_ms: u64) -> Option<String> {
         self.now_ms = self.now_ms.max(at_ms);
         if self.line_until.is_some_and(|until| self.now_ms >= until) {
             self.line = None;
@@ -225,14 +221,14 @@ impl ItemLookups {
         let (read, asked) = self.searching.take()?;
         // A search not yet asked waits out MeowDB's pace from the last one that went over
         // the network.
-        if !asked && !pace.ready(at_ms) {
+        if !asked && !self.pace.ready(at_ms) {
             self.searching = Some((read, false));
             return None;
         }
         let answer = match source.item_search(&read) {
             Poll::Pending => {
                 if !asked {
-                    pace.sent(at_ms);
+                    self.pace.sent(at_ms);
                 }
                 self.searching = Some((read, true));
                 return None;
@@ -310,18 +306,12 @@ pub(crate) fn alert_placement(game: &GameWindow, size: Size, avoid: &[ScreenRect
     // Each move only goes down, so going over the regions twice settles it.
     for _ in 0..2 {
         for region in avoid {
-            if overlaps(alert, *region) {
+            if alert.overlaps(*region) {
                 alert.y = region.y + region.height as i32 + ALERT_GAP;
             }
         }
     }
     alert
-}
-
-pub(crate) fn overlaps(a: ScreenRect, b: ScreenRect) -> bool {
-    let (a_right, b_right) = (a.x + a.width as i32, b.x + b.width as i32);
-    let (a_bottom, b_bottom) = (a.y + a.height as i32, b.y + b.height as i32);
-    a.x < b_right && b.x < a_right && a.y < b_bottom && b.y < a_bottom
 }
 
 /// The item's name in what the Item Tooltip's name line read as: trimmed, spaces

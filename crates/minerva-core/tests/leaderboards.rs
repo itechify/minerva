@@ -7,22 +7,15 @@
 mod common;
 
 use common::player::Player;
-use common::{CONSTRUCTION_SITE_ID, NORTHERN_TOP_ID, SUNSET_SKY_ID, tracking};
+use common::{CONSTRUCTION_SITE_ID, NORTHERN_TOP_ID, SUNSET_SKY_ID, tracking, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, S, DAY, MIN};
 use minerva_core::{
     BESTS_VERSION, CharacterBests, LeaderboardAnswer, LeaderboardCharacter, LeaderboardEntry, LeaderboardStatus,
     LeaderboardToggle, LeaderboardUpload, MapBests, Minerva, PanelControl, PanelState, RejectedEntry, RejectedListing, RejectedReason, Request, SavedBests, ScreenRect,
     Settings, StatusBar, StatusBarReading, VisitBest,
 };
 
-const S: u64 = 1000;
-const MIN: u64 = 60 * S;
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const CONSTRUCTION_SITE: &str = "victoria-road__construction-site-north-of-kerning-city--window";
-
 /// The wall clock at capture time 0: 9 Oct 2026, 12:00 UTC.
 const WALL: u64 = 1_791_547_200_000;
-const DAY: u64 = 24 * 60 * 60 * S;
 
 /// A Visit's best: `exp` EXP/h, set `days_ago` before [`WALL`] (`None`: before Minerva knew the
 /// date) by a Magician of `level`.
@@ -137,7 +130,7 @@ fn all_taken(minerva: &mut Minerva, at_ms: u64) {
 fn a_new_best_goes_up_when_its_visit_ends_not_while_it_rises() {
     let mut player = Player::clocked(tracking());
     player.status(Some("Egbert"), 13);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.minerva.show_on_leaderboards("Egbert", true);
     let at = player.at;
     // Nothing has ended yet: an empty set, which claims the name.
@@ -151,7 +144,7 @@ fn a_new_best_goes_up_when_its_visit_ends_not_while_it_rises() {
     assert_eq!(sent(player.minerva.tick(at)), []);
 
     // On to the Construction Site: the Visit to Sunset Sky ends, and its best goes up.
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     let at = player.at;
     let set_at = player.minerva.bests().maps_of(Some("Egbert"))[0].visits[0].set_at_unix_ms.unwrap();
     let best = LeaderboardEntry { map: SUNSET_SKY_ID.to_string(), level: 13, job: "Magician".to_string(), exp_per_hour: 7200, set_at };
@@ -393,9 +386,9 @@ fn characters_not_shown_and_the_unassigned_bests_never_leave_the_machine() {
     let mut uploads: Vec<LeaderboardUpload> = Vec::new();
     let mut play = |player: &mut Player, name: Option<&str>, level: u32, exp: u64| {
         player.status(name, level);
-        player.arrive(SUNSET);
+        player.arrive(SUNSET_SAMPLE);
         player.hunt(6 * MIN, exp);
-        player.arrive(CONSTRUCTION_SITE);
+        player.arrive(CONSTRUCTION_SAMPLE);
         player.hunt(MIN, 10);
         // The shell's loop: a tick, and each upload under way made and taken.
         let at = player.at;
@@ -419,11 +412,11 @@ fn characters_not_shown_and_the_unassigned_bests_never_leave_the_machine() {
 /// ends it, and the shell's loop ticks: the uploads asked for then.
 fn a_visit_ends(player: &mut Player) -> Vec<(String, Option<Vec<LeaderboardEntry>>)> {
     player.status(Some("Egbert"), 13);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
     let at = player.at;
     assert_eq!(sent(player.minerva.tick(at)), [], "nothing while the Visit is under way");
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     let at = player.at;
     sent(player.minerva.tick(at))
 }
@@ -482,9 +475,9 @@ fn characters_in_the_bests_of_settings_from_before_the_default_stay_off_and_new_
     // A Character met since is new.
     let mut player = Player::clocked(minerva);
     player.status(Some("Carol"), 13);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     let at = player.at;
     let names: Vec<String> = player.minerva.tick(at).leaderboard_uploads.iter().map(|u| u.name.clone()).collect();
     assert_eq!(names, ["Carol"]);
@@ -638,12 +631,12 @@ fn lost_bests(shown: &[&str]) -> Player {
 /// and the Personal Bests window open. The capture time then.
 fn a_best_after_the_bests_were_lost(shown: &[&str]) -> (Player, u64) {
     let mut player = lost_bests(shown);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     let at = player.at;
     // An empty set would delete every entry they have on the site.
     assert_eq!(sent(player.minerva.tick(at)), []);
     player.hunt(6 * MIN, 20);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.press(PanelControl::TogglePersonalBests);
     let at = player.at;
     (player, at)

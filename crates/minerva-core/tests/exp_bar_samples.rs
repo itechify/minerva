@@ -33,17 +33,13 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, SUNSET_SAMPLE, KERNING_SAMPLE, CONSTRUCTION_SAMPLE};
 use minerva_core::{
-    ExpBar, Frame, GameWindow, Minerva, PanelState, ScreenPoint, ScreenRect, Settings, StatusBarCapture,
+    ExpBar, Frame, Minerva, PanelState, ScreenPoint, StatusBarCapture,
 };
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-
-fn samples_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/exp-bar")
-}
 
 fn frame(path: &Path) -> Frame {
     let img = image::open(path).unwrap_or_else(|e| panic!("{}: {e}", path.display())).to_rgba8();
@@ -54,12 +50,8 @@ fn frame(path: &Path) -> Frame {
 /// with this client area at the screen's origin: the Grind Tracker is on.
 fn started(width: u32, height: u32) -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms_offline());
-    minerva.restore(Settings {
-        setup_done: true,
-        ..Settings::default()
-    });
-    let screen = ScreenRect { x: 0, y: 0, width, height };
-    minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    minerva.restore(common::set_up());
+    minerva.on_game_window(Some(common::window_at_origin(width, height)));
     minerva
 }
 
@@ -78,10 +70,10 @@ fn status_bar_capture(state: &PanelState, client: &image::RgbaImage, at_ms: u64)
 /// The minimap samples that are whole game windows, and what their EXP bars show.
 const WINDOWS: [(&str, ExpBar); 6] = [
     ("hidden-street__northern-top-of-construction-site--window", ExpBar { exp: 335, percent_hundredths: 798 }),
-    ("victoria-road__construction-site-north-of-kerning-city--window", ExpBar { exp: 266, percent_hundredths: 633 }),
-    ("victoria-road__kerning-city--window", ExpBar { exp: 160, percent_hundredths: 381 }),
+    (CONSTRUCTION_SAMPLE, ExpBar { exp: 266, percent_hundredths: 633 }),
+    (KERNING_SAMPLE, ExpBar { exp: 160, percent_hundredths: 381 }),
     ("victoria-road__perion-department-store--window", ExpBar { exp: 100_300, percent_hundredths: 6449 }),
-    ("victoria-road__sunset-sky--window", ExpBar { exp: 160, percent_hundredths: 381 }),
+    (SUNSET_SAMPLE, ExpBar { exp: 160, percent_hundredths: 381 }),
     ("victoria-road__subway-ticketing-booth--window", ExpBar { exp: 100_300, percent_hundredths: 6449 }),
 ];
 
@@ -107,7 +99,7 @@ fn is_strip(path: &Path) -> bool {
 
 /// The PNG samples here, sorted: the strips, or the figures alone.
 fn sample_pngs(strips: bool) -> Vec<PathBuf> {
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(common::samples_in("exp-bar"))
         .expect("samples dir")
         .map(|e| e.expect("dir entry").path())
         .filter(|p| p.extension().is_some_and(|x| x == "png") && is_strip(p) == strips)
@@ -205,7 +197,7 @@ const AT_EACH_UI_SIZE: [&str; 7] = [
 fn the_pointer_anywhere_over_the_figures_at_any_ui_size_never_reads_as_another_number() {
     let mut wrong = Vec::new();
     for name in AT_EACH_UI_SIZE {
-        let img = image::open(samples_dir().join(format!("{name}.png"))).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
+        let img = image::open(common::samples_in("exp-bar").join(format!("{name}.png"))).unwrap_or_else(|e| panic!("{name}: {e}")).to_rgba8();
         // The pointer is the game's, the same size at any UI Size.
         let step = (img.height() / 5).max(2) as usize;
         for y in (0..img.height()).step_by(step) {
@@ -231,7 +223,7 @@ struct Expected {
 
 #[test]
 fn every_recorded_frame_reads_as_its_readings_file_says() {
-    let recordings: Vec<PathBuf> = std::fs::read_dir(samples_dir())
+    let recordings: Vec<PathBuf> = std::fs::read_dir(common::samples_in("exp-bar"))
         .expect("samples dir")
         .map(|e| e.expect("dir entry").path())
         .filter(|p| p.is_dir())

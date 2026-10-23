@@ -9,18 +9,9 @@
 
 mod common;
 
-use common::world::{WorldMap, map, mob, orange, osms_world, search_for, world};
-use common::{FakeSource, arrive, osms};
-use minerva_core::{Action, Minerva, DensityTier, Distance, HuntingTarget, Mob, PanelState, SearchView, Step};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
-
-/// A mob with this Spawn Share (whole percent).
-fn sharing(share: u32, mut mob: Mob) -> Mob {
-    mob.spawn_share_percent = share;
-    mob
-}
+use common::world::{WorldMap, map, mob, orange, osms_world, world, sharing, on_sunset_sky, on_sunset_sky_from, hunt_orange_on, highlighted_map, stops};
+use common::{FakeSource, arrive, osms, SUNSET_SAMPLE, KERNING_SAMPLE, shown_id};
+use minerva_core::{Action, DensityTier, Distance, HuntingTarget, PanelState, SearchView, Step};
 
 /// Sunset Sky leads to Kerning City, Kerning City to the Mushroom Field, where Orange
 /// Mushrooms are a third as dense as on the Mushroom Grove, which is out of reach.
@@ -33,41 +24,13 @@ fn mushroom_roads() -> Vec<WorldMap> {
     ]
 }
 
-/// A core over `maps`, its file set in hand, with the player arrived on Sunset Sky.
-fn on_sunset_sky(maps: Vec<WorldMap>) -> Minerva {
-    on_sunset_sky_from(world(maps))
-}
-
-/// As [`on_sunset_sky`], with the file set and pictures from `source`.
-fn on_sunset_sky_from(source: FakeSource) -> Minerva {
-    let mut minerva = Minerva::new(source);
-    minerva.tick(0);
-    minerva.tick(50);
-    arrive(&mut minerva, SUNSET, 100);
-    minerva
-}
-
-/// Make the Orange Mushroom on map `map_id` the Hunting Target.
-fn hunt_orange_on(minerva: &mut Minerva, map_id: &str) -> PanelState {
-    search_for(minerva, "orange");
-    minerva.search_pick(map_id).clone()
-}
-
 fn target(state: &PanelState) -> &HuntingTarget {
     state.search.hunting.as_ref().expect("a Hunting Target")
 }
 
 /// The target's route, as its map names with how each is reached.
 fn route(state: &PanelState) -> Vec<String> {
-    target(state)
-        .map
-        .route
-        .iter()
-        .map(|stop| match stop.by {
-            None => stop.map_name.clone(),
-            Some(step) => format!("{step:?}: {}", stop.map_name),
-        })
-        .collect()
+    stops(&target(state).map.route)
 }
 
 #[test]
@@ -138,7 +101,7 @@ fn the_mobs_animation_stays_once_the_player_has_arrived() {
     hunt_orange_on(&mut minerva, "100000001");
     minerva.tick(200);
 
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
 
     assert!(target(&state).arrived);
     assert_eq!(target(&state).image.as_deref(), Some("picture:images/monsters/gif9.webp"));
@@ -151,7 +114,7 @@ fn the_route_goes_from_the_current_map_and_is_worked_out_again_as_the_player_mov
     let state = hunt_orange_on(&mut minerva, "100000002");
     assert_eq!(route(&state), ["Sunset Sky", "Portal: Kerning City", "Portal: Mushroom Field"]);
 
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
     assert_eq!(target(&state).map.distance, Distance::MapChanges(1));
     assert_eq!(route(&state), ["Kerning City", "Portal: Mushroom Field"]);
 }
@@ -182,7 +145,7 @@ fn arriving_on_the_target_map_says_so_with_the_trip_until_the_player_leaves_it()
     let state = hunt_orange_on(&mut minerva, "100000001");
     assert!(!target(&state).arrived);
 
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
     let here = target(&state);
     assert!(here.arrived);
     assert_eq!(here.map.distance, Distance::MapChanges(0));
@@ -190,7 +153,7 @@ fn arriving_on_the_target_map_says_so_with_the_trip_until_the_player_leaves_it()
     assert_eq!((trip.from.as_str(), trip.map_changes), ("Sunset Sky", 1));
     assert!(trip.travel.is_empty(), "by portals alone");
 
-    let state = arrive(&mut minerva, SUNSET, 2_000);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 2_000);
     assert_eq!(state.search.hunting, None);
 }
 
@@ -220,12 +183,12 @@ fn picking_the_map_the_player_is_on_keeps_it_until_they_leave_and_come_back() {
     assert_eq!(target(&state).map.distance, Distance::MapChanges(0));
     assert!(!target(&state).arrived, "they haven't gone anywhere");
     assert_eq!(target(&state).trip, None);
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
     assert!(state.search.hunting.is_some());
 
-    let state = arrive(&mut minerva, SUNSET, 2_000);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 2_000);
     assert!(target(&state).arrived);
-    let state = arrive(&mut minerva, KERNING, 3_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 3_000);
     assert_eq!(state.search.hunting, None);
 }
 
@@ -240,13 +203,13 @@ fn with_candidates_the_player_arrives_once_the_candidate_shown_is_the_target() {
     ]);
     hunt_orange_on(&mut minerva, "100000002");
 
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
     assert!(state.candidates.is_some());
-    assert_eq!(state.map.as_ref().map(|m| m.id.as_str()), Some("100000001"));
+    assert_eq!(shown_id(&state), Some("100000001"));
     assert!(state.search.hunting.is_some(), "the candidate shown isn't the target");
 
     let state = minerva.act(Action::ChooseCandidate);
-    assert_eq!(state.map.as_ref().map(|m| m.id.as_str()), Some("100000002"));
+    assert_eq!(shown_id(state), Some("100000002"));
     assert!(target(state).arrived);
 }
 
@@ -268,7 +231,7 @@ fn the_sections_x_clears_it_once_the_player_has_arrived_too() {
         map("100000001", "Kerning City", 100, vec![orange(10)]),
     ]);
     hunt_orange_on(&mut minerva, "100000001");
-    arrive(&mut minerva, KERNING, 1_000);
+    arrive(&mut minerva, KERNING_SAMPLE, 1_000);
 
     let state = minerva.act(Action::ClearHuntingTarget);
 
@@ -284,11 +247,6 @@ fn near_and_far_fields() -> Vec<WorldMap> {
     ]
 }
 
-/// The highlighted map's name in the search view's map list.
-fn highlighted(state: &PanelState) -> Option<&str> {
-    state.search.highlighted_result.map(|at| state.search.results[at].map_name.as_str())
-}
-
 #[test]
 fn the_sections_search_button_reopens_the_mobs_map_list_on_the_target_map() {
     let mut minerva = on_sunset_sky(near_and_far_fields());
@@ -299,7 +257,7 @@ fn the_sections_search_button_reopens_the_mobs_map_list_on_the_target_map() {
     assert_eq!(state.search.view, Some(SearchView::Maps));
     assert_eq!(state.search.picked.as_ref().map(|m| m.name.as_str()), Some("Orange Mushroom"));
     assert_eq!(state.search.results[0].map_name, "Far Field");
-    assert_eq!(highlighted(&state), Some("Near Field"), "the current target");
+    assert_eq!(highlighted_map(&state), Some("Near Field"), "the current target");
     assert_eq!(target(&state).map.map_name, "Near Field", "until another map is picked");
 }
 

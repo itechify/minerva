@@ -10,42 +10,28 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, KERNING_SAMPLE};
 use minerva_core::{
     Action, ExpBar, GameWindow, Minerva, PanelState, ScreenPoint, ScreenRect, Settings, StatusBarCapture, TrackingState,
 };
 
-const KERNING: &str = "victoria-road__kerning-city--window";
-
-/// The client area of a window sample shown at (812,110).
-fn game(sample: &str) -> ScreenRect {
-    let client = common::client_of(&common::load(sample));
-    ScreenRect { x: 812, y: 110, width: client.width(), height: client.height() }
-}
-
 /// The game window as the shell reports it, with this client area on a 3440x1440 screen.
 fn window(client: ScreenRect) -> Option<GameWindow> {
-    let frame = ScreenRect { x: client.x - 1, y: client.y - 31, width: client.width + 2, height: client.height + 32 };
-    Some(GameWindow { client, frame, screens: vec![ScreenRect { x: 0, y: 0, width: 3440, height: 1440 }] })
-}
-
-/// Settings with setup finished.
-fn set_up() -> Settings {
-    Settings { setup_done: true, ..Settings::default() }
+    Some(common::window_on_wide_screen(client))
 }
 
 /// A core restored from `settings`, over the sample's game window.
 fn started(settings: Settings, sample: &str) -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms());
     minerva.restore(settings);
-    minerva.on_game_window(window(game(sample)));
+    minerva.on_game_window(window(common::game_of(sample)));
     minerva
 }
 
 /// The capture the core asks for of a sample for the Status Bar, at `at_ms`, after `paint`
 /// has had its way with the strip (its coordinates the strip's).
 fn capture(minerva: &Minerva, sample: &str, at_ms: u64, paint: impl Fn(&mut image::RgbaImage)) -> StatusBarCapture {
-    let game = game(sample);
+    let game = common::game_of(sample);
     let strip = minerva.panel_state().status_bar_capture.expect("the Status Bar is captured with the game in front");
     let client = common::client_of(&common::load(sample));
     let (x, y) = ((strip.x - game.x) as u32, (strip.y - game.y) as u32);
@@ -94,7 +80,7 @@ fn read_painted(minerva: &mut Minerva, sample: &str, (from, until): (u64, u64), 
 #[test]
 fn setup_marks_nothing_and_the_grind_tracker_is_on_after_it() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.on_game_window(window(game(KERNING)));
+    minerva.on_game_window(window(common::game_of(KERNING_SAMPLE)));
 
     let state = minerva.act(Action::FinishSetup).clone();
 
@@ -106,9 +92,9 @@ fn setup_marks_nothing_and_the_grind_tracker_is_on_after_it() {
 
 #[test]
 fn the_figures_are_read_where_the_status_bar_has_them() {
-    let mut minerva = started(set_up(), KERNING);
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
 
-    let state = read(&mut minerva, KERNING, 0);
+    let state = read(&mut minerva, KERNING_SAMPLE, 0);
 
     assert_eq!(state.exp_bar, Some(ExpBar { exp: 160, percent_hundredths: 381 }));
     let found = state.exp_figures.and_then(|figures| figures.last_found);
@@ -117,8 +103,8 @@ fn the_figures_are_read_where_the_status_bar_has_them() {
 
 #[test]
 fn a_dimmer_capture_still_reads() {
-    let mut minerva = started(set_up(), KERNING);
-    let capture = capture(&minerva, KERNING, 0, |img| {
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
+    let capture = capture(&minerva, KERNING_SAMPLE, 0, |img| {
         for p in img.pixels_mut() {
             for c in &mut p.0[..3] {
                 *c = (*c as f32 * 0.935).round() as u8;
@@ -131,10 +117,10 @@ fn a_dimmer_capture_still_reads() {
 
 #[test]
 fn the_figures_move_with_the_game_window() {
-    let mut minerva = started(set_up(), KERNING);
-    read(&mut minerva, KERNING, 0);
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
 
-    let moved = ScreenRect { x: 100, y: 50, ..game(KERNING) };
+    let moved = ScreenRect { x: 100, y: 50, ..common::game_of(KERNING_SAMPLE) };
     let state = minerva.on_game_window(window(moved));
 
     let found = state.exp_figures.and_then(|figures| figures.last_found);
@@ -143,10 +129,10 @@ fn the_figures_move_with_the_game_window() {
 
 #[test]
 fn while_the_lv_box_is_covered_the_figures_are_read_where_they_were_last_found() {
-    let mut minerva = started(set_up(), KERNING);
-    read(&mut minerva, KERNING, 0);
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
 
-    let state = read_painted(&mut minerva, KERNING, (1_000, 30_000), lv_box_covered);
+    let state = read_painted(&mut minerva, KERNING_SAMPLE, (1_000, 30_000), lv_box_covered);
 
     assert_eq!(state.status_bar, None, "the Status Bar isn't found");
     assert_ne!(state.exp_tracking.state, TrackingState::Unreadable, "the figures still read");
@@ -155,19 +141,19 @@ fn while_the_lv_box_is_covered_the_figures_are_read_where_they_were_last_found()
 
 #[test]
 fn after_the_client_area_changes_size_the_figures_are_only_read_where_the_status_bar_is_found() {
-    let mut minerva = started(set_up(), KERNING);
-    read(&mut minerva, KERNING, 0);
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
 
-    let state = minerva.on_game_window(window(ScreenRect { width: 1280, height: 720, ..game(KERNING) })).clone();
+    let state = minerva.on_game_window(window(ScreenRect { width: 1280, height: 720, ..common::game_of(KERNING_SAMPLE) })).clone();
 
     assert_eq!(state.exp_figures.map(|figures| figures.last_found), Some(None));
 }
 
 #[test]
 fn a_status_bar_never_found_is_what_the_grind_tracker_says_cant_be_read() {
-    let mut minerva = started(set_up(), KERNING);
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
 
-    let state = read_painted(&mut minerva, KERNING, (0, 15_000), lv_box_covered);
+    let state = read_painted(&mut minerva, KERNING_SAMPLE, (0, 15_000), lv_box_covered);
 
     assert_eq!(state.exp_tracking.state, TrackingState::Unreadable);
     assert!(state.exp_tracking.no_status_bar);
@@ -175,10 +161,10 @@ fn a_status_bar_never_found_is_what_the_grind_tracker_says_cant_be_read() {
 
 #[test]
 fn figures_covered_on_a_status_bar_found_are_unreadable_with_the_status_bar_there() {
-    let mut minerva = started(set_up(), KERNING);
-    read(&mut minerva, KERNING, 0);
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
 
-    let state = read_painted(&mut minerva, KERNING, (1_000, 15_000), figures_covered);
+    let state = read_painted(&mut minerva, KERNING_SAMPLE, (1_000, 15_000), figures_covered);
 
     assert!(state.status_bar.is_some());
     assert_eq!(state.exp_tracking.state, TrackingState::Unreadable);
@@ -187,10 +173,10 @@ fn figures_covered_on_a_status_bar_found_are_unreadable_with_the_status_bar_ther
 
 #[test]
 fn turning_the_grind_tracker_off_stops_reading_the_figures_but_not_the_status_bar() {
-    let mut minerva = started(set_up(), KERNING);
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
 
     minerva.act(Action::SetGrindTracker { on: false });
-    let state = read(&mut minerva, KERNING, 0);
+    let state = read(&mut minerva, KERNING_SAMPLE, 0);
 
     assert!(!state.grind_tracker.on);
     assert_eq!(state.grind_tracker.placement, None);
@@ -202,11 +188,10 @@ fn turning_the_grind_tracker_off_stops_reading_the_figures_but_not_the_status_ba
 
 #[test]
 fn the_switch_survives_a_restart() {
-    let mut minerva = started(set_up(), KERNING);
+    let mut minerva = started(common::set_up(), KERNING_SAMPLE);
     minerva.act(Action::SetGrindTracker { on: false });
 
-    let json = serde_json::to_string(&minerva.settings()).unwrap();
-    let restarted = started(serde_json::from_str(&json).unwrap(), KERNING);
+    let restarted = started(common::settings_after_restart(&minerva), KERNING_SAMPLE);
 
     assert!(!restarted.panel_state().grind_tracker.on);
     assert_eq!(restarted.panel_state().exp_figures, None);
@@ -227,7 +212,7 @@ fn settings_with_an_exp_bar_region_load_with_the_grind_tracker_on_and_the_region
                 }}
             }}"#
         );
-        let minerva = started(serde_json::from_str(&json).unwrap(), KERNING);
+        let minerva = started(serde_json::from_str(&json).unwrap(), KERNING_SAMPLE);
 
         let state = minerva.panel_state();
         assert_eq!(state.setup.needed, None, "{exp_bar_region}");
@@ -242,8 +227,8 @@ fn settings_with_an_exp_bar_region_load_with_the_grind_tracker_on_and_the_region
 /// Bar is, as the Minimap Title is wherever the minimap is (ADR 0021).
 #[test]
 fn another_client_size_needs_no_setup() {
-    let settings = set_up();
-    let resized = ScreenRect { width: 1914, height: 1197, ..game(KERNING) };
+    let settings = common::set_up();
+    let resized = ScreenRect { width: 1914, height: 1197, ..common::game_of(KERNING_SAMPLE) };
     let mut minerva = Minerva::new(FakeSource::osms());
     minerva.restore(settings);
 

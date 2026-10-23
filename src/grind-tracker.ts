@@ -1,10 +1,8 @@
 import "./errors";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { byId, span } from "./dom";
 import type { Character, ExpRate, ExpTracking, PacePoint, PaceTrace } from "./exp-tracking";
 import { percent, rate, sharePercent, whole } from "./figures";
+import { dragByHandles, followView, heightReporter, pressControls } from "./shell";
 import { soloExpHelp } from "./solo-exp-help";
 
 /** What the shell sends: the figures, the Character playing (none until the Status Bar names
@@ -329,19 +327,8 @@ function drawPace(trace: PaceTrace | null) {
   paceName.textContent = name;
 }
 
-// The shell sizes the window to the content, as the overlay does the panel. The panel is
-// no taller than the window, so it is measured without that limit, or the window could
-// never grow.
-let reportedHeight = 0;
-function reportHeight() {
-  panelEl.classList.add("measuring");
-  const height = Math.ceil(panelEl.getBoundingClientRect().height);
-  panelEl.classList.remove("measuring");
-  if (height > 0 && height !== reportedHeight) {
-    reportedHeight = height;
-    invoke("grind_tracker_height", { height });
-  }
-}
+// The shell sizes the window to the content, as the overlay does the panel.
+const reportHeight = heightReporter(panelEl, "page_height");
 // The trace and the forecast are drawn to the window's width.
 window.addEventListener("resize", () => (shown ? render(shown) : reportHeight()));
 // The height depends on the font: measure again once it has loaded.
@@ -349,22 +336,11 @@ document.fonts.ready.then(reportHeight);
 
 // Dragged by its header, never by its buttons. A click leaves the keyboard with the game:
 // the window can't be activated.
-document.addEventListener("mousedown", (e) => {
-  const target = e.target instanceof Element ? e.target : null;
-  const onHeader = !!target?.closest(".drag-handle") && !target?.closest("button");
-  if (e.button === 0 && onHeader) getCurrentWindow().startDragging();
-});
+dragByHandles();
 
 // Close, reset and its Undo, removing the best and opening or closing the Personal Bests
 // window, through the core like the panel's icons.
-panelEl.addEventListener("click", (e) => {
-  const button = e.target instanceof Element ? e.target.closest<HTMLButtonElement>("button[data-control]") : null;
-  if (button) invoke("panel_press", { control: button.dataset.control });
-});
+pressControls(panelEl);
 
-listen<TrackerView>("grind-tracker-state", (e) => render(e.payload));
-// The figures may have been sent before the page was listening.
-invoke<TrackerView | null>("grind_tracker_view").then((view) => {
-  if (view) render(view);
-});
+followView<TrackerView>("grind-tracker-state", "page_view", render);
 reportHeight();

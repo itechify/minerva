@@ -82,7 +82,8 @@ fn make(path: &Path) -> Result<String, String> {
 /// Makes the core's uploads.
 pub struct Uploader {
     key: KeyFile,
-    client: Option<reqwest::Client>,
+    /// The data source's: one HTTP client for all that Minerva fetches and sends.
+    client: reqwest::Client,
     /// The id of the last upload made: the core's ids only grow.
     made: u64,
     /// Where the answers go, for the core loop.
@@ -90,8 +91,8 @@ pub struct Uploader {
 }
 
 impl Uploader {
-    pub fn new(key: KeyFile, commands: Sender<Command>) -> Self {
-        Self { key, client: None, made: 0, commands }
+    pub fn new(key: KeyFile, client: reqwest::Client, commands: Sender<Command>) -> Self {
+        Self { key, client, made: 0, commands }
     }
 
     /// Make each of `uploads` (the core's under way) not made yet, in the background; each
@@ -101,9 +102,8 @@ impl Uploader {
         for upload in uploads.iter().filter(|upload| upload.id > made) {
             self.made = self.made.max(upload.id);
             let id = upload.id;
-            let started = self.key.key().and_then(|key| Ok((key, self.client()?)));
-            let (key, client) = match started {
-                Ok(started) => started,
+            let key = match self.key.key() {
+                Ok(key) => key,
                 Err(why) => {
                     error!("Map Leaderboards: {why}");
                     let _ = self.commands.send(Command::LeaderboardAnswer { id, answer: LeaderboardAnswer::Failed { why } });
@@ -115,24 +115,15 @@ impl Uploader {
                 Some(body) => (reqwest::Method::PUT, Some(body)),
                 None => (reqwest::Method::DELETE, None),
             };
-            let commands = self.commands.clone();
-            tauri::async_runtime::spawn(async move {
+            let client = self.client.clone();
+            http::answer_in_background(self.commands.clone(), async move {
                 let answer = match http::send(&client, method, &url, &key, body).await {
                     Ok(reply) => read_leaderboard_answer(reply.status, reply.retry_after.as_deref(), &reply.body),
                     Err(why) => LeaderboardAnswer::Failed { why },
                 };
-                let _ = commands.send(Command::LeaderboardAnswer { id, answer });
+                Command::LeaderboardAnswer { id, answer }
             });
         }
-    }
-
-    fn client(&mut self) -> Result<reqwest::Client, String> {
-        if let Some(client) = &self.client {
-            return Ok(client.clone());
-        }
-        let client = http::client().map_err(|e| format!("HTTP client: {e}"))?;
-        self.client = Some(client.clone());
-        Ok(client)
     }
 }
 

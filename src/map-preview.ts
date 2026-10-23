@@ -18,7 +18,7 @@
  * row, and shows its card, close up.
  */
 
-import { byId, cardTop, span } from "./dom";
+import { byId, cardTop, span, svgEl } from "./dom";
 import { mapMark, type MapMarks } from "./map-marks";
 
 /** Mirror of `minerva_core::HiddenPortal`. */
@@ -120,8 +120,6 @@ const CLOSE_SPAWN_LIT_RING = 7.5;
 /** How faint the other mobs' dots go while one mob's are lit. */
 const DIMMED = 0.3;
 
-const SVG = "http://www.w3.org/2000/svg";
-
 const preview = byId("map-preview");
 const picture = byId("map-picture");
 const marksSvg = byId("map-marks") as unknown as SVGSVGElement;
@@ -216,12 +214,6 @@ export function lightMob(mob: string | null) {
   relight();
 }
 
-function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>) {
-  const el = document.createElementNS(SVG, tag);
-  for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, String(value));
-  return el;
-}
-
 /** The classes a mark's ring is drawn with: where it leads, and dashed when hidden. */
 function ringClass(mark: PortalMark): string {
   const dashed = mark.kind === "hidden" || mark.kind === "quest" ? " dashed" : "";
@@ -230,18 +222,18 @@ function ringClass(mark: PortalMark): string {
 
 /** A ring: a white halo, then the ring in its colour over a faint fill. */
 function ring(mark: PortalMark, cx: number, cy: number): SVGGElement {
-  const g = svg("g", { class: ringClass(mark) });
+  const g = svgEl("g", { class: ringClass(mark) });
   g.append(
-    svg("circle", { class: "halo", cx, cy, r: RING }),
-    svg("circle", { class: "stroke", cx, cy, r: RING }),
-    svg("circle", { class: "lit-ring", cx, cy, r: LIT_RING }),
+    svgEl("circle", { class: "halo", cx, cy, r: RING }),
+    svgEl("circle", { class: "stroke", cx, cy, r: RING }),
+    svgEl("circle", { class: "lit-ring", cx, cy, r: LIT_RING }),
   );
   return g;
 }
 
 /** The ring a Hidden Portal's row leads with: its mark's, as on the map. */
 function rowRing(mark: PortalMark | undefined): SVGSVGElement {
-  const el = svg("svg", { class: "row-ring", viewBox: "0 0 12 12", "aria-hidden": "true" });
+  const el = svgEl("svg", { class: "row-ring", viewBox: "0 0 12 12", "aria-hidden": "true" });
   const leads: PortalMark = mark ?? {
     x: 0,
     y: 0,
@@ -410,8 +402,8 @@ const at = (x: number, y: number, f: Frame) => ({
 function drawMarks(marks: PortalMark[], spawns: SpawnMark[], f: Frame) {
   marksSvg.setAttribute("width", String(f.width));
   marksSvg.setAttribute("height", String(f.height));
-  const defs = svg("defs", {});
-  const head = svg("marker", {
+  const defs = svgEl("defs");
+  const head = svgEl("marker", {
     id: "landing-head",
     viewBox: "0 0 6 6",
     refX: 5,
@@ -421,9 +413,9 @@ function drawMarks(marks: PortalMark[], spawns: SpawnMark[], f: Frame) {
     markerUnits: "userSpaceOnUse",
     orient: "auto-start-reverse",
   });
-  head.append(svg("path", { d: "M0 0.5 6 3 0 5.5z", class: "head" }));
+  head.append(svgEl("path", { d: "M0 0.5 6 3 0 5.5z", class: "head" }));
   defs.append(head);
-  const arrows = svg("g", { class: "arrows" });
+  const arrows = svgEl("g", { class: "arrows" });
   marks.forEach((mark, i) => {
     const landing = mark.landsAt;
     if (mark.leads !== "withinTheMap" || !landing) return;
@@ -444,47 +436,47 @@ function drawMarks(marks: PortalMark[], spawns: SpawnMark[], f: Frame) {
       x2: to.x - ux * end,
       y2: to.y - uy * end,
     };
-    const g = svg("g", { class: "arrow", "data-from": i, "data-to": landing.mark ?? "" });
-    const dash = svg("line", { ...line, class: "dash", "marker-end": "url(#landing-head)" });
+    const g = svgEl("g", { class: "arrow", "data-from": i, "data-to": landing.mark ?? "" });
+    const dash = svgEl("line", { ...line, class: "dash", "marker-end": "url(#landing-head)" });
     if (landing.bothWays) dash.setAttribute("marker-start", "url(#landing-head)");
-    g.append(svg("line", { ...line, class: "halo" }), dash);
+    g.append(svgEl("line", { ...line, class: "halo" }), dash);
     arrows.append(g);
   });
   // Next on the Hunting Target's route: a wide ring around the portal's own, on a halo of
   // its own, always shown. Over the arrows and under every ring, so it never hides one.
-  const routeRings = svg("g", { class: "route-rings" });
-  const rings = svg("g", { class: "rings" });
+  const routeRings = svgEl("g", { class: "route-rings" });
+  const rings = svgEl("g", { class: "rings" });
   marks.forEach((mark, i) => {
     const { x, y } = at(mark.x, mark.y, f);
     if (mark.nextOnRoute) {
       routeRings.append(
-        svg("circle", { class: "route-halo", cx: x, cy: y, r: ROUTE_RING }),
-        svg("circle", { class: "route-ring", cx: x, cy: y, r: ROUTE_RING }),
+        svgEl("circle", { class: "route-halo", cx: x, cy: y, r: ROUTE_RING }),
+        svgEl("circle", { class: "route-ring", cx: x, cy: y, r: ROUTE_RING }),
       );
     }
     const g = ring(mark, x, y);
     g.dataset.mark = String(i);
     // A target larger than the ring, so a small ring is easy to rest on.
-    g.append(svg("circle", { class: "hit", cx: x, cy: y, r: 8 }));
+    g.append(svgEl("circle", { class: "hit", cx: x, cy: y, r: 8 }));
     rings.append(g);
   });
   // Every spawn point, under everything else: the minimap's red mob dot on a white halo,
   // with a ring around it in the same red while its mob is lit.
-  const dots = svg("g", { class: "spawns" });
+  const dots = svgEl("g", { class: "spawns" });
   spawns.forEach((spawn, i) => {
     const { x, y } = at(spawn.x, spawn.y, f);
-    const g = svg("g", { class: "spawn" });
+    const g = svgEl("g", { class: "spawn" });
     g.dataset.spawn = String(i);
     g.dataset.mob = spawn.mob;
     g.append(
-      svg("circle", { class: "lit-ring", cx: x, cy: y, r: SPAWN_LIT_RING }),
-      svg("circle", { class: "halo", cx: x, cy: y, r: SPAWN_DOT + 1 }),
-      svg("circle", { class: "dot", cx: x, cy: y, r: SPAWN_DOT }),
-      svg("circle", { class: "hit", cx: x, cy: y, r: 5 }),
+      svgEl("circle", { class: "lit-ring", cx: x, cy: y, r: SPAWN_LIT_RING }),
+      svgEl("circle", { class: "halo", cx: x, cy: y, r: SPAWN_DOT + 1 }),
+      svgEl("circle", { class: "dot", cx: x, cy: y, r: SPAWN_DOT }),
+      svgEl("circle", { class: "hit", cx: x, cy: y, r: 5 }),
     );
     dots.append(g);
   });
-  drawnMarks = svg("g", {});
+  drawnMarks = svgEl("g");
   drawnMarks.append(dots, arrows, routeRings, rings);
   marksSvg.replaceChildren(defs, drawnMarks);
 }

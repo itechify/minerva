@@ -1,8 +1,8 @@
 import "./errors";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { byId, span } from "./dom";
 import { keyLabel } from "./hotkeys";
+import { followView, heightReporter } from "./shell";
 
 /** Mirror of `minerva_core::ItemChoice`: one of several MeowDB items sharing a name. */
 type ItemChoice = { id: string; name: string; category: string | null; url: string };
@@ -124,16 +124,7 @@ function render({ shown, line, hotkey }: AlertView) {
 }
 
 // The shell sizes the window to the alert, as the overlay does the panel.
-let reportedHeight = 0;
-function reportHeight() {
-  alertEl.classList.add("measuring");
-  const height = Math.ceil(alertEl.getBoundingClientRect().height);
-  alertEl.classList.remove("measuring");
-  if (height > 0 && height !== reportedHeight) {
-    reportedHeight = height;
-    invoke("item_lookup_height", { height });
-  }
-}
+const reportHeight = heightReporter(alertEl, "page_height");
 window.addEventListener("resize", reportHeight);
 // The height depends on the font: measure again once it has loaded.
 document.fonts.ready.then(reportHeight);
@@ -145,8 +136,4 @@ choices.addEventListener("click", (e) => {
   if (button?.dataset.id) invoke("pick_item", { id: button.dataset.id });
 });
 
-listen<AlertView>("item-lookup-state", (e) => render(e.payload));
-// The alert may have been sent before the page was listening.
-invoke<AlertView | null>("item_lookup_view").then((view) => {
-  if (view) render(view);
-});
+followView<AlertView>("item-lookup-state", "page_view", render);

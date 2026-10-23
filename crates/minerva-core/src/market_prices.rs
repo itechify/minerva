@@ -92,6 +92,14 @@ impl From<SavedShape> for SavedMarketPrices {
     }
 }
 
+impl SavedMarketPrices {
+    /// Whether they were saved in a shape this version reads: this one (one saved before
+    /// there were Market Lines reads as this one). The shell sets a file in any other aside.
+    pub fn in_a_known_shape(&self) -> bool {
+        self.version == MARKET_PRICES_VERSION
+    }
+}
+
 /// Prices a tool of the player's own leaves for their Market Lines (ADR 0013): a file in
 /// `market-prices.json`'s shape in the `market-imports` folder beside it, which Minerva
 /// takes in as it comes, onto the lines of the same IDs.
@@ -100,6 +108,14 @@ impl From<SavedShape> for SavedMarketPrices {
 pub struct MarketImport {
     pub version: u32,
     pub lines: Vec<SavedMarketLine>,
+}
+
+impl MarketImport {
+    /// Whether it is in a shape this version reads: the market prices' own. The shell sets
+    /// one in any other aside.
+    pub fn in_a_known_shape(&self) -> bool {
+        self.version == MARKET_PRICES_VERSION
+    }
 }
 
 /// The market prices held, and a count of their changes, so the shell saves them only then.
