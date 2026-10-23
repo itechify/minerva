@@ -1,0 +1,55 @@
+# Runs the checks docs/releasing.md asks of main on a pull request that could change the
+# core, the app or its frontend, and on main itself, so a broken main shows at the PR and
+# not at the release. Windows, since src-tauri only builds there. The site has its own
+# check (site-check.yml), and the ADRs theirs (adr-check.yml).
+name: Check
+
+on:
+  pull_request:
+    paths:
+      - crates/**
+      - src-tauri/**
+      - src/**
+      - "*.html"
+      - Cargo.toml
+      - Cargo.lock
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - tsconfig.json
+      - vite.config.ts
+      - .github/workflows/check.yml
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      # Dependencies build at opt-level 3 (Cargo.toml), minutes from cold; the cache is keyed
+      # on Cargo.lock, so a run that changes no dependency reuses them.
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # First: the app embeds dist/ when it compiles (tauri.conf.json's frontendDist).
+      - run: pnpm build
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo test -p minerva --lib
