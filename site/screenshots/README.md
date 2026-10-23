@@ -23,10 +23,13 @@ The pictures on the Minerva site, taken by hand in the game. The site's build fa
 | `item-card.png` | An Item Card at the pointer over the inventory (Claw Attack Scroll: Intermediate): its window bar, the item's picture beside its name, Shop pays, Your price under Market, and the credit's info icon at its foot, with the game's tooltip under it. | 475×400, the inventory, the card and the tooltip | 0.10.0 |
 | `item-lookup.png` | An item's tooltip in the inventory, and the Item Lookup alert above it saying the page it opened. | 611×742, the inventory, the tooltip and the alert | 0.7.0 |
 | `setup.png` | Setup's step for marking the minimap title, reopened from Help & Setup (step 3 of 6), with Keep the current title. | 522×592, the setup window | 0.9.0 |
+| `wip.png` | Not a shot: Minerva's owl in a hard hat beside a sign, "WIP, screenshot coming soon". The page shows it in place of a shot listed under Retake that is too far out of date to show, until it is retaken. | 1448×1086 | |
 
 ## Retake
 
 When a change alters something a shot shows, the PR that makes it lists the shot here, with what changed. At release, the smoke test retakes every shot listed (`docs/releasing.md`) and empties the list.
+
+A release may go out without retaking them. Then the page shows `wip.png` in place of each shot too far out of date to show, and the shot stays listed. Since 0.14.0 that is `grind-tracker.png` and `item-card.png` in `site/index.html`, and `setup.png` in `site/faq/index.html`. Retaking one means pointing its `<img>` back at its own file and writing its alt text afresh, from what it shows and the entries below. For `setup.png` it was: "Setup at its step Finding your map: the map Minerva found in the minimap's title, beside its Map Mark, tagged Found, with the hotkeys to use while you play."
 
 - `grind-tracker.png`: the solo EXP/h comparison has a ? help icon explaining the calculation. Update its alt text in `site/index.html` to say so.
 - `item-card.png`: each line under Market now has the Deal Line's ring before its name, filled on the Deal Line (Your price). Update its alt text in `site/index.html` to say so.
