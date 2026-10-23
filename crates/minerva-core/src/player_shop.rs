@@ -29,8 +29,11 @@
 //!    only in the game's exact shape: "<quantity> for <mesos> mesos", the mesos with their
 //!    commas where the game puts them, and only with as many digits and commas as its line's
 //!    ink is wide for ([`PRICE_DIGIT_W`]): a digit ocrs drops leaves the shape whole.
+//! 6. While the pointer is on the list, the Item Tooltip by it is read too, as the Item
+//!    Card reads it (ADR 0007): the Deal Finder names a listing the game cut short by it.
 
 use crate::Frame;
+use crate::item_tooltip::{ItemTooltip, ShopTooltipReader};
 use crate::panel::{ScreenPoint, ScreenRect};
 use crate::prep::Rect;
 use crate::recogniser::{Recogniser, RememberedLines, frame_to_rgb};
@@ -48,6 +51,8 @@ pub struct ShopCapture {
     pub frame: Frame,
     /// Where the frame's top-left pixel is on screen: the client area's corner.
     pub origin: ScreenPoint,
+    /// Where the mouse pointer was on screen when the frame was captured, if known.
+    pub pointer: Option<ScreenPoint>,
 }
 
 /// What a Deal Finder capture reads as.
@@ -56,8 +61,20 @@ pub struct ShopCapture {
 pub struct ShopReading {
     /// The Player Shop's item list, if one shows.
     pub shop: Option<ShopList>,
+    /// The pointer on the list, and the Item Tooltip by it; `None` while it is off the list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hover: Option<ShopHover>,
     /// When the frame was captured, as in [`Frame::at_ms`].
     pub at_ms: u64,
+}
+
+/// The pointer on a Player Shop's list, and the Item Tooltip the game shows by it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShopHover {
+    /// Where the pointer is on screen.
+    pub pointer: ScreenPoint,
+    pub tooltip: ItemTooltip,
 }
 
 /// A Player Shop's item list, as it shows on screen.
@@ -97,6 +114,11 @@ impl ShopList {
     }
 }
 
+/// Whether `point` lies in `rect`.
+pub(crate) fn holds(rect: ScreenRect, point: ScreenPoint) -> bool {
+    (rect.x..rect.x + rect.width as i32).contains(&point.x) && (rect.y..rect.y + rect.height as i32).contains(&point.y)
+}
+
 fn is_false(b: &bool) -> bool {
     !*b
 }
@@ -119,6 +141,8 @@ pub struct PlayerShopReader {
     /// The slots a listing was read in, while the list stays where it is: the column its
     /// bands start at, and each slot's top (frame px).
     slots: Option<(u32, Vec<u32>)>,
+    /// Reads the Item Tooltip by the pointer on the list.
+    tooltips: ShopTooltipReader,
 }
 
 /// A listing's band is this many px wide at the samples' UI Size...
@@ -199,12 +223,21 @@ const UPSCALE: u32 = 2;
 
 impl PlayerShopReader {
     pub fn bundled() -> Self {
-        Self { recogniser: Recogniser::bundled(), read: RememberedLines::default(), slots: None }
+        let tooltips = ShopTooltipReader::bundled();
+        Self { recogniser: Recogniser::bundled(), read: RememberedLines::default(), slots: None, tooltips }
     }
 
     pub fn read(&mut self, capture: &ShopCapture) -> ShopReading {
-        let shop = frame_to_rgb(&capture.frame).and_then(|img| self.read_rgb(&img, capture.origin));
-        ShopReading { shop, at_ms: capture.frame.at_ms }
+        let img = frame_to_rgb(&capture.frame);
+        let shop = img.as_ref().and_then(|img| self.read_rgb(img, capture.origin));
+        // Only on the list: off it, no listing is hovered, and the search for the tooltip
+        // costs as much again as finding the list.
+        let on_list = |pointer: &ScreenPoint| shop.as_ref().is_some_and(|shop| holds(shop.area, *pointer));
+        let hover = img.as_ref().zip(capture.pointer.filter(on_list)).map(|(img, pointer)| ShopHover {
+            pointer,
+            tooltip: self.tooltips.read(img, capture.origin, pointer),
+        });
+        ShopReading { shop, hover, at_ms: capture.frame.at_ms }
     }
 
     fn read_rgb(&mut self, capture: &RgbImage, origin: ScreenPoint) -> Option<ShopList> {

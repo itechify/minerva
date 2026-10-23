@@ -5,12 +5,12 @@
 
 mod common;
 
-use common::items::{ItemWorld, equip, etc, item_world};
+use common::items::{ItemWorld, equip, etc, item_world, scroll};
 use common::osms;
 use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame};
 use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES};
 use minerva_core::{
-    ListedPrice, ShopCapture, ShopList, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
+    ListedPrice, ShopCapture, ShopHover, ShopList, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, Rect, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TitleRegion, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
@@ -962,13 +962,13 @@ fn shop_reading(names: &[Option<&str>], at_ms: u64) -> ShopReading {
             covered: false,
         })
         .collect();
-    ShopReading { shop: Some(ShopList { area: ScreenRect { x: 561, y: 513, width: 311, height: 366 }, rows }), at_ms }
+    ShopReading { shop: Some(ShopList { area: ScreenRect { x: 561, y: 513, width: 311, height: 366 }, rows }), hover: None, at_ms }
 }
 
 /// The game's client area as the shell captures it for the Deal Finder.
 fn shop_capture(at_ms: u64) -> ShopCapture {
     let ItemCapture { frame, origin, .. } = client_capture(ScreenPoint { x: 0, y: 0 }, at_ms);
-    ShopCapture { frame, origin }
+    ShopCapture { frame, origin, pointer: None }
 }
 
 /// A run with the Deal Finder: turned on, a shop read the same a few times, then with a
@@ -988,7 +988,7 @@ fn run_with_the_deal_finder() -> Shell {
     shell.minerva.act(Action::SetDealMargin { percent: 5 });
     shell.minerva.act(Action::OpenDealItem { row: 0 });
     shell.play(20 * S, CONSTRUCTION_SITE, grind);
-    shell.minerva.on_player_shop_reading(ShopReading { shop: None, at_ms: 20 * S });
+    shell.minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 20 * S });
     shell.minerva.act(Action::ToggleDealFinder);
     shell.play(30 * S, CONSTRUCTION_SITE, grind);
     shell
@@ -1006,6 +1006,49 @@ fn the_deal_finder_replays_through_the_same_states_with_the_runs_item_files() {
     let timeline = recording.timeline(0).join("\n");
     assert!(timeline.contains(r#"Player Shop read: "Bronze Ore" 1 for 999, ? 1 for 999"#), "{timeline}");
     assert!(timeline.contains("market line 2 chosen as the Deal Line"), "{timeline}");
+}
+
+/// The pointer on a listing whose name the game cut short so that it could be either Pet
+/// Equip Speed Scroll, and the Item Tooltip by it naming it: the Deal Finder's reading is
+/// written down with the pointer and the tooltip, replays to the same badges, and the
+/// report keeps the part of the capture around the pointer as an Item Card press's.
+#[test]
+fn a_shop_read_with_the_pointer_on_a_listing_replays_with_its_tooltip_and_keeps_the_tooltip() {
+    let items = || {
+        items()
+            .with_scroll(scroll(2_048_000, "Pet Equip Speed Scroll: Legs"))
+            .with_scroll(scroll(2_048_001, "Pet Equip Speed Scroll: Lungs"))
+    };
+    let mut shell = Shell::new(FakeSource::osms().with_items(items()));
+    shell.minerva.set_deal_badges_size(Size { width: 160, height: 0 });
+    shell.play(10 * S, CONSTRUCTION_SITE, grind);
+    assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
+    let scroll_listed = || shop_reading(&[Some("Pet Equip Speed Scroll: L...")], 10_400);
+    shell.minerva.on_player_shop_read(shop_capture(10_400), scroll_listed());
+    let pointer = ScreenPoint { x: 580, y: 530 };
+    let area = ScreenRect { x: 590, y: 570, width: 300, height: 18 };
+    let hover = ShopHover { pointer, tooltip: ItemTooltip::Found { area, name: Some("Pet Equip Speed Scroll: Legs".into()) } };
+    let capture = ShopCapture { pointer: Some(pointer), ..shop_capture(10_800) };
+    let state = shell.minerva.on_player_shop_read(capture, ShopReading { hover: Some(hover), at_ms: 10_800, ..scroll_listed() });
+    let badge = &state.deal_badges.as_ref().expect("badges").badges[0];
+    assert!(matches!(&badge.verdict, Verdict::NoPrice { item, .. } if item.name == "Pet Equip Speed Scroll: Legs"), "{badge:?}");
+    // The pointer moves along the listing, the tooltip with it, saying the same.
+    let moved = ScreenPoint { x: 640, y: 540 };
+    let area = ScreenRect { x: 650, y: 580, ..area };
+    let hover = ShopHover { pointer: moved, tooltip: ItemTooltip::Found { area, name: Some("Pet Equip Speed Scroll: Legs".into()) } };
+    let capture = ShopCapture { pointer: Some(moved), ..shop_capture(11_200) };
+    shell.minerva.on_player_shop_read(capture, ShopReading { hover: Some(hover), at_ms: 11_200, ..scroll_listed() });
+
+    let (_, recording) = shell.report();
+
+    let replay = bug_report::replay_with(&recording, ReplayData { osms: Some(osms::game().files()), items: Some(items().files()) });
+    assert_eq!(replay.divergence, None);
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains(r#"the pointer on it at 580, 530, its tooltip "Pet Equip Speed Scroll: Legs""#), "{timeline}");
+    let crop = format!("crops/item-tooltip-{:010}@400,400.png", 10_800);
+    let tooltips: Vec<&String> = recording.crops.iter().filter(|name| name.starts_with("crops/item-tooltip-")).collect();
+    assert_eq!(tooltips, [&crop], "one crop while the tooltip says the same");
+    assert!(timeline.contains(&format!("[{crop}]")), "{timeline}");
 }
 
 #[test]
@@ -1050,7 +1093,7 @@ fn a_shops_list_at_another_ui_size_is_cut_as_much_smaller() {
     };
     let list = ShopList { area: ScreenRect { x: 561, y: 513, width: 199, height: 235 }, rows: vec![row(0, Some("Bronze Ore")), row(1, None)] };
     assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
-    shell.minerva.on_player_shop_read(shop_capture(31 * S), ShopReading { shop: Some(list), at_ms: 31 * S });
+    shell.minerva.on_player_shop_read(shop_capture(31 * S), ShopReading { shop: Some(list), hover: None, at_ms: 31 * S });
 
     let (report, _) = shell.report();
 

@@ -15,12 +15,20 @@
 //! cut short and shared by several), or a price not in the game's shape, gets a "?" badge,
 //! never another item's verdict. Equipment is judged by its name alone: Market Lines keep
 //! one price per item, whatever its stats.
+//!
+//! A name cut short and shared by several items is named by the Item Tooltip the game shows
+//! while the player hovers its listing: when the pointer is on its slot, and the tooltip's
+//! name starts as the listing's does and is one item's. The name stands while what was read
+//! there stands. The tooltip by the pointer usually hides the listing's price, so its badge
+//! keeps the price read there before, marked covered.
 
 use crate::item_card::item_id;
+use crate::item_lookup::item_key;
+use crate::item_tooltip::ItemTooltip;
 use crate::market_prices::MarketPrices;
 use crate::osms_items::{ItemFacts, ItemSet};
 use crate::panel::{GameWindow, ScreenRect, Size, clear_of};
-use crate::player_shop::{ListedPrice, ShopList, ShopReading, ShopRow};
+use crate::player_shop::{ListedPrice, ShopHover, ShopList, ShopReading, ShopRow, holds};
 use serde::Serialize;
 
 /// The Deal Finder, as the panel shows it.
@@ -122,6 +130,20 @@ pub(crate) struct DealFinder {
     /// listing's badge says.
     seen: Vec<ShopRow>,
     seen_at: Option<i32>,
+    /// The listings an Item Tooltip named, while `seen` stands.
+    named: Vec<Named>,
+    /// The pointer on the list in the latest capture, and the tooltip by it.
+    hover: Option<ShopHover>,
+}
+
+/// A listing whose name the game cut short, named by the Item Tooltip by the pointer on it.
+struct Named {
+    /// Its slot's top on screen.
+    top: i32,
+    /// Its name as read there, cut short.
+    cut: String,
+    /// The tooltip's name as read.
+    tooltip: String,
 }
 
 /// Two listings whose tops are this close (physical px) are in one slot.
@@ -157,23 +179,32 @@ impl DealFinder {
         if !self.on {
             self.shop = None;
             self.items.clear();
-            self.seen.clear();
+            self.forget();
             self.seen_at = None;
+            self.hover = None;
         }
+    }
+
+    /// Forget what was read before, and the names tooltips gave it.
+    fn forget(&mut self) {
+        self.seen.clear();
+        self.named.clear();
     }
 
     /// What a capture read as; ignored while it is off (a capture taken before it was
     /// turned off). The listings read whole are remembered where they are. The list has
     /// changed (scrolled, or a listing bought or sold out) when one of them reads otherwise
     /// than what was read there before, or a listing read before is gone and not covered:
-    /// then nothing read before is kept.
+    /// then nothing read before is kept, nor the names tooltips gave it. A listing whose name
+    /// is cut short is named by the Item Tooltip by the pointer on its slot, if the tooltip's
+    /// name starts as its does.
     pub fn read(&mut self, reading: ShopReading) {
         if !self.on {
             return;
         }
         if let Some(list) = &reading.shop {
             if self.seen_at != Some(list.area.x) {
-                self.seen.clear();
+                self.forget();
                 self.seen_at = Some(list.area.x);
             }
             let otherwise = list.rows.iter().filter(|row| whole(row)).any(|row| {
@@ -181,7 +212,7 @@ impl DealFinder {
             });
             let gone = self.seen.iter().any(|seen| !list.rows.iter().any(|row| same_slot(row, seen)));
             if otherwise || gone {
-                self.seen.clear();
+                self.forget();
             }
             for row in list.rows.iter().filter(|row| whole(row)) {
                 match self.seen.iter_mut().find(|seen| same_slot(seen, row)) {
@@ -189,8 +220,27 @@ impl DealFinder {
                     None => self.seen.push(row.clone()),
                 }
             }
+            if let Some(hover) = &reading.hover {
+                self.name_hovered(list, hover);
+            }
         }
         self.shop = reading.shop;
+        self.hover = reading.hover;
+    }
+
+    /// Name the listing whose slot the pointer is on by the tooltip by it, if the name read
+    /// there (now, or before while it is covered) is cut short and the tooltip's starts so.
+    fn name_hovered(&mut self, list: &ShopList, hover: &ShopHover) {
+        let ItemTooltip::Found { name: Some(tooltip), .. } = &hover.tooltip else { return };
+        let Some(row) = list.rows.iter().find(|row| on_slot(list, row, hover)) else { return };
+        let seen = self.seen.iter().find(|seen| same_slot(seen, row));
+        let read = if row.covered { seen.and_then(|seen| seen.name.as_ref()) } else { row.name.as_ref() };
+        let Some(cut) = read.filter(|read| cut_start(read).is_some()).cloned() else { return };
+        if !starts_as(tooltip, &cut) {
+            return;
+        }
+        self.named.retain(|named| (named.top - row.area.y).abs() > SAME_SLOT);
+        self.named.push(Named { top: row.area.y, cut, tooltip: tooltip.clone() });
     }
 
     pub fn shop(&self) -> Option<&ShopList> {
@@ -233,10 +283,22 @@ impl DealFinder {
             .iter()
             .enumerate()
             .map(|(row, shown)| {
-                // Covered, what was read there before.
-                let seen = shown.covered.then(|| self.seen.iter().find(|seen| same_slot(seen, shown))).flatten();
+                // Covered, what was read there before; or so under the pointer, where its name
+                // reads as before and the tooltip by the pointer hides its price.
+                let seen = self.seen.iter().find(|seen| same_slot(seen, shown));
+                let hidden = shown.price.is_none()
+                    && shown.name.is_some()
+                    && seen.is_some_and(|seen| seen.name == shown.name)
+                    && self.hover.as_ref().is_some_and(|hover| on_slot(shop, shown, hover));
+                let seen = seen.filter(|_| shown.covered || hidden);
                 let listing = seen.unwrap_or(shown);
-                let named = items.zip(listing.name.as_deref()).and_then(|(items, name)| item_named(items, name));
+                let named = items.zip(listing.name.as_deref()).and_then(|(items, name)| {
+                    item_named(items, name).or_else(|| {
+                        let top = shown.area.y;
+                        let named = self.named.iter().find(|named| (named.top - top).abs() <= SAME_SLOT && named.cut == name)?;
+                        tooltip_named(items, &named.tooltip, name)
+                    })
+                });
                 let ids = named.as_ref().map(|(_, ids)| ids.clone());
                 let open = opened.is_some_and(|(badge, opened)| badge.y == shown.area.y && ids.as_deref() == Some(opened));
                 judged.push(ids);
@@ -254,7 +316,7 @@ impl DealFinder {
                     row: row as u32,
                     top: (shown.area.y - top).max(0) as u32,
                     height: shown.area.height,
-                    covered: shown.covered,
+                    covered: shown.covered || seen.is_some(),
                     open,
                     verdict,
                 }
@@ -310,11 +372,47 @@ fn judge(item: DealItem, listed: ListedPrice, line_mesos: u64, margin_percent: u
 /// L..."), the one item whose name starts so. `None` when no item, or several that don't
 /// look alike, have it.
 fn item_named<'a>(items: &'a ItemSet, read: &str) -> Option<(&'a ItemFacts, Vec<u32>)> {
-    let trimmed = read.trim_end_matches(['.', '…', ' ']);
-    let found = if trimmed.len() < read.trim_end().len() { items.starting_with(trimmed) } else { items.named(read) };
+    let found = match cut_start(read) {
+        Some(start) => items.starting_with(start),
+        None => items.named(read),
+    };
+    alike(found)
+}
+
+/// The item an Item Tooltip's name read as `tooltip` is, for the listing whose name the game
+/// cut short as `cut`: as [`item_named`] has a whole name, when its name starts as `cut`
+/// does.
+fn tooltip_named<'a>(items: &'a ItemSet, tooltip: &str, cut: &str) -> Option<(&'a ItemFacts, Vec<u32>)> {
+    let (item, ids) = alike(items.named(tooltip))?;
+    starts_as(&item.name, cut).then_some((item, ids))
+}
+
+/// The first of `found`, with them all, when they look alike (their kinds and shop prices).
+fn alike(found: Vec<&ItemFacts>) -> Option<(&ItemFacts, Vec<u32>)> {
     let first = *found.first()?;
     let alike = found.iter().all(|item| item.kind == first.kind && item.shop == first.shop);
     alike.then(|| (first, found.iter().map(|item| item.id).collect()))
+}
+
+/// Where a name the game cut short ("Pet Equip Speed Scroll: L...") starts; `None` for a
+/// whole one.
+fn cut_start(read: &str) -> Option<&str> {
+    let trimmed = read.trim_end_matches(['.', '…', ' ']);
+    (trimmed.len() < read.trim_end().len()).then_some(trimmed)
+}
+
+/// Whether `name` starts as `cut`, a name the game cut short, does: compared as item names
+/// are.
+fn starts_as(name: &str, cut: &str) -> bool {
+    let start = item_key(cut_start(cut).unwrap_or(cut));
+    !start.is_empty() && item_key(name).starts_with(&start)
+}
+
+/// Whether `hover`'s pointer is on `row`'s slot in `list`: its band, across the list's
+/// width, the pictures' column included.
+fn on_slot(list: &ShopList, row: &ShopRow, hover: &ShopHover) -> bool {
+    let slot = ScreenRect { x: list.area.x, width: list.area.width, ..row.area };
+    holds(slot, hover.pointer)
 }
 
 #[cfg(test)]

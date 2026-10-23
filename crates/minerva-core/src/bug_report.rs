@@ -37,7 +37,7 @@ use crate::osms::{OsmsFiles, SavedFiles};
 use crate::osms_items::{ItemFiles, SavedItemFiles};
 use crate::panel::{Action, Foreground, GameWindow, PanelSizes, ScreenPoint, ScreenRect, Size};
 use crate::personal_best::{SavedBests, VisitBest};
-use crate::player_shop::{ShopCapture, ShopList, ShopReading};
+use crate::player_shop::{ShopCapture, ShopHover, ShopList, ShopReading};
 use crate::recogniser::{TitleLines, TitleReading};
 use crate::session::{ExpTracking, TrackingState};
 use crate::settings::Settings;
@@ -163,13 +163,16 @@ pub enum Event {
     Press { control: PanelControl },
     ItemTooltip { reading: Option<ItemTooltipReading> },
     /// A Deal Finder capture taken at `at_ms` read as `shop` (`None`: no Player Shop), or
-    /// the `same` as the reading before.
+    /// the `same` as the reading before; with the pointer on the list and the Item Tooltip
+    /// by it, if it was on the list.
     PlayerShop {
         at_ms: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         shop: Option<ShopList>,
         #[serde(default, skip_serializing_if = "is_false")]
         same: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hover: Option<ShopHover>,
     },
     /// A Status Bar capture taken at `at_ms` read as `bar` (`None`: no Status Bar), or the
     /// `same` as the reading before.
@@ -375,6 +378,10 @@ pub struct Line {
     /// The crop of the frame read, kept in the report under this name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crop: Option<String>,
+    /// The crop of the Item Tooltip by the pointer in the frame read (a Deal Finder
+    /// capture's), kept in the report under this name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tooltip_crop: Option<String>,
 }
 
 impl Line {
@@ -392,6 +399,7 @@ impl Line {
             update_check: None,
             update_job: None,
             crop: None,
+            tooltip_crop: None,
         }
     }
 }
@@ -514,12 +522,22 @@ const ITEM_TOOLTIP_REACH: u32 = 400;
 /// The part of an Item Card or Item Lookup capture around the pointer, cut to the game's
 /// client area, for a Bug Report: the Item Tooltip the reader read, or should have.
 pub(crate) fn item_tooltip_crop(capture: &ItemCapture) -> Option<(Region, Frame)> {
-    let frame = &capture.frame;
+    around_pointer(&capture.frame, capture.origin, capture.pointer)
+}
+
+/// Likewise for the Item Tooltip by the pointer on a Player Shop's list, in a Deal Finder
+/// capture: `None` while the pointer was off the list.
+pub(crate) fn shop_tooltip_crop(capture: &ShopCapture, hover: Option<&ShopHover>) -> Option<(Region, Frame)> {
+    around_pointer(&capture.frame, capture.origin, hover?.pointer)
+}
+
+/// The part of `frame`, its top-left pixel at `origin` on screen, around `pointer`.
+fn around_pointer(frame: &Frame, origin: ScreenPoint, pointer: ScreenPoint) -> Option<(Region, Frame)> {
     if frame.width == 0 || frame.height == 0 || frame.rgba.len() < (frame.width * frame.height * 4) as usize {
         return None;
     }
     let at = |pointer: i32, origin: i32, size: u32| (pointer - origin).clamp(0, size as i32 - 1) as u32;
-    let (px, py) = (at(capture.pointer.x, capture.origin.x, frame.width), at(capture.pointer.y, capture.origin.y, frame.height));
+    let (px, py) = (at(pointer.x, origin.x, frame.width), at(pointer.y, origin.y, frame.height));
     let (x0, y0) = (px.saturating_sub(ITEM_TOOLTIP_REACH), py.saturating_sub(ITEM_TOOLTIP_REACH));
     let (x1, y1) = ((px + ITEM_TOOLTIP_REACH).min(frame.width), (py + ITEM_TOOLTIP_REACH).min(frame.height));
     Some((Region::ItemTooltip { pointer: (px - x0, py - y0) }, cut(frame, (x0, y0), (x1, y1))))
@@ -603,7 +621,7 @@ struct Chunk {
 /// The input being taken, written down once what came of it is known.
 struct Open {
     line: Line,
-    frame: Option<(Region, Frame)>,
+    frames: Vec<(Region, Frame)>,
 }
 
 /// What came of an input.
@@ -631,6 +649,9 @@ struct Last {
     unavailable_hotkeys: Option<(Vec<String>, Vec<String>)>,
     title_lines: Option<Option<TitleLines>>,
     shop: Option<Option<ShopList>>,
+    /// What the Item Tooltip by the pointer on the shop's list said in the last Deal Finder
+    /// capture with one: its name as read (`None`: unreadable).
+    shop_tooltip: Option<Option<String>>,
     status_bar: Option<Option<StatusBar>>,
     exp_bar_rgba: Vec<u8>,
     /// The id of the last upload to the Map Leaderboards written down as asked for.
@@ -694,6 +715,7 @@ impl Recorder {
                 unavailable_hotkeys: None,
                 title_lines: None,
                 shop: None,
+                shop_tooltip: None,
                 status_bar: None,
                 exp_bar_rgba: Vec::new(),
                 upload_id: 0,
@@ -735,9 +757,9 @@ impl Recorder {
     }
 
     /// Start writing down `event`, an input captured or ticked at `at_ms` if it has a
-    /// time, read from `frame` if it has one. What came of it is written once the next
+    /// time, read from `frames` if it has any. What came of it is written once the next
     /// input comes.
-    pub fn open(&mut self, mut event: Event, at_ms: Option<u64>, frame: Option<(Region, Frame)>) {
+    pub fn open(&mut self, mut event: Event, at_ms: Option<u64>, frames: Vec<(Region, Frame)>) {
         if let Event::Title { lines, same, .. } = &mut event {
             if self.last.title_lines.as_ref() == Some(lines) {
                 *same = true;
@@ -746,7 +768,11 @@ impl Recorder {
                 self.last.title_lines = Some(lines.clone());
             }
         }
-        if let Event::PlayerShop { shop, same, .. } = &mut event {
+        if let Event::PlayerShop { shop, same, hover, .. } = &mut event {
+            // Off the list, no tooltip: the next one by it is new.
+            if hover.is_none() {
+                self.last.shop_tooltip = None;
+            }
             if self.last.shop.as_ref() == Some(shop) {
                 *same = true;
                 *shop = None;
@@ -772,13 +798,13 @@ impl Recorder {
         if let Some(at) = at_ms {
             self.now = self.now.max(at);
         }
-        self.open = Some(Open { line, frame });
+        self.open = Some(Open { line, frames });
     }
 
     /// Write down the input being taken, with what came of it. A tick that changed
     /// nothing isn't written: the next line says it came first.
     pub fn close(&mut self, outcome: Outcome<'_>) {
-        let Some(Open { mut line, frame }) = self.open.take() else { return };
+        let Some(Open { mut line, frames }) = self.open.take() else { return };
         let changed = *outcome.state != self.last.state;
         let bests_changed = outcome.bests_revision != self.last.bests_revision;
         if line.event == (Event::Tick {}) {
@@ -825,7 +851,7 @@ impl Recorder {
             }
             self.last.state = outcome.state.clone();
         }
-        if let Some((region, frame)) = frame {
+        for (region, frame) in frames {
             self.keep_crop(&mut line, region, frame, outcome.state);
         }
         self.write(line);
@@ -858,6 +884,21 @@ impl Recorder {
             Region::Title => {
                 let same = matches!(line.event, Event::Title { same: true, .. });
                 (!same, line.map.is_some())
+            }
+            // A Deal Finder capture's, when its tooltip says something new, as the pointer
+            // lingers on a listing and the tooltip follows it; for the run, one whose name
+            // couldn't be read.
+            Region::ItemTooltip { .. } if matches!(line.event, Event::PlayerShop { .. }) => {
+                let says = match &line.event {
+                    Event::PlayerShop { hover: Some(ShopHover { tooltip: ItemTooltip::Found { name, .. }, .. }), .. } => {
+                        Some(name.clone())
+                    }
+                    _ => None,
+                };
+                let changed = says.is_some() && says != self.last.shop_tooltip;
+                let unread = says == Some(None);
+                self.last.shop_tooltip = says;
+                (changed, changed && unread)
             }
             // Each press's, as presses are few; for the run, one whose name couldn't be read
             // or isn't an item's, as it may have been misread.
@@ -905,7 +946,8 @@ impl Recorder {
                 Region::StatusBar => format!("crops/status-bar-{:010}.png", frame.at_ms),
             };
             if let Some(png) = png(&frame) {
-                line.crop = Some(name.clone());
+                let shop_tooltip = matches!(region, Region::ItemTooltip { .. }) && matches!(line.event, Event::PlayerShop { .. });
+                *(if shop_tooltip { &mut line.tooltip_crop } else { &mut line.crop }) = Some(name.clone());
                 self.crops.push_back(Crop { name, at_ms: frame.at_ms, kept, png });
             }
         }
@@ -1448,10 +1490,10 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::ItemTooltip { reading } => {
                 minerva.on_item_tooltip_reading(reading);
             }
-            Event::PlayerShop { at_ms, shop: read, same } => {
+            Event::PlayerShop { at_ms, shop: read, same, hover } => {
                 let read = if same { shop.clone() } else { read };
                 shop.clone_from(&read);
-                minerva.on_player_shop_reading(ShopReading { shop: read, at_ms });
+                minerva.on_player_shop_reading(ShopReading { shop: read, hover, at_ms });
             }
             Event::StatusBar { at_ms, bar, same } => {
                 let bar = if same { status_bar.clone() } else { bar };
@@ -1570,7 +1612,7 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Answer::Items { answer: Ok(_) } => Answer::Items { answer: Ok(String::new()) },
             other => other,
         });
-        let line = Line { crop: None, answers: answers.collect(), ..line.clone() };
+        let line = Line { crop: None, tooltip_crop: None, answers: answers.collect(), ..line.clone() };
         serde_json::to_string(&line).unwrap_or_default()
     };
     let length = recording.lines.len().max(replayed.len());
@@ -1637,7 +1679,7 @@ impl Recording {
                     line.event,
                     Event::Tick {}
                         | Event::Title { same: true, .. }
-                        | Event::PlayerShop { same: true, .. }
+                        | Event::PlayerShop { same: true, hover: None, .. }
                         | Event::StatusBar { same: true, .. }
                 );
             if notable || (line.t >= from_ms && !quiet) {
@@ -1645,7 +1687,7 @@ impl Recording {
                 if !consequences.is_empty() {
                     text += &format!("  →  {}", consequences.join("; "));
                 }
-                if let Some(crop) = &line.crop {
+                for crop in line.crop.iter().chain(&line.tooltip_crop) {
                     text += &format!("  [{crop}]");
                 }
                 out.push(text);
@@ -1817,6 +1859,15 @@ impl Event {
             Event::Hotkey { pressed } => format!("hotkey {pressed}"),
             Event::SearchQuery { query } => format!("search typed {query:?}"),
             Event::ItemTooltip { reading } => format!("Item Tooltip read {}", json(reading)),
+            Event::PlayerShop { hover: Some(hover), same, shop, at_ms } => {
+                let read = Event::PlayerShop { at_ms: *at_ms, shop: shop.clone(), same: *same, hover: None }.describe(title);
+                let tooltip = match &hover.tooltip {
+                    ItemTooltip::Found { name: Some(name), .. } => format!("its tooltip {name:?}"),
+                    ItemTooltip::Found { name: None, .. } => "its tooltip unreadable".to_string(),
+                    ItemTooltip::None => "no tooltip".to_string(),
+                };
+                format!("{read}; the pointer on it at {}, {}, {tooltip}", hover.pointer.x, hover.pointer.y)
+            }
             Event::PlayerShop { same: true, .. } => "Player Shop read as before".to_string(),
             Event::PlayerShop { shop: None, .. } => "no Player Shop".to_string(),
             Event::PlayerShop { shop: Some(shop), .. } => {

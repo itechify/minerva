@@ -24,13 +24,26 @@ So the Deal Finder finds the shop itself: while it is on, the shell captures the
 - The price compared is the price of one: the listing's mesos over its quantity. A throwing star or a bullet (an item OSMS gives a recharge price, `unitPrice`) is one set however many it holds: its listing's number is the set's count, so its whole price is compared, as players price a set. It is a deal when it is below the Deal Line's price for the item by at least the Deal Margin, a percentage in the settings (0 by default: any price below).
 - The name is matched against OSMS's item files as the Item Card matches a tooltip's (ADR 0010). A name the game cut short ("Pet Equip Speed Scroll: L...") is the one item whose name starts so; several, and the listing is "?". Several items sharing the name that don't look alike (their kinds or shop prices differ) are "?" too.
 - Equipment is judged by its name alone: Market Lines keep one price per item, whatever its stats, and the listing doesn't show them.
+
+## Naming a cut-short listing from its tooltip
+
+Scrolls are the common case of a name cut short that starts several items' names ("One-Handed Sword Attac..." is the Lesser, Intermediate, Greater and Chaos scroll), so their listings were "?" (#135). The player hovers the listing they look at, and the game shows its Item Tooltip by the pointer with the whole name. So the shell records the pointer with each capture (reading its position only, ADR 0001), and while the pointer is on the shop's list, the reader reads the Item Tooltip by it as the Item Card does (ADR 0007), remembering each name's ink so a tooltip left showing costs no recognition. Off the list it isn't searched for: the search costs as much again as finding the list.
+
+- The reader reads the tooltip on any listing; the core decides what it names. It names a listing only when the pointer is on its slot (its band, across the list's width), the name read there (now, or before while the pointer covers it) is cut short, the tooltip's name starts as it does, and that name is one item's, or alike items' (their kinds and shop prices). Otherwise the badge stays "?". A tooltip left over from the listing next to it almost never starts as this one's name.
+- A name read whole, or unreadable, isn't named by a tooltip: the first needs nothing, the second has nothing to compare the tooltip's with. A listing the pointer covered from the first capture is "?" until its name has been read once.
+- The tooltip by the pointer usually hides the hovered listing's price line, while its name still reads. Its badge keeps the price read there before, marked covered, as a covered listing's does: only while its name reads as before. With its price hidden, a listing re-priced under the pointer can't be told from the one read before; the next capture with the pointer off it reads it afresh.
+- The name stands for that slot while what was read there stands: it goes when the list scrolls, a listing is bought or sold out, the shop moves or another opens, its slot reads another name or price, or the Deal Finder is turned off. It is never carried to another slot or shop.
+- The badge of a listing named so looks as any other: no mark says a tooltip named it.
+- A Bug Report writes the pointer and the tooltip down with the reading (`Event::PlayerShop`), and keeps the part of the capture around the pointer as an Item Card press's crop, as samples of the Item Tooltip are cut from by hand. The Player Shop's crop stays the list alone.
+- The tooltip's name line can run over the shop's chat window, as light as its letters: the name ends at the tooltip's edge, light above the line where no letter reaches, not at the first gap past it.
 - Only the listings on screen are read. Minerva sends no input to the game (ADR 0001), so the player scrolls, and the badges follow within half a second.
 
 ## Considered options
 
 - **A Shop Region marked at setup.** Setup would grow a step that only shop browsers use, and would be asked for again whenever the game window changes size, as the Title Region is. A shop dragged elsewhere would be read wrong, or not at all, without a word. Finding the shop costs little more than reading a region: the scan of the capture is a few milliseconds, and recognition, the costly part, is the same either way.
 - **Recognising text across the whole client area.** ocrs's detection model isn't shipped (ADR 0002), and reading every line on screen would cost far more than finding the bands, with chat and names to tell apart from listings.
-- **Reading each item's Item Tooltip.** It would tell equipment's stats, but takes the player's hover over each listing, one at a time: the Item Card does that already.
+- **Reading each item's Item Tooltip.** It would tell equipment's stats, but takes the player's hover over each listing, one at a time: the Item Card does that already. Tooltips are still not read for stats, nor to name every listing: only to name one whose name the game cut short so that it could be several items, which nothing else tells (#135).
+- **Naming a cut-short listing at an Item Card press.** Pressing the hotkey over the listing would name it too, but opens a card each time, and the player hovers the listing anyway.
 - **Scrolling the list for the player.** Sending input to the game is ruled out (ADR 0001).
 
 ## Consequences

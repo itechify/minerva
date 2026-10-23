@@ -657,8 +657,10 @@ impl ReaderThread {
                         Command::ReadItemTooltip { capture, reading }
                     }
                     Capture::Shop(region) => {
+                        // The pointer first, as for Item Lookup: the tooltip follows it.
+                        let pointer = gamewin::cursor_position();
                         let reading = grab(region).map(|frame| {
-                            let capture = ShopCapture { frame, origin: ScreenPoint { x: region.x, y: region.y } };
+                            let capture = ShopCapture { frame, origin: ScreenPoint { x: region.x, y: region.y }, pointer };
                             let read = shop_reader.read(&capture);
                             (Box::new(capture), read)
                         });

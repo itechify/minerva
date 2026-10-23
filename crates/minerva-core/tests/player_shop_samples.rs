@@ -9,6 +9,15 @@
 //!   and the mesos; or `{ "covered": true }` for one the pointer or the game's tooltip
 //!   covers. Read on its own, a covered listing's badge says it is covered, or it has none:
 //!   with no capture before, a slot the tooltip hides wholly isn't known to hold a listing.
+//!   A listing whose name the game cut short so that it starts several items' names also
+//!   says `"named"`: the item it is, as the Item Tooltip hovered over it names it. Its badge
+//!   is "?" until it is hovered.
+//! - A hovered sample, `<name>@<x>,<y>.png`, is a frame of `<name>.png`'s shop with the
+//!   pointer at (x, y) on a listing and the game's Item Tooltip by it, cut as far right as
+//!   the tooltip's name line and past its edge, the shop's chat window painted out but for
+//!   that line, and the chat showing through the tooltip painted its fill. It is fed after
+//!   `<name>.png`, as the player sees a shop and then hovers a listing: its `"named"`
+//!   listing's badge is that item's, or "?", whether the tooltip covers it or not.
 //! - Each frame is fed as the game's client area at the screen's origin, as it is and as
 //!   the darker colours of live captures (`prep.rs`), to a core of its own.
 //! - Each is fed again at the other UI Sizes in [`OTHER_UI_SIZES`], scaled smoothly as the game
@@ -39,17 +48,40 @@ fn samples_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/player-shop")
 }
 
-/// One listing as a sample's readings write it: read, or covered.
+/// One listing as a sample's readings write it: read, or covered; and the item an Item
+/// Tooltip names it as, for one whose name the game cut short so that it could be several.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum Listing {
-    Read { name: String, quantity: u64, mesos: u64 },
-    Covered { covered: bool },
+    Read {
+        name: String,
+        quantity: u64,
+        mesos: u64,
+        #[serde(default)]
+        named: Option<String>,
+    },
+    Covered {
+        covered: bool,
+        #[serde(default)]
+        named: Option<String>,
+    },
+}
+
+impl Listing {
+    fn named(&self) -> Option<&str> {
+        match self {
+            Listing::Read { named, .. } | Listing::Covered { named, .. } => named.as_deref(),
+        }
+    }
 }
 
 struct Sample {
     file: String,
     listings: Vec<Listing>,
+    /// A hovered sample's pointer, in the frame.
+    pointer: Option<ScreenPoint>,
+    /// The sample of the same shop a hovered sample is fed after.
+    partner: Option<String>,
 }
 
 fn samples() -> Vec<Sample> {
@@ -65,9 +97,17 @@ fn samples() -> Vec<Sample> {
             let readings = samples_dir().join(file.replace(".png", ".json"));
             let text = std::fs::read_to_string(&readings).unwrap_or_else(|e| panic!("{}: {e}", readings.display()));
             let listings: Vec<Listing> = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", readings.display()));
-            let written = listings.iter().all(|l| !matches!(l, Listing::Covered { covered: false }));
+            let written = listings.iter().all(|l| !matches!(l, Listing::Covered { covered: false, .. }));
             assert!(written, "{}: a listing is read, or `\"covered\": true`", readings.display());
-            Sample { file, listings }
+            let (pointer, partner) = match file.trim_end_matches(".png").split_once('@') {
+                Some((name, at)) => {
+                    let (x, y) = at.split_once(',').unwrap_or_else(|| panic!("{file}: <name>@<x>,<y>"));
+                    let pointer = ScreenPoint { x: x.parse().expect("x"), y: y.parse().expect("y") };
+                    (Some(pointer), Some(format!("{name}.png")))
+                }
+                None => (None, None),
+            };
+            Sample { file, listings, pointer, partner }
         })
         .collect()
 }
@@ -81,14 +121,18 @@ fn item_name(listing: &str) -> String {
     }
 }
 
-/// Made-up item data with an item of each listing's name.
+/// Made-up item data with an item of each listing's name, and the item each is named as: a
+/// listing named so starts both items' names.
 fn sample_items(samples: &[Sample]) -> ItemWorld {
     let mut names: Vec<String> = samples
         .iter()
         .flat_map(|s| &s.listings)
-        .filter_map(|l| match l {
-            Listing::Read { name, .. } => Some(item_name(name)),
-            Listing::Covered { .. } => None,
+        .flat_map(|l| {
+            let read = match l {
+                Listing::Read { name, .. } => Some(item_name(name)),
+                Listing::Covered { .. } => None,
+            };
+            read.into_iter().chain(l.named().map(String::from))
         })
         .collect();
     names.sort();
@@ -149,9 +193,13 @@ fn sample_ui_size(img: &RgbaImage) -> f32 {
     width as f32 / SAMPLES_BAND_W
 }
 
-/// The sample's frame, its colours times `brightness`.
-fn frame(sample: &Sample, brightness: f32) -> Frame {
-    frame_of(&image_of(&sample.file), brightness)
+/// The captures `sample` is fed as, each image made a frame by `frame` at `factor` times its
+/// size: a hovered sample's partner's first, then its own with the pointer on it.
+fn captures(sample: &Sample, factor: f32, frame: impl Fn(&RgbaImage) -> Frame) -> Vec<ShopCapture> {
+    let at = |v: i32| (v as f32 * factor).round() as i32;
+    let pointer = sample.pointer.map(|p| ScreenPoint { x: at(p.x), y: at(p.y) });
+    let capture = |file: &str, pointer| ShopCapture { frame: frame(&image_of(file)), origin: ScreenPoint { x: 0, y: 0 }, pointer };
+    sample.partner.iter().map(|partner| capture(partner, None)).chain([capture(&sample.file, pointer)]).collect()
 }
 
 /// `img` as a frame, its colours times `brightness`.
@@ -187,21 +235,43 @@ struct Checked {
     places: Vec<(i32, u32)>,
 }
 
-/// Feed `frame` of `sample` to a core of its own, and check its badges against the sample's
-/// readings: what reads wrong goes in `wrong`, labelled `label`; `None` when the badges
-/// aren't the readings' listings one for one.
-fn check(samples: &[Sample], sample: &Sample, frame: Frame, label: &str, wrong: &mut Vec<String>) -> Option<Checked> {
+/// Feed `captures` of `sample` to a core of its own, and check its badges after against the
+/// sample's readings: what reads wrong goes in `wrong`, labelled `label`; `None` when the
+/// badges aren't the readings' listings one for one.
+fn check(samples: &[Sample], sample: &Sample, captures: Vec<ShopCapture>, label: &str, wrong: &mut Vec<String>) -> Option<Checked> {
     let mut minerva = started(samples);
-    let state = minerva.on_player_shop_capture(ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 } });
+    let pointer = captures.last().and_then(|capture| capture.pointer);
+    let mut state = None;
+    for capture in captures {
+        state = Some(minerva.on_player_shop_capture(capture).clone());
+    }
+    let state = state.expect("a capture");
     let window_top = state.deal_badges.as_ref().map_or(0, |shown| shown.placement.y);
-    let badges = badges(state);
-    let (covered, uncovered): (Vec<&DealBadge>, Vec<&DealBadge>) = badges.iter().partition(|b| b.covered);
-    let covers = sample.listings.iter().filter(|l| matches!(l, Listing::Covered { .. })).count();
-    let reads: Vec<(&String, u64, u64)> = sample
-        .listings
+    let badges = badges(&state);
+    let mut checked = Checked { unreadable: 0, places: Vec::new() };
+    // A hovered listing reads covered or not, as far as the tooltip hides it: it is set
+    // aside, and its badge is the one level with the pointer.
+    let hovered = sample.listings.iter().position(|l| l.named().is_some()).zip(pointer);
+    let (listings, badges): (Vec<&Listing>, Vec<&DealBadge>) = match hovered {
+        Some((at, pointer)) => {
+            let named = sample.listings[at].named().expect("named");
+            let level = |b: &&DealBadge| (0..b.height as i32).contains(&(pointer.y - window_top - b.top as i32));
+            match badges.iter().find(level).and_then(read) {
+                Some((read, _)) if read == named => {}
+                None => checked.unreadable += 1,
+                Some(read) => wrong.push(format!("{label}: {read:?}, not {named:?}")),
+            }
+            let listings = sample.listings.iter().enumerate().filter(|&(i, _)| i != at).map(|(_, l)| l).collect();
+            (listings, badges.iter().filter(|b| !level(b)).collect())
+        }
+        None => (sample.listings.iter().collect(), badges.iter().collect()),
+    };
+    let (covered, uncovered): (Vec<&DealBadge>, Vec<&DealBadge>) = badges.into_iter().partition(|b| b.covered);
+    let covers = listings.iter().filter(|l| matches!(l, Listing::Covered { .. })).count();
+    let reads: Vec<(&String, u64, u64, Option<&str>)> = listings
         .iter()
         .filter_map(|l| match l {
-            Listing::Read { name, quantity, mesos } => Some((name, *quantity, *mesos)),
+            Listing::Read { name, quantity, mesos, .. } => Some((name, *quantity, *mesos, l.named())),
             Listing::Covered { .. } => None,
         })
         .collect();
@@ -210,14 +280,15 @@ fn check(samples: &[Sample], sample: &Sample, frame: Frame, label: &str, wrong: 
         wrong.push(format!("{label}: {found}, not {} and up to {covers}", reads.len()));
         return None;
     }
-    let mut checked = Checked { unreadable: 0, places: Vec::new() };
-    for (badge, (name, quantity, mesos)) in uncovered.into_iter().zip(reads) {
+    for (badge, (name, quantity, mesos, named)) in uncovered.into_iter().zip(reads) {
         checked.places.push((window_top + badge.top as i32, badge.height));
-        let expected = (item_name(name), ListedPrice { quantity, mesos });
-        match read(badge) {
-            Some(read) if read == expected => {}
-            None => checked.unreadable += 1,
-            Some(read) => wrong.push(format!("{label}: {read:?}, not {expected:?}")),
+        // Not hovered, a name that starts several items' is "?".
+        let expected = named.is_none().then(|| (item_name(name), ListedPrice { quantity, mesos }));
+        match (read(badge), expected) {
+            (Some(read), Some(expected)) if read == expected => {}
+            (None, Some(_)) => checked.unreadable += 1,
+            (None, None) => {}
+            (Some(read), expected) => wrong.push(format!("{label}: {read:?}, not {expected:?}")),
         }
     }
     Some(checked)
@@ -232,7 +303,8 @@ fn every_samples_listings_read_as_its_readings_say_or_as_unreadable_never_wrong(
     for sample in &samples {
         for brightness in [1.0, 0.935] {
             let label = format!("{} ×{brightness}", sample.file);
-            if let Some(checked) = check(&samples, sample, frame(sample, brightness), &label, &mut wrong) {
+            let captures = captures(sample, 1.0, |img| frame_of(img, brightness));
+            if let Some(checked) = check(&samples, sample, captures, &label, &mut wrong) {
                 unreadable += checked.unreadable;
             }
         }
@@ -251,16 +323,16 @@ fn every_samples_listings_read_at_other_ui_sizes_as_its_readings_say_or_as_unrea
     for sample in &samples {
         let img = image_of(&sample.file);
         let own = sample_ui_size(&img);
-        let at_own = check(&samples, sample, frame_of(&img, 1.0), &sample.file, &mut wrong);
+        let at_own = check(&samples, sample, captures(sample, 1.0, |img| frame_of(img, 1.0)), &sample.file, &mut wrong);
         for size in OTHER_UI_SIZES {
             let factor = size / own;
             if (factor - 1.0).abs() < 0.05 {
                 continue;
             }
-            let resized = scaled(&img, factor);
             for brightness in [1.0, 0.935] {
                 let label = format!("{} at ×{size} ×{brightness}", sample.file);
-                let Some(checked) = check(&samples, sample, frame_of(&resized, brightness), &label, &mut wrong) else {
+                let captures = captures(sample, factor, |img| frame_of(&scaled(img, factor), brightness));
+                let Some(checked) = check(&samples, sample, captures, &label, &mut wrong) else {
                     continue;
                 };
                 let Some(at_own) = &at_own else { continue };
@@ -291,14 +363,14 @@ fn bands_too_narrow_or_too_wide_for_any_ui_size_or_with_no_listing_show_no_badge
         for size in [0.5, 2.0] {
             let mut minerva = started(&samples);
             let frame = frame_of(&scaled(&img, size / own), 1.0);
-            let state = minerva.on_player_shop_capture(ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 } });
+            let state = minerva.on_player_shop_capture(ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
             assert!(badges(state).is_empty(), "{} at ×{size}", sample.file);
         }
     }
     let mut client = RgbaImage::from_pixel(1920, 1200, Rgba([96, 150, 210, 255]));
     imageops::replace(&mut client, &RgbaImage::from_pixel(300, 400, Rgba([202, 213, 223, 255])), 800, 400);
     let mut minerva = started(&samples);
-    let state = minerva.on_player_shop_capture(ShopCapture { frame: frame_of(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 } });
+    let state = minerva.on_player_shop_capture(ShopCapture { frame: frame_of(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
     assert!(badges(state).is_empty(), "a plain stack of the band's colour");
 }
 
@@ -313,7 +385,7 @@ fn listings_read_before_the_pointer_and_its_tooltip_came_over_them_keep_their_ba
     let samples = samples();
     let mut minerva = started(&samples);
     let capture =
-        |file: &str| ShopCapture { frame: frame_of(&scaled(&image_of(file), size), 1.0), origin: ScreenPoint { x: 0, y: 0 } };
+        |file: &str| ShopCapture { frame: frame_of(&scaled(&image_of(file), size), 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None };
     let shown = |state: &PanelState| -> Vec<(bool, Option<String>)> {
         badges(state).iter().map(|b| (b.covered, read(b).map(|(name, _)| name))).collect()
     };
@@ -342,7 +414,7 @@ fn placed(file: &str, at: (u32, u32), at_ms: u64, size: f32) -> ShopCapture {
     imageops::replace(&mut client, &image_of(file), at.0 as i64, at.1 as i64);
     let client = if size == 1.0 { client } else { scaled(&client, size) };
     let frame = Frame { width: client.width(), height: client.height(), rgba: client.into_raw(), at_ms };
-    ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 } }
+    ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 }, pointer: None }
 }
 
 /// A Bug Report's run, as the player saw it: one shop, then another opened a few px higher
@@ -388,7 +460,7 @@ fn a_larger_stack_of_the_bands_colour_elsewhere_doesnt_hide_the_shop() {
     imageops::replace(&mut client, &RgbaImage::from_pixel(300, 900, Rgba([202, 213, 223, 255])), 100, 100);
     imageops::replace(&mut client, &image_of("gems-and-ores.png"), 1343, 643);
 
-    let state = minerva.on_player_shop_capture(ShopCapture { frame: frame_of(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 } });
+    let state = minerva.on_player_shop_capture(ShopCapture { frame: frame_of(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
 
     assert_eq!(badges(state).iter().filter_map(read).count(), 5, "the shop's five listings");
 }
