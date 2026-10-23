@@ -25,6 +25,8 @@ How a Minerva version is numbered, made and published as a GitHub Release. Follo
   - `cargo clippy --workspace --all-targets -- -D warnings`
   - `pnpm build`
   - `pnpm site:test`
+
+  `.github/workflows/check.yml` runs the first four on every pull request that touches code and on `main`, and `site-check.yml` the last on one that touches the site, so a green check on `main`'s head covers this.
 - **The live data still reads:** `cargo run -p minerva --example probe osms` reads OSMS Data Explorer's live set in full.
 - **A smoke test against the game** (`pnpm tauri dev`): the map is recognised; the Map section shows its picture; Search sets a Hunting Target, then a Destination, and Navigation shows the route to each; an item picked in Search shows its card beside the panel; a Mob Card opens; Item Lookup opens a page.
 - **The site describes this release** (`site/`, published from the tag in step 6): every change a player notices is on it, and nothing that's gone. While the game is open for the smoke test, retake each shot under Retake in `site/screenshots/README.md` as it says, set the version they were taken on, empty the list, and merge them into `main`. `pnpm site:build` passes, and `pnpm site:dev` reads right.

@@ -1,0 +1,24 @@
+# Every ADR has a number of its own, so "ADR 0017" names one decision. Two once shared a
+# number for weeks before a review noticed.
+name: ADR check
+
+on:
+  pull_request:
+    paths:
+      - docs/adr/**
+
+permissions:
+  contents: read
+
+jobs:
+  numbers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Each ADR number is used once
+        run: |
+          twice=$(ls docs/adr | sed 's/-.*//' | sort | uniq -d)
+          if [ -n "$twice" ]; then
+            echo "ADR numbers used twice: $twice"
+            exit 1
+          fi
