@@ -26,7 +26,7 @@ Paste a long random string (say `openssl rand -hex 32`) and keep it in a passwor
 
 ## 4. Set the Discord webhook (optional)
 
-A new #1 on a Map Leaderboard is posted to a Discord webhook (ADR 0017). It is optional: with no secret set, nothing is posted and uploads are unchanged.
+A new #1 on a Map Leaderboard is posted to a Discord webhook (ADR 0022). It is optional: with no secret set, nothing is posted and uploads are unchanged.
 
 In Discord, on the Minerva server: **#personal-bests → Edit Channel → Integrations → Webhooks → New Webhook**, name it (say "Map Leaderboards"), then **Copy Webhook URL**. The URL is a secret — anyone holding it can post to that channel — so it is never committed; keep it in a password manager beside `ADMIN_TOKEN`.
 

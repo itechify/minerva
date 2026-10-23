@@ -285,7 +285,7 @@ fn update_manifest(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// `<report.zip> [--all] [--osms <osms-set.json>]`
+/// `<report.zip> [--all] [--osms <osms-set.json>] [--items <osms-items.json>]`
 fn replay(args: &[String]) -> Result<(), String> {
     use minerva_core::bug_report;
     let mut rest = args.iter();
