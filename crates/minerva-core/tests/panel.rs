@@ -581,6 +581,19 @@ fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_it() {
     assert!(!overlaps(placement, TITLE));
 }
 
+/// While the title is looked for again (no capture found it where it was), the panel still
+/// keeps clear of where it was last found: over it, the panel would hide it from the search.
+#[test]
+fn a_panel_dragged_onto_where_the_title_was_last_found_is_moved_clear_of_it_while_it_is_looked_for() {
+    let mut minerva = set_up_on_small_game();
+    minerva.on_reading(TitleReading { lines: None, found: None, at_ms: 333 });
+
+    let state = minerva.act(Action::PanelMoved { x: 892, y: 140 });
+
+    let placement = state.placement.unwrap();
+    assert!(!overlaps(placement, TITLE), "{placement:?}");
+}
+
 #[test]
 fn the_collapsed_icon_never_covers_the_minimap_title_either() {
     let mut minerva = set_up_on_small_game();

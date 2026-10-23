@@ -373,6 +373,9 @@ pub const TITLE_SEARCH_MS: u64 = 1000;
 /// With no Minimap Title found for this long, the panel says it can't find it
 /// ([`PanelState::title_lost`]).
 pub const TITLE_LOST_AFTER_MS: u64 = 10_000;
+/// A title found where it was, but read as no map for this long, is looked for afresh in the
+/// whole client area.
+pub const TITLE_UNREAD_SEARCH_MS: u64 = 3_000;
 
 /// How often the shell captures [`PanelState::deal_finder_capture`] for the Deal Finder:
 /// a listing's badge follows the player's scrolling within half a second.
@@ -553,11 +556,17 @@ pub struct Minerva {
     /// Where the Status Bar's level, job and name were last found, and the game's client
     /// area then: our windows keep clear of them while the client area stays where it was.
     status_bar_area: Option<(ScreenRect, ScreenRect)>,
-    /// Where the Minimap Title was last found, and the game's client area then: captured
-    /// there while the client area stays where it was and the title is there (ADR 0021).
+    /// Where the Minimap Title was last found, and the game's client area then: our windows
+    /// keep clear of it while the client area stays where it was (ADR 0021)...
     title_found: Option<(ScreenRect, ScreenRect)>,
+    /// ...and it is captured there while it is there: until a capture there finds none, or
+    /// reads it as no map for [`TITLE_UNREAD_SEARCH_MS`].
+    title_locked: bool,
     /// When a capture first found no Minimap Title, since the last that found one.
     title_missing_since: Option<u64>,
+    /// When a capture where the title was found first read it as no map, since the last that
+    /// read it as one.
+    title_unread_since: Option<u64>,
     /// The Characters shown on the Map Leaderboards, and the uploads for them.
     leaderboards: Leaderboards,
     /// The checks for a newer version, and its download and install when the player chooses.
@@ -621,7 +630,9 @@ impl Minerva {
             status_bar_reader: None,
             status_bar_area: None,
             title_found: None,
+            title_locked: false,
             title_missing_since: None,
+            title_unread_since: None,
             leaderboards: Leaderboards::default(),
             updater: Updater::default(),
             requests: VecDeque::new(),
@@ -683,11 +694,13 @@ impl Minerva {
         match (reading.found, client) {
             (Some(found), Some(client)) => {
                 self.title_found = Some((client, found));
+                self.title_locked = true;
                 self.title_missing_since = None;
             }
             (Some(_), None) => self.title_missing_since = None,
             (None, _) => {
-                self.title_found = None;
+                self.title_locked = false;
+                self.title_unread_since = None;
                 self.title_missing_since.get_or_insert(reading.at_ms);
             }
         }
@@ -727,6 +740,17 @@ impl Minerva {
                 mark: entry.mark.clone(),
             }
         };
+        // Found where it was, but read as no map for a while: the box may cut a moved minimap's
+        // title. It is looked for afresh.
+        if reading.found.is_some() && snap.is_none() {
+            let since = *self.title_unread_since.get_or_insert(reading.at_ms);
+            if reading.at_ms.saturating_sub(since) >= TITLE_UNREAD_SEARCH_MS {
+                self.title_locked = false;
+                self.title_unread_since = None;
+            }
+        } else {
+            self.title_unread_since = None;
+        }
         let tracked = self.tracker.update(snap);
         let titled = tracked.current.map_or_else(Vec::new, |i| matcher.same_title_as(i));
         let maps = titled.into_iter().map(current_map).collect();
@@ -2171,7 +2195,14 @@ impl Minerva {
     fn sync_title(&mut self) {
         let shows = self.panel.layer() != Layer::Hidden;
         let client = self.panel.game.as_ref().filter(|_| shows).map(|game| game.client);
-        let found = self.title_area().filter(|_| shows);
+        let found = self.title_area().filter(|_| shows && self.title_locked);
+        if !shows {
+            // No time behind another app counts as time the title wasn't found: none was
+            // looked for.
+            self.title_missing_since = None;
+            self.title_unread_since = None;
+            self.state.title_lost = false;
+        }
         self.state.title_capture = found.or(client);
         self.state.title_searching = found.is_none() && client.is_some();
     }

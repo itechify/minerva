@@ -9,7 +9,8 @@ mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    BugReport, Foreground, GameWindow, Minerva, PanelState, ReportAbout, ScreenPoint, ScreenRect, TITLE_LOST_AFTER_MS, TitleCapture,
+    BugReport, Foreground, GameWindow, Minerva, PanelState, ReportAbout, ScreenPoint, ScreenRect, TITLE_LOST_AFTER_MS,
+    TITLE_UNREAD_SEARCH_MS, TitleCapture,
     TitleReading,
 };
 use std::io::Read;
@@ -239,4 +240,52 @@ fn the_panels_line_saying_it_cant_find_the_title_opens_the_faqs_answer_on_it() {
 
     let url = "https://owlofminerva.app/faq/#minimap-not-found".to_string();
     assert_eq!(request, Some(minerva_core::Request::OpenInBrowser { url }));
+}
+
+/// Found where it was, but read as no map for a while (a moved minimap whose title the box
+/// cuts, say): it is looked for afresh in the whole client area.
+#[test]
+fn a_title_found_but_read_as_no_map_for_a_few_seconds_is_looked_for_afresh() {
+    let mut minerva = started(KERNING);
+    read(&mut minerva, KERNING, 0);
+    read(&mut minerva, KERNING, 333);
+    let found = minerva.panel_state().title_capture.unwrap();
+    let misread = |at_ms| TitleReading {
+        lines: Some(minerva_core::TitleLines { street: "Vxqz Rozd".into(), map: "Qwrtp Czty".into() }),
+        found: Some(found),
+        at_ms,
+    };
+
+    assert!(!minerva.on_reading(misread(1_000)).title_searching);
+    assert!(!minerva.on_reading(misread(1_000 + TITLE_UNREAD_SEARCH_MS - 1)).title_searching);
+    let state = minerva.on_reading(misread(1_000 + TITLE_UNREAD_SEARCH_MS));
+
+    assert!(state.title_searching);
+    assert_eq!(state.title_capture, Some(game(KERNING)));
+}
+
+#[test]
+fn a_title_read_as_its_map_again_in_time_stays_where_it_was_found() {
+    let mut minerva = started(KERNING);
+    read(&mut minerva, KERNING, 0);
+    let found = minerva.panel_state().title_capture.unwrap();
+
+    minerva.on_reading(TitleReading { lines: None, found: Some(found), at_ms: 333 });
+    read(&mut minerva, KERNING, 666);
+    let state = minerva.on_reading(TitleReading { lines: None, found: Some(found), at_ms: 333 + TITLE_UNREAD_SEARCH_MS });
+
+    assert!(!state.title_searching, "the read at 666 ms started the wait afresh");
+}
+
+/// Time behind another app isn't time the title wasn't found: none was looked for.
+#[test]
+fn the_cant_find_line_counts_afresh_after_another_app_was_in_front() {
+    let mut minerva = started(KERNING);
+    minerva.on_reading(not_found(0));
+
+    minerva.on_foreground(Foreground::OtherApp);
+    minerva.on_foreground(Foreground::Game);
+
+    assert!(!minerva.on_reading(not_found(TITLE_LOST_AFTER_MS)).title_lost);
+    assert!(minerva.on_reading(not_found(2 * TITLE_LOST_AFTER_MS)).title_lost);
 }
