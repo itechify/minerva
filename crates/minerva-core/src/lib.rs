@@ -14,8 +14,10 @@ mod hotkey_settings;
 mod item_card;
 mod item_data;
 mod item_lookup;
+mod ink;
 mod item_tooltip;
 mod leaderboards;
+mod loader;
 mod map_data;
 mod map_index;
 mod map_mark;
@@ -50,14 +52,13 @@ mod world;
 
 pub use bests_window::{PersonalBestsCharacter, PersonalBestsMap, PersonalBestsVisit, PersonalBestsWindow};
 pub use bug_report::{BugReport, ReportAbout};
-pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, GREAT_BELOW, STEAL_BELOW, Verdict};
+pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Verdict};
 pub use exp_bar::{ExpBar, ExpBarPlace, ExpBarReader, ExpBarReading, ExpFigures};
 pub use game_data::{GameData, Refresh};
 pub use grind_tracker::{ClientOffset, GrindTrackerWindow};
 pub use hotkey_settings::{KeyPress, RebindProblem, SettingsNotice, SettingsView};
 pub use item_card::{
-    Edge, ITEM_CARD_CREDIT, ItemCard, ItemCardChoice, ItemCardView, MESOWATCH_URL, MarketEdit, MarketLine, NameProblem, ShopPrice,
-    ShownItemCard,
+    Edge, ItemCard, ItemCardChoice, ItemCardView, MarketEdit, MarketLine, NameProblem, ShopPrice, ShownItemCard,
 };
 pub use market_prices::{MARKET_PRICES_VERSION, MarketImport, MarketPrice, SavedMarketLine, SavedMarketPrices};
 pub use item_lookup::{ItemChoice, ItemHit, ItemLookup, ItemLookupLine, OurWindow};
@@ -73,7 +74,7 @@ pub use map_index::{Fetched, MapDataSource, MapEntry, SourceError};
 pub use map_mark::MapMark;
 pub use map_preview::{Landing, Leads, MapPreview, PicturePoint, PortalMark, PreviewImage, SpawnMark};
 pub use mob_card::{DamageRange, Elements, HpPerExp, MobCard, MobDetails};
-pub use portal_overrides::{PORTAL_OVERRIDES, PortalOverride};
+pub use portal_overrides::PortalOverride;
 pub use panel::{
     Action, CollapsedSections, DEFAULT_PANEL_WIDTH, Foreground, GameWindow, InsideOffset, Layer, MIN_PANEL_WIDTH, PanelSizes,
     PlacementMode, ScreenPoint,
@@ -88,8 +89,8 @@ pub use search::{
 pub use session::{Character, Deaths, ExpRate, ExpTracking, Forecast, PacePoint, PaceTrace, TrackingState};
 pub use settings::{Hotkey, Hotkeys, Settings};
 pub use setup::{SetupReason, SetupState};
-pub use shown_map::{Candidate, Candidates, FIRST_MOBS, LevelRange, Outline};
-pub use status_bar::{MAX_LEVEL, STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarReader, StatusBarReading};
+pub use shown_map::{Candidate, Candidates, LevelRange, Outline};
+pub use status_bar::{STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarReader, StatusBarReading};
 pub use updates::{
     Build, DownloadAnswer, QuitItem, UpdateAnswer, UpdateJob, UpdateNotice, UpdateOffer, UpdateStage, UpdateStatus, UpdateStep,
     Updates,
@@ -102,17 +103,17 @@ use deal_finder::DealFinder;
 use game_data::Refreshes;
 use grind_tracker::GrindTracker;
 use hotkey_settings::HotkeySettings;
-use item_card::{Editing, ItemCards, Pressed};
-use item_data::ItemFilesLoader;
+use item_card::{Editing, ItemCards, MESOWATCH_URL, Pressed};
+use loader::{Held, Load, Loaded, Loader};
 use market_prices::MarketPrices;
 use item_lookup::ItemLookups;
 use leaderboards::Leaderboards;
 use search::{Search, Searched};
 use shown_map::ShownMap;
 use matcher::{Match, Matcher, Snap};
-use pace::Pace;
 use pictures::Pictures;
 use panel::Panel;
+use portal_overrides::PORTAL_OVERRIDES;
 use session::Session;
 use setup::Setup;
 pub use recogniser::{TitleCapture, TitleLines, TitleReader, TitleReading};
@@ -120,8 +121,8 @@ use tracker::Tracker;
 use updates::{Chosen, Updater};
 use serde::{Deserialize, Serialize};
 use osms::MapSet;
+use osms_items::ItemSet;
 use std::collections::{BTreeMap, VecDeque};
-use std::task::Poll;
 
 /// A title capture's image or a Status Bar's, or the game's whole client area for
 /// Item Lookup: tightly packed RGBA, top-down rows.
@@ -211,8 +212,6 @@ pub struct PanelState {
     pub recognition: Recognition,
     /// The last map the core was confident about.
     pub map: Option<CurrentMap>,
-    /// How well the latest frame matched the map shown, 0..=100 (0 when it didn't).
-    pub confidence: u8,
     /// The latest frame didn't confirm the map shown (unreadable, low confidence, or
     /// a different map not yet confirmed).
     pub not_sure: bool,
@@ -352,6 +351,14 @@ pub struct PanelState {
     pub updates: Updates,
 }
 
+impl PanelState {
+    /// Where the overlay shows on screen: its placement, while it isn't hidden (see
+    /// [`Layer`]). It shows in screen captures, ours included.
+    pub(crate) fn panel_showing(&self) -> Option<ScreenRect> {
+        self.placement.filter(|_| self.layer != Layer::Hidden)
+    }
+}
+
 /// What a hotkey asks the shell to do at once, beyond rendering the panel state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Request {
@@ -471,14 +478,6 @@ const SET_RETRY_MS: u64 = 60_000;
 /// date: game data changes only on patch days, so a younger one says nothing.
 const SAVED_COPY_AFTER_MS: u64 = 7 * 24 * 60 * 60 * 1000;
 
-/// OSMS's file set as read, and when it was saved (ms since the Unix epoch): by an earlier
-/// launch, or as it was fetched in this one (the wall clock then); `None` if the wall
-/// clock wasn't known.
-struct HeldSet {
-    maps: MapSet,
-    saved_at_unix_ms: Option<u64>,
-}
-
 /// The Minerva core: feed it frames, render its [`PanelState`].
 pub struct Minerva {
     /// Reads frames fed to [`Minerva::on_frame`]; loaded on the first one, so a shell
@@ -502,19 +501,9 @@ pub struct Minerva {
     bests_window: BestsWindow,
     /// The data source, whose answers a Bug Report writes down.
     source: RecordedSource,
-    /// Every map's data, once OSMS's file set has been read: the map list, and the
-    /// shown map's figures.
-    set: Option<HeldSet>,
-    /// When to ask for OSMS's file set next (capture time); 0 at startup.
-    ask_osms_at: u64,
-    /// The source is fetching OSMS's file set.
-    osms_in_flight: bool,
-    /// The set an earlier launch saved has been looked at (on the first tick or frame).
-    saved_set_seen: bool,
-    /// The set an earlier launch saved, read, while a fresh one is fetched at startup
-    /// because it is too old to use as it is: what the panel falls back on if none can be
-    /// had.
-    fallback: Option<HeldSet>,
+    /// OSMS's file set, once read: every map's data, the map list and the shown map's
+    /// figures among it, and when to ask for it next.
+    maps: Loader<MapSet>,
     /// The player's Refresh of OSMS's file set and item files.
     refreshes: Refreshes,
     /// What the file set is read with: [`PORTAL_OVERRIDES`], but for tests of the list.
@@ -528,8 +517,6 @@ pub struct Minerva {
     /// OSMS's pictures the panel asked for: the Map Preview's picture, and the map's mobs'
     /// animations for their Mob Cards.
     pictures: Pictures,
-    /// MeowDB's pace, kept by Item Lookup's searches.
-    meowdb_pace: Pace,
     /// What the player typed, highlighted and picked in Search.
     search: Search,
     /// The settings view, and the hotkey being rebound in it.
@@ -538,25 +525,18 @@ pub struct Minerva {
     item_reader: Option<ItemTooltipReader>,
     /// The latest Item Lookup.
     item_lookups: ItemLookups,
-    /// The Item Lookup alert's size, in physical px for the current display.
-    item_lookup_size: Size,
-    /// OSMS's item files, for the Item Card.
-    item_files: ItemFilesLoader,
+    /// OSMS's item files, for the Item Card, and when to ask for them next.
+    items: Loader<ItemSet>,
     /// The Item Card showing.
     item_cards: ItemCards,
     /// A capture for an Item Card was asked for and its reading hasn't come back.
     card_capturing: bool,
-    /// The Item Card's size, in physical px for the current display.
-    item_card_size: Size,
     /// The market prices the player keeps, which the Item Card shows.
     market_prices: MarketPrices,
     /// The Deal Finder, and the Player Shop it read last.
     deal_finder: DealFinder,
     /// Reads captures fed to [`Minerva::on_player_shop_capture`]; loaded on the first one.
     shop_reader: Option<PlayerShopReader>,
-    /// The Deal Badges' window's size, in physical px for the current display: its width
-    /// counts, as its height follows the shop's list.
-    deal_badges_size: Size,
     /// Reads captures fed to [`Minerva::on_status_bar_capture`]; loaded on the first one.
     status_bar_reader: Option<StatusBarReader>,
     /// Where the Status Bar's level, job and name were last found, and the game's client
@@ -607,11 +587,7 @@ impl Minerva {
             grind_tracker: GrindTracker::default(),
             bests_window: BestsWindow::default(),
             source,
-            set: None,
-            ask_osms_at: 0,
-            osms_in_flight: false,
-            saved_set_seen: false,
-            fallback: None,
+            maps: Loader::default(),
             refreshes: Refreshes::default(),
             portal_overrides: PORTAL_OVERRIDES.to_vec(),
             matcher: None,
@@ -619,20 +595,16 @@ impl Minerva {
             shown_map: ShownMap::default(),
             wall_clock: None,
             pictures: Pictures::default(),
-            meowdb_pace: Pace::default(),
             search: Search::default(),
             hotkey_settings: HotkeySettings::default(),
             item_reader: None,
             item_lookups: ItemLookups::default(),
-            item_lookup_size: Size { width: 0, height: 0 },
-            item_files: ItemFilesLoader::default(),
+            items: Loader::default(),
             item_cards: ItemCards::default(),
             card_capturing: false,
-            item_card_size: Size { width: 0, height: 0 },
             market_prices: MarketPrices::default(),
             deal_finder: DealFinder::default(),
             shop_reader: None,
-            deal_badges_size: Size { width: 0, height: 0 },
             status_bar_reader: None,
             status_bar_area: None,
             title_found: None,
@@ -646,7 +618,7 @@ impl Minerva {
             setup: Setup::default(),
             settings: Settings::default(),
             state: PanelState::default(),
-            recorder: Recorder::new(&PanelState::default()),
+            recorder: Recorder::default(),
         };
         minerva.sync_panel();
         minerva.recorder = Recorder::new(&minerva.state);
@@ -717,7 +689,7 @@ impl Minerva {
     fn take_title_reading(&mut self, reading: TitleReading) -> &PanelState {
         self.follow_title(&reading);
         self.load_osms(reading.at_ms);
-        let (Some(matcher), Some(set)) = (&self.matcher, &self.set) else {
+        let (Some(matcher), Some(set)) = (&self.matcher, self.maps.held()) else {
             // Without the map list nothing can be recognised.
             return self.sync_panel();
         };
@@ -725,13 +697,13 @@ impl Minerva {
             Match::Sure(snap) => Some(snap),
             // Names differing only in a numeral the reading doesn't make out: the
             // one within the player's reach, if just one is; otherwise not sure.
-            Match::OneOf { maps, score } => {
-                let reach = self.shown_map.within_reach(&set.maps);
+            Match::OneOf { maps } => {
+                let reach = self.shown_map.within_reach(set);
                 let mut reachable = maps.into_iter().filter(|&i| {
                     matcher.same_title_as(i).into_iter().any(|j| reach.contains(&matcher.map(j).id))
                 });
                 match (reachable.next(), reachable.next()) {
-                    (Some(index), None) => Some(Snap { index, score }),
+                    (Some(index), None) => Some(Snap { index }),
                     _ => None,
                 }
             }
@@ -762,11 +734,10 @@ impl Minerva {
         let maps = titled.into_iter().map(current_map).collect();
         // Another title confirmed is another map: a new Visit. Losing the title, or choosing
         // among the maps sharing it, is not.
-        if self.shown_map.show(maps, &set.maps) {
+        if self.shown_map.show(maps, set) {
             self.session.arrive();
         }
         self.sync_shown_map();
-        self.state.confidence = (tracked.confidence * 100.0).round() as u8;
         self.state.not_sure = tracked.not_sure;
         self.sync_panel()
     }
@@ -814,8 +785,8 @@ impl Minerva {
 
     fn sync_shown_map(&mut self) {
         let map = self.shown_map.map().map(|map| CurrentMap { mark: self.shown_map.mark(), ..map.clone() });
-        let saved_copy_from = self.saved_copy_from();
-        let data = self.set.as_ref().map_or(MapDataStatus::NoMap, |set| self.shown_map.data(&set.maps, saved_copy_from));
+        let saved_copy_from = self.maps.saved_copy_from(self.wall_clock);
+        let data = self.maps.held().map_or(MapDataStatus::NoMap, |maps| self.shown_map.data(maps, saved_copy_from));
         // Distances are measured from the map shown (with Candidates, the one shown).
         let moved = map.as_ref().map(|m| &m.id) != self.state.map.as_ref().map(|m| &m.id);
         let paged = data.data() != self.state.data.data();
@@ -829,7 +800,7 @@ impl Minerva {
         if moved || paged {
             self.sync_search();
         }
-        self.state.candidates = self.set.as_ref().and_then(|set| self.shown_map.candidates(&set.maps));
+        self.state.candidates = self.maps.held().and_then(|maps| self.shown_map.candidates(maps));
         self.sync_pictured();
         self.state.credit = self.state.map.as_ref().map(|_| OSMS_AND_MEOWDB_CREDIT);
     }
@@ -838,22 +809,19 @@ impl Minerva {
     /// portals on the route to the Hunting Target or Destination marked), the map's mobs'
     /// Mob Cards, Search's matches and the Hunting Target's mob.
     fn sync_pictured(&mut self) {
-        self.state.map_marks =
-            self.set.as_ref().map(|set| map_mark::table(&set.maps, &self.pictures)).unwrap_or_default();
+        let set = self.maps.held();
+        self.state.map_marks = set.map(|maps| map_mark::table(maps, &self.pictures)).unwrap_or_default();
         let next_map = self.state.search.next_map_by_portal();
-        self.state.map_preview = self
-            .set
-            .as_ref()
-            .and_then(|set| self.shown_map.preview(&set.maps, &self.pictures))
-            .map(|preview| preview.on_route_to(next_map));
+        self.state.map_preview =
+            set.and_then(|maps| self.shown_map.preview(maps, &self.pictures)).map(|preview| preview.on_route_to(next_map));
         let mobs = self.state.data.data().map_or(&[][..], |data| &data.mobs);
-        self.state.mob_cards = match &self.set {
-            Some(set) => mob_card::cards(mobs, &set.maps, &self.pictures),
+        self.state.mob_cards = match set {
+            Some(maps) => mob_card::cards(mobs, maps, &self.pictures),
             None => Vec::new(),
         };
-        if let Some(set) = &self.set {
+        if let Some(maps) = set {
             let pictures = &self.pictures;
-            self.state.search.fill_pictures(&set.maps, |path| pictures.url(path).map(String::from));
+            self.state.search.fill_pictures(maps, |path| pictures.url(path).map(String::from));
         }
     }
 
@@ -863,21 +831,21 @@ impl Minerva {
     /// beside every map's name; then the Map Preview's, then the map's mobs' animations,
     /// then the Hunting Target mob's.
     fn poll_pictures(&mut self, at_ms: u64) {
-        let mut wanted = self.state.search.pictures(self.set.as_ref().map(|set| &set.maps));
+        let mut wanted = self.state.search.pictures(self.maps.held());
         wanted.extend(self.item_cards.pictures());
-        if let Some(set) = &self.set {
+        if let Some(maps) = self.maps.held() {
             let preview = self.state.map_preview.as_ref().map(|preview| map_preview::picture_path(&preview.picture));
             let mobs = self.state.data.data().map_or(&[][..], |data| &data.mobs);
-            let hunted = self.state.search.hunting.as_ref().and_then(|hunting| set.maps.animation(&hunting.mob.id));
+            let hunted = self.state.search.hunting.as_ref().and_then(|hunting| maps.animation(&hunting.mob.id));
             wanted.extend(
-                map_mark::pictures(&set.maps)
+                map_mark::pictures(maps)
                     .chain(preview)
-                    .chain(mob_card::animations(mobs, &set.maps))
+                    .chain(mob_card::animations(mobs, maps))
                     .chain(hunted.map(String::from)),
             );
         }
         self.pictures.poll(&wanted, &mut self.source, at_ms);
-        if self.set.is_some() {
+        if self.maps.held().is_some() {
             self.sync_pictured();
         }
     }
@@ -903,14 +871,14 @@ impl Minerva {
     /// The Item Lookup alert's size, in physical px for the current display.
     pub fn set_item_lookup_size(&mut self, size: Size) -> &PanelState {
         self.record(Event::ItemLookupSize { size });
-        self.item_lookup_size = size;
+        self.item_lookups.size = size;
         self.sync_panel()
     }
 
     /// The Item Card's size, in physical px for the current display.
     pub fn set_item_card_size(&mut self, size: Size) -> &PanelState {
         self.record(Event::ItemCardSize { size });
-        self.item_card_size = size;
+        self.item_cards.size = size;
         self.sync_panel()
     }
 
@@ -918,7 +886,7 @@ impl Minerva {
     /// is the shop's list's).
     pub fn set_deal_badges_size(&mut self, size: Size) -> &PanelState {
         self.record(Event::DealBadgesSize { size });
-        self.deal_badges_size = size;
+        self.deal_finder.size = size;
         self.sync_panel()
     }
 
@@ -1041,11 +1009,11 @@ impl Minerva {
             }
             Action::SearchPrevious | Action::SearchNext => {
                 let by = if action == Action::SearchNext { 1 } else { -1 };
-                self.search.move_highlight(by, &searched(&self.set, &self.item_files, &self.state, &self.settings));
+                self.search.move_highlight(by, &searched(&self.maps, &self.items, &self.state, &self.settings));
                 self.sync_search();
             }
             Action::SearchEnter => {
-                let picked = self.search.enter(&searched(&self.set, &self.item_files, &self.state, &self.settings));
+                let picked = self.search.enter(&searched(&self.maps, &self.items, &self.state, &self.settings));
                 self.sync_search();
                 if let Some(ids) = picked {
                     self.show_card(ids);
@@ -1091,8 +1059,8 @@ impl Minerva {
             Action::RefreshGameData => {
                 if self.refreshes.start() {
                     // Asked for at the next tick, unless a fetch is under way: it counts.
-                    self.ask_osms_at = 0;
-                    self.item_files.ask_now();
+                    self.maps.ask_now();
+                    self.items.ask_now();
                 }
             }
             Action::BeginRebind(hotkey) => self.hotkey_settings.begin(hotkey),
@@ -1158,7 +1126,7 @@ impl Minerva {
     /// with this ID in the mob's map list. Like Enter on it.
     pub fn search_pick(&mut self, id: &str) -> &PanelState {
         self.record(Event::SearchPick { id: id.to_string() });
-        self.search.pick(id, &searched(&self.set, &self.item_files, &self.state, &self.settings));
+        self.search.pick(id, &searched(&self.maps, &self.items, &self.state, &self.settings));
         self.sync_search();
         self.sync_panel()
     }
@@ -1167,7 +1135,7 @@ impl Minerva {
     /// Destination. Like Enter on it.
     pub fn search_pick_destination(&mut self, id: &str) -> &PanelState {
         self.record(Event::SearchPickDestination { id: id.to_string() });
-        self.search.pick_destination(id, &searched(&self.set, &self.item_files, &self.state, &self.settings));
+        self.search.pick_destination(id, &searched(&self.maps, &self.items, &self.state, &self.settings));
         self.sync_search();
         self.sync_panel()
     }
@@ -1176,7 +1144,7 @@ impl Minerva {
     /// its card shows, beside the panel. Like Enter on it.
     pub fn search_pick_item(&mut self, id: &str) -> &PanelState {
         self.record(Event::SearchPickItem { id: id.to_string() });
-        let picked = self.search.pick_item(id, &searched(&self.set, &self.item_files, &self.state, &self.settings));
+        let picked = self.search.pick_item(id, &searched(&self.maps, &self.items, &self.state, &self.settings));
         self.sync_search();
         if let Some(ids) = picked {
             self.show_card(ids);
@@ -1211,7 +1179,7 @@ impl Minerva {
     /// Hunting Target or Destination: the pictures, and the Map Preview's portals on the
     /// route.
     fn sync_search(&mut self) {
-        let search = self.search.state(&searched(&self.set, &self.item_files, &self.state, &self.settings));
+        let search = self.search.state(&searched(&self.maps, &self.items, &self.state, &self.settings));
         self.state.search = search;
         self.sync_pictured();
     }
@@ -1223,38 +1191,31 @@ impl Minerva {
     pub fn on_hotkey(&mut self, pressed: &str) -> Option<Request> {
         self.record(Event::Hotkey { pressed: pressed.to_string() });
         let hotkeys = &self.settings.hotkeys;
-        let is = |hotkey: &str| same_hotkey(hotkey, pressed);
+        // The Item Card's and Item Lookup's first: they capture rather than press a control.
+        let captures = [Hotkey::ItemCard, Hotkey::ItemLookup];
+        let hotkey = captures.into_iter().chain(Hotkey::ALL).find(|&hotkey| same_hotkey(hotkeys.get(hotkey), pressed))?;
         // Only over a game window, and not while the last capture is being read.
         let reading = self.card_capturing || self.item_lookups.capturing();
-        if is(&hotkeys.item_card) {
-            let capture = self.panel.game.is_some() && !reading;
-            self.card_capturing |= capture;
-            // The card showing hides for the capture, which it would otherwise be in.
-            self.sync_panel();
-            return capture.then_some(Request::CaptureItemTooltip);
-        }
-        if is(&hotkeys.item_lookup) {
-            let capture = self.panel.game.is_some() && !reading && self.item_lookups.start();
-            return capture.then_some(Request::CaptureItemTooltip);
-        }
-        let control = if is(&hotkeys.toggle_panel) {
-            PanelControl::TogglePanel
-        } else if is(&hotkeys.cycle_placement) {
-            PanelControl::CyclePlacement
-        } else if is(&hotkeys.setup) {
-            PanelControl::Setup
-        } else if is(&hotkeys.choose_candidate) {
-            PanelControl::ChooseCandidate
-        } else if is(&hotkeys.search) {
-            PanelControl::Search
-        } else if is(&hotkeys.grind_tracker) {
-            PanelControl::ToggleGrindTracker
-        } else if is(&hotkeys.open_meowdb_page) {
-            PanelControl::OpenMeowdbPage
-        } else if is(&hotkeys.deal_finder) {
-            PanelControl::ToggleDealFinder
-        } else {
-            return None;
+        let control = match hotkey {
+            Hotkey::ItemCard => {
+                let capture = self.panel.game.is_some() && !reading;
+                self.card_capturing |= capture;
+                // The card showing hides for the capture, which it would otherwise be in.
+                self.sync_panel();
+                return capture.then_some(Request::CaptureItemTooltip);
+            }
+            Hotkey::ItemLookup => {
+                let capture = self.panel.game.is_some() && !reading && self.item_lookups.start();
+                return capture.then_some(Request::CaptureItemTooltip);
+            }
+            Hotkey::TogglePanel => PanelControl::TogglePanel,
+            Hotkey::CyclePlacement => PanelControl::CyclePlacement,
+            Hotkey::OpenMeowdbPage => PanelControl::OpenMeowdbPage,
+            Hotkey::Setup => PanelControl::Setup,
+            Hotkey::ChooseCandidate => PanelControl::ChooseCandidate,
+            Hotkey::GrindTracker => PanelControl::ToggleGrindTracker,
+            Hotkey::Search => PanelControl::Search,
+            Hotkey::DealFinder => PanelControl::ToggleDealFinder,
         };
         self.apply_press(control)
     }
@@ -1492,9 +1453,8 @@ impl Minerva {
 
     fn take_item_tooltip_reading(&mut self, reading: Option<ItemTooltipReading>) -> &PanelState {
         // Our windows show in the capture: one over the name would be read instead.
-        let panel = self.state.placement.filter(|_| self.state.layer != Layer::Hidden);
         let ours: Vec<(OurWindow, ScreenRect)> = [
-            panel.map(|at| (OurWindow::Panel, at)),
+            self.state.panel_showing().map(|at| (OurWindow::Panel, at)),
             self.state.grind_tracker.placement.map(|at| (OurWindow::GrindTracker, at)),
             self.state.personal_bests.placement.map(|at| (OurWindow::PersonalBests, at)),
             self.state.item_lookup_placement.map(|at| (OurWindow::Alert, at)),
@@ -1504,14 +1464,14 @@ impl Minerva {
         .collect();
         if std::mem::take(&mut self.card_capturing) {
             let at_ms = reading.as_ref().map_or(0, |r| r.at_ms);
-            match self.item_cards.read(reading, &ours, self.item_files.items()) {
+            match self.item_cards.read(reading, &ours, self.items.items()) {
                 Pressed::Shown => self.item_lookups.clear(),
                 Pressed::Closed => {}
                 Pressed::Alert(outcome) => self.item_lookups.alert(outcome, at_ms),
             }
             return self.sync_panel();
         }
-        let open = self.item_lookups.read(reading, &ours, &mut self.source, &mut self.meowdb_pace);
+        let open = self.item_lookups.read(reading, &ours, &mut self.source);
         self.requests.extend(open.map(|url| Request::OpenInBrowser { url }));
         self.sync_panel()
     }
@@ -1619,11 +1579,11 @@ impl Minerva {
     /// came of it.
     pub fn open_card_meowdb_page(&mut self, at_ms: u64) -> &PanelState {
         self.record(Event::OpenCardMeowdbPage { at_ms });
-        let Some(item) = self.item_files.items().ok().and_then(|items| self.item_cards.item(items)) else {
+        let Some(item) = self.items.items().ok().and_then(|items| self.item_cards.item(items)) else {
             return self.sync_panel();
         };
         let (name, kind) = (item.name.clone(), item.kind.clone());
-        let open = self.item_lookups.look_up(name, kind, &mut self.source, &mut self.meowdb_pace, at_ms);
+        let open = self.item_lookups.look_up(name, kind, &mut self.source, at_ms);
         self.requests.extend(open.map(|url| Request::OpenInBrowser { url }));
         self.sync_panel()
     }
@@ -1890,107 +1850,62 @@ impl Minerva {
         self.leaderboards.tick(at_ms, self.session.bests().history(), self.wall_clock);
         self.updater.tick(at_ms, self.settings.check_for_updates);
         self.load_osms(at_ms);
-        if self.set.is_some() {
+        if self.maps.held().is_some() {
             self.sync_shown_map();
         }
         self.poll_pictures(at_ms);
-        if self.item_files.load(&mut self.source, at_ms, self.wall_clock) {
-            // Search matches items once they are in.
-            self.sync_search();
+        // The Item Card's item files, on the map set's schedule ([`Minerva::load_osms`]).
+        let Loaded { refresh, load } = self.items.load(&mut self.source, at_ms, self.wall_clock, osms_items::read);
+        match load {
+            Load::Hold(held) => {
+                self.items.hold(held);
+                // Search matches items once they are in.
+                self.sync_search();
+            }
+            // Search says why they are missing.
+            Load::Failed => self.sync_search(),
+            Load::Nothing => {}
         }
-        if let Some(refresh) = self.item_files.take_fetched() {
+        if let Some(refresh) = refresh {
             self.refreshes.items_fetched(refresh);
         }
         // An Item Lookup's search, which the player waits on.
-        let open = self.item_lookups.poll(&mut self.source, &mut self.meowdb_pace, at_ms);
+        let open = self.item_lookups.poll(&mut self.source, at_ms);
         self.requests.extend(open.map(|url| Request::OpenInBrowser { url }));
         self.sync_panel()
     }
 
-    /// OSMS's file set. At startup (the first tick or frame), the set this version saved at
-    /// an earlier launch, if it was saved under [`SET_RECHECK_MS`] ago; otherwise, and every
-    /// [`SET_RECHECK_MS`] after, or when the player presses Refresh, one the source fetches
-    /// afresh, and with no set at all, a minute after OSMS couldn't be reached. A fetched
-    /// set that reads replaces the one held whole. One that can't be had or doesn't read
-    /// leaves the one held as it is, and at startup falls back on the saved set, however
-    /// old.
+    /// OSMS's file set, as [`Loader::load`] keeps it: at startup the set this version saved
+    /// at an earlier launch if it is under a day old, else one fetched afresh, and every day
+    /// after, or when the player presses Refresh. A set that comes replaces the one held
+    /// ([`Minerva::take_set`]); nothing held and none to be had shows in
+    /// [`PanelState::recognition`].
     fn load_osms(&mut self, at_ms: u64) {
-        if !self.osms_in_flight {
-            if at_ms < self.ask_osms_at {
-                return;
-            }
-            if !self.saved_set_seen {
-                self.saved_set_seen = true;
-                if self.take_saved_set() {
-                    self.ask_osms_at = at_ms + SET_RECHECK_MS;
-                    return;
-                }
-            }
+        let overrides = &self.portal_overrides;
+        let read = |files: &osms::OsmsFiles| osms::read_with(files, overrides);
+        let Loaded { refresh, load } = self.maps.load(&mut self.source, at_ms, self.wall_clock, read);
+        if let Some(refresh) = refresh {
+            self.refreshes.set_fetched(refresh);
         }
-        let fetched = match self.source.fetch_osms_files() {
-            Poll::Pending => {
-                self.osms_in_flight = true;
-                return;
-            }
-            Poll::Ready(fetched) => fetched,
-        };
-        self.osms_in_flight = false;
-        self.ask_osms_at = at_ms + SET_RECHECK_MS;
-        let read = fetched.and_then(|files| osms::read_with(&files, &self.portal_overrides));
-        self.refreshes.set_fetched(Refresh::of(&read));
-        match (read, self.fallback.take()) {
-            // The source saved it as it fetched it: now.
-            (Ok(maps), _) => self.take_set(HeldSet { maps, saved_at_unix_ms: self.wall_clock }),
-            (Err(_), _) if self.set.is_some() => {}
-            (Err(_), Some(saved)) => self.take_set(saved),
-            (Err(SourceError::Unreachable(_)), None) => {
-                self.state.recognition = Recognition::Unavailable;
-                self.ask_osms_at = at_ms + SET_RETRY_MS;
-            }
-            (Err(SourceError::FormatChanged(_)), None) => self.state.recognition = Recognition::FormatChanged,
+        if let Load::Hold(set) = load {
+            self.take_set(set);
         }
-    }
-
-    /// Take the set an earlier launch saved if this version saved it under
-    /// [`SET_RECHECK_MS`] ago by the wall clock, or else keep it to fall back on; whether it
-    /// was taken. Without the wall clock its age is unknown, so it isn't taken as it is, and
-    /// a set that doesn't read is as good as none.
-    fn take_saved_set(&mut self) -> bool {
-        let Some(saved) = self.source.saved_osms_files() else { return false };
-        let Ok(maps) = osms::read_with(&saved.files, &self.portal_overrides) else { return false };
-        let held = HeldSet { maps, saved_at_unix_ms: Some(saved.saved_at_unix_ms) };
-        let age = self.wall_clock.and_then(|now| now.checked_sub(saved.saved_at_unix_ms));
-        let ours = saved.saved_by.as_deref() == Some(MINERVA_VERSION);
-        if ours && age.is_some_and(|age| age < SET_RECHECK_MS) {
-            self.take_set(held);
-            return true;
-        }
-        self.fallback = Some(held);
-        false
     }
 
     /// Hold `set`, a file set just read, in place of the one held: search and Distance
     /// work over it at once. A new map list is matched against from then on, and the map
     /// the player is on stays theirs.
-    fn take_set(&mut self, set: HeldSet) {
-        let entries = set.maps.entries();
-        if self.set.as_ref().is_none_or(|held| held.maps.entries() != entries) {
+    fn take_set(&mut self, set: Held<MapSet>) {
+        let entries = set.data.entries();
+        if self.maps.held().is_none_or(|held| held.entries() != entries) {
             let matcher = Matcher::new(entries);
             if let Some(old) = &self.matcher {
                 self.tracker.remap(|at| matcher.index_of(&old.map(at).id));
             }
             self.matcher = Some(matcher);
         }
-        self.set = Some(set);
+        self.maps.hold(set);
         self.sync_search();
-    }
-
-    /// When the file set held was saved, if that was over [`SAVED_COPY_AFTER_MS`] ago, so it
-    /// is a Saved Copy: no fresh one could be had since. The panel says so, with its date.
-    fn saved_copy_from(&self) -> Option<u64> {
-        let saved_at = self.set.as_ref()?.saved_at_unix_ms?;
-        let now = self.wall_clock?;
-        (now.saturating_sub(saved_at) > SAVED_COPY_AFTER_MS).then_some(saved_at)
     }
 
     pub fn panel_state(&self) -> &PanelState {
@@ -2010,7 +1925,7 @@ impl Minerva {
             .recorder
             .maps_shown()
             .filter_map(|id| {
-                let maps = &self.set.as_ref()?.maps;
+                let maps = self.maps.held()?;
                 let entry = maps.entry(id)?;
                 Some(MapFacts {
                     id: id.to_string(),
@@ -2059,12 +1974,16 @@ impl Minerva {
     }
 
     fn sync_panel(&mut self) -> &PanelState {
-        if self.set.is_some() {
-            self.state.recognition = match self.saved_copy_from() {
+        // Whether titles can be snapped to real maps: by the file set held, or why none is.
+        self.state.recognition = match (self.maps.held(), self.maps.failed()) {
+            (Some(_), _) => match self.maps.saved_copy_from(self.wall_clock) {
                 Some(saved_at_unix_ms) => Recognition::SavedCopy { saved_at_unix_ms },
                 None => Recognition::Ready,
-            };
-        }
+            },
+            (None, None) => Recognition::Starting,
+            (None, Some(SourceError::Unreachable(_))) => Recognition::Unavailable,
+            (None, Some(SourceError::FormatChanged(_))) => Recognition::FormatChanged,
+        };
         self.sync_setup();
         self.sync_status_bar();
         // Never over a captured region, nor the Status Bar's Character or its EXP figures: the
@@ -2087,9 +2006,8 @@ impl Minerva {
         self.sync_item_lookup();
         self.sync_item_card();
         self.sync_deal_finder();
-        let panel = self.state.placement.filter(|_| self.state.layer != Layer::Hidden);
         self.state.our_windows = [
-            panel,
+            self.state.panel_showing(),
             self.state.grind_tracker.placement,
             self.state.personal_bests.placement,
             self.state.item_lookup_placement,
@@ -2104,7 +2022,7 @@ impl Minerva {
         self.state.hotkeys_live = in_front && !self.hotkey_settings.is_rebinding();
         self.state.settings_view = self.hotkey_settings.state(&self.settings.hotkeys);
         self.state.game_data = GameData {
-            fetched_at_unix_ms: self.set.as_ref().and_then(|set| set.saved_at_unix_ms),
+            fetched_at_unix_ms: self.maps.saved_at_unix_ms(),
             refresh: self.refreshes.state(),
         };
         self.state.updates = self.updater.state(self.settings.check_for_updates);
@@ -2120,7 +2038,7 @@ impl Minerva {
         let shows = self.panel.layer() != Layer::Hidden;
         self.state.item_lookup_placement = match (&line, &self.panel.game) {
             (Some(_), Some(game)) if shows => {
-                Some(item_lookup::alert_placement(game, self.item_lookup_size, &self.panel.avoid))
+                Some(item_lookup::alert_placement(game, self.item_lookups.size, &self.panel.avoid))
             }
             _ => None,
         };
@@ -2132,9 +2050,9 @@ impl Minerva {
     /// cover.
     fn sync_item_card(&mut self) {
         let pictures = &self.pictures;
-        let saved_copy_from = self.item_files.saved_copy_from(self.wall_clock);
+        let saved_copy_from = self.items.saved_copy_from(self.wall_clock);
         self.state.item_card = self.item_cards.view(
-            self.item_files.items().ok(),
+            self.items.items().ok(),
             saved_copy_from,
             &self.market_prices,
             |path| pictures.url(path).map(String::from),
@@ -2145,8 +2063,7 @@ impl Minerva {
                 // Beside the panel, a card from Search keeps off our other windows there.
                 let others: Vec<ScreenRect> =
                     [self.state.grind_tracker.placement, self.state.personal_bests.placement].into_iter().flatten().collect();
-                let panel = self.state.placement.filter(|_| self.state.layer != Layer::Hidden);
-                self.item_cards.placement(game, self.item_card_size, &self.panel.avoid, panel, &others)
+                self.item_cards.placement(game, &self.panel.avoid, self.state.panel_showing(), &others)
             }
             _ => None,
         };
@@ -2170,9 +2087,9 @@ impl Minerva {
         let capturing = self.card_capturing || self.item_lookups.capturing();
         let placement = game
             .filter(|_| !capturing)
-            .and_then(|game| self.deal_finder.placement(game, self.deal_badges_size, &self.panel.avoid));
+            .and_then(|game| self.deal_finder.placement(game, &self.panel.avoid));
         let top = placement.map_or(0, |at| at.y);
-        let items = self.item_files.items().ok();
+        let items = self.items.items().ok();
         let opened = self.item_cards.badge().filter(|_| self.state.item_card.is_some());
         let badges = self.deal_finder.badges(items, &self.market_prices, self.settings.deal_margin_percent, top, opened);
         self.state.deal_badges = placement.map(|placement| DealBadges { placement, badges });
@@ -2291,9 +2208,9 @@ impl Minerva {
             _ => None,
         };
         let characters = if window.open {
-            let set = &self.set;
+            let set = self.maps.held();
             let map = |id: &str| {
-                let maps = &set.as_ref()?.maps;
+                let maps = set?;
                 Some((maps.entry(id)?, maps.data(id)?))
             };
             let (saved, this_visit) = self.session.bests().standing();
@@ -2329,8 +2246,8 @@ impl Minerva {
 /// What mob search works over: OSMS's file set, the map the panel shows, and the travel
 /// the player has turned on.
 fn searched<'a>(
-    set: &'a Option<HeldSet>,
-    item_files: &'a ItemFilesLoader,
+    maps: &'a Loader<MapSet>,
+    item_files: &'a Loader<ItemSet>,
     state: &'a PanelState,
     settings: &Settings,
 ) -> Searched<'a> {
@@ -2340,7 +2257,7 @@ fn searched<'a>(
         _ => ItemsMissing::Loading,
     });
     Searched {
-        set: set.as_ref().map(|held| &held.maps),
+        set: maps.held(),
         items,
         here: state.map.as_ref().map(|map| map.id.as_str()),
         travel: settings.travel,

@@ -22,28 +22,59 @@ const LINE_MARGIN: f32 = 3.0;
 /// How many lines' readings [`RememberedLines`] keeps before it forgets them all at once.
 const REMEMBERED: usize = 512;
 
-/// What lines of ink read as, remembered by their ink: a frame read again unchanged costs
-/// no recognition, the costly part of reading it.
-#[derive(Default)]
+/// An ink's key in what was read: its width and its pixels.
+type InkKey = (u32, Vec<u8>);
+
+fn ink_key(ink: &GrayImage) -> InkKey {
+    (ink.width(), ink.as_raw().clone())
+}
+
+/// What inks (black on white) read as, remembered by the ink, up to `most` of them: past
+/// that it forgets them all at once. A frame read again unchanged costs no recognition, the
+/// costly part of reading it.
+struct Remembered<V> {
+    read: HashMap<InkKey, V>,
+    most: usize,
+}
+
+impl<V> Remembered<V> {
+    fn new(most: usize) -> Self {
+        Self { read: HashMap::new(), most }
+    }
+
+    fn get(&self, key: &InkKey) -> Option<&V> {
+        self.read.get(key)
+    }
+
+    /// Remember what inks `read` as, forgetting everything first if they don't all fit.
+    fn remember(&mut self, read: impl ExactSizeIterator<Item = (InkKey, V)>) {
+        if self.read.len() + read.len() > self.most {
+            self.read.clear();
+        }
+        self.read.extend(read);
+    }
+}
+
+/// What lines of ink read as, remembered by their ink ([`Remembered`]).
 pub(crate) struct RememberedLines {
-    read: HashMap<(u32, Vec<u8>), Option<String>>,
+    read: Remembered<Option<String>>,
+}
+
+impl Default for RememberedLines {
+    fn default() -> Self {
+        Self { read: Remembered::new(REMEMBERED) }
+    }
 }
 
 impl RememberedLines {
     /// What each of `inks` (black on white) reads as, enlarged `upscale` times for ocrs:
     /// those not read before, all at once.
     pub fn read(&mut self, recogniser: &Recogniser, inks: &[GrayImage], upscale: u32) -> Vec<Option<String>> {
-        let key = |ink: &GrayImage| (ink.width(), ink.as_raw().clone());
-        let keys: Vec<(u32, Vec<u8>)> = inks.iter().map(key).collect();
-        let unknown: Vec<usize> = (0..inks.len()).filter(|&i| !self.read.contains_key(&keys[i])).collect();
+        let keys: Vec<InkKey> = inks.iter().map(ink_key).collect();
+        let unknown: Vec<usize> = (0..inks.len()).filter(|&i| self.read.get(&keys[i]).is_none()).collect();
         if !unknown.is_empty() {
             let read = recogniser.read_stacked(&unknown.iter().map(|&i| &inks[i]).collect::<Vec<_>>(), upscale);
-            if self.read.len() + unknown.len() > REMEMBERED {
-                self.read.clear();
-            }
-            for (&i, text) in unknown.iter().zip(read) {
-                self.read.insert(keys[i].clone(), text);
-            }
+            self.read.remember(unknown.iter().map(|&i| keys[i].clone()).zip(read));
         }
         keys.iter().map(|key| self.read.get(key).cloned().flatten()).collect()
     }
@@ -91,12 +122,12 @@ const REMEMBERED_TITLES: usize = 64;
 /// standing in one map, the title doesn't change, and costs no recognition.
 pub struct TitleReader {
     recogniser: Recogniser,
-    read: HashMap<(u32, Vec<u8>), Option<TitleLines>>,
+    read: Remembered<Option<TitleLines>>,
 }
 
 impl TitleReader {
     pub fn bundled() -> Self {
-        Self { recogniser: Recogniser::bundled(), read: HashMap::new() }
+        Self { recogniser: Recogniser::bundled(), read: Remembered::new(REMEMBERED_TITLES) }
     }
 
     pub fn read(&mut self, capture: &TitleCapture) -> TitleReading {
@@ -105,15 +136,12 @@ impl TitleReader {
             minimap_title::find(&img)
         });
         let Some(found) = found else { return TitleReading { lines: None, found: None, at_ms: capture.frame.at_ms } };
-        let key = (found.prepared.canvas.width(), found.prepared.canvas.as_raw().clone());
+        let key = ink_key(&found.prepared.canvas);
         let lines = match self.read.get(&key) {
             Some(lines) => lines.clone(),
             None => {
                 let lines = self.recogniser.read_prepared(&found.prepared);
-                if self.read.len() >= REMEMBERED_TITLES {
-                    self.read.clear();
-                }
-                self.read.insert(key, lines.clone());
+                self.read.remember([(key, lines.clone())].into_iter());
                 lines
             }
         };
@@ -191,7 +219,7 @@ impl Recogniser {
 
     /// ocrs's reading of each line's ink (black on white), stacked on one canvas and enlarged
     /// `upscale` times: `None` where it read nothing, or for every line if it couldn't run.
-    pub fn read_stacked(&self, inks: &[&GrayImage], upscale: u32) -> Vec<Option<String>> {
+    pub(crate) fn read_stacked(&self, inks: &[&GrayImage], upscale: u32) -> Vec<Option<String>> {
         let width = inks.iter().map(|ink| ink.width()).max().unwrap_or(0) + 2 * PAD;
         let height = inks.iter().map(|ink| ink.height() + PAD).sum::<u32>() + PAD;
         let mut canvas = GrayImage::from_pixel(width, height, image::Luma([255]));

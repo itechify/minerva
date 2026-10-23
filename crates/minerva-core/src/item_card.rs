@@ -12,7 +12,7 @@
 //! keeps a card from showing goes in the Item Lookup alert.
 
 use crate::grind_tracker::ClientOffset;
-use crate::item_lookup::{ItemLookup, OurWindow, item_name, overlaps};
+use crate::item_lookup::{ItemLookup, OurWindow, item_name};
 use crate::item_tooltip::{ItemTooltip, ItemTooltipReading};
 use crate::market_prices::{MarketPrice, MarketPrices};
 use crate::osms_items::{ItemFacts, ItemSet};
@@ -174,6 +174,8 @@ pub(crate) enum Pressed {
 pub(crate) struct ItemCards {
     shown: Option<Shown>,
     cards: u32,
+    /// The card's size, in physical px for the current display.
+    pub size: Size,
 }
 
 /// The card showing: which items, where it opened, and where the player dragged it.
@@ -234,7 +236,7 @@ impl ItemCards {
             ItemTooltip::None => return Pressed::Alert(ItemLookup::NoTooltip),
             ItemTooltip::Found { area, name } => (*area, name),
         };
-        if let Some((by, _)) = ours.iter().find(|(_, window)| overlaps(*window, area)) {
+        if let Some((by, _)) = ours.iter().find(|(_, window)| window.overlaps(area)) {
             return Pressed::Alert(ItemLookup::Covered { by: *by });
         }
         let Some(read) = name.as_deref().and_then(item_name) else { return Pressed::Alert(ItemLookup::Unreadable) };
@@ -361,20 +363,14 @@ impl ItemCards {
         }
     }
 
-    /// Where the card showing of `size` goes over `game`: where the player dragged it,
-    /// wholly on a monitor and moved off any of `avoid` (the captured regions); or else at
-    /// the pointer ([`card_placement`]), or beside the `panel` and off our `others` windows
-    /// as well ([`beside_panel`]). `None` while no card shows, or while one opened beside
-    /// the panel has no panel to go beside.
-    pub fn placement(
-        &self,
-        game: &GameWindow,
-        size: Size,
-        avoid: &[ScreenRect],
-        panel: Option<ScreenRect>,
-        others: &[ScreenRect],
-    ) -> Option<ScreenRect> {
+    /// Where the card showing goes over `game`: where the player dragged it, wholly on a
+    /// monitor and moved off any of `avoid` (the captured regions); or else at the pointer
+    /// ([`card_placement`]), or beside the `panel` and off our `others` windows as well
+    /// ([`beside_panel`]). `None` while no card shows, or while one opened beside the panel
+    /// has no panel to go beside.
+    pub fn placement(&self, game: &GameWindow, avoid: &[ScreenRect], panel: Option<ScreenRect>, others: &[ScreenRect]) -> Option<ScreenRect> {
         let shown = self.shown.as_ref()?;
+        let size = self.size;
         Some(match (shown.moved, shown.opened) {
             (Some(at), _) => {
                 let (x, y) = (game.client.x + at.x, game.client.y + at.y);
@@ -543,28 +539,21 @@ fn beside_badge(game: &GameWindow, badge: ScreenRect, shop: ScreenRect, size: Si
 /// none of them clear, the first, moved inside `client` and below (or above) any of `avoid`
 /// it would cover.
 fn first_clear(spots: &[ScreenRect], client: ScreenRect, avoid: &[ScreenRect]) -> ScreenRect {
-    let clear = |card: &ScreenRect| !avoid.iter().any(|region| overlaps(*card, *region));
-    if let Some(card) = spots.iter().find(|card| inside(**card, client) && clear(card)) {
+    let clear = |card: &ScreenRect| !avoid.iter().any(|region| card.overlaps(*region));
+    if let Some(card) = spots.iter().find(|card| client.contains(**card) && clear(card)) {
         return *card;
     }
     let mut card = clamp(spots[0], client);
     // Each region is gone over twice, as a move off one may cover another.
     for _ in 0..2 {
         for region in avoid {
-            if overlaps(card, *region) {
+            if card.overlaps(*region) {
                 let under = region.y + region.height as i32 + REGION_GAP;
-                card.y = if inside(ScreenRect { y: under, ..card }, client) { under } else { region.y - REGION_GAP - card.height as i32 };
+                card.y = if client.contains(ScreenRect { y: under, ..card }) { under } else { region.y - REGION_GAP - card.height as i32 };
             }
         }
     }
     card
-}
-
-fn inside(card: ScreenRect, client: ScreenRect) -> bool {
-    card.x >= client.x
-        && card.y >= client.y
-        && card.x + card.width as i32 <= client.x + client.width as i32
-        && card.y + card.height as i32 <= client.y + client.height as i32
 }
 
 /// `card` moved the least to lie inside `client`, which is at least as big.
