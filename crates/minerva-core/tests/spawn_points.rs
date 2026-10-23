@@ -15,7 +15,7 @@ const BLUE_SNAIL: u64 = 3;
 const SLIME: u64 = 7;
 
 fn read_as(at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: "Made-up Street".into(), map: "Field".into() }), at_ms }
+    TitleReading { lines: Some(TitleLines { street: "Made-up Street".into(), map: "Field".into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 /// The panel on the made-up Field, with the game's maps and mobs around it.

@@ -12,8 +12,7 @@ mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    Action, ExpBar, GameWindow, Minerva, PanelState, Rect, ScreenPoint, ScreenRect, Settings, Size, StatusBarCapture,
-    TitleRegion, TrackingState,
+    Action, ExpBar, GameWindow, Minerva, PanelState, ScreenPoint, ScreenRect, Settings, StatusBarCapture, TrackingState,
 };
 
 const KERNING: &str = "victoria-road__kerning-city--window";
@@ -30,11 +29,9 @@ fn window(client: ScreenRect) -> Option<GameWindow> {
     Some(GameWindow { client, frame, screens: vec![ScreenRect { x: 0, y: 0, width: 3440, height: 1440 }] })
 }
 
-/// Settings with the Title Region kept on a client area of the sample's size.
-fn set_up(sample: &str) -> Settings {
-    let game = game(sample);
-    let client = Size { width: game.width, height: game.height };
-    Settings { title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }), ..Settings::default() }
+/// Settings with setup finished.
+fn set_up() -> Settings {
+    Settings { setup_done: true, ..Settings::default() }
 }
 
 /// A core restored from `settings`, over the sample's game window.
@@ -95,12 +92,9 @@ fn read_painted(minerva: &mut Minerva, sample: &str, (from, until): (u64, u64), 
 }
 
 #[test]
-fn setup_marks_only_the_title_and_the_grind_tracker_is_on_after_it() {
+fn setup_marks_nothing_and_the_grind_tracker_is_on_after_it() {
     let mut minerva = Minerva::new(FakeSource::osms());
     minerva.on_game_window(window(game(KERNING)));
-    let region = minerva.act(Action::MarkTitleRegion(Rect { x: 70, y: 40, width: 130, height: 48 })).title_region.unwrap();
-    let client = common::client_of(&common::load(KERNING));
-    minerva.on_frame(common::capture(&client, game(KERNING), region, 0));
 
     let state = minerva.act(Action::FinishSetup).clone();
 
@@ -112,7 +106,7 @@ fn setup_marks_only_the_title_and_the_grind_tracker_is_on_after_it() {
 
 #[test]
 fn the_figures_are_read_where_the_status_bar_has_them() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
 
     let state = read(&mut minerva, KERNING, 0);
 
@@ -123,7 +117,7 @@ fn the_figures_are_read_where_the_status_bar_has_them() {
 
 #[test]
 fn a_dimmer_capture_still_reads() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
     let capture = capture(&minerva, KERNING, 0, |img| {
         for p in img.pixels_mut() {
             for c in &mut p.0[..3] {
@@ -137,7 +131,7 @@ fn a_dimmer_capture_still_reads() {
 
 #[test]
 fn the_figures_move_with_the_game_window() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
     read(&mut minerva, KERNING, 0);
 
     let moved = ScreenRect { x: 100, y: 50, ..game(KERNING) };
@@ -149,7 +143,7 @@ fn the_figures_move_with_the_game_window() {
 
 #[test]
 fn while_the_lv_box_is_covered_the_figures_are_read_where_they_were_last_found() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
     read(&mut minerva, KERNING, 0);
 
     let state = read_painted(&mut minerva, KERNING, (1_000, 30_000), lv_box_covered);
@@ -161,7 +155,7 @@ fn while_the_lv_box_is_covered_the_figures_are_read_where_they_were_last_found()
 
 #[test]
 fn after_the_client_area_changes_size_the_figures_are_only_read_where_the_status_bar_is_found() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
     read(&mut minerva, KERNING, 0);
 
     let state = minerva.on_game_window(window(ScreenRect { width: 1280, height: 720, ..game(KERNING) })).clone();
@@ -171,7 +165,7 @@ fn after_the_client_area_changes_size_the_figures_are_only_read_where_the_status
 
 #[test]
 fn a_status_bar_never_found_is_what_the_grind_tracker_says_cant_be_read() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
 
     let state = read_painted(&mut minerva, KERNING, (0, 15_000), lv_box_covered);
 
@@ -181,7 +175,7 @@ fn a_status_bar_never_found_is_what_the_grind_tracker_says_cant_be_read() {
 
 #[test]
 fn figures_covered_on_a_status_bar_found_are_unreadable_with_the_status_bar_there() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
     read(&mut minerva, KERNING, 0);
 
     let state = read_painted(&mut minerva, KERNING, (1_000, 15_000), figures_covered);
@@ -193,7 +187,7 @@ fn figures_covered_on_a_status_bar_found_are_unreadable_with_the_status_bar_ther
 
 #[test]
 fn turning_the_grind_tracker_off_stops_reading_the_figures_but_not_the_status_bar() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
 
     minerva.act(Action::SetGrindTracker { on: false });
     let state = read(&mut minerva, KERNING, 0);
@@ -208,7 +202,7 @@ fn turning_the_grind_tracker_off_stops_reading_the_figures_but_not_the_status_ba
 
 #[test]
 fn the_switch_survives_a_restart() {
-    let mut minerva = started(set_up(KERNING), KERNING);
+    let mut minerva = started(set_up(), KERNING);
     minerva.act(Action::SetGrindTracker { on: false });
 
     let json = serde_json::to_string(&minerva.settings()).unwrap();
@@ -240,20 +234,16 @@ fn settings_with_an_exp_bar_region_load_with_the_grind_tracker_on_and_the_region
         assert!(state.grind_tracker.on, "{exp_bar_region}");
         let saved = serde_json::to_string(&minerva.settings()).unwrap();
         assert!(!saved.contains("expBarRegion"), "{saved}");
-        assert_eq!(minerva.settings().version, 7, "saved as the current version");
+        assert_eq!(minerva.settings().version, 8, "saved as the current version");
     }
 }
 
-/// A client area of another size asks for the title to be marked again, but never for the
-/// EXP bar: the figures are found wherever the Status Bar is.
+/// A client area of another size needs no setup: the figures are found wherever the Status
+/// Bar is, as the Minimap Title is wherever the minimap is (ADR 0021).
 #[test]
-fn another_client_size_with_the_title_marked_on_it_needs_no_setup() {
-    let mut settings = set_up(KERNING);
+fn another_client_size_needs_no_setup() {
+    let settings = set_up();
     let resized = ScreenRect { width: 1914, height: 1197, ..game(KERNING) };
-    settings.title_region = Some(TitleRegion {
-        marked: Rect { x: 70, y: 40, width: 130, height: 48 },
-        client: Size { width: resized.width, height: resized.height },
-    });
     let mut minerva = Minerva::new(FakeSource::osms());
     minerva.restore(settings);
 

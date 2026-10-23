@@ -1,4 +1,4 @@
-//! Screen capture of the Title Region (Windows): a GDI BitBlt from the desktop DC.
+//! Screen capture of the game's client area, or a part of it (Windows): a GDI BitBlt from the desktop DC.
 //! It copies screen pixels only; it never uses PrintWindow (which would send the game
 //! WM_PRINT) or any capture session tied to the game window (ADR 0001).
 

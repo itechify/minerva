@@ -43,7 +43,7 @@ fn the_meowdb_icon_opens_the_shown_maps_page_like_ctrl_shift_m_and_nothing_witho
 #[test]
 fn the_help_icon_opens_setup_like_ctrl_shift_s() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.restore(Settings { title_region: Some(common::kerning_title_region()), ..Settings::default() });
+    minerva.restore(Settings { setup_done: true, ..Settings::default() });
 
     minerva.press(PanelControl::Setup);
 

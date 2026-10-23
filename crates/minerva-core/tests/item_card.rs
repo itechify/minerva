@@ -19,8 +19,8 @@ use common::{FakeSource, ItemSetAnswer};
 use common::items::{ItemWorld, cash, equip, etc, item_world, scroll, setup, use_item, weapon};
 use minerva_core::{
     Action, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, Hotkey, ItemCard, ItemHit, ItemCardChoice, ItemCardView, ItemLookup, ItemTooltip,
-    ItemTooltipReading, MarketEdit, MarketImport, MarketPrice, NameProblem, OurWindow, PanelSizes, PanelState, Rect, Request, ScreenPoint, ScreenRect, Settings, ShopPrice,
-    Recognition, Size, SourceError, TitleRegion, meowdb,
+    ItemTooltipReading, MarketEdit, MarketImport, MarketPrice, NameProblem, OurWindow, PanelSizes, PanelState, Request, ScreenPoint, ScreenRect, Settings, ShopPrice,
+    Recognition, Size, SourceError, meowdb,
 };
 use minerva_core::osms_items::ItemFiles;
 use std::sync::atomic::Ordering;
@@ -28,7 +28,6 @@ use std::task::Poll;
 
 const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
 const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
-const CLIENT: Size = Size { width: 1920, height: 1200 };
 /// Where the pointer is when the player presses the hotkey.
 const POINTER: ScreenPoint = ScreenPoint { x: 1000, y: 580 };
 /// Where the name line of the Item Tooltip read is on screen.
@@ -38,7 +37,7 @@ const CARD: Size = Size { width: 300, height: 160 };
 
 fn settings() -> Settings {
     Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client: CLIENT }),
+        setup_done: true,
         ..Settings::default()
     }
 }
@@ -63,6 +62,7 @@ fn started_with(source: FakeSource) -> Minerva {
     minerva.set_item_card_size(CARD);
     let frame = ScreenRect { x: GAME.x - 1, y: GAME.y - 31, width: GAME.width + 2, height: GAME.height + 32 };
     minerva.on_game_window(Some(GameWindow { client: GAME, frame, screens: vec![SCREEN] }));
+    common::found_title(&mut minerva, common::title_on(GAME), 0);
     minerva.tick(0);
     minerva
 }
@@ -159,7 +159,6 @@ fn the_card_goes_to_the_pointers_other_side_rather_than_cover_the_exp_figures() 
 #[test]
 fn with_no_side_of_the_pointer_clear_of_the_minimap_title_the_card_moves_below_it() {
     let mut minerva = started();
-    assert_eq!(minerva.panel_state().title_region, Some(TITLE_REGION));
 
     // Right of the pointer covers the title; left and above leave the game window.
     let state = press_at(&mut minerva, ScreenPoint { x: 1000, y: 130 }, "Bronze Ore");
@@ -605,6 +604,7 @@ fn started_at(source: FakeSource, now_unix_ms: u64) -> Minerva {
     minerva.set_item_card_size(CARD);
     let frame = ScreenRect { x: GAME.x - 1, y: GAME.y - 31, width: GAME.width + 2, height: GAME.height + 32 };
     minerva.on_game_window(Some(GameWindow { client: GAME, frame, screens: vec![SCREEN] }));
+    common::found_title(&mut minerva, common::title_on(GAME), 0);
     minerva.tick(0);
     minerva
 }

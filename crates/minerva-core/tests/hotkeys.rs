@@ -9,7 +9,7 @@ mod common;
 use common::{FakeSource, arrive};
 use minerva_core::{
     Minerva, ExpBar, ExpBarReading, Foreground, GameWindow, Hotkeys, PanelControl,
-    PlacementMode, Rect, Request, ScreenRect, Settings, SetupReason, Size, TitleRegion, TrackingState,
+    PlacementMode, Request, ScreenRect, Settings, SetupReason, TrackingState,
 };
 
 const SUNSET: &str = "victoria-road__sunset-sky--window";
@@ -50,7 +50,7 @@ fn ctrl_shift_i_shows_the_item_card_and_ctrl_shift_u_looks_the_item_up_even_with
     assert_eq!(state.hotkeys.toggle_panel, ctrl_shift("x"), "the player's own bindings are kept");
     let saved = minerva.settings();
     assert_eq!((saved.hotkeys.item_card.as_str(), saved.hotkeys.item_lookup.as_str()), ("ctrl+shift+i", "ctrl+shift+u"));
-    assert_eq!(saved.version, 7, "and saved with the rest");
+    assert_eq!(saved.version, 8, "and saved with the rest");
 }
 
 /// The Item Card took Item Lookup's key: the key the player presses over an item now
@@ -273,7 +273,7 @@ fn ctrl_shift_m_opens_the_shown_maps_meowdb_page_and_nothing_without_a_map() {
 #[test]
 fn ctrl_shift_s_opens_setup_again() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.restore(Settings { title_region: Some(common::kerning_title_region()), ..Settings::default() });
+    minerva.restore(Settings { setup_done: true, ..Settings::default() });
     assert!(!minerva.panel_state().setup.window_open);
 
     minerva.on_hotkey("ctrl+shift+s");
@@ -394,10 +394,9 @@ fn a_hotkey_reported_unavailable_stays_listed_while_the_hotkeys_are_not_live() {
 /// A core with EXP tracking on (both regions kept, on a 1920x1200 game window) and
 /// these hotkeys.
 fn tracking_with(hotkeys: Hotkeys) -> Minerva {
-    let client = Size { width: 1920, height: 1200 };
     let mut minerva = Minerva::new(FakeSource::osms());
     minerva.restore(Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
+        setup_done: true,
         hotkeys,
         ..Settings::default()
     });

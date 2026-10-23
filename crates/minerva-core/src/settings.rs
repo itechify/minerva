@@ -4,7 +4,6 @@
 use crate::grind_tracker::ClientOffset;
 use crate::leaderboards::LeaderboardCharacter;
 use crate::panel::{CollapsedSections, InsideOffset, PlacementMode, ScreenPoint};
-use crate::setup::TitleRegion;
 use crate::world::Travel;
 use serde::{Deserialize, Serialize};
 
@@ -16,8 +15,10 @@ use serde::{Deserialize, Serialize};
 /// default ([`Hotkeys::free_deal_finder`]). The EXP Bar Region files from before ADR 0017
 /// hold (`expBarRegion`) is ignored: the Grind Tracker is on for every file without
 /// `grindTrackerOn`. Version 7 brought [`Settings::map_leaderboards_met`], which an older
-/// file doesn't have, so none of the Characters it knew starts shared.
-pub(crate) const VERSION: u32 = 7;
+/// file doesn't have, so none of the Characters it knew starts shared. Version 8 has no Title
+/// Region (ADR 0021): a file with one (`titleRegion`) has finished setup, and the region is
+/// dropped, as the Minimap Title is found wherever it is.
+pub(crate) const VERSION: u32 = 8;
 
 /// The player's settings. Missing fields (an older or empty file) take their defaults.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,8 +40,10 @@ pub struct Settings {
     /// default width.
     pub panel_width: Option<u32>,
     pub hotkeys: Hotkeys,
-    /// The Title Region marked at setup; `None` until setup is first finished.
-    pub title_region: Option<TitleRegion>,
+    /// Setup has been finished. A file from before version 8 has finished it if it has a Title
+    /// Region (`titleRegion`), which is dropped.
+    #[serde(alias = "titleRegion", deserialize_with = "done_or_marked")]
+    pub setup_done: bool,
     /// The Grind Tracker is on (Settings' switch): the EXP figures are read from the Status
     /// Bar, and the Session runs. Files from before it have it on.
     pub grind_tracker_on: bool,
@@ -90,7 +93,7 @@ impl Default for Settings {
             detached_at: None,
             panel_width: None,
             hotkeys: Hotkeys::default(),
-            title_region: None,
+            setup_done: false,
             grind_tracker_on: true,
             game_window_title: None,
             travel: Travel::default(),
@@ -260,4 +263,19 @@ impl Default for Hotkeys {
             deal_finder: "ctrl+shift+d".into(),
         }
     }
+}
+
+/// `setupDone`, or a Title Region from before version 8 (ADR 0021): setup was finished if one
+/// was kept.
+fn done_or_marked<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum DoneOrMarked {
+        Done(bool),
+        Marked(Option<serde::de::IgnoredAny>),
+    }
+    Ok(match DoneOrMarked::deserialize(deserializer)? {
+        DoneOrMarked::Done(done) => done,
+        DoneOrMarked::Marked(marked) => marked.is_some(),
+    })
 }

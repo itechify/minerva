@@ -23,7 +23,6 @@ export default defineConfig(() => ({
         "item-card.html",
         "deal-badges.html",
         "setup.html",
-        "region.html",
       ],
     },
   },

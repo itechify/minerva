@@ -17,13 +17,12 @@ mod common;
 use common::FakeSource;
 use minerva_core::{
     Action, BESTS_VERSION, Minerva, Foreground, GameWindow, ItemChoice, ItemHit, ItemLookup, ItemTooltip,
-    ItemTooltipReading, MapBests, OurWindow, PanelControl, PanelSizes, PanelState, Rect, Request, SavedBests,
-    ScreenPoint, ScreenRect, Settings, Size, SourceError, TitleRegion, VisitBest, meowdb,
+    ItemTooltipReading, MapBests, OurWindow, PanelControl, PanelSizes, PanelState, Request, SavedBests,
+    ScreenPoint, ScreenRect, Settings, Size, SourceError, VisitBest, meowdb,
 };
 
 const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
 const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
-const CLIENT: Size = Size { width: 1920, height: 1200 };
 /// Where the pointer is when the player presses the hotkey.
 const POINTER: ScreenPoint = ScreenPoint { x: 1000, y: 580 };
 /// Where the name line of the Item Tooltip read is on screen.
@@ -35,7 +34,7 @@ const PANEL: ScreenRect = ScreenRect { x: 2376, y: 510, width: 340, height: 72 }
 
 fn settings() -> Settings {
     Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client: CLIENT }),
+        setup_done: true,
         ..Settings::default()
     }
 }
@@ -53,6 +52,7 @@ fn started_with(source: FakeSource, settings: Settings) -> Minerva {
     minerva.set_item_lookup_size(ALERT);
     let frame = ScreenRect { x: GAME.x - 1, y: GAME.y - 31, width: GAME.width + 2, height: GAME.height + 32 };
     minerva.on_game_window(Some(GameWindow { client: GAME, frame, screens: vec![SCREEN] }));
+    common::found_title(&mut minerva, common::title_on(GAME), 0);
     minerva
 }
 
@@ -621,11 +621,11 @@ fn the_alert_hides_while_another_app_is_in_front_of_the_game_and_shows_again_unt
 }
 
 #[test]
-fn the_alert_goes_below_a_title_region_marked_where_it_would_be() {
-    // A minimap title marked at the top centre of the client area.
-    let title = TitleRegion { marked: Rect { x: 800, y: 40, width: 320, height: 48 }, client: CLIENT };
-    let mut minerva = started_with(FakeSource::osms_offline(), Settings { title_region: Some(title), ..settings() });
-    let region = minerva.panel_state().title_region.expect("the Title Region is captured");
+fn the_alert_goes_below_a_minimap_title_found_where_it_would_be() {
+    let mut minerva = started_with(FakeSource::osms_offline(), settings());
+    // A minimap title found at the top centre of the client area.
+    let region = ScreenRect { x: GAME.x + 800, y: GAME.y + 40, width: 320, height: 48 };
+    common::found_title(&mut minerva, region, 0);
 
     let alert = look_up(&mut minerva, "Zqxv Nothing", 1_000).item_lookup_placement.expect("an alert");
 

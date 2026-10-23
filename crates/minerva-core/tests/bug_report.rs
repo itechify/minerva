@@ -12,8 +12,8 @@ use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData,
 use minerva_core::{
     ListedPrice, ShopCapture, ShopHover, ShopList, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
-    CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, Rect, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
-    TitleReading, TitleRegion, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
+    CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
+    TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
 };
 
 const S: u64 = 1000;
@@ -56,10 +56,9 @@ struct Shell {
 
 impl Shell {
     fn new(source: FakeSource) -> Self {
-        let client = Size { width: 1920, height: 1200 };
         let mut minerva = Minerva::new(source);
         minerva.restore(Settings {
-            title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
+            setup_done: true,
             ..Settings::default()
         });
         minerva.restore_bests(SavedBests::default());
@@ -85,7 +84,7 @@ impl Shell {
             self.at += 50;
             if self.at.is_multiple_of(350) {
                 let lines = Some(TitleLines { street: map.0.into(), map: map.1.into() });
-                self.minerva.on_reading(TitleReading { lines, at_ms: self.at });
+                self.minerva.on_reading(TitleReading { lines, found: Some(common::TITLE_FOUND), at_ms: self.at });
             }
             if self.at.is_multiple_of(S) {
                 self.minerva.on_exp_bar_reading(ExpBarReading { bar: exp(self.at), at_ms: self.at, place: None });

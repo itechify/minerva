@@ -39,7 +39,7 @@ fn names_osms_gives_with_spaces_around_them_are_trimmed() {
 }
 
 fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), at_ms }
+    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 /// OSMS lists one map with neither a name nor a street. A map missing either can't be

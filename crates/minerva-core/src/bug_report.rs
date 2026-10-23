@@ -16,7 +16,7 @@
 //!   set the run up (the settings and Personal Bests restored) are kept even then. It is
 //!   held compressed.
 //! - Crops: the EXP figures' from the last [`RECENT_CROPS_MS`], where they changed, and
-//!   the Title Region's where its reading changed; for the whole run, those behind a
+//!   the Minimap Title's where its reading changed; for the whole run, those behind a
 //!   reading the core found unusual ([`Note::is_unusual`]) or that changed the map shown.
 //! - A report is at most [`MAX_REPORT_BYTES`]: crops are left out to keep it so, the
 //!   oldest ordinary ones first, then the oldest kept for the run. The text never is.
@@ -38,7 +38,7 @@ use crate::osms_items::{ItemFiles, SavedItemFiles};
 use crate::panel::{Action, Foreground, GameWindow, PanelSizes, ScreenPoint, ScreenRect, Size};
 use crate::personal_best::{SavedBests, VisitBest};
 use crate::player_shop::{ShopCapture, ShopHover, ShopList, ShopReading};
-use crate::recogniser::{TitleLines, TitleReading};
+use crate::recogniser::{TitleCapture, TitleLines, TitleReading};
 use crate::session::{ExpTracking, TrackingState};
 use crate::settings::Settings;
 use crate::status_bar::{StatusBar, StatusBarCapture, StatusBarReading};
@@ -129,12 +129,15 @@ pub enum Note {
 pub enum Event {
     /// Time passed, to the line's `t`.
     Tick {},
-    /// A Title Region frame captured at `at_ms` read as `lines` (`None`: unreadable), or
-    /// the `same` as the reading before.
+    /// A title capture taken at `at_ms` read as `lines` (`None`: unreadable), the Minimap
+    /// Title found on screen at `found` (`None`: not found), or the `same` as the reading
+    /// before, found where it was.
     Title {
         at_ms: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         lines: Option<TitleLines>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        found: Option<ScreenRect>,
         #[serde(default, skip_serializing_if = "is_false")]
         same: bool,
     },
@@ -461,8 +464,9 @@ pub struct ReportFile {
     pub truncated: bool,
     /// The game window's client area, physical screen px.
     pub game_client: Option<ScreenRect>,
-    /// Where the Title Region was captured, physical screen px.
-    pub title_region: Option<ScreenRect>,
+    /// Where the Minimap Title was being captured, physical screen px: where it was found, or
+    /// the whole client area while it was looked for (ADR 0021).
+    pub title_capture: Option<ScreenRect>,
     /// The fingerprints of the OSMS file sets the run took, in order.
     pub osms_sets: Vec<String>,
     /// Every map the panel showed.
@@ -584,6 +588,15 @@ pub(crate) fn player_shop_crop(capture: &ShopCapture, shop: Option<&ShopList>) -
     Some((Region::PlayerShop, cut_on_screen(&capture.frame, capture.origin, top_left, bottom_right)?))
 }
 
+/// The Minimap Title in a title capture, for a Bug Report: where it was found (ADR 0021), as
+/// a sample of it in `samples/minimap` keeps it, and none of the rest of the client area.
+/// `None` with no title found.
+pub(crate) fn title_crop(capture: &TitleCapture, found: Option<ScreenRect>) -> Option<(Region, Frame)> {
+    let found = found?;
+    let bottom_right = (found.x + found.width as i32, found.y + found.height as i32);
+    Some((Region::Title, cut_on_screen(&capture.frame, capture.origin, (found.x, found.y), bottom_right)?))
+}
+
 /// How far the crop of a Status Bar capture reaches around the bar's level, job and name
 /// (px): enough for the reader to find them in it again.
 const STATUS_BAR_MARGIN: u32 = 10;
@@ -648,6 +661,7 @@ struct Last {
     foreground: Option<Foreground>,
     unavailable_hotkeys: Option<(Vec<String>, Vec<String>)>,
     title_lines: Option<Option<TitleLines>>,
+    title_found: Option<Option<ScreenRect>>,
     shop: Option<Option<ShopList>>,
     /// What the Item Tooltip by the pointer on the shop's list said in the last Deal Finder
     /// capture with one: its name as read (`None`: unreadable).
@@ -714,6 +728,7 @@ impl Recorder {
                 foreground: None,
                 unavailable_hotkeys: None,
                 title_lines: None,
+                title_found: None,
                 shop: None,
                 shop_tooltip: None,
                 status_bar: None,
@@ -760,12 +775,14 @@ impl Recorder {
     /// time, read from `frames` if it has any. What came of it is written once the next
     /// input comes.
     pub fn open(&mut self, mut event: Event, at_ms: Option<u64>, frames: Vec<(Region, Frame)>) {
-        if let Event::Title { lines, same, .. } = &mut event {
-            if self.last.title_lines.as_ref() == Some(lines) {
+        if let Event::Title { lines, found, same, .. } = &mut event {
+            if self.last.title_lines.as_ref() == Some(lines) && self.last.title_found == Some(*found) {
                 *same = true;
                 *lines = None;
+                *found = None;
             } else {
                 self.last.title_lines = Some(lines.clone());
+                self.last.title_found = Some(*found);
             }
         }
         if let Event::PlayerShop { shop, same, hover, .. } = &mut event {
@@ -938,7 +955,7 @@ impl Recorder {
         };
         if changed || kept {
             let name = match region {
-                Region::Title => format!("crops/title-{:010}.png", frame.at_ms),
+                Region::Title => format!("crops/minimap-title-{:010}.png", frame.at_ms),
                 Region::ExpBar => format!("crops/exp-bar-{:010}.png", frame.at_ms),
                 // Named as `samples/item-tooltip` names its frames: the pointer's spot in it.
                 Region::ItemTooltip { pointer: (x, y) } => format!("crops/item-tooltip-{:010}@{x},{y}.png", frame.at_ms),
@@ -1055,7 +1072,7 @@ impl Recorder {
             trace_from_ms,
             truncated: self.truncated,
             game_client: press.game_client,
-            title_region: press.state.title_region,
+            title_capture: press.state.title_capture,
             osms_sets: self.sets.clone(),
             maps: press.maps.clone(),
             crops,
@@ -1137,7 +1154,7 @@ impl Recorder {
         out += "  report.json  the run's facts: version, system, regions, the maps shown and their Map Summaries\n";
         out += "  trace.jsonl  every input the core took in, a JSON object a line (t: ms since launch),\n";
         out += "               with what came of it: answers, notes, what the Grind Tracker and map showed\n";
-        out += "  crops/       the EXP figures', the Title Region's and the Status Bar's crops, named by capture time (ms since launch)\n";
+        out += "  crops/       the EXP figures', the Minimap Title's and the Status Bar's crops, named by capture time (ms since launch)\n";
         out
     }
 }
@@ -1423,6 +1440,7 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
     // core it with every tick.
     let mut wall_clock: Option<(u64, u64)> = None;
     let mut title_lines: Option<TitleLines> = None;
+    let mut title_found: Option<ScreenRect> = None;
     let mut shop: Option<ShopList> = None;
     let mut status_bar: Option<StatusBar> = None;
     for line in &recording.lines {
@@ -1437,10 +1455,11 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::Tick {} => {
                 minerva.tick(line.t);
             }
-            Event::Title { at_ms, lines, same } => {
-                let lines = if same { title_lines.clone() } else { lines };
+            Event::Title { at_ms, lines, found, same } => {
+                let (lines, found) = if same { (title_lines.clone(), title_found) } else { (lines, found) };
                 title_lines.clone_from(&lines);
-                minerva.on_reading(TitleReading { lines, at_ms });
+                title_found = found;
+                minerva.on_reading(TitleReading { lines, found, at_ms });
             }
             Event::ExpBar { at_ms, bar, place } => {
                 minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place });
@@ -1809,6 +1828,7 @@ impl Event {
                 Some(lines) => format!("title read {:?} / {:?} again", lines.street, lines.map),
                 None => "title unreadable again".to_string(),
             },
+            Event::Title { found: None, .. } => "no title found".to_string(),
             Event::Title { .. } => "title unreadable".to_string(),
             Event::ExpBar { bar: Some(b), place, .. } => format!("EXP bar read {}{}", bar(b), remembered(place)),
             Event::ExpBar { bar: None, place: None, .. } => "EXP bar not whole".to_string(),

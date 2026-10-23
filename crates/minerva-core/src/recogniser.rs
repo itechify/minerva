@@ -1,8 +1,11 @@
-//! Title recogniser (ADR 0002): ocrs, recognition model only. We supply the two line
-//! boxes from our own mask and line split, so ocrs' detection model is not shipped.
+//! Title recogniser (ADR 0002): ocrs, recognition model only. We supply the line boxes from
+//! our own mask and line split, so ocrs' detection model is not shipped. The title is found
+//! first, wherever it is in the capture (ADR 0021, `minimap_title`).
 
 use crate::Frame;
-use crate::prep::{Numeral, PAD, Prepared, Rect, prepare};
+use crate::minimap_title;
+use crate::panel::{ScreenPoint, ScreenRect};
+use crate::prep::{Numeral, PAD, Prepared, Rect};
 use image::{GrayImage, RgbImage};
 use ocrs::{ImageSource, OcrEngine, OcrEngineParams, TextItem, TextLine};
 use rten::Model;
@@ -54,30 +57,63 @@ pub struct TitleLines {
     pub map: String,
 }
 
-/// What one Title Region frame reads as.
+/// A capture for the Minimap Title (ADR 0021): of the game's whole client area while the title
+/// is looked for, or of where it was last found.
+#[derive(Debug, Clone)]
+pub struct TitleCapture {
+    pub frame: Frame,
+    /// Where the frame's top-left pixel is on screen.
+    pub origin: ScreenPoint,
+}
+
+/// What one title capture reads as.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TitleReading {
-    /// `None` when the frame is unreadable (loading screen, minimap hidden or covered).
+    /// `None` when the title is unreadable (covered, say), or not found.
     pub lines: Option<TitleLines>,
+    /// Where on screen the title was found: the minimap window's top, as wide and as tall as
+    /// either layout is for the longest names. `None`: no title found (a loading screen, the
+    /// minimap closed).
+    pub found: Option<ScreenRect>,
     /// When the frame was captured, as in [`Frame::at_ms`].
     pub at_ms: u64,
 }
 
-/// Reads Title Region frames with the bundled recogniser (ADR 0002). Reading takes
-/// tens of milliseconds, so the shell keeps one on its own thread and hands the core
-/// each [`TitleReading`] (`Minerva::on_reading`).
+/// How many titles' readings [`TitleReader`] keeps before it forgets them all at once.
+const REMEMBERED_TITLES: usize = 64;
+
+/// Reads title captures with the bundled recogniser (ADR 0002). Reading takes tens of
+/// milliseconds, so the shell keeps one on its own thread and hands the core each
+/// [`TitleReading`] (`Minerva::on_title_read`). It remembers what each title's ink read as:
+/// standing in one map, the title doesn't change, and costs no recognition.
 pub struct TitleReader {
     recogniser: Recogniser,
+    read: HashMap<(u32, Vec<u8>), Option<TitleLines>>,
 }
 
 impl TitleReader {
     pub fn bundled() -> Self {
-        Self { recogniser: Recogniser::bundled() }
+        Self { recogniser: Recogniser::bundled(), read: HashMap::new() }
     }
 
-    pub fn read(&self, frame: &Frame) -> TitleReading {
-        let lines = frame_to_rgb(frame).and_then(|img| self.recogniser.read(&img));
-        TitleReading { lines, at_ms: frame.at_ms }
+    pub fn read(&mut self, capture: &TitleCapture) -> TitleReading {
+        let found = frame_to_rgb(&capture.frame).and_then(|img| minimap_title::find(&img));
+        let Some(found) = found else { return TitleReading { lines: None, found: None, at_ms: capture.frame.at_ms } };
+        let key = (found.prepared.canvas.width(), found.prepared.canvas.as_raw().clone());
+        let lines = match self.read.get(&key) {
+            Some(lines) => lines.clone(),
+            None => {
+                let lines = self.recogniser.read_prepared(&found.prepared);
+                if self.read.len() >= REMEMBERED_TITLES {
+                    self.read.clear();
+                }
+                self.read.insert(key, lines.clone());
+                lines
+            }
+        };
+        let (x, y, width, height) = found.area;
+        let found = ScreenRect { x: capture.origin.x + x, y: capture.origin.y + y, width, height };
+        TitleReading { lines, found: Some(found), at_ms: capture.frame.at_ms }
     }
 }
 
@@ -109,12 +145,6 @@ pub(crate) struct Recogniser {
 impl Recogniser {
     pub fn bundled() -> Self {
         Self { engine: engine() }
-    }
-
-    /// Read the street line and the map line. `None` means unreadable.
-    fn read(&self, img: &RgbImage) -> Option<TitleLines> {
-        let prepared = prepare(img)?;
-        self.read_prepared(&prepared)
     }
 
     /// Read each line box (canvas coordinates) of a black-on-white canvas: one entry per
@@ -160,9 +190,14 @@ impl Recogniser {
         (0..inks.len()).map(|i| text(lines.get(i).and_then(|line| line.as_ref()))).collect()
     }
 
+    /// Read the street line and the map line, or the one line "Street : Map". `None` means
+    /// unreadable.
     fn read_prepared(&self, p: &Prepared) -> Option<TitleLines> {
         let out = self.read_lines(&p.canvas, &p.lines)?;
         let line = |i: usize| out.get(i).and_then(|l| l.as_ref());
+        if p.lines.len() == 1 {
+            return one_line(&line(0)?.to_string());
+        }
         let street = line(0).map(|l| l.to_string().trim().to_string());
         let map = match (line(1), p.numeral) {
             (line, Some(numeral)) => Some(with_numeral(line, numeral)),
@@ -185,4 +220,12 @@ fn with_numeral(line: Option<&TextLine>, numeral: Numeral) -> String {
         .map(|c| c.char)
         .collect();
     format!("{} {}", before.trim(), "I".repeat(numeral.strokes)).trim().to_string()
+}
+
+/// The one-line layout's reading, "Street : Map", split at its colon. `None` without one: the
+/// header of an open minimap ("MINI MAP"), say.
+fn one_line(text: &str) -> Option<TitleLines> {
+    let (street, map) = text.split_once(':')?;
+    let (street, map) = (street.trim(), map.trim());
+    (!street.is_empty() && !map.is_empty()).then(|| TitleLines { street: street.to_string(), map: map.to_string() })
 }

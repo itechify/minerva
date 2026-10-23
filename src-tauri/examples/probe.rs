@@ -1,12 +1,12 @@
 //! Read-only smoke test of the shell's adapters without any UI: find the "MapleStory"
-//! window, capture its default Title Region a few times, and print what the recogniser
-//! read (the street line and map line, before they are snapped to a map) and what the
-//! core shows. It only reads window geometry and screen pixels (ADR 0001), and fetches
+//! window, capture its whole client area a few times, as the app does while it looks for the
+//! Minimap Title (ADR 0021), and print where the title was found, what the recogniser read
+//! (the street name and map name, before they are snapped to a map) and what the core shows. It only reads window geometry and screen pixels (ADR 0001), and fetches
 //! OSMS Data Explorer's file set once (saved for a day, ADR 0008).
 //!
 //! `cargo run -p minerva --example probe [reads] [save.png]`
-//! With a path, the last captured Title Region is saved there for inspection; as a
-//! `--title-region` sample in `samples/minimap` it is read exactly as the probe read it.
+//! With a path, the last client area captured is saved there for inspection; as a sample in
+//! `samples/minimap` it is read exactly as the probe read it.
 //!
 //! `cargo run -p minerva --example probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>]`
 //! Record mode: capture each named rectangle of the game's client area (physical px,
@@ -56,7 +56,7 @@
 //! another version. No game window is needed.
 
 use minerva_core::{Minerva, GAME_WINDOW_TITLE, PortalKind, Rect, TitleReader};
-use minerva_lib::{capture, capture_title_frame, gamewin, source::WebSource};
+use minerva_lib::{capture, capture_title, gamewin, source::WebSource};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -120,7 +120,7 @@ fn main() {
     // The core goes by the wall clock to tell whether the set saved is a day old.
     let since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
     minerva.on_wall_clock(since_epoch.as_millis() as u64);
-    let reader = TitleReader::bundled();
+    let mut reader = TitleReader::bundled();
     let title = minerva.panel_state().game_window_title.clone();
     gamewin::look_for(&title);
     let Some(client) = gamewin::find_game_client() else {
@@ -132,13 +132,15 @@ fn main() {
     let mut last = None;
     for _ in 0..reads {
         let t = Instant::now();
-        match capture_title_frame(client, start.elapsed().as_millis() as u64) {
-            Ok(frame) => {
-                let reading = reader.read(&frame);
-                last = Some(frame);
-                match &reading.lines {
-                    Some(lines) => println!("{:>4} ms  read {:?} / {:?}", t.elapsed().as_millis(), lines.street, lines.map),
-                    None => println!("{:>4} ms  read nothing (unreadable)", t.elapsed().as_millis()),
+        match capture_title(client, start.elapsed().as_millis() as u64) {
+            Ok(capture) => {
+                let reading = reader.read(&capture);
+                last = Some(capture.frame);
+                let ms = t.elapsed().as_millis();
+                match (&reading.lines, reading.found) {
+                    (Some(lines), Some(found)) => println!("{ms:>4} ms  read {:?} / {:?} at {found:?}", lines.street, lines.map),
+                    (None, Some(found)) => println!("{ms:>4} ms  found at {found:?}, unreadable"),
+                    _ => println!("{ms:>4} ms  no minimap title found"),
                 }
                 let state = minerva.on_reading(reading);
                 println!("         {:?} {:?} not sure: {}", state.recognition, state.map, state.not_sure);

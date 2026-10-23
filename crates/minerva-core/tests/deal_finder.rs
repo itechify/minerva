@@ -17,14 +17,13 @@ use common::FakeSource;
 use common::items::{ItemWorld, equip, etc, item_world, scroll, use_item};
 use minerva_core::{
     Action, DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Edge, Foreground, GameWindow, Hotkey, Hotkeys, ItemCardView, ListedPrice,
-    MarketPrice, Minerva, PanelControl, PanelSizes, PanelState, Rect, Request, SavedMarketLine, SavedMarketPrices, ScreenRect,
-    Settings, ShopHover, ShopList, ShopReading, ShopRow, Size, TitleRegion, Verdict, ItemTooltip, ScreenPoint,
+    MarketPrice, Minerva, PanelControl, PanelSizes, PanelState, Request, SavedMarketLine, SavedMarketPrices, ScreenRect,
+    Settings, ShopHover, ShopList, ShopReading, ShopRow, Size, Verdict, ItemTooltip, ScreenPoint,
 };
 use std::task::Poll;
 
 const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
 const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
-const CLIENT: Size = Size { width: 1920, height: 1200 };
 /// The shop's item list, from its first listing to its sixth.
 const LIST: ScreenRect = ScreenRect { x: 1373, y: 600, width: 311, height: 367 };
 const BADGES: Size = Size { width: 160, height: 0 };
@@ -38,7 +37,7 @@ const WOODEN_TOP: &str = "02070000";
 
 fn settings() -> Settings {
     Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client: CLIENT }),
+        setup_done: true,
         ..Settings::default()
     }
 }
@@ -455,7 +454,7 @@ fn a_file_from_before_the_deal_finder_gets_its_hotkey_unless_another_has_it() {
     minerva.restore(serde_json::from_str(file).unwrap());
     assert_eq!(minerva.panel_state().hotkeys.deal_finder, "", "off, as another hotkey has its default");
     assert_eq!(minerva.panel_state().hotkeys.search, "ctrl+shift+d");
-    assert_eq!(minerva.settings().version, 7);
+    assert_eq!(minerva.settings().version, 8);
 }
 
 #[test]

@@ -1,5 +1,6 @@
 //! Minerva shell: a thin adapter around `minerva-core`. It finds the game window,
-//! captures the Title Region and the bottom of the client area for the Status Bar (and,
+//! captures the Minimap Title (the whole client area while it looks for it, ADR 0021) and the
+//! bottom of the client area for the Status Bar (and,
 //! for Item Lookup, the client area with the pointer), feeds frames, hotkeys and drags to
 //! the core and renders the panel state in an overlay on top of everything (detached, with a taskbar entry), the
 //! Grind Tracker in a window of its own beside it, the Personal Bests window over the game
@@ -42,7 +43,7 @@ use minerva_core::{
     Action, DEAL_FINDER_CAPTURE_MS, Minerva, ExpBarReader, ExpBarReading, ExpFigures, Frame, GameWindow, ItemCapture, ItemTooltipReader,
     ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
     Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, Size, StatusBarCapture, StatusBarReader, StatusBarReading,
-    TitleReader, TitleReading, UpdateAnswer, VisitBest, default_title_region,
+    TITLE_READ_MS, TITLE_SEARCH_MS, TitleCapture, TitleReader, TitleReading, UpdateAnswer, VisitBest,
 };
 use source::WebSource;
 use bests_window::{BestsWindow, PersonalBestsView};
@@ -54,15 +55,18 @@ use item_lookup::{ItemLookupView, ItemLookupWindow};
 use setup::{Bridge, SetupPageView, SetupWindows};
 use sizemove::{Gesture, SizeMove};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent};
 use tauri_plugin_opener::OpenerExt;
 
-/// Capture and recognition rate: ~3 Hz keeps a map change within about a second.
-const TICK: Duration = Duration::from_millis(333);
+/// Minimap Title capture rate where it was found: ~3 Hz keeps a map change within about a
+/// second...
+const TICK: Duration = Duration::from_millis(TITLE_READ_MS);
+/// ...and while it is looked for in the whole client area (the core's pace).
+const TITLE_SEARCH_TICK: Duration = Duration::from_millis(TITLE_SEARCH_MS);
 /// Status Bar capture rate: EXP tracking needs its figures about once a second.
 const EXP_BAR_TICK: Duration = Duration::from_millis(1000);
 /// Deal Finder capture rate, while it is on (the core's pace).
@@ -208,9 +212,9 @@ pub(crate) enum Command {
     /// A watcher took one of our windows out of sight, with another app in front, while
     /// the core still showed it: check the game window and the foreground now.
     CheckForeground,
-    /// The reader is done with a capture of the Title Region `region`: the frame and what
-    /// it read, or `None` if the capture failed.
-    Read { region: ScreenRect, reading: Option<(Frame, TitleReading)> },
+    /// The reader is done with a capture of `region` for the Minimap Title: the capture and
+    /// what it read, or `None` if the capture failed.
+    Read { region: ScreenRect, reading: Option<(Box<TitleCapture>, TitleReading)> },
 
     /// The reader is done with an Item Card's or Item Lookup's capture: the capture, and
     /// what it read.
@@ -248,17 +252,12 @@ fn cache_dir(app: &AppHandle) -> tauri::Result<PathBuf> {
     Ok(app.path().app_cache_dir()?.join("cache"))
 }
 
-/// Capture the default Title Region of the game's client area (the probe's guess; the
-/// app captures the region the player marked at setup).
-pub fn capture_title_frame(client: ScreenRect, at_ms: u64) -> Result<Frame, String> {
-    let r = default_title_region(client.width, client.height);
-    let rgba = capture::capture_rgba(
-        client.x + r.x as i32,
-        client.y + r.y as i32,
-        r.width as i32,
-        r.height as i32,
-    )?;
-    Ok(Frame { width: r.width, height: r.height, rgba, at_ms })
+/// Capture the game's whole client area for the Minimap Title, as the app does while it looks
+/// for it (ADR 0021): for the probe.
+pub fn capture_title(client: ScreenRect, at_ms: u64) -> Result<TitleCapture, String> {
+    let rgba = capture::capture_rgba(client.x, client.y, client.width as i32, client.height as i32)?;
+    let frame = Frame { width: client.width, height: client.height, rgba, at_ms };
+    Ok(TitleCapture { frame, origin: ScreenPoint { x: client.x, y: client.y } })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -294,7 +293,7 @@ pub fn run() {
         .setup(|app| {
             let overlay = app.get_webview_window("overlay").expect("overlay window in tauri.conf.json");
             // Not content-protected: the panel shows in the player's screenshots and
-            // streams. The core keeps it off the Title Region instead, so our own capture
+            // streams. The core keeps it off the Minimap Title instead, so our own capture
             // never reads it.
             // Clicks pass through until there is a panel to show; then it is always
             // clickable, but never activated by a click (`focusable: false` in
@@ -340,11 +339,7 @@ pub fn run() {
             let tray = tray::install(app, commands.clone())?;
             app.manage(commands.clone());
             let (picks, picks_rx) = mpsc::channel();
-            app.manage(Bridge {
-                commands: commands.clone(),
-                picks,
-                game: Mutex::new(None),
-            });
+            app.manage(Bridge { commands: commands.clone(), picks });
             let setup_windows = SetupWindows::new(app.handle())?;
             // Without it the player's drags and resizes don't stick, but the panel works.
             if let Err(e) =
@@ -413,11 +408,6 @@ pub fn run() {
             errors::window_error,
             setup::setup_view,
             setup::pick_game_window,
-            setup::start_marking,
-            setup::adjust_selection,
-            setup::confirm_selection,
-            setup::mark_region,
-            setup::cancel_marking,
             setup::finish_setup,
             search::panel_press,
             search::open_mob_page,
@@ -602,7 +592,7 @@ enum Capture {
     StatusBar(ScreenRect, Option<ExpFigures>),
 }
 
-/// Captures and reads the Title Region, the Status Bar's strip (its EXP figures too) and the Deal
+/// Captures and reads the Minimap Title, the Status Bar's strip (its EXP figures too) and the Deal
 /// Finder's client area on its own thread, and reads Item Lookup's captures (taken at the
 /// press, while the Item Tooltip shows). Reading takes tens of ms (far more in a debug
 /// build), so the core loop never waits for it: it keeps following the game window at its
@@ -611,7 +601,7 @@ struct ReaderThread {
     captures: Sender<Capture>,
     /// The clock frames and ticks are timed by.
     start: Instant,
-    /// A Title Region capture was asked for and its reading hasn't come back yet.
+    /// A capture for the Minimap Title was asked for and its reading hasn't come back yet.
     title_busy: bool,
     /// Likewise for the Deal Finder's capture.
     shop_busy: bool,
@@ -625,7 +615,8 @@ impl ReaderThread {
         let (captures, asked) = mpsc::channel::<Capture>();
         std::thread::Builder::new().name("reader".into()).spawn(move || {
             // The readers share one recogniser.
-            let title_reader = TitleReader::bundled();
+            // It remembers the titles it read: standing in one map costs no recognition.
+            let mut title_reader = TitleReader::bundled();
             let exp_bar_reader = ExpBarReader::bundled();
             let item_reader = ItemTooltipReader::bundled();
             // It remembers the lines it read, so a shop left open costs no recognition.
@@ -645,9 +636,10 @@ impl ReaderThread {
             for capture in asked {
                 let command = match capture {
                     Capture::Title(region) => {
-                        let reading = grab(region).map(|f| {
-                            let read = title_reader.read(&f);
-                            (f, read)
+                        let reading = grab(region).map(|frame| {
+                            let capture = TitleCapture { frame, origin: ScreenPoint { x: region.x, y: region.y } };
+                            let read = title_reader.read(&capture);
+                            (Box::new(capture), read)
                         });
                         Command::Read { region, reading }
                     }
@@ -684,7 +676,7 @@ impl ReaderThread {
         Ok(Self { captures, start, title_busy: false, shop_busy: false, status_bar_busy: false })
     }
 
-    /// Capture and read the Title Region `region`, unless the last capture of it is
+    /// Capture `region` and read the Minimap Title in it, unless the last capture for it is
     /// still being read.
     fn read_title(&mut self, region: ScreenRect) {
         if !self.title_busy {
@@ -944,10 +936,10 @@ fn core_loop(
             }
             Ok(Command::Read { region, reading }) => {
                 reader.title_busy = false;
-                // A reading of a region no longer captured (setup marked a new one, or
-                // the game window moved) would judge the wrong spot.
-                if let (Some((frame, reading)), true) = (reading, minerva.panel_state().title_region == Some(region)) {
-                    minerva.on_title_frame_read(frame, reading);
+                // A reading of a region no longer captured (the game window moved, say) would
+                // put the title where it isn't.
+                if let (Some((capture, reading)), true) = (reading, minerva.panel_state().title_capture == Some(region)) {
+                    minerva.on_title_read(*capture, reading);
                 }
             }
 
@@ -1052,10 +1044,11 @@ fn core_loop(
             }
         }
         if Instant::now() >= next_capture {
-            next_capture = Instant::now() + TICK;
-            // The region the player marked; none until setup is done, nor after the
-            // game's resolution changes.
-            if let Some(region) = minerva.panel_state().title_region {
+            // Where the title was found, or the whole client area while it is looked for, less
+            // often (ADR 0021). None while another app is in front.
+            let searching = minerva.panel_state().title_searching;
+            next_capture = Instant::now() + if searching { TITLE_SEARCH_TICK } else { TICK };
+            if let Some(region) = minerva.panel_state().title_capture {
                 reader.read_title(region);
             }
         }
@@ -1342,7 +1335,7 @@ impl OverlayWindow {
             && gesture != Some(Gesture::Resize)
         {
             // While the player drags it the position is theirs; once they let go it goes
-            // where the core says (clear of the Title Region, inside the game).
+            // where the core says (clear of the Minimap Title, inside the game).
             place(&self.overlay, placement, gesture == Some(Gesture::Drag) && !layer_changed);
         }
     }

@@ -10,8 +10,8 @@ pub mod world;
 use minerva_core::osms::{OsmsFiles, SavedFiles};
 use minerva_core::osms_items::{ItemFiles, SavedItemFiles};
 use minerva_core::{
-    MINERVA_VERSION, Minerva, Fetched, Frame, GameWindow, ItemHit, MapDataSource, PanelState, Rect,
-    ScreenRect, Settings, Size, SourceError, TitleRegion, default_title_region,
+    MINERVA_VERSION, Minerva, Fetched, Frame, GameWindow, ItemHit, MapDataSource, PanelState,
+    ScreenRect, Settings, SourceError, TitleReading,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -83,21 +83,12 @@ pub fn capture(client: &image::RgbaImage, game: ScreenRect, region: ScreenRect, 
     frame(&crop, at_ms)
 }
 
-/// Crop the default Title Region out of a window screenshot, the way the shell crops
-/// it out of the game's client area.
-pub fn default_region_frame(window: &image::RgbaImage, at_ms: u64) -> Frame {
-    let client = client_of(window);
-    let r = default_title_region(client.width(), client.height());
-    let crop = image::imageops::crop_imm(&client, r.x, r.y, r.width, r.height).to_image();
-    frame(&crop, at_ms)
-}
-
-/// The frame the shell would capture for a sample: `--window` samples go through the
-/// default Title Region; other samples (a minimap crop, a live Title Region capture)
-/// are fed whole.
+/// The frame the shell would capture for a sample: `--window` samples' client area, as the
+/// shell captures it while it looks for the title (ADR 0021); other samples (a minimap crop,
+/// a capture of where the title was found) are fed whole.
 pub fn sample_frame(name: &str, at_ms: u64) -> Frame {
     let img = load(name);
-    if name.ends_with("--window") { default_region_frame(&img, at_ms) } else { frame(&img, at_ms) }
+    if name.ends_with("--window") { frame(&client_of(&img), at_ms) } else { frame(&img, at_ms) }
 }
 
 /// Two confident reads of a sample: the panel switches to its map.
@@ -113,24 +104,14 @@ pub fn tracking() -> Minerva {
 
 /// As [`tracking`], with OSMS's file set from `source`.
 pub fn tracking_with(source: FakeSource) -> Minerva {
-    let client = Size { width: 1920, height: 1200 };
     let mut minerva = Minerva::new(source);
     minerva.restore(Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
+        setup_done: true,
         ..Settings::default()
     });
     let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
     minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
     minerva
-}
-
-/// A Title Region marked around the minimap title of the Kerning City window sample,
-/// whose client area is 1916x1197.
-pub fn kerning_title_region() -> TitleRegion {
-    TitleRegion {
-        marked: Rect { x: 70, y: 40, width: 130, height: 48 },
-        client: Size { width: 1916, height: 1197 },
-    }
 }
 
 /// Sunset Sky's and the Construction Site's map IDs: both have a Map Summary in the
@@ -390,3 +371,19 @@ impl MapDataSource for FakeSource {
         self.item_set_answers[n.min(self.item_set_answers.len() - 1)].clone()
     }
 }
+
+/// Where a Minimap Title is found on the game's client area `client` in these tests: at
+/// client (70,40), 620x48 (ADR 0021), as the Title Region the player marked there was.
+pub fn title_on(client: ScreenRect) -> ScreenRect {
+    ScreenRect { x: client.x + 70, y: client.y + 40, width: 620.min(client.width - 70), height: 48 }
+}
+
+/// A Minimap Title found at `area` on screen, but unreadable: the map shown stays as it is, and
+/// our windows keep clear of it.
+pub fn found_title(minerva: &mut Minerva, area: ScreenRect, at_ms: u64) {
+    minerva.on_reading(TitleReading { lines: None, found: Some(area), at_ms });
+}
+
+/// Where readings made up in these tests found the Minimap Title, on a game window at the
+/// screen's top-left: the open minimap's top, at the samples' UI Size.
+pub const TITLE_FOUND: ScreenRect = ScreenRect { x: 0, y: 4, width: 720, height: 110 };

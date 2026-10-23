@@ -35,8 +35,7 @@ mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    ExpBar, Frame, GameWindow, Minerva, PanelState, Rect, ScreenPoint, ScreenRect, Settings, Size, StatusBarCapture,
-    TitleRegion,
+    ExpBar, Frame, GameWindow, Minerva, PanelState, ScreenPoint, ScreenRect, Settings, StatusBarCapture,
 };
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -54,10 +53,9 @@ fn frame(path: &Path) -> Frame {
 /// A fresh core (so no earlier reading lingers), set up as a player's is, over a game window
 /// with this client area at the screen's origin: the Grind Tracker is on.
 fn started(width: u32, height: u32) -> Minerva {
-    let client = Size { width, height };
     let mut minerva = Minerva::new(FakeSource::osms_offline());
     minerva.restore(Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
+        setup_done: true,
         ..Settings::default()
     });
     let screen = ScreenRect { x: 0, y: 0, width, height };
@@ -78,11 +76,13 @@ fn status_bar_capture(state: &PanelState, client: &image::RgbaImage, at_ms: u64)
 }
 
 /// The minimap samples that are whole game windows, and what their EXP bars show.
-const WINDOWS: [(&str, ExpBar); 4] = [
+const WINDOWS: [(&str, ExpBar); 6] = [
     ("hidden-street__northern-top-of-construction-site--window", ExpBar { exp: 335, percent_hundredths: 798 }),
     ("victoria-road__construction-site-north-of-kerning-city--window", ExpBar { exp: 266, percent_hundredths: 633 }),
     ("victoria-road__kerning-city--window", ExpBar { exp: 160, percent_hundredths: 381 }),
+    ("victoria-road__perion-department-store--window", ExpBar { exp: 100_300, percent_hundredths: 6449 }),
     ("victoria-road__sunset-sky--window", ExpBar { exp: 160, percent_hundredths: 381 }),
+    ("victoria-road__subway-ticketing-booth--window", ExpBar { exp: 100_300, percent_hundredths: 6449 }),
 ];
 
 #[test]
