@@ -24,7 +24,7 @@ fn frames_read_on_another_thread_switch_the_map_like_frames_fed_to_the_core() {
     let readings = std::thread::spawn(|| {
         let mut reader = TitleReader::bundled();
         let origin = ScreenPoint { x: 0, y: 0 };
-        [0, 333].map(|at_ms| reader.read(&TitleCapture { frame: sample_frame(KERNING, at_ms), origin }))
+        [0, 333].map(|at_ms| reader.read(&TitleCapture { frame: sample_frame(KERNING, at_ms), origin, ours: Vec::new() }))
     })
     .join()
     .unwrap();

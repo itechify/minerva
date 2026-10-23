@@ -64,6 +64,9 @@ pub struct TitleCapture {
     pub frame: Frame,
     /// Where the frame's top-left pixel is on screen.
     pub origin: ScreenPoint,
+    /// Where our own windows were on screen as it was captured (the panel state's
+    /// `our_windows`): the capture holds them, and no title is looked for in them.
+    pub ours: Vec<ScreenRect>,
 }
 
 /// What one title capture reads as.
@@ -97,7 +100,10 @@ impl TitleReader {
     }
 
     pub fn read(&mut self, capture: &TitleCapture) -> TitleReading {
-        let found = frame_to_rgb(&capture.frame).and_then(|img| minimap_title::find(&img));
+        let found = frame_to_rgb(&capture.frame).and_then(|mut img| {
+            blank(&mut img, capture.origin, &capture.ours);
+            minimap_title::find(&img)
+        });
         let Some(found) = found else { return TitleReading { lines: None, found: None, at_ms: capture.frame.at_ms } };
         let key = (found.prepared.canvas.width(), found.prepared.canvas.as_raw().clone());
         let lines = match self.read.get(&key) {
@@ -114,6 +120,22 @@ impl TitleReader {
         let (x, y, width, height) = found.area;
         let found = ScreenRect { x: capture.origin.x + x, y: capture.origin.y + y, width, height };
         TitleReading { lines, found: Some(found), at_ms: capture.frame.at_ms }
+    }
+}
+
+/// `img`, captured with its top-left pixel at `origin` on screen, painted black wherever one of
+/// `ours` (our windows, on screen) covers it.
+fn blank(img: &mut RgbImage, origin: ScreenPoint, ours: &[ScreenRect]) {
+    let (w, h) = (img.width() as i64, img.height() as i64);
+    for r in ours {
+        let (x0, y0) = ((r.x as i64 - origin.x as i64).clamp(0, w), (r.y as i64 - origin.y as i64).clamp(0, h));
+        let x1 = (r.x as i64 + r.width as i64 - origin.x as i64).clamp(0, w);
+        let y1 = (r.y as i64 + r.height as i64 - origin.y as i64).clamp(0, h);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                img.put_pixel(x as u32, y as u32, image::Rgb([0, 0, 0]));
+            }
+        }
     }
 }
 
@@ -190,14 +212,11 @@ impl Recogniser {
         (0..inks.len()).map(|i| text(lines.get(i).and_then(|line| line.as_ref()))).collect()
     }
 
-    /// Read the street line and the map line, or the one line "Street : Map". `None` means
-    /// unreadable.
+    /// Read the street line and the map line, of either layout: the one line "Street : Map"
+    /// comes split at its colon. `None` means unreadable.
     fn read_prepared(&self, p: &Prepared) -> Option<TitleLines> {
         let out = self.read_lines(&p.canvas, &p.lines)?;
         let line = |i: usize| out.get(i).and_then(|l| l.as_ref());
-        if p.lines.len() == 1 {
-            return one_line(&line(0)?.to_string());
-        }
         let street = line(0).map(|l| l.to_string().trim().to_string());
         let map = match (line(1), p.numeral) {
             (line, Some(numeral)) => Some(with_numeral(line, numeral)),
@@ -220,12 +239,4 @@ fn with_numeral(line: Option<&TextLine>, numeral: Numeral) -> String {
         .map(|c| c.char)
         .collect();
     format!("{} {}", before.trim(), "I".repeat(numeral.strokes)).trim().to_string()
-}
-
-/// The one-line layout's reading, "Street : Map", split at its colon. `None` without one: the
-/// header of an open minimap ("MINI MAP"), say.
-fn one_line(text: &str) -> Option<TitleLines> {
-    let (street, map) = text.split_once(':')?;
-    let (street, map) = (street.trim(), map.trim());
-    (!street.is_empty() && !map.is_empty()).then(|| TitleLines { street: street.to_string(), map: map.to_string() })
 }

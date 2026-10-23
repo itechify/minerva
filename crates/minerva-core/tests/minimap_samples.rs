@@ -10,7 +10,10 @@
 //! III's are that same rectangle cropped from the player's screenshots of the game's client
 //! area (no Windows title bar, so the minimap starts at y = 0); those screenshots are
 //! hand-cropped to within a few px of the client area, so the crops can sit a pixel or three
-//! off the live capture. In I's, the mouse pointer covers the map icon.
+//! off the live capture. In I's, the mouse pointer covers the map icon. `--collapsed` samples
+//! are a Bug Report's crops of where a collapsed minimap's one-line title was found, the WORLD
+//! button 23 rows down; Free Market <1>'s are cut to the bar, past which other players' shops
+//! stand, and `--collapsed-dim`'s is taken as the map fades in, the bar and its text darker.
 
 mod common;
 

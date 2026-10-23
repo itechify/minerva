@@ -15,7 +15,8 @@
 //! 4. Split the two lines (street, map) with a horizontal projection profile.
 //!
 //! The one-line layout ("Street : Map", a collapsed minimap's or a map's without one) is dark
-//! grey text on the bar's light grey: "ink" is how dark a neutral pixel is ([`prepare_one_line`]).
+//! grey text on the bar's light grey: "ink" is how dark a neutral pixel is. It is split at the
+//! colon found in the ink, into the same two lines ([`prepare_one_line`]).
 
 use image::{GrayImage, Luma, RgbImage};
 
@@ -70,10 +71,20 @@ const BAR_TINT: u8 = 16;
 /// ...is ink from this luma down, wholly so this far below it...
 const BAR_INK_FROM: f32 = 190.0;
 const BAR_INK_SPAN: f32 = 110.0;
+/// ...next to the bar at this luma: the samples'.
+const BAR_LUMA: f32 = 215.0;
 /// ...and is the bar's light grey from this luma up (215 on the samples).
 const BAR_MIN_LUMA: f32 = 170.0;
 /// The bar is at least this wide left of its buttons.
 const BAR_MIN_W: u32 = 40;
+/// The text on the bar ends at a gap of at least this many ink-free columns (words are 4-6
+/// apart).
+const BAR_TEXT_END_GAP: u32 = 12;
+/// The colon between street and map: at most this many columns wide, its two dots each at most
+/// this many rows tall (2-3 at the samples' size), a row of a dot having this much ink.
+const COLON_MAX_W: u32 = 4;
+const COLON_DOT_H: u32 = 4;
+const COLON_DOT_INK: f32 = 0.5;
 /// White padding around the masked text canvas.
 pub const PAD: u32 = 8;
 
@@ -225,14 +236,16 @@ pub fn prepare(img: &RgbImage) -> Option<Prepared> {
     Some(Prepared { canvas, lines, left: rx, numeral })
 }
 
-/// The one-line layout's ink (0.0 background ..= 1.0 text): how dark a neutral pixel is. The
-/// bar is (215,215,215), the text (45,45,45), anti-aliased between them.
-fn bar_ink(p: [u8; 3]) -> f32 {
+/// The one-line layout's ink (0.0 background ..= 1.0 text): how dark a neutral pixel is, next to
+/// the bar's grey `bar` (its luma): the samples' bar is (215,215,215), the text (45,45,45),
+/// anti-aliased between them, and a bar the game draws darker (as a map fades in) has its text
+/// as much darker.
+fn bar_ink(p: [u8; 3], bar: f32) -> f32 {
     let (max, min) = (p.iter().max().copied().unwrap_or(0), p.iter().min().copied().unwrap_or(0));
     if max - min > BAR_TINT {
         return 0.0;
     }
-    ((BAR_INK_FROM - luma(p)) / BAR_INK_SPAN).clamp(0.0, 1.0)
+    ((BAR_INK_FROM - luma(p) * BAR_LUMA / bar) / BAR_INK_SPAN).clamp(0.0, 1.0)
 }
 
 /// The bar's light grey, at any brightness.
@@ -244,6 +257,10 @@ fn is_bar(p: [u8; 3]) -> bool {
 /// The one-line layout's title in `img`, at the samples' UI Size: dark grey text on the bar,
 /// on `rows`, ending at column `right` (where the bar's buttons start). The bar's left edge is
 /// where its light grey ends, left along the clear rows `clear` above and below the text.
+///
+/// "Street : Map" is split at its colon, found in the ink (ocrs drops it as often as not), into
+/// the street line and the map line, read as the two-line layout's are. Without a colon it is
+/// no title: the header of an open minimap ("MINI MAP"), say.
 pub fn prepare_one_line(img: &RgbImage, rows: (u32, u32), right: u32, clear: [u32; 2]) -> Option<Prepared> {
     let (y0, y1) = (rows.0, rows.1.min(img.height()));
     let right = right.min(img.width());
@@ -256,23 +273,46 @@ pub fn prepare_one_line(img: &RgbImage, rows: (u32, u32), right: u32, clear: [u3
         return None;
     }
     let (tw, th) = (right - left, y1 - y0);
+    // The bar's grey, along its clear rows.
+    let bar = clear.iter().flat_map(|&y| (left..right).map(move |x| luma(img.get_pixel(x, y).0))).sum::<f32>() / (2 * tw) as f32;
     let inks: Vec<f32> = (0..th)
         .flat_map(|y| (0..tw).map(move |x| (x, y)))
-        .map(|(x, y)| bar_ink(img.get_pixel(left + x, y0 + y).0))
+        .map(|(x, y)| bar_ink(img.get_pixel(left + x, y0 + y).0, bar))
         .collect();
     let at = |x: u32, y: u32| inks[(y * tw + x) as usize];
     let col_on: Vec<bool> = (0..tw).map(|x| (0..th).map(|y| at(x, y)).sum::<f32>() > COL_MIN_INK).collect();
-    let row_on: Vec<bool> = (0..th).map(|y| (0..tw).map(|x| at(x, y)).sum::<f32>() > LINE_MIN_INK).collect();
-    let (first, last) = (col_on.iter().position(|&b| b)? as u32, col_on.iter().rposition(|&b| b)? as u32 + 1);
-    let (top, bottom) = (row_on.iter().position(|&b| b)? as u32, row_on.iter().rposition(|&b| b)? as u32 + 1);
-    let line = Rect { x: first + PAD, y: top + PAD, w: last - first, h: bottom - top };
+    // The letters' runs of columns, up to the first gap too wide for one between words: past
+    // it is the edge of the bar's first small button (a collapsed minimap's bar is wider than
+    // a short title).
+    let mut letters = runs(&col_on);
+    let end = letters.windows(2).position(|w| w[1].0 - w[0].1 >= BAR_TEXT_END_GAP).map_or(letters.len(), |i| i + 1);
+    letters.truncate(end);
+    let colon = letters.iter().position(|&run| is_colon(&at, run, th))?;
+    let (street, map) = (&letters[..colon], &letters[colon + 1..]);
+    // A line: its letters' columns, and the rows they ink.
+    let line = |runs: &[(u32, u32)]| -> Option<Rect> {
+        let (x0, x1) = (runs.first()?.0, runs.last()?.1);
+        let row_on: Vec<bool> = (0..th).map(|y| (x0..x1).map(|x| at(x, y)).sum::<f32>() > LINE_MIN_INK).collect();
+        let (top, bottom) = (row_on.iter().position(|&b| b)? as u32, row_on.iter().rposition(|&b| b)? as u32 + 1);
+        Some(Rect { x: x0 + PAD, y: top + PAD, w: x1 - x0, h: bottom - top })
+    };
+    let lines = vec![line(street)?, line(map)?];
+    let numeral = trailing_numeral(&at, lines[1]);
     let mut canvas = GrayImage::from_pixel(tw + 2 * PAD, th + 2 * PAD, Luma([255]));
     for y in 0..th {
         for x in 0..tw {
             canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - at(x, y))).round() as u8]));
         }
     }
-    Some(Prepared { canvas, lines: vec![line], left, numeral: None })
+    Some(Prepared { canvas, lines, left, numeral })
+}
+
+/// Whether the columns `run` (ends exclusive) of a line of ink `th` rows tall are a colon: no
+/// wider than one, and two dots, one above the other.
+fn is_colon(at: &impl Fn(u32, u32) -> f32, (x0, x1): (u32, u32), th: u32) -> bool {
+    let row_on: Vec<bool> = (0..th).map(|y| (x0..x1).map(|x| at(x, y)).sum::<f32>() > COLON_DOT_INK).collect();
+    let dots = runs(&row_on);
+    x1 - x0 <= COLON_MAX_W && dots.len() == 2 && dots.iter().all(|(a, b)| b - a <= COLON_DOT_H)
 }
 
 /// The Roman numeral I, II or III ending a line (`line` in canvas coordinates; `at`
