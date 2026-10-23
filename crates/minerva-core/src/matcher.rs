@@ -173,12 +173,14 @@ fn read_numeral(reading: &[char], stem: &[char]) -> Option<Vec<char>> {
 /// RoadI") and punctuation carries little signal. Glyphs the game font draws as one
 /// upright stroke (I, l, 1, |, !) are folded together, on both sides of a match, and
 /// an unknown glyph is kept, so a misread numeral counts as misread rather than absent.
+/// So are angle brackets: ocrs gives "Free Market <2>" as "Free Market ?2>" as often as
+/// not, which without them is as near "<12>" (its 1 folded) as "<2>".
 pub(crate) fn key(s: &str) -> Vec<char> {
     s.chars()
         .flat_map(char::to_lowercase)
         .filter_map(|c| match c {
             'l' | '1' | '|' | '!' => Some('i'),
-            UNKNOWN => Some(UNKNOWN),
+            UNKNOWN | '<' | '>' => Some(c),
             c if c.is_alphanumeric() => Some(c),
             _ => None,
         })

@@ -117,6 +117,29 @@ fn every_title_in_osmss_map_list_read_exactly_shows_that_title() {
     assert!(wrong.is_empty(), "wrong maps:\n{}", wrong.join("\n"));
 }
 
+/// ocrs often can't name the "<" of a bracketed name, "Free Market <2>" reading as
+/// "Free Market ?2>": still that room, never <12> or <20>, nor not sure between them.
+#[test]
+fn a_bracketed_name_whose_opening_bracket_is_unreadable_shows_its_own_map() {
+    let mut minerva = Minerva::new(FakeSource::osms());
+    let mut wrong = Vec::new();
+    let names = osms::map_names();
+    let bracketed = names.maps.iter().filter(|m| m.name.trim().contains('<'));
+    for (i, entry) in bracketed.enumerate() {
+        let (street, map) = (entry.street_name.trim(), entry.name.trim());
+        let read = map.replacen('<', "?", 1);
+        let at_ms = 1000 * i as u64;
+        minerva.on_reading(read_as(street, &read, at_ms));
+        let state = minerva.on_reading(read_as(street, &read, at_ms + 333));
+
+        let shown = state.map.as_ref().map(|m| (m.street_name.as_str(), m.map_name.as_str()));
+        if shown != Some((street, map)) || state.not_sure {
+            wrong.push(format!("{street} / {read}: panel shows {shown:?} (not sure: {})", state.not_sure));
+        }
+    }
+    assert!(wrong.is_empty(), "wrong maps:\n{}", wrong.join("\n"));
+}
+
 /// A source whose map list says map `from` leads to the maps `to`, and every other map
 /// leads nowhere.
 fn leading(from: &str, to: &[&str]) -> FakeSource {

@@ -12,7 +12,7 @@
 //! hand-cropped to within a few px of the client area, so the crops can sit a pixel or three
 //! off the live capture. In I's, the mouse pointer covers the map icon. `--collapsed` samples
 //! are a Bug Report's crops of where a collapsed minimap's one-line title was found, the WORLD
-//! button 23 rows down; Free Market <1>'s are cut to the bar, past which other players' shops
+//! button 23 rows down; Free Market <1> to <4>'s are cut to the bar, past which other players' shops
 //! stand, and `--collapsed-dim`'s is taken as the map fades in, the bar and its text darker.
 
 mod common;
