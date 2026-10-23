@@ -2,7 +2,7 @@
 // the page scrolls. It opens on the hero shot, the panel under the minimap, so the first
 // screen shows what Minerva does; the camera draws back to the whole game window, then moves
 // in to the minimap's title;
-// setup's dashed box is marked around its two lines; a read passes over them and turns them
+// Minerva's dashed box finds its two lines; a read passes over them and turns them
 // into Minerva's own lettering, which drops into the panel's title under the minimap;
 // and the camera draws back to the hero shot as it is. While it plays, the hero stays put
 // and the scroll runs the film, as the minimap's dot moves only with the scroll: never on a
@@ -16,8 +16,8 @@ type Rect = { x: number; y: number; w: number; h: number };
 // checking these). The hero shot, hero.png, is its top-left corner at full size.
 const WHOLE: Rect = { x: 0, y: 0, w: 1922, h: 1232 };
 const HERO: Rect = { x: 0, y: 0, w: 600, h: 960 };
-/** The box marked around the minimap title's two lines, with a little of its blue panel. */
-const MARK: Rect = { x: 70, y: 68, w: 248, h: 58 };
+/** Where Minerva finds the minimap title: its two lines, with a little of its blue panel. */
+const FOUND: Rect = { x: 70, y: 68, w: 248, h: 58 };
 /** The panel's title panel, under the minimap, where the read lands: beside its Map Mark. */
 const TITLE: Rect = { x: 49, y: 409, w: 290, h: 56 };
 /** Close on the minimap's title, with the panel's under it, in the hero's shape. */
@@ -33,14 +33,13 @@ const READ_FROM = [0xa4, 0xc8, 0xda];
 const READ_TO = [0xab, 0xcf, 0xe2];
 
 // The film's beats, as shares of its scroll: out from the hero shot to the whole window, in
-// to the title, the box marked, the read, the drop into the panel, then back to the shot.
+// to the title, the title found, the read, the drop into the panel, then back to the shot.
 const OUT = [0, 0.12];
 const PUSH = [0.14, 0.34];
-const VEIL_IN = [0.34, 0.397];
-const DRAG = [0.359, 0.472];
+const FIND = [0.359, 0.472];
 const READ = [0.491, 0.623];
 const DROP = [0.642, 0.811];
-const VEIL_OUT = [0.811, 0.887];
+const BOX_OUT = [0.811, 0.887];
 const LANDED = [0.83, 0.887];
 const BACK = [0.849, 1];
 /**
@@ -50,16 +49,14 @@ const BACK = [0.849, 1];
 const CAPTIONS: [string, number, number][] = [
   ["", -1, 0.1],
   ["MapleStory, windowed, with its minimap open.", 0.1, 0.331],
-  ["At setup, you mark the minimap's title: both its lines.", 0.331, 0.481],
-  ["Minerva captures just that box, the way a screenshot does, and reads it.", 0.481, 0.632],
+  ["Minerva finds the minimap's title by itself, wherever the minimap is.", 0.331, 0.481],
+  ["It captures just the title, the way a screenshot does, and reads it.", 0.481, 0.632],
   ["The panel names the map it read.", 0.632, 0.849],
   ["", 0.849, 2],
 ];
 const FADE = 0.015;
 /** The share of the pinned scroll the film takes; the rest holds its last frame. */
 const PLAY = 0.85;
-/** The navy veil the title-marking window lays over the game (region.html). */
-const VEIL = "18, 28, 56";
 
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -123,7 +120,7 @@ export function reel(head: () => number) {
 
   // The film: a frame onto the game window, the shot's top-left corner in it at full size
   // over the whole window at half, the read's lettering, and over them in the frame's own
-  // pixels the veil, the marked box and the read's line. Captions under the frame.
+  // pixels the box around the title found and the read's line. Captions under the frame.
   const pin = make("div", "reel-pin");
   const frame = make("div", "reel-frame");
   const world = make("div", "reel-world");
@@ -133,12 +130,11 @@ export function reel(head: () => number) {
   const read = make("div", "reel-read");
   read.setAttribute("aria-hidden", "true");
   read.append(make("p", "reel-street", STREET), make("p", "reel-map", MAP));
-  const veil = make("div", "reel-veil");
   const box = make("div", "reel-box");
   const sweep = make("div", "reel-sweep");
-  for (const node of [veil, box, sweep]) node.setAttribute("aria-hidden", "true");
+  for (const node of [box, sweep]) node.setAttribute("aria-hidden", "true");
   world.append(base, read);
-  frame.append(world, veil, box, sweep);
+  frame.append(world, box, sweep);
   const captions = make("div", "reel-captions");
   captions.setAttribute("aria-hidden", "true");
   const lines = CAPTIONS.map(([words]) => captions.appendChild(make("span", "", words || caption.textContent!.trim())));
@@ -258,25 +254,19 @@ export function reel(head: () => number) {
       line.style.opacity = String(clamp((p - a) / FADE - 1) * clamp((b - p) / FADE - 1));
     });
 
-    // The box, dragged from its top-left corner as the player marks it, the veil around it.
-    const drag = ease(seg(p, DRAG));
-    const shade = seg(p, VEIL_IN) * (1 - seg(p, VEIL_OUT));
-    const left = (MARK.x - cam.x) * s;
-    const top = (MARK.y - cam.y) * s;
-    const width = MARK.w * s * drag;
-    const tall = MARK.h * s * drag;
-    for (const node of [veil, box]) {
-      Object.assign(node.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${tall}px` });
-    }
-    veil.style.boxShadow = `0 0 0 ${Math.ceil(height + w)}px rgba(${VEIL}, ${0.3 * shade})`;
-    visible(veil, shade > 0);
-    box.style.opacity = String(1 - seg(p, VEIL_OUT));
-    visible(box, drag > 0 && p < VEIL_OUT[1]);
+    // The box around the title, as Minerva finds it: nothing for the player to mark.
+    const found = seg(p, FIND) * (1 - seg(p, BOX_OUT));
+    const left = (FOUND.x - cam.x) * s;
+    const top = (FOUND.y - cam.y) * s;
+    const tall = FOUND.h * s;
+    Object.assign(box.style, { left: `${left}px`, top: `${top}px`, width: `${FOUND.w * s}px`, height: `${tall}px` });
+    box.style.opacity = String(found);
+    visible(box, found > 0);
 
     // The read: a line across the box, Minerva's lettering where it has passed.
     const done = seg(p, READ);
     visible(sweep, done > 0 && done < 1);
-    sweep.style.transform = `translate(${left + MARK.w * s * done - 1}px, ${top}px)`;
+    sweep.style.transform = `translate(${left + FOUND.w * s * done - 1}px, ${top}px)`;
     sweep.style.height = `${tall}px`;
     read.style.clipPath = `inset(0 ${(1 - done) * 100}% 0 0)`;
     visible(read, done > 0 && p < LANDED[1]);
@@ -284,10 +274,10 @@ export function reel(head: () => number) {
     // Then it drops into the panel's title, which says the same, and gives way to it.
     const drop = ease(seg(p, DROP));
     Object.assign(read.style, {
-      left: `${MARK.x + (TITLE.x - MARK.x) * drop}px`,
-      top: `${MARK.y + (TITLE.y - MARK.y) * drop}px`,
-      width: `${MARK.w + (TITLE.w - MARK.w) * drop}px`,
-      height: `${MARK.h + (TITLE.h - MARK.h) * drop}px`,
+      left: `${FOUND.x + (TITLE.x - FOUND.x) * drop}px`,
+      top: `${FOUND.y + (TITLE.y - FOUND.y) * drop}px`,
+      width: `${FOUND.w + (TITLE.w - FOUND.w) * drop}px`,
+      height: `${FOUND.h + (TITLE.h - FOUND.h) * drop}px`,
       opacity: String(1 - seg(p, LANDED)),
       backgroundColor: `rgb(${READ_FROM.map((c, k) => Math.round(c + (READ_TO[k] - c) * drop)).join(", ")})`,
     });

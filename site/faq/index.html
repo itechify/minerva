@@ -254,7 +254,7 @@
                   <summary>What do I need to run Minerva?</summary>
                   <p>
                     Windows 10 or 11, 64-bit, and MapleStory Classic World played windowed or borderless, with the minimap
-                    open and both lines of its title showing.
+                    showing, open or collapsed, anywhere in the game window.
                   </p>
                   <p>
                     Minerva has been tested mostly with the game windowed at 1920×1200, its UI size set to
@@ -349,7 +349,7 @@
           <section class="faq-group stop" id="setup" data-about="setup and hotkeys" aria-labelledby="setup-title">
             <div class="faq-group-head">
               <h2 id="setup-title">Setup &amp; hotkeys</h2>
-              <p>The first run, marking the minimap title, and changing the hotkeys.</p>
+              <p>The first run, finding your map, and changing the hotkeys.</p>
             </div>
             <div class="faq-group-body">
               <h3>Setup</h3>
@@ -360,23 +360,25 @@
                   <ol>
                     <li>The <a href="/#safe">account warning</a>.</li>
                     <li>Finding the game window, or picking it by hand.</li>
-                    <li>Setting up the game: windowed or borderless, with the minimap open and its title showing.</li>
-                    <li><a href="#mark-title">Marking the minimap title</a>, then a test read of it.</li>
+                    <li>Setting up the game: windowed or borderless, with the minimap showing, open or collapsed.</li>
+                    <li>Finding your map: Minerva <a href="#minimap-title">finds the minimap title by itself</a> and shows the map it names.</li>
                     <li>The <a href="/#grind-tracker">Grind Tracker</a>, which <a href="#exp-bar">needs nothing marked</a>.</li>
                   </ol>
                   <p>Finish starts the overlay. Closing setup on its first run quits.</p>
                 </details>
-                <details class="qa" id="mark-title">
-                  <summary>How do I mark the minimap title?</summary>
+                <details class="qa" id="minimap-title">
+                  <summary>Do I have to mark the minimap title?</summary>
                   <p>
-                    Drag a box around both lines of the title, with a little of the blue panel around them. Or move the box
-                    with the arrow keys and resize it with <kbd>Alt+Arrow</kbd>, holding <kbd>Shift</kbd> for ten-pixel
-                    steps. <kbd>Enter</kbd> tests the box; <kbd>Esc</kbd> goes back without changing the previous mark.
+                    No. Minerva finds the minimap's title by itself, wherever you put the minimap, open or collapsed,
+                    whatever the game window's size, and at any of the game's UI Size settings. On a map without a
+                    minimap, it reads the bar the game shows there instead, "Victoria Road : Perion Department Store". A
+                    mark you made in an earlier version isn't used any more. Setup shows the map it found, and you can
+                    finish it before it has found one.
                   </p>
                   <figure class="shot">
                     <img
                       src="../screenshots/setup.png"
-                      alt="Setup reopened from Help & Setup, at its step for marking the minimap title again: draw or adjust a box around its two lines, with Back, Keep the current title and Mark the title."
+                      alt="Setup at its step Finding your map: the map Minerva found in the minimap's title, beside its Map Mark, tagged Found, with the hotkeys to use while you play."
                       loading="lazy"
                       decoding="async"
                     />
@@ -395,7 +397,7 @@
                   <summary>How do I open setup again?</summary>
                   <p>
                     <kbd>Ctrl+Shift+S</kbd>, or Help &amp; Setup on the panel or on the owl in the notification area. There
-                    you can mark the title anew, or read the Overlay Guide, which lists your hotkeys and explains placement
+                    you can see the map Minerva found, or read the Overlay Guide, which lists your hotkeys and explains placement
                     and the hunting figures. About &amp; Credits, beside it, links back to this site.
                   </p>
                 </details>
@@ -1256,11 +1258,13 @@
                     the pointer over the game while setup counts down.
                   </p>
                 </details>
-                <details class="qa" id="no-map-recognised">
-                  <summary>The test read says "No map recognised in the marked box". What now?</summary>
+                <details class="qa" id="minimap-not-found">
+                  <summary>The panel says "Can't find the minimap's title". What now?</summary>
                   <p>
-                    Open the minimap with both lines of its title showing, then mark the box again around both lines, with a
-                    little of the blue panel around them. Setup waits on this step until a map is recognised.
+                    No minimap title has been found for 10 seconds, so the panel keeps the last map it showed. Open the
+                    minimap, or expand it if you collapsed it to its bar, and keep it out from under other windows:
+                    Minerva finds it wherever it is, within a second or two. If the minimap is showing and the panel still
+                    can't find it, <a href="#bug-reports">send a Bug Report</a>.
                   </p>
                 </details>
                 <details class="qa" id="no-panel">
@@ -1275,15 +1279,10 @@
                   <summary>Why can't the panel tell which map I'm on?</summary>
                   <p>
                     It says "Reading the minimap title…", or shows the last map it read marked
-                    <span class="chip-doubt">Not sure</span>. Keep the minimap open with both lines of its title showing. If
-                    it goes on, mark the title again with <kbd>Ctrl+Shift+S</kbd>.
-                  </p>
-                </details>
-                <details class="qa" id="changed-size">
-                  <summary>Why does the panel say "The game window changed size"?</summary>
-                  <p>
-                    The minimap title has moved with it, so setup opens by itself: mark it again. The EXP bar needs no mark:
-                    Minerva finds it wherever it is.
+                    <span class="chip-doubt">Not sure</span>. Keep the minimap's title in sight, open or collapsed, with
+                    nothing over it: the pointer or another window over it makes it unreadable. If it goes on with the
+                    title in plain sight, <a href="#bug-reports">send a Bug Report</a>: Minerva reads best at the game's
+                    <b>Default Ratio</b> UI size.
                   </p>
                 </details>
                 <details class="qa" id="recognition-unavailable">
