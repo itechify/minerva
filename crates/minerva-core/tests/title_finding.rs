@@ -42,7 +42,8 @@ fn started(sample: &str) -> Minerva {
 fn capture(minerva: &Minerva, sample: &str, at_ms: u64) -> TitleCapture {
     let client = common::client_of(&common::load(sample));
     let region = minerva.panel_state().title_capture.expect("a title capture with the game in front");
-    TitleCapture { frame: common::capture(&client, game(sample), region, at_ms), origin: ScreenPoint { x: region.x, y: region.y } }
+    let ours = minerva.panel_state().our_windows.clone();
+    TitleCapture { frame: common::capture(&client, game(sample), region, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ours }
 }
 
 /// Capture what the core asks for of `sample`, and read it.
@@ -112,7 +113,7 @@ fn when_the_title_is_no_longer_where_it_was_found_the_whole_client_area_is_looke
     // The player moved the minimap: nothing of it is there now.
     let blank = image::RgbaImage::from_pixel(found.width, found.height, image::Rgba([0, 0, 0, 255]));
     let origin = ScreenPoint { x: found.x, y: found.y };
-    let state = minerva.on_title_capture(TitleCapture { frame: common::frame(&blank, 666), origin });
+    let state = minerva.on_title_capture(TitleCapture { frame: common::frame(&blank, 666), origin, ours: Vec::new() });
 
     assert_eq!(state.title_capture, Some(game(KERNING)));
     assert!(state.title_searching);
@@ -143,6 +144,36 @@ fn the_game_window_moving_has_the_title_looked_for_again() {
 
     assert_eq!(state.title_capture, Some(moved));
     assert!(state.title_searching);
+}
+
+/// The panel shows in a capture of the screen, and looks like an open minimap: its map's name on
+/// light blue, beside an orange NOT SURE where the WORLD button would be. Found there, it would
+/// move the panel clear of itself, and back once the next capture missed it.
+#[test]
+fn the_panel_in_the_capture_is_never_read_as_the_minimap_title() {
+    // A Bug Report's capture with the panel in it, shown at (1504,526), on a client area at
+    // (1512,93) with the panel dragged to (1513,486) and no minimap showing.
+    let client = ScreenRect { x: 1512, y: 93, width: 1920, height: 1200 };
+    let mut minerva = Minerva::new(FakeSource::osms());
+    let offset = minerva_core::InsideOffset { x: 321, y: 393 };
+    minerva.restore(minerva_core::Settings { setup_done: true, inside_offset: Some(offset), ..Default::default() });
+    let size = |width, height| minerva_core::Size { width, height };
+    minerva.set_panel_sizes(minerva_core::PanelSizes { expanded: size(320, 338), collapsed: size(44, 44) });
+    minerva.on_game_window(window(client));
+    minerva.on_foreground(Foreground::Game);
+    let panel = minerva.panel_state().placement.expect("the panel inside the game");
+    assert_eq!((panel.x, panel.y), (1513, 486));
+    let crop = image::open(common::fixtures_dir().join("our-panel-over-the-game.png")).expect("fixture").to_rgba8();
+    let mut screen = image::RgbaImage::from_pixel(client.width, client.height, image::Rgba([120, 170, 220, 255]));
+    image::imageops::overlay(&mut screen, &crop, (1504 - client.x) as i64, (526 - client.y) as i64);
+
+    let ours = minerva.panel_state().our_windows.clone();
+    let origin = ScreenPoint { x: client.x, y: client.y };
+    let state = minerva.on_title_capture(TitleCapture { frame: common::frame(&screen, 0), origin, ours });
+
+    assert!(state.title_searching, "no title found: {:?}", state.title_capture);
+    assert_eq!(state.title_capture, Some(client));
+    assert_eq!(state.placement, Some(panel), "the panel stays put");
 }
 
 #[test]

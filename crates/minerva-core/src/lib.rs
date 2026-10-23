@@ -265,6 +265,12 @@ pub struct PanelState {
     /// `title_capture` is the whole client area, as the title is looked for: the shell
     /// captures it every [`TITLE_SEARCH_MS`], not every [`TITLE_READ_MS`].
     pub title_searching: bool,
+    /// Where our windows show on screen, as placed here: the overlay while it shows, the Grind
+    /// Tracker, the Personal Bests window, Item Lookup's alert, the Item Card and the Deal
+    /// Badges. A capture of the screen holds them, and the Minimap Title is never read in them
+    /// ([`TitleCapture::ours`]): the panel's own map name and NOT SURE pass for a minimap.
+    #[serde(skip_serializing)]
+    pub our_windows: Vec<ScreenRect>,
     /// No Minimap Title has been found for [`TITLE_LOST_AFTER_MS`]: the minimap may be
     /// closed. Not while a title is found, even one that doesn't read.
     pub title_lost: bool,
@@ -659,7 +665,7 @@ impl Minerva {
     /// Read a title capture's frame, captured at the screen's top-left, and update the panel
     /// state: as [`Minerva::on_title_capture`] does.
     pub fn on_frame(&mut self, frame: Frame) -> &PanelState {
-        self.on_title_capture(TitleCapture { frame, origin: ScreenPoint { x: 0, y: 0 } })
+        self.on_title_capture(TitleCapture { frame, origin: ScreenPoint { x: 0, y: 0 }, ours: Vec::new() })
     }
 
     /// Read a capture of [`PanelState::title_capture`] and update the panel state: the same as
@@ -2081,6 +2087,18 @@ impl Minerva {
         self.sync_item_lookup();
         self.sync_item_card();
         self.sync_deal_finder();
+        let panel = self.state.placement.filter(|_| self.state.layer != Layer::Hidden);
+        self.state.our_windows = [
+            panel,
+            self.state.grind_tracker.placement,
+            self.state.personal_bests.placement,
+            self.state.item_lookup_placement,
+            self.state.item_card_placement,
+            self.state.deal_badges.as_ref().map(|badges| badges.placement),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
         self.state.hotkeys = self.settings.hotkeys.clone();
         let in_front = self.panel.foreground.is_some_and(|foreground| foreground != Foreground::OtherApp);
         self.state.hotkeys_live = in_front && !self.hotkey_settings.is_rebinding();

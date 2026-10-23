@@ -257,7 +257,7 @@ fn cache_dir(app: &AppHandle) -> tauri::Result<PathBuf> {
 pub fn capture_title(client: ScreenRect, at_ms: u64) -> Result<TitleCapture, String> {
     let rgba = capture::capture_rgba(client.x, client.y, client.width as i32, client.height as i32)?;
     let frame = Frame { width: client.width, height: client.height, rgba, at_ms };
-    Ok(TitleCapture { frame, origin: ScreenPoint { x: client.x, y: client.y } })
+    Ok(TitleCapture { frame, origin: ScreenPoint { x: client.x, y: client.y }, ours: Vec::new() })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -583,7 +583,9 @@ struct Channels {
 /// taken already, to read.
 #[derive(Debug, Clone)]
 enum Capture {
-    Title(ScreenRect),
+    /// Where the Minimap Title is to be looked for, and where our windows are (which the
+    /// capture holds, and the reader leaves out).
+    Title(ScreenRect, Vec<ScreenRect>),
     Item(Box<ItemCapture>),
     /// The game's client area, for the Deal Finder.
     Shop(ScreenRect),
@@ -635,9 +637,9 @@ impl ReaderThread {
             };
             for capture in asked {
                 let command = match capture {
-                    Capture::Title(region) => {
+                    Capture::Title(region, ours) => {
                         let reading = grab(region).map(|frame| {
-                            let capture = TitleCapture { frame, origin: ScreenPoint { x: region.x, y: region.y } };
+                            let capture = TitleCapture { frame, origin: ScreenPoint { x: region.x, y: region.y }, ours };
                             let read = title_reader.read(&capture);
                             (Box::new(capture), read)
                         });
@@ -676,11 +678,11 @@ impl ReaderThread {
         Ok(Self { captures, start, title_busy: false, shop_busy: false, status_bar_busy: false })
     }
 
-    /// Capture `region` and read the Minimap Title in it, unless the last capture for it is
-    /// still being read.
-    fn read_title(&mut self, region: ScreenRect) {
+    /// Capture `region` and read the Minimap Title in it, but not in `ours` (our windows), unless
+    /// the last capture for it is still being read.
+    fn read_title(&mut self, region: ScreenRect, ours: Vec<ScreenRect>) {
         if !self.title_busy {
-            self.title_busy = self.captures.send(Capture::Title(region)).is_ok();
+            self.title_busy = self.captures.send(Capture::Title(region, ours)).is_ok();
         }
     }
 
@@ -1049,7 +1051,7 @@ fn core_loop(
             let searching = minerva.panel_state().title_searching;
             next_capture = Instant::now() + if searching { TITLE_SEARCH_TICK } else { TICK };
             if let Some(region) = minerva.panel_state().title_capture {
-                reader.read_title(region);
+                reader.read_title(region, minerva.panel_state().our_windows.clone());
             }
         }
         if Instant::now() >= next_exp_bar_capture {

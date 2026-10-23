@@ -29,7 +29,7 @@ fn capture(minerva: &Minerva, sample: &str, at_ms: u64) -> TitleCapture {
     let client = common::client_of(&common::load(sample));
     let region = minerva.panel_state().title_capture.expect("a title capture with the game in front");
     let frame = common::capture(&client, game(sample), region, at_ms);
-    TitleCapture { frame, origin: ScreenPoint { x: region.x, y: region.y } }
+    TitleCapture { frame, origin: ScreenPoint { x: region.x, y: region.y }, ours: minerva.panel_state().our_windows.clone() }
 }
 
 /// A fresh install with the game in front, as the player first sees setup.
