@@ -1,6 +1,6 @@
 [package]
 name = "minerva"
-version = "0.13.0"
+version = "0.14.0"
 description = "Minerva overlay shell: window lookup, Title Region capture and rendering around minerva-core"
 authors = ["Jeffrey Davis"]
 edition.workspace = true
