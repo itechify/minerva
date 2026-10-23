@@ -1,6 +1,6 @@
 # Setting up the Map Leaderboards API
 
-The Map Leaderboards API runs on the site's Worker with a D1 database (ADR 0015). The Site workflow (`.github/workflows/site.yml`) applies the database's migrations and deploys the Worker, but a few steps are done by hand on the Cloudflare account, once, before its first deploy. Do them in this order. Wrangler is a dev dependency, so after `pnpm install` each command runs as `pnpm exec wrangler ...`, from the repo root, signed in to the account in `site/wrangler.jsonc` (`pnpm exec wrangler login`).
+The Map Leaderboards API, and the Accounts beside it, run on the site's Worker with a D1 database (ADR 0015, ADR 0023). The Site workflow (`.github/workflows/site.yml`) applies the database's migrations and deploys the Worker, but a few steps are done by hand on the Cloudflare account, once, before its first deploy. Do them in this order. Wrangler is a dev dependency, so after `pnpm install` each command runs as `pnpm exec wrangler ...`, from the repo root, signed in to the account in `site/wrangler.jsonc` (`pnpm exec wrangler login`).
 
 ## 1. Create the database, and commit its ID
 
@@ -36,9 +36,27 @@ pnpm exec wrangler secret put DISCORD_WEBHOOK_URL --config site/wrangler.jsonc
 
 Paste the URL. For `wrangler dev`, put `DISCORD_WEBHOOK_URL=...` in `site/.dev.vars`, which is gitignored; leave it out and nothing is posted. To stop the posts, delete the webhook in Discord or `pnpm exec wrangler secret delete DISCORD_WEBHOOK_URL --config site/wrangler.jsonc`.
 
-## 5. Deploy the API before any app that uploads
+## 5. Set up signing in with Discord
 
-The API must be live before any Minerva version that uploads to it (#110) is released. Once this is on `main`, publish the site from `main`:
+Accounts (ADR 0023) sign in with Discord: players to link their PCs, the maintainer to moderate at `/admin/`. With either of the client ID and secret unset, signing in is off and everything else works as before.
+
+1. In the [Discord Developer Portal](https://discord.com/developers/applications), **New Application**, named "Minerva". Under **OAuth2**, copy the **Client ID**, then **Reset Secret** and copy the **Client Secret** into the password manager beside `ADMIN_TOKEN`.
+2. Still under **OAuth2 → Redirects**, add the three addresses Discord may send a player back to:
+   - `https://owlofminerva.app/api/auth/discord/callback`
+   - `https://www.owlofminerva.app/api/auth/discord/callback`
+   - `http://localhost:5173/api/auth/discord/callback`, for `pnpm site:dev`
+3. In `site/wrangler.jsonc`, set `vars.DISCORD_CLIENT_ID` to the client ID and `vars.MAINTAINER_DISCORD_IDS` to your Discord user ID (Discord: **Settings → Advanced → Developer Mode**, then right-click your name → **Copy User ID**; more than one, comma-separated). Neither is secret, so commit them.
+4. Set the secret:
+
+   ```bash
+   pnpm exec wrangler secret put DISCORD_CLIENT_SECRET --config site/wrangler.jsonc
+   ```
+
+For `wrangler dev`, put `DISCORD_CLIENT_SECRET=...` in `site/.dev.vars`. Sign in at `http://localhost:5173/admin/` with `pnpm site:dev` and `wrangler dev` both running.
+
+## 6. Deploy the API before any app that uses it
+
+The API must be live before any Minerva version that uses it is released: one that uploads (#110), or one that links a PC to an Account (#152). Once this is on `main`, publish the site from `main`:
 
 ```bash
 gh workflow run site.yml -f ref=main
@@ -52,11 +70,11 @@ From then on, **never publish the site from a ref older than the API**: an older
 
 - **A new migration** goes in `site/migrations` as the next `NNNN_<what>.sql` (`pnpm exec wrangler d1 migrations create minerva-leaderboards <what> --config site/wrangler.jsonc`). The Site workflow applies it before the deploy that needs it. Try it locally first: `pnpm exec wrangler d1 migrations apply minerva-leaderboards --local --config site/wrangler.jsonc`.
 - **The ceilings table** (`site/worker/osms-ceilings.json`) is written again when OSMS's set changes, as `probe osms` is run: `cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json`.
-- **A lost Leaderboard Key.** The player says on Discord that their Character's name is "claimed". Ask them to try again from Minerva (toggling the upload off and on), then run, with the maintainer's token:
+- **A lost Leaderboard Key.** The player says on Discord that their Character's name is "claimed". If they have an Account, ask for its Discord username and that they link their new PC to it; at `/admin/`, under **Characters**, look the name up and **Reassign** it to their Account. Otherwise, ask them to try again from Minerva (toggling the upload off and on), then **Reassign to refused key** there, or with the maintainer's token:
 
   ```bash
   curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/characters/<name>/reassign
   ```
 
   It moves the name to the last key refused for it and says when that was. Check the time with the player before telling them it's done.
-- **Reports**: `curl -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/reports`, and to delete an entry, `curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/entries/<name>/<map>/<band>`.
+- **Reports**: at `/admin/`, under **Reports**, each with **Delete entry** and **Dismiss**. Without Discord, `curl -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/reports`, and to delete an entry, `curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/entries/<name>/<map>/<band>`.

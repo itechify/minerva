@@ -14,8 +14,8 @@ export async function hash(text: string): Promise<string> {
 }
 
 /** Whether the request carries the maintainer's token (the ADMIN_TOKEN secret). With no
- *  secret set, nobody does. */
-export async function isMaintainer(request: Request, env: Env): Promise<boolean> {
+ *  secret set, nobody does. The maintainer may sign in with Discord instead (sessions.ts). */
+export async function isMaintainerToken(request: Request, env: Env): Promise<boolean> {
   const given = /^Bearer (.+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
   if (!env.ADMIN_TOKEN || given === undefined) return false;
   // Compared as hashes, so the comparison takes as long whatever matches.

@@ -54,7 +54,7 @@ The app calls the API from the shell, not from a web page, so there is no CORS.
 
 ## Considered options
 
-- **Accounts or OAuth (Discord, Google).** A real identity per name, and recovery without the maintainer. But Minerva has no account anywhere and the site no sign-in, and a player would trust a third party with a fan tool. A name's worth to a cheater is small, and a lost key is rare; the maintainer reassigning it by hand is enough.
+- **Accounts or OAuth (Discord, Google).** A real identity per name, and recovery without the maintainer. But Minerva has no account anywhere and the site no sign-in, and a player would trust a third party with a fan tool. A name's worth to a cheater is small, and a lost key is rare; the maintainer reassigning it by hand is enough. Later added as optional, beside the keys: ADR 0023.
 - **Uploading a Visit's readings as evidence.** The EXP bar's readings over the Visit would let the site check the EXP/h, or a moderator replay it. But they hold the player's whole run, and the site would have to reimplement or host the core's Session to make sense of them. A reading that is made up is no harder to make than a figure. The cap keeps off what can't be true, and reports catch the rest.
 - **Party, event or buff tags.** They'd make entries fairer to compare, but Minerva can't tell party play, an EXP event or a buff from the screen, so the player would tag them, and an honest player would be ranked below one who didn't. Raw EXP/h, capped, is ranked as it is.
 - **A separate service** (its own Worker or a hosted database elsewhere). Isolation from the site's deploys, but another domain, deploy, token and CORS. The site's Worker already serves owlofminerva.app, and D1 is on the same account.

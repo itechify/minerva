@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- The account page (ADR 0023): who's signed in with Discord, the PCs whose Leaderboard
+     Keys they linked, unlinking one, deleting the Account, and signing out. No page links
+     here for everyone: a player reaches it from Minerva's Link Discord, or the window's
+     head once signed in. It reads the API from the browser (account/page.ts). -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Your Account · Minerva</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../../assets/icon-16.png" />
+    <link rel="preload" href="../fonts/Maplestory-Light.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../fonts/Maplestory-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../../src/theme.css" />
+    <link rel="stylesheet" href="../site.css" />
+    <script type="module" src="../site.ts"></script>
+    <script type="module" src="./page.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the page</a>
+    <div class="window">
+      @WINDOW_HEAD@
+
+      <main class="window-body" id="main">
+        <div class="part" data-street="Account">
+          <header class="lb-head stop" id="top" data-mini="Account">
+            <h1>Your Account</h1>
+            <p class="lede">
+              An Account is optional. Link the PCs you play on to it, and your Characters' names on the
+              <a href="/leaderboards/">Map Leaderboards</a> follow you to a new PC, without asking on Discord.
+            </p>
+          </header>
+
+          <section class="lb-section stop" id="account" data-mini="Signed in" aria-labelledby="account-title">
+            <h2 id="account-title">Signed in</h2>
+            <p class="lb-said" id="said" aria-live="polite">Loading…</p>
+            <noscript><p class="lb-said">Your Account needs JavaScript to load.</p></noscript>
+            <p id="signed-out" hidden><a class="button" id="sign-in" href="/api/auth/discord?return=%2Faccount%2F">Sign in with Discord</a></p>
+            <div class="account-actions" id="signed-in-actions" hidden>
+              <a class="button secondary" id="admin-link" href="/admin/" hidden>Moderation</a>
+              <button class="button secondary" id="sign-out" type="button">Sign out</button>
+            </div>
+          </section>
+
+          <section class="lb-section stop" id="pcs-section" data-mini="Linked PCs" aria-labelledby="pcs-title" hidden>
+            <h2 id="pcs-title">Linked PCs</h2>
+            <p class="lb-said" id="pcs-said" aria-live="polite"></p>
+            <ul class="account-list" id="pcs"></ul>
+          </section>
+
+          <section class="lb-section stop" id="delete-section" data-mini="Delete" aria-labelledby="delete-title" hidden>
+            <h2 id="delete-title">Delete your Account</h2>
+            <p>
+              Your linked PCs and your Discord sign-in go. Your Characters stay on the Map Leaderboards, each with the PC that
+              first put it there. To take a Character off, turn off <strong>Show on the Map Leaderboards</strong> in Minerva.
+            </p>
+            <p class="lb-said" id="delete-said" aria-live="polite" hidden></p>
+            <button class="button secondary" id="delete" type="button">Delete Account</button>
+          </section>
+        </div>
+      </main>
+
+      <footer class="window-foot" id="credits" data-mini="Credits">
+@CREDITS@
+      </footer>
+    </div>
+  </body>
+</html>

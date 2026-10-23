@@ -4,6 +4,7 @@ import { isMap, isName } from "../entries";
 import { bandOf, levelsOf } from "../level-bands";
 import { type Top, takenTops, tell } from "./announce";
 import { type Answer, badRequest, body } from "./http";
+import { accountOfKey, touchKey } from "./accounts";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
 import ceilings from "./osms-ceilings.json";
@@ -86,9 +87,11 @@ interface Claim {
 }
 
 /** Claim `name` for the request's Leaderboard Key, if no key holds it yet, and say whether
- *  the write may go ahead: only with the key that holds the name. Another key is refused
- *  as "claimed", and kept as the one the maintainer would reassign the name to.
- *  With `unclaimed: "leave"`, a name no key holds is left so, and the answer is `null`. */
+ *  the write may go ahead: only with the key that holds the name, or a key linked to the
+ *  name's Account (ADR 0023). Another key is refused as "claimed", and kept as the one the
+ *  maintainer would reassign the name to. A name first claimed by a linked key gets its
+ *  Account. With `unclaimed: "leave"`, a name no key holds is left so, and the answer is
+ *  `null`. */
 async function claim(
   env: Env,
   request: Request,
@@ -103,27 +106,35 @@ async function claim(
   const keyHash = await hash(key);
   const limited = await limit(env, `key:${keyHash}`, WRITES);
   if (limited !== undefined) return limited;
+  const account = await accountOfKey(env, keyHash);
+  type Holder = { key_hash: string; account_id: number | null };
   const holder =
     unclaimed === "claim"
       ? await env.DB.prepare(
-          `INSERT INTO characters (name_key, name, key_hash, claimed_at) VALUES (?, ?, ?, ?)
-           ON CONFLICT (name_key) DO UPDATE SET name_key = name_key RETURNING key_hash`,
+          `INSERT INTO characters (name_key, name, key_hash, claimed_at, account_id) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (name_key) DO UPDATE SET name_key = name_key RETURNING key_hash, account_id`,
         )
-          .bind(nameKey, name, keyHash, now)
-          .first<string>("key_hash")
-      : await env.DB.prepare("SELECT key_hash FROM characters WHERE name_key = ?").bind(nameKey).first<string>("key_hash");
+          .bind(nameKey, name, keyHash, now, account)
+          .first<Holder>()
+      : await env.DB.prepare("SELECT key_hash, account_id FROM characters WHERE name_key = ?").bind(nameKey).first<Holder>();
   if (holder === null) return null;
-  if (holder !== keyHash) {
+  const throughAccount = account !== null && holder.account_id === account;
+  if (holder.key_hash !== keyHash && !throughAccount) {
     await env.DB.prepare("UPDATE characters SET refused_key_hash = ?, refused_at = ? WHERE name_key = ?")
       .bind(keyHash, now, nameKey)
       .run();
     return { status: 409, body: { error: "claimed" } };
   }
+  if (account !== null) await touchKey(env, keyHash, now);
   return { nameKey, keyHash };
 }
 
-/** Each statement of a write runs only while the key still holds the name. */
-const HELD = "EXISTS (SELECT 1 FROM characters WHERE name_key = ?1 AND key_hash = ?2)";
+/** A name's write goes through with the key that claimed it (`?2`, its hash), or any key
+ *  linked to its Account. */
+const MAY_WRITE = "(key_hash = ?2 OR account_id IN (SELECT account_id FROM account_keys WHERE key_hash = ?2))";
+
+/** Each statement of a write runs only while the key may still write for the name. */
+const HELD = `EXISTS (SELECT 1 FROM characters WHERE name_key = ?1 AND ${MAY_WRITE})`;
 
 /** A place on the Map Leaderboards: one map's Level Band. */
 interface Place {
@@ -191,7 +202,7 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
   const improved: Place[] = accepted.filter((e) => (held.get(`${e.map} ${e.band}`) ?? 0) < e.expPerHour);
   const before = improved.length === 0 ? [] : await topsAt(env, improved);
   await env.DB.batch([
-    env.DB.prepare(`UPDATE characters SET name = ?3 WHERE name_key = ?1 AND key_hash = ?2`).bind(nameKey, keyHash, name),
+    env.DB.prepare(`UPDATE characters SET name = ?3 WHERE name_key = ?1 AND ${MAY_WRITE}`).bind(nameKey, keyHash, name),
     env.DB.prepare(`DELETE FROM entries WHERE name_key = ?1 AND ${HELD}`).bind(nameKey, keyHash),
     ...accepted.map((e) =>
       env.DB.prepare(

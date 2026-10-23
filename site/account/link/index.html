@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- Linking a PC's Leaderboard Key to an Account (ADR 0023): Minerva's Link Discord opens
+     this page with a one-time token (?t=). It signs the player in with Discord if they
+     aren't, then asks before linking: only its Link button links (account/link.ts). -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Link Discord · Minerva</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../../../assets/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../../../assets/icon-16.png" />
+    <link rel="preload" href="../../fonts/Maplestory-Light.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../../fonts/Maplestory-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../../../src/theme.css" />
+    <link rel="stylesheet" href="../../site.css" />
+    <script type="module" src="../../site.ts"></script>
+    <script type="module" src="../link.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the page</a>
+    <div class="window">
+      @WINDOW_HEAD@
+
+      <main class="window-body" id="main">
+        <div class="part" data-street="Account">
+          <header class="lb-head stop" id="top" data-mini="Link Discord">
+            <p class="lb-back"><a href="/account/">Your Account</a></p>
+            <h1>Link Discord</h1>
+            <p class="lede">
+              A PC linked to your Account can upload your Characters to the
+              <a href="/leaderboards/">Map Leaderboards</a>, so their names follow you to a new PC.
+            </p>
+          </header>
+
+          <section class="lb-section stop" id="link" data-mini="Link this PC" aria-labelledby="link-title">
+            <h2 id="link-title">Link this PC</h2>
+            <p class="lb-said" id="said" aria-live="polite">Loading…</p>
+            <noscript><p class="lb-said">Linking needs JavaScript.</p></noscript>
+            <p id="signed-out" hidden><a class="button" id="sign-in" href="/api/auth/discord">Sign in with Discord</a></p>
+            <div id="ask" hidden>
+              <p><strong id="ask-question"></strong></p>
+              <p id="ask-holds"></p>
+              <p class="lb-note" id="ask-warn"></p>
+              <div class="account-actions">
+                <button class="button" id="confirm" type="button">Link</button>
+                <a class="button secondary" href="/">Cancel</a>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <footer class="window-foot" id="credits" data-mini="Credits">
+@CREDITS@
+      </footer>
+    </div>
+  </body>
+</html>

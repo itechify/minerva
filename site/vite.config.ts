@@ -10,7 +10,8 @@ import { STAR } from "./star.ts";
 
 // The Minerva site for players: the home page (site/index.html), the FAQ
 // (site/faq/index.html) and the Map Leaderboards (site/leaderboards/index.html, and a map's
-// page, site/leaderboards/map/index.html, both reading the Worker's API), published on
+// page, site/leaderboards/map/index.html, both reading the Worker's API), and the account
+// pages (site/account, its link page and site/admin, which no tab names), published on
 // Cloudflare from a release's tag (.github/workflows/site.yml, site/wrangler.jsonc). `pnpm site:dev` serves it,
 // `pnpm site:build` builds it into site/dist.
 
@@ -18,6 +19,9 @@ const HOME = fileURLToPath(new URL("./index.html", import.meta.url));
 const FAQ = fileURLToPath(new URL("./faq/index.html", import.meta.url));
 const LEADERBOARDS = fileURLToPath(new URL("./leaderboards/index.html", import.meta.url));
 const MAP_LEADERBOARD = fileURLToPath(new URL("./leaderboards/map/index.html", import.meta.url));
+const ACCOUNT = fileURLToPath(new URL("./account/index.html", import.meta.url));
+const LINK = fileURLToPath(new URL("./account/link/index.html", import.meta.url));
+const ADMIN = fileURLToPath(new URL("./admin/index.html", import.meta.url));
 const REPO = fileURLToPath(new URL("..", import.meta.url));
 const same = (a: string, b: string) => a.replace(/\\/g, "/") === b.replace(/\\/g, "/");
 /** The folder `to` from the folder of the page `page`, as an address: "", "..", "../.."… */
@@ -49,14 +53,16 @@ function fillPlaceholders(): Plugin {
   // The window's head opens every page and the credits close it, each written once.
   const windowHead = fileURLToPath(new URL("./window-head.html", import.meta.url));
   const credits = fileURLToPath(new URL("./credits.html", import.meta.url));
-  /** The head as `page` shows it: its icon from the repo's root, and its own tab marked open. */
+  /** The head as `page` shows it: its icon from the repo's root, and its own tab marked open.
+   *  The account pages have no tab. */
   function headFor(page: string) {
-    const tab = isHome(page) ? "/" : isFaq(page) ? "/faq/" : "/leaderboards/";
-    return readFileSync(windowHead, "utf8")
+    const isLeaderboards = same(page, LEADERBOARDS) || same(page, MAP_LEADERBOARD);
+    const tab = isHome(page) ? "/" : isFaq(page) ? "/faq/" : isLeaderboards ? "/leaderboards/" : null;
+    const head = readFileSync(windowHead, "utf8")
       .replace(/^<!--[\s\S]*?-->\s*/, "")
       .trim()
-      .replace("@ROOT@", () => upTo(page, REPO))
-      .replace(`<a class="tab" href="${tab}"`, (open) => `${open} aria-current="page"`);
+      .replace("@ROOT@", () => upTo(page, REPO));
+    return tab === null ? head : head.replace(`<a class="tab" href="${tab}"`, (open) => `${open} aria-current="page"`);
   }
   return {
     name: "minerva-site:placeholders",
@@ -230,7 +236,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    rolldownOptions: { input: { home: HOME, faq: FAQ, leaderboards: LEADERBOARDS, map: MAP_LEADERBOARD } },
+    rolldownOptions: {
+      input: { home: HOME, faq: FAQ, leaderboards: LEADERBOARDS, map: MAP_LEADERBOARD, account: ACCOUNT, link: LINK, admin: ADMIN },
+    },
     // A screenshot keeps a file of its own, however small, so the cards can address it.
     assetsInlineLimit: (file) => (file.includes("/screenshots/") ? false : undefined),
   },

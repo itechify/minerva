@@ -183,8 +183,12 @@ A map's page on owlofminerva.app where players' Personal Bests stand side by sid
 _Avoid_: leaderboard (alone), ranking, high scores, hiscores
 
 **Leaderboard Key**:
-The secret each install of Minerva makes on its first upload to the Map Leaderboards and keeps in a file of its own beside the settings (`leaderboard-key`), sent with every upload. The shell keeps it, never the core, so no Bug Report holds it. A Character's first upload ties its name to the key; later uploads for the name must carry it, and another key's are refused as claimed. Never shown to the player; the site keeps only its hash. A lost one is replaced by the maintainer reassigning the name.
+The secret each install of Minerva makes on its first upload to the Map Leaderboards and keeps in a file of its own beside the settings (`leaderboard-key`), sent with every upload. The shell keeps it, never the core, so no Bug Report holds it. A Character's first upload ties its name to the key; later uploads for the name must carry it, and another key's are refused as claimed. Never shown to the player; the site keeps only its hash. A lost one is replaced by linking the new one to the name's Account, if the old one was linked, or else by the maintainer reassigning the name.
 _Avoid_: password, token, account
+
+**Account**:
+An optional sign-in on owlofminerva.app, with Discord, that the player links their PCs' Leaderboard Keys to (ADR 0023). A name its linked keys claimed may be written by any key linked to it, so the name follows the player to a new PC. Never needed to upload. The site keeps the Discord user ID and username, never shown. The maintainer signs in to one to moderate at `/admin/`.
+_Avoid_: profile, login (alone), user
 
 **Time to Level**:
 How long the player would take to reach the next level at their net EXP rate.
