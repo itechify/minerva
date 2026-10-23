@@ -28,7 +28,7 @@ use crate::item_tooltip::ItemTooltip;
 use crate::market_prices::MarketPrices;
 use crate::osms_items::{ItemFacts, ItemSet};
 use crate::panel::{GameWindow, ScreenRect, Size, clear_of};
-use crate::player_shop::{ListedPrice, ShopHover, ShopList, ShopReading, ShopRow, holds};
+use crate::player_shop::{ListedPrice, ShopHover, ShopList, ShopReading, ShopRow};
 use serde::Serialize;
 
 /// The Deal Finder, as the panel shows it.
@@ -134,6 +134,9 @@ pub(crate) struct DealFinder {
     named: Vec<Named>,
     /// The pointer on the list in the latest capture, and the tooltip by it.
     hover: Option<ShopHover>,
+    /// The Deal Badges' window's size, in physical px for the current display: its width
+    /// counts, as its height follows the shop's list.
+    pub size: Size,
 }
 
 /// A listing whose name the game cut short, named by the Item Tooltip by the pointer on it.
@@ -330,11 +333,11 @@ impl DealFinder {
     /// just left of the shop's window, or right of it with no room on the left; kept inside
     /// the client area and off `avoid` (the captured regions). `None` while no shop was
     /// found.
-    pub fn placement(&self, game: &GameWindow, size: Size, avoid: &[ScreenRect]) -> Option<ScreenRect> {
+    pub fn placement(&self, game: &GameWindow, avoid: &[ScreenRect]) -> Option<ScreenRect> {
         let shop = self.shop.as_ref()?;
         let (list, span) = (shop.area, shop.span());
         let client = game.client;
-        let width = size.width.min(client.width);
+        let width = self.size.width.min(client.width);
         let (shop_left, shop_right) = shop_reach(shop);
         let left = list.x - shop_left - SHOP_GAP - width as i32;
         let x = if left >= client.x { left } else { list.x + shop_right + SHOP_GAP };
@@ -408,7 +411,7 @@ fn starts_as(name: &str, cut: &str) -> bool {
 /// width, the pictures' column included.
 fn on_slot(list: &ShopList, row: &ShopRow, hover: &ShopHover) -> bool {
     let slot = ScreenRect { x: list.area.x, width: list.area.width, ..row.area };
-    holds(slot, hover.pointer)
+    slot.holds(hover.pointer)
 }
 
 #[cfg(test)]

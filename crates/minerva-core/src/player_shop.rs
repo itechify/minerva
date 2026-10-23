@@ -99,7 +99,7 @@ pub struct ShopRow {
     /// Its price as read; `None`: unreadable, covered, or not in the game's shape.
     pub price: Option<ListedPrice>,
     /// Something covers it, so neither was read: the pointer, or the game's tooltip by it.
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub covered: bool,
 }
 
@@ -116,20 +116,10 @@ impl ShopList {
     /// Where it is on screen down to every listing: a covered or selected one may lie past
     /// the bands found, as the last one showing does under the pointer, which breaks its band.
     pub(crate) fn span(&self) -> ScreenRect {
-        let bottom = |r: ScreenRect| r.y + r.height as i32;
         let top = self.rows.iter().map(|row| row.area.y).fold(self.area.y, i32::min);
-        let end = self.rows.iter().map(|row| bottom(row.area)).fold(bottom(self.area), i32::max);
-        ScreenRect { y: top, height: (end - top) as u32, ..self.area }
+        let end = self.rows.iter().map(|row| row.area.bottom()).fold(self.area.bottom(), i64::max);
+        ScreenRect { y: top, height: (end - i64::from(top)) as u32, ..self.area }
     }
-}
-
-/// Whether `point` lies in `rect`.
-pub(crate) fn holds(rect: ScreenRect, point: ScreenPoint) -> bool {
-    (rect.x..rect.x + rect.width as i32).contains(&point.x) && (rect.y..rect.y + rect.height as i32).contains(&point.y)
-}
-
-fn is_false(b: &bool) -> bool {
-    !*b
 }
 
 /// A listing's price: `quantity` of the item for `mesos`.
@@ -241,7 +231,7 @@ impl PlayerShopReader {
         let shop = img.as_ref().and_then(|img| self.read_rgb(img, capture.origin));
         // Only on the list: off it, no listing is hovered, and the search for the tooltip
         // costs as much again as finding the list.
-        let on_list = |pointer: &ScreenPoint| shop.as_ref().is_some_and(|shop| holds(shop.span(), *pointer));
+        let on_list = |pointer: &ScreenPoint| shop.as_ref().is_some_and(|shop| shop.span().holds(*pointer));
         let hover = img.as_ref().zip(capture.pointer.filter(on_list)).map(|(img, pointer)| ShopHover {
             pointer,
             tooltip: self.tooltips.read(img, capture.origin, pointer),
@@ -715,7 +705,7 @@ fn line_ink(img: &RgbImage, line: &TextLine, brightness: f32) -> GrayImage {
 
 /// A price line as the game writes it: "<quantity> for <mesos> mesos", the mesos grouped in
 /// threes with commas ("1 for 12,999 mesos"). `None` for anything else.
-pub(crate) fn parse_price(read: &str) -> Option<ListedPrice> {
+fn parse_price(read: &str) -> Option<ListedPrice> {
     let words: Vec<&str> = read.split_whitespace().collect();
     let [quantity, "for", mesos, "mesos"] = words[..] else { return None };
     let quantity: u64 = digits(quantity)?;

@@ -12,8 +12,39 @@ pub struct ScreenRect {
     pub height: u32,
 }
 
+impl ScreenRect {
+    /// Its right edge (the first column past it), in a type that can't overflow.
+    pub fn right(&self) -> i64 {
+        i64::from(self.x) + i64::from(self.width)
+    }
+
+    /// Its bottom edge (the first row past it), in a type that can't overflow.
+    pub fn bottom(&self) -> i64 {
+        i64::from(self.y) + i64::from(self.height)
+    }
+
+    /// Whether it and `other` share a pixel.
+    pub fn overlaps(&self, other: ScreenRect) -> bool {
+        i64::from(self.x) < other.right()
+            && i64::from(other.x) < self.right()
+            && i64::from(self.y) < other.bottom()
+            && i64::from(other.y) < self.bottom()
+    }
+
+    /// Whether `inner` lies wholly inside it.
+    pub fn contains(&self, inner: ScreenRect) -> bool {
+        inner.x >= self.x && inner.y >= self.y && inner.right() <= self.right() && inner.bottom() <= self.bottom()
+    }
+
+    /// Whether pixel `at` lies inside it.
+    pub fn holds(&self, at: ScreenPoint) -> bool {
+        let (x, y) = (i64::from(at.x), i64::from(at.y));
+        i64::from(self.x) <= x && x < self.right() && i64::from(self.y) <= y && y < self.bottom()
+    }
+}
+
 /// A size in physical pixels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Size {
     pub width: u32,
@@ -421,7 +452,7 @@ impl Panel {
             let panel = ScreenRect { x: at.x, y: at.y, width: size.width, height: size.height };
             // On the monitor its top-left corner is on (the last ones known, as it
             // doesn't depend on the game).
-            let on = self.screens.iter().copied().find(|screen| holds(*screen, at));
+            let on = self.screens.iter().copied().find(|screen| screen.holds(at));
             return Some(on.map_or(panel, |screen| below_top(panel, screen)));
         }
         let game = self.game.as_ref()?;
@@ -431,7 +462,7 @@ impl Panel {
                 // Never off-screen: without room beside the game, it goes inside.
                 let fits = game.screens.iter().find_map(|&screen| {
                     let docked = below_top(docked, screen);
-                    (docked.height > 0 && contains(screen, docked)).then_some(docked)
+                    (docked.height > 0 && screen.contains(docked)).then_some(docked)
                 });
                 Some(fits.unwrap_or_else(|| self.inside(game.client)))
             }
@@ -487,31 +518,21 @@ impl Panel {
 
 /// `rect`, cut short at the bottom of `screen` if it reaches past it.
 fn below_top(rect: ScreenRect, screen: ScreenRect) -> ScreenRect {
-    let room = (bottom(screen) - rect.y as i64).max(0);
+    let room = (screen.bottom() - rect.y as i64).max(0);
     ScreenRect { height: rect.height.min(room as u32), ..rect }
-}
-
-fn bottom(r: ScreenRect) -> i64 {
-    r.y as i64 + r.height as i64
-}
-
-/// Whether pixel `at` lies inside `rect`.
-pub(crate) fn holds(rect: ScreenRect, at: ScreenPoint) -> bool {
-    let (x, y) = (at.x as i64, at.y as i64);
-    (rect.x as i64) <= x && x < rect.x as i64 + rect.width as i64 && (rect.y as i64) <= y && y < bottom(rect)
 }
 
 /// The tallest stretch of `within`, top to bottom, that none of `avoid` reaches into:
 /// above the first, between two, or below the last.
 fn tallest_gap(avoid: &[ScreenRect], within: ScreenRect) -> u32 {
-    let mut spans: Vec<(i64, i64)> = avoid.iter().map(|r| (r.y as i64, bottom(*r))).collect();
+    let mut spans: Vec<(i64, i64)> = avoid.iter().map(|r| (r.y as i64, r.bottom())).collect();
     spans.sort();
     let (mut from, mut tallest) = (within.y as i64, 0);
     for (top, end) in spans {
         tallest = tallest.max(top - from);
         from = from.max(end);
     }
-    tallest.max(bottom(within) - from).max(0) as u32
+    tallest.max(within.bottom() - from).max(0) as u32
 }
 
 /// `panel`, moved the shortest way (below, above, right or left of one of the `avoid`
@@ -532,7 +553,7 @@ pub(crate) fn clear_of(panel: ScreenRect, avoid: &[ScreenRect], within: ScreenRe
                 ScreenRect { x: r.x - w, ..panel },
             ]
         })
-        .filter(|spot| contains(within, *spot) && clear(*spot, avoid))
+        .filter(|spot| within.contains(*spot) && clear(*spot, avoid))
         .min_by_key(|spot| (spot.x - panel.x).abs() + (spot.y - panel.y).abs())
         .unwrap_or(panel)
 }
@@ -548,31 +569,18 @@ pub(crate) fn in_view(game: &GameWindow, spot: ScreenRect, avoid: &[ScreenRect])
         y: spot.y.min(screen.y + screen.height as i32 - h).max(screen.y),
         ..spot
     };
-    let within = if contains(game.client, spot) { game.client } else { screen };
+    let within = if game.client.contains(spot) { game.client } else { screen };
     clear_of(spot, avoid, within)
 }
 
 /// The monitor's work area holding point (x, y), or else the one holding the game's
 /// client area's top-left corner, or else the client area itself.
 pub(crate) fn screen_at(game: &GameWindow, x: i32, y: i32) -> ScreenRect {
-    let holding = |x, y| game.screens.iter().copied().find(|screen| holds(*screen, ScreenPoint { x, y }));
+    let holding = |x, y| game.screens.iter().copied().find(|screen| screen.holds(ScreenPoint { x, y }));
     holding(x, y).or_else(|| holding(game.client.x, game.client.y)).unwrap_or(game.client)
 }
 
 /// Whether `panel` overlaps none of `avoid`.
 fn clear(panel: ScreenRect, avoid: &[ScreenRect]) -> bool {
-    avoid.iter().all(|r| !overlaps(panel, *r))
-}
-
-fn overlaps(a: ScreenRect, b: ScreenRect) -> bool {
-    let right = |r: ScreenRect| r.x as i64 + r.width as i64;
-    let bottom = |r: ScreenRect| r.y as i64 + r.height as i64;
-    (a.x as i64) < right(b) && (b.x as i64) < right(a) && (a.y as i64) < bottom(b) && (b.y as i64) < bottom(a)
-}
-
-/// Whether `inner` lies wholly inside `outer`.
-pub(crate) fn contains(outer: ScreenRect, inner: ScreenRect) -> bool {
-    let right = |r: ScreenRect| r.x as i64 + r.width as i64;
-    let bottom = |r: ScreenRect| r.y as i64 + r.height as i64;
-    inner.x >= outer.x && inner.y >= outer.y && right(inner) <= right(outer) && bottom(inner) <= bottom(outer)
+    avoid.iter().all(|r| !panel.overlaps(*r))
 }

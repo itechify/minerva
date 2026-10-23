@@ -21,7 +21,7 @@
 //!    under the pointer breaks it), and a 2 read wherever the mask has a 2's flat foot,
 //!    and nowhere else (ocrs has read the 7 of "71.07%" as a 2).
 
-use crate::bug_report::cut_on_screen;
+use crate::bug_report::rect_crop;
 use crate::panel::ScreenRect;
 use crate::prep::{PAD, Rect};
 use crate::recogniser::{Recogniser, frame_to_rgb};
@@ -125,8 +125,7 @@ impl ExpBarReader {
 
 /// The figures at `place` in a Status Bar capture; `None` if the capture doesn't hold them.
 pub(crate) fn figures_frame(capture: &StatusBarCapture, place: ExpBarPlace) -> Option<Frame> {
-    let a = place.area;
-    cut_on_screen(&capture.frame, capture.origin, (a.x, a.y), (a.x + a.width as i32, a.y + a.height as i32))
+    rect_crop(&capture.frame, capture.origin, place.area, 0)
 }
 
 /// A reading that could be on an EXP bar: under 100%, and no EXP at 0.00% unless the

@@ -6,6 +6,7 @@
 
 use crate::item_card::ShopPrice;
 use crate::item_lookup::{closest, item_key};
+use crate::loader::Saved;
 use crate::map_index::SourceError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -28,16 +29,9 @@ impl ItemFiles {
 }
 
 /// OSMS's item files as the source saved them, at an earlier launch or earlier in this
-/// one, and when.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SavedItemFiles {
-    pub files: ItemFiles,
-    /// When they were saved (ms since the Unix epoch).
-    pub saved_at_unix_ms: u64,
-    /// The Minerva version that fetched and saved them ([`crate::MINERVA_VERSION`]); `None`
-    /// for files saved before they said so.
-    pub saved_by: Option<String>,
-}
+/// one, and when: their `files`, `saved_at_unix_ms` and the Minerva version they were
+/// `saved_by` ([`crate::MINERVA_VERSION`]; `None` for files saved before they said so).
+pub type SavedItemFiles = Saved<ItemFiles>;
 
 /// One item, as its Item Card shows it.
 #[derive(Debug, Clone, PartialEq, Eq)]

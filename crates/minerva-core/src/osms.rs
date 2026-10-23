@@ -2,6 +2,7 @@
 //! [`DATA_URL`], and the reader that turns them into every map's data and every mob's
 //! Mob Card figures and animation. Credit "OSMS Data Explorer (osmsdataexplorer.com)".
 
+use crate::loader::Saved;
 use crate::map_data::{MapData, MapSummary, Mob, PerParty};
 use crate::map_mark;
 use crate::map_index::{MapEntry, SourceError};
@@ -43,16 +44,9 @@ impl OsmsFiles {
 }
 
 /// OSMS's file set as the source saved it, at an earlier launch or earlier in this one,
-/// and when.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SavedFiles {
-    pub files: OsmsFiles,
-    /// When it was saved (ms since the Unix epoch).
-    pub saved_at_unix_ms: u64,
-    /// The Minerva version that fetched and saved it ([`crate::MINERVA_VERSION`]); `None`
-    /// for a set saved before sets said so.
-    pub saved_by: Option<String>,
-}
+/// and when: its `files`, `saved_at_unix_ms` and the Minerva version it was `saved_by`
+/// ([`crate::MINERVA_VERSION`]; `None` for a set saved before sets said so).
+pub type SavedFiles = Saved<OsmsFiles>;
 
 /// Every map's data from OSMS's file set: the map list, each listed map's figures, and
 /// every mob's Mob Card figures.
