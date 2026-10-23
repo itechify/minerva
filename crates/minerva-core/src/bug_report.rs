@@ -581,7 +581,8 @@ const PLAYER_SHOP_WIDTH: f32 = 352.0;
 /// reader read, or should have, as `samples/player-shop` keeps them. `None` with no shop.
 pub(crate) fn player_shop_crop(capture: &ShopCapture, shop: Option<&ShopList>) -> Option<(Region, Frame)> {
     let shop = shop?;
-    let (list, size) = (shop.area, shop.ui_size());
+    // Down to every listing, the covered ones past the bands found included.
+    let (list, size) = (shop.span(), shop.ui_size());
     let (margin, width) = ((PLAYER_SHOP_MARGIN * size).round() as i32, (PLAYER_SHOP_WIDTH * size).round() as i32);
     let top_left = (list.x - margin, list.y - margin);
     let bottom_right = (list.x + width, list.y + list.height as i32 + margin);
