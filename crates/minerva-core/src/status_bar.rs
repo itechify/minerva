@@ -29,10 +29,12 @@
 //!    0017): [`StatusBar::exp_figures`] says where, for the EXP bar reader.
 
 use crate::Frame;
+use crate::ink::{Component, black_on_white, components, luma, ocr_digit, tint};
 use crate::panel::{ScreenPoint, ScreenRect};
+use crate::prep::Rect;
 use crate::recogniser::{Recogniser, RememberedLines, frame_to_rgb};
 use crate::ui_size::{self, AtSamplesSize};
-use image::{GrayImage, Luma, RgbImage};
+use image::{GrayImage, RgbImage};
 use serde::{Deserialize, Serialize};
 
 /// A capture of the bottom of the game's client area, for the Status Bar.
@@ -215,8 +217,8 @@ impl StatusBarReader {
         let back = |r: ScreenRect| {
             let (x0, y0) = at.back(r.x as f32, r.y as f32);
             let (x1, y1) = at.back((r.x + r.width as i32) as f32, (r.y + r.height as i32) as f32);
-            let (x0, y0, x1, y1) = (x0.round() as i32, y0.round() as i32, x1.round() as i32, y1.round() as i32);
-            ScreenRect { x: origin.x + x0, y: origin.y + y0, width: (x1 - x0) as u32, height: (y1 - y0) as u32 }
+            let (x0, y0, x1, y1) = (x0.round() as u32, y0.round() as u32, x1.round() as u32, y1.round() as u32);
+            Rect { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }.on_screen(origin)
         };
         Some(StatusBar { area: back(bar.area), exp_figures: bar.exp_figures.map(back), ..bar })
     }
@@ -294,85 +296,41 @@ fn orange(p: [u8; 3]) -> Option<f32> {
 /// leaves a near-black, bluish fringe ((0,15,30)) along the tiles' edges. Never the pointer's
 /// black.
 fn box_grey(p: [u8; 3]) -> bool {
-    let max = p.iter().copied().max().unwrap_or(0);
-    let min = p.iter().copied().min().unwrap_or(0);
-    max - min <= 8 && (24..=72).contains(&max) || max <= BOX_FRINGE && !ui_size::pointer_black(p)
-}
-
-/// A connected run of orange pixels: its bounding box (ends exclusive), and the brightest
-/// red in it.
-#[derive(Debug, Clone, Copy)]
-struct Blob {
-    x0: u32,
-    x1: u32,
-    y0: u32,
-    y1: u32,
-    scale: f32,
+    let max = p.into_iter().max().unwrap_or(0);
+    tint(p) <= 8 && (24..=72).contains(&max) || max <= BOX_FRINGE && !ui_size::pointer_black(p)
 }
 
 /// The orange components (4-connected) of a tile's size, at the samples' UI Size.
-fn tiles(img: &RgbImage) -> Vec<Blob> {
-    let sized = |b: &Blob| TILE_W.contains(&(b.x1 - b.x0)) && TILE_H.contains(&(b.y1 - b.y0));
+fn tiles(img: &RgbImage) -> Vec<Component> {
+    let sized = |b: &Component| TILE_W.contains(&b.w()) && TILE_H.contains(&b.h());
     oranges(img).into_iter().filter(sized).collect()
 }
 
-/// The orange components (4-connected), of any size.
-fn oranges(img: &RgbImage) -> Vec<Blob> {
+/// The orange components (4-connected), of any size: each with its bounding box (ends
+/// exclusive) and, as its `max`, the brightest of its orange next to the screenshots'.
+fn oranges(img: &RgbImage) -> Vec<Component> {
     let (w, h) = img.dimensions();
-    let mut seen = vec![false; (w * h) as usize];
-    let mut out = Vec::new();
-    for y in 0..h {
-        for x in 0..w {
-            if seen[(y * w + x) as usize] || orange(img.get_pixel(x, y).0).is_none() {
-                continue;
-            }
-            let mut blob = Blob { x0: x, x1: x + 1, y0: y, y1: y + 1, scale: 0.0 };
-            let mut stack = vec![(x, y)];
-            seen[(y * w + x) as usize] = true;
-            while let Some((cx, cy)) = stack.pop() {
-                let k = orange(img.get_pixel(cx, cy).0).unwrap_or(0.0);
-                blob = Blob {
-                    x0: blob.x0.min(cx),
-                    x1: blob.x1.max(cx + 1),
-                    y0: blob.y0.min(cy),
-                    y1: blob.y1.max(cy + 1),
-                    scale: blob.scale.max(k),
-                };
-                let next = [(cx.wrapping_sub(1), cy), (cx + 1, cy), (cx, cy.wrapping_sub(1)), (cx, cy + 1)];
-                for (nx, ny) in next {
-                    if nx < w && ny < h && !seen[(ny * w + nx) as usize] && orange(img.get_pixel(nx, ny).0).is_some() {
-                        seen[(ny * w + nx) as usize] = true;
-                        stack.push((nx, ny));
-                    }
-                }
-            }
-            out.push(blob);
-        }
-    }
-    out
+    components(img, 0..w, 0..h, orange)
 }
 
 /// The bar's UI Size (ADR 0020): its LV box's height next to the samples' [`BOX_H`]. The box
 /// is found as [`find`] finds it, but at any size: a row of tiles of one height at their
 /// pitch, with the box's grey all round them.
 fn measure(img: &RgbImage) -> Option<f32> {
-    let mut blobs: Vec<Blob> = oranges(img)
+    let mut blobs: Vec<Component> = oranges(img)
         .into_iter()
-        .filter(|b| {
-            let (w, h) = ((b.x1 - b.x0) as f32, b.y1 - b.y0);
-            ANY_TILE_H.contains(&h) && TILE_ASPECT.contains(&(w / h as f32))
-        })
+        .filter(|b| ANY_TILE_H.contains(&b.h()) && TILE_ASPECT.contains(&(b.w() as f32 / b.h() as f32)))
         .collect();
     blobs.sort_by_key(|b| (b.y0, b.x0));
     let grey = |x: u32, y: u32| box_grey(img.get_pixel(x, y).0);
     let (w, h) = img.dimensions();
     for (i, first) in blobs.iter().enumerate() {
         // How large this tile is next to the samples', and so how near its neighbours are.
-        let size = (first.y1 - first.y0) as f32 / TILE_H_AT_SAMPLES;
+        let size = first.h() as f32 / TILE_H_AT_SAMPLES;
         let pitch = TILE_PITCH as f32 * size;
         let near = |a: u32, b: f32, within: f32| (a as f32 - b).abs() <= within.max(1.0);
         // Next to it, at the pitch (give or take two px at the samples' size).
-        let in_line = |a: &Blob, b: &Blob| {
+        let in_line = |a: &Component, b: &Component| {
             b.x0 > a.x0 && near(a.y0, b.y0 as f32, size) && near(a.y1, b.y1 as f32, size) && near(b.x0 - a.x0, pitch, 2.0 * size)
         };
         let mut group = vec![*first];
@@ -415,7 +373,7 @@ fn find(img: &RgbImage) -> Option<Found> {
     let (w, h) = img.dimensions();
     let mut blobs = tiles(img);
     blobs.sort_by_key(|b| (b.y0, b.x0));
-    let in_line = |a: &Blob, b: &Blob| {
+    let in_line = |a: &Component, b: &Component| {
         a.y0.abs_diff(b.y0) <= 1 && a.y1.abs_diff(b.y1) <= 1 && (b.x0 as i64 - a.x0 as i64 - TILE_PITCH as i64).abs() <= 2
     };
     let mut i = 0;
@@ -451,7 +409,7 @@ fn find(img: &RgbImage) -> Option<Found> {
         if box_right == x1 + BOX_MARGIN {
             continue;
         }
-        let scale = group.iter().map(|b| b.scale).fold(0.0, f32::max);
+        let scale = group.iter().map(|b| b.max).fold(0.0, f32::max);
         return Some(Found { tiles: group.iter().map(|b| (b.x0, b.x1)).collect(), top, bottom, box_right, scale });
     }
     None
@@ -475,17 +433,9 @@ fn level_ink(img: &RgbImage, found: &Found) -> Option<(GrayImage, Vec<bool>)> {
         narrow.push((last - first + 1) as usize <= NARROW);
         glyphs.push((x0, x1));
     }
-    let width: u32 = glyphs.iter().map(|(x0, x1)| x1 - x0).sum();
-    let mut canvas = GrayImage::from_pixel(width, y1 - y0, Luma([255]));
-    let mut at = 0;
-    for (x0, x1) in glyphs {
-        for x in x0..x1 {
-            for y in y0..y1 {
-                canvas.put_pixel(at + x - x0, y - y0, Luma([(255.0 * (1.0 - ink(img.get_pixel(x, y).0))).round() as u8]));
-            }
-        }
-        at += x1 - x0;
-    }
+    // The glyphs' columns, side by side.
+    let columns: Vec<u32> = glyphs.iter().flat_map(|&(x0, x1)| x0..x1).collect();
+    let canvas = black_on_white(columns.len() as u32, y1 - y0, 0, |x, y| ink(img.get_pixel(columns[x as usize], y0 + y).0));
     Some((canvas, narrow))
 }
 
@@ -495,8 +445,7 @@ fn level_ink(img: &RgbImage, found: &Found) -> Option<(GrayImage, Vec<bool>)> {
 /// too bright: the pointer and the game's tooltip give themselves away by their black.
 fn slate_or_text(p: [u8; 3], scale: f32) -> bool {
     let [r, g, b] = p.map(i32::from);
-    let luma = 0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32;
-    (40.0 * scale..=255.0).contains(&luma) && (-8..=24).contains(&(b - r)) && g >= r - 8 && g <= b + 8
+    (40.0 * scale..=255.0).contains(&luma(p)) && (-8..=24).contains(&(b - r)) && g >= r - 8 && g <= b + 8
 }
 
 /// Whether `p` is darker than the slate but has its tint: the fringe the game's filter
@@ -517,8 +466,7 @@ fn text(p: [u8; 3], scale: f32) -> f32 {
     if (r - g).abs() > 24 || (g - b).abs() > 24 {
         return 0.0;
     }
-    let luma = 0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32;
-    ((luma - 120.0 * scale) / (80.0 * scale)).clamp(0.0, 1.0)
+    ((luma(p) - 120.0 * scale) / (80.0 * scale)).clamp(0.0, 1.0)
 }
 
 /// The line of text in columns `x0..x1` and `rows`, black on white, cut to its ink; `None`
@@ -546,23 +494,13 @@ fn text_ink(img: &RgbImage, x0: u32, x1: u32, (y0, y1): (u32, u32), scale: f32) 
     let rows: Vec<u32> = (y0..y1).filter(|&y| (x0..x1).any(|x| inked(x, y))).collect();
     let (cx0, cx1) = ((*cols.first()?).saturating_sub(1).max(x0), (*cols.last()? + 2).min(x1));
     let (cy0, cy1) = ((*rows.first()?).saturating_sub(1).max(y0), (*rows.last()? + 2).min(y1));
-    Some(GrayImage::from_fn(cx1 - cx0, cy1 - cy0, |x, y| {
-        Luma([(255.0 * (1.0 - text(img.get_pixel(cx0 + x, cy0 + y).0, scale))).round() as u8])
-    }))
+    Some(black_on_white(cx1 - cx0, cy1 - cy0, 0, |x, y| text(img.get_pixel(cx0 + x, cy0 + y).0, scale)))
 }
 
 /// The level from what ocrs read of the tiles' glyphs, if it is one the bar could show: a
 /// digit for each tile, a 1 on each narrow glyph and on no other.
 fn level_of(read: &str, narrow: &[bool]) -> Option<u32> {
-    let digits: Vec<char> = read
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .map(|c| match c {
-            'O' | 'o' | 'D' => '0',
-            'l' | 'I' | '|' | 'i' => '1',
-            c => c,
-        })
-        .collect();
+    let digits: Vec<char> = read.chars().filter(|c| !c.is_whitespace()).map(ocr_digit).collect();
     let shaped = digits.len() == narrow.len()
         && digits.iter().all(char::is_ascii_digit)
         && digits[0] != '0'

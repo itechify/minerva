@@ -14,6 +14,7 @@ mod hotkey_settings;
 mod item_card;
 mod item_data;
 mod item_lookup;
+mod ink;
 mod item_tooltip;
 mod leaderboards;
 mod loader;
