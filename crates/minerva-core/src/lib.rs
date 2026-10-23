@@ -231,8 +231,8 @@ pub struct PanelState {
     /// The Mob Card of each mob the panel lists, in its order; empty while it lists none.
     pub mob_cards: Vec<MobCard>,
     /// Every Map Mark, by OSMS's name for it, which each map shown anywhere names its own
-    /// by (the panel's title, Hidden Portals, the Map Preview, search, the route, setup's
-    /// test read and the Personal Bests window); empty until OSMS's file set is read.
+    /// by (the panel's title, Hidden Portals, the Map Preview, search, the route, the map
+    /// setup found and the Personal Bests window); empty until OSMS's file set is read.
     pub map_marks: BTreeMap<String, MapMark>,
     /// Expanded to the full panel, or collapsed to a small icon.
     pub expanded: bool,

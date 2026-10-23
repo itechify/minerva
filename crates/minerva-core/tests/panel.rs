@@ -496,7 +496,7 @@ fn overlaps(a: ScreenRect, b: ScreenRect) -> bool {
 }
 
 #[test]
-fn the_default_spot_moves_below_the_title_region_when_it_would_cover_it() {
+fn the_default_spot_moves_below_the_minimap_title_when_it_would_cover_it() {
     let mut minerva = set_up_on_small_game();
 
     let state = minerva.on_game_window(game(SMALL_GAME));
@@ -528,7 +528,7 @@ fn inside_the_panel_is_never_taller_than_the_game_client() {
 }
 
 #[test]
-fn inside_a_tall_panel_still_keeps_clear_of_the_title_region_in_the_space_below_it() {
+fn inside_a_tall_panel_still_keeps_clear_of_the_minimap_title_in_the_space_below_it() {
     let mut minerva = set_up_on_small_game();
     content_height(&mut minerva, 500);
 

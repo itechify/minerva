@@ -126,7 +126,7 @@ pub struct Hotkeys {
     pub cycle_placement: String,
     /// Open the shown map's MeowDB page in the browser.
     pub open_meowdb_page: String,
-    /// Open setup again, to mark the Title Region anew.
+    /// Open setup again.
     pub setup: String,
     /// Show the next of the maps sharing the shown map's title, when the core couldn't
     /// tell which one the player is on.

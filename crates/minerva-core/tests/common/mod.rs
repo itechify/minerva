@@ -59,7 +59,7 @@ pub fn pointer(img: &mut image::RgbaImage, (x, y): (u32, u32), rows: u32) {
     }
 }
 
-/// A loading screen: the Title Region is plain black.
+/// A loading screen: where the title was found is plain black.
 pub fn black_frame(at_ms: u64) -> Frame {
     frame(&image::RgbaImage::from_pixel(560, 96, image::Rgba([0, 0, 0, 255])), at_ms)
 }
@@ -75,7 +75,7 @@ pub fn client_of(window: &image::RgbaImage) -> image::RgbaImage {
 }
 
 /// Capture `region` (physical screen px) from a game client area shown on screen at
-/// `game`, the way the shell captures the panel state's Title Region.
+/// `game`, the way the shell captures the panel state's `title_capture`.
 pub fn capture(client: &image::RgbaImage, game: ScreenRect, region: ScreenRect, at_ms: u64) -> Frame {
     let (x, y) = ((region.x - game.x) as u32, (region.y - game.y) as u32);
     let crop = image::imageops::crop_imm(client, x, y, region.width, region.height).to_image();
@@ -373,7 +373,7 @@ impl MapDataSource for FakeSource {
 }
 
 /// Where a Minimap Title is found on the game's client area `client` in these tests: at
-/// client (70,40), 620x48 (ADR 0021), as the Title Region the player marked there was.
+/// client (70,40), 620x48 (ADR 0021), where the Title Region the player marked there once was.
 pub fn title_on(client: ScreenRect) -> ScreenRect {
     ScreenRect { x: client.x + 70, y: client.y + 40, width: 620.min(client.width - 70), height: 48 }
 }

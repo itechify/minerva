@@ -10,8 +10,8 @@
 //!
 //! Where it goes, worked as in `grind_tracker_window.rs`: the game's client area at
 //! (812,110), 1920x1200 physical px, on one 3440x1440 monitor, and a Personal Bests window
-//! of 920x600, so centred at (1312,410). The Title Region is captured at (882,150)
-//! 130x48.
+//! of 920x600, so centred at (1312,410). The Minimap Title is found at (882,150)
+//! 620x48.
 
 mod common;
 
@@ -619,7 +619,7 @@ fn game(client: ScreenRect) -> Option<GameWindow> {
     Some(GameWindow { client, frame, screens: vec![SCREEN] })
 }
 
-/// Settings with the Title Region marked on the game's client area.
+/// Settings with setup finished.
 fn tracking_settings() -> Settings {
     Settings {
         setup_done: true,

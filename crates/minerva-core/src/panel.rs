@@ -332,9 +332,9 @@ pub(crate) struct Panel {
     pub mode: PlacementMode,
     /// The detached panel's top-left corner; `None` until it is first detached.
     pub detached_at: Option<ScreenPoint>,
-    /// Where the Title Region is captured on screen, and where the Status Bar's Character
-    /// and EXP figures were found. A panel inside the game is kept off them, or the capture
-    /// would read the panel instead.
+    /// Where the Minimap Title, the Status Bar's Character and its EXP figures were found on
+    /// screen. A panel inside the game is kept off them, or the capture would read the panel
+    /// instead.
     pub avoid: Vec<ScreenRect>,
     /// The monitors' work areas, as last known with the game window: a detached panel
     /// stays within them after the game is gone.

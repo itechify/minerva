@@ -105,9 +105,9 @@ fn ctrl_shift_i_over_an_item_shows_its_card_with_what_a_shop_pays_for_it() {
     assert_eq!(card.shop, ShopPrice::Sells { mesos: 450 });
 }
 
-/// The game window's Title Region on screen (the core captures more than was marked, wide
-/// enough for the longest name), and where the EXP figures were found in its Status Bar.
-const TITLE_REGION: ScreenRect = ScreenRect { x: 882, y: 150, width: 620, height: 48 };
+/// Where the Minimap Title was found on the game window ([`common::title_on`]), and where
+/// the EXP figures were found in its Status Bar.
+const TITLE_FOUND_AT: ScreenRect = ScreenRect { x: 882, y: 150, width: 620, height: 48 };
 const EXP_FIGURES: ScreenRect = ScreenRect { x: 1817, y: 1254, width: 384, height: 32 };
 
 /// The Item Tooltip by `pointer` read as `name`, after the player pressed Ctrl+Shift+I.
@@ -837,7 +837,7 @@ fn a_card_dragged_over_the_minimap_title_moves_off_it() {
     let state = minerva.act(Action::ItemCardMoved { x: 1000, y: 140 }).clone();
 
     let placed = state.item_card_placement.expect("the card shows");
-    assert!(!overlaps(placed, TITLE_REGION), "{placed:?}");
+    assert!(!overlaps(placed, TITLE_FOUND_AT), "{placed:?}");
 }
 
 #[test]

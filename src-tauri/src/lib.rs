@@ -481,7 +481,7 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-/// Our windows: the overlay (with Search in it), setup (with its region window), the
+/// Our windows: the overlay (with Search in it), setup, the
 /// Grind Tracker's, the Personal Bests window, the Item Lookup alert's, the Item Card's and
 /// the Deal Badges'.
 struct Windows {

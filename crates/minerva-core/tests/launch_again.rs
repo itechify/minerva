@@ -11,7 +11,7 @@ use minerva_core::{
 
 const GAME: ScreenRect = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
 
-/// A core set up before (a Title Region marked on this game window's size), so no
+/// A core set up before, so no
 /// first-run setup is waiting, with or without the game window found.
 fn set_up(game_found: bool) -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms_offline());

@@ -2118,7 +2118,7 @@ html.lb-morph::view-transition-group(lb-head) {
 }
 
 /* Reporting an entry: a small window over the page, framed as the site's window, under
-   the title-marking window's navy veil. */
+   the Navy Veil. */
 .lb-dialog {
   box-sizing: border-box;
   width: min(30em, calc(100vw - 36px));

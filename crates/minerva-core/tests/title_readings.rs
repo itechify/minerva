@@ -1,4 +1,4 @@
-//! Reading a title takes a while, so the shell reads Title Region frames with a
+//! Reading a title takes a while, so the shell reads title captures with a
 //! `TitleReader` on its own thread and hands the core each `TitleReading`: the window
 //! tracking and the panel never wait for recognition. A reading counts exactly as the
 //! frame it came from would.

@@ -23,7 +23,7 @@ pub struct GrindTrackerWindow {
     pub open: bool,
     /// Where it goes on screen; `None` while it is hidden: closed, with the Grind Tracker
     /// off, with no game window, while setup is open, or while another app is in front
-    /// (see [`crate::Layer`]). Never over the Title Region, the Status Bar's Character or
+    /// (see [`crate::Layer`]). Never over the Minimap Title where it was found, the Status Bar's Character or
     /// its EXP figures: it shows in screen captures, ours included.
     pub placement: Option<ScreenRect>,
     /// Some map has a Personal Best, the Visit under way's included: the window bar's

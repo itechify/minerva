@@ -6,7 +6,7 @@ status: accepted
 
 A player browsing Player Shops wants to know at a glance which listings are deals: priced below what they know the item sells for. They already keep that on their Market Lines (ADR 0011). The Deal Finder compares each listing of the open shop with one of them, the Deal Line, and marks the deals beside the shop.
 
-The shop's window opens at the same spot every time for a given size of the game window, centred, and the player can drag it. Its listings would be read from a region marked at setup, as the minimap title is (the Title Region), or found in a capture of the whole client area, as the Item Tooltip is (ADR 0007).
+The shop's window opens at the same spot every time for a given size of the game window, centred, and the player can drag it. Its listings would be read from a region marked at setup, as the minimap title was until ADR 0021 (the Title Region), or found in a capture of the whole client area, as the Item Tooltip is (ADR 0007).
 
 So the Deal Finder finds the shop itself: while it is on, the shell captures the game's whole client area a few times a second (every 400 ms), and the core finds the shop's listings in it and reads them.
 
@@ -40,7 +40,7 @@ Scrolls are the common case of a name cut short that starts several items' names
 
 ## Considered options
 
-- **A Shop Region marked at setup.** Setup would grow a step that only shop browsers use, and would be asked for again whenever the game window changes size, as the Title Region is. A shop dragged elsewhere would be read wrong, or not at all, without a word. Finding the shop costs little more than reading a region: the scan of the capture is a few milliseconds, and recognition, the costly part, is the same either way.
+- **A Shop Region marked at setup.** Setup would grow a step that only shop browsers use, and would be asked for again whenever the game window changes size, as the Title Region was until ADR 0021. A shop dragged elsewhere would be read wrong, or not at all, without a word. Finding the shop costs little more than reading a region: the scan of the capture is a few milliseconds, and recognition, the costly part, is the same either way.
 - **Recognising text across the whole client area.** ocrs's detection model isn't shipped (ADR 0002), and reading every line on screen would cost far more than finding the bands, with chat and names to tell apart from listings.
 - **Reading each item's Item Tooltip.** It would tell equipment's stats, but takes the player's hover over each listing, one at a time: the Item Card does that already. Tooltips are still not read for stats, nor to name every listing: only to name one whose name the game cut short so that it could be several items, which nothing else tells (#135).
 - **Naming a cut-short listing at an Item Card press.** Pressing the hotkey over the listing would name it too, but opens a card each time, and the player hovers the listing anyway.
