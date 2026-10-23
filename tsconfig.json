@@ -20,5 +20,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "site"],
-  "exclude": ["site/vite.config.ts", "site/leaderboards/vitest.config.ts", "site/dist", "site/worker"]
+  "exclude": ["site/vite.config.ts", "site/leaderboards/vitest.config.ts", "site/account/vitest.config.ts", "site/dist", "site/worker"]
 }

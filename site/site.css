@@ -2528,3 +2528,102 @@ button.button {
     flex: 1;
   }
 }
+
+/* ---- Accounts: the account, link and moderation pages (site/account, site/admin) ---- */
+
+.part[data-street="Account"] .lb-section,
+.part[data-street="Moderation"] .lb-section {
+  max-width: 44em;
+  padding-top: 40px;
+}
+/* A row of buttons, wrapping on a phone. */
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+/* The tab a moderation view is open on stands pressed. */
+.account-actions [role="tab"][aria-selected="true"] {
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--select-edge);
+}
+/* Linked PCs, reports and Accounts found: rows parted by Window Rules in an inset box, as
+   the Map Leaderboards list maps, what the row is about at the left and its buttons right. */
+.account-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--inset-bg);
+}
+.account-list:empty {
+  display: none;
+}
+.account-list > li {
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 21px;
+}
+.account-list > li + li {
+  border-top: 1px solid var(--rule);
+}
+.account-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.account-item .account-actions {
+  margin-top: 0;
+}
+.account-words {
+  display: flex;
+  flex: 1 1 16em;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--ink-2);
+}
+.account-words strong {
+  color: var(--ink);
+}
+.account-reason {
+  font-style: italic;
+}
+.account-lines {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 15px;
+  line-height: 23px;
+}
+.lb-section .lb-search {
+  margin-top: 18px;
+}
+/* Who's signed in, in the window's bar beside the version, once a page has asked. */
+.window-signed-in {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--window-bar-ink);
+  white-space: nowrap;
+}
+.window-signed-in a,
+.window-signed-in button {
+  color: inherit;
+}
+.window-signed-in button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-decoration: underline 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+@media (max-width: 720px) {
+  .window-signed-in {
+    display: none;
+  }
+}

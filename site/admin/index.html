@@ -1,0 +1,72 @@
+<!doctype html>
+<!-- The maintainer's page (ADR 0023): signed in with a Discord account the Worker lists as a
+     maintainer's (MAINTAINER_DISCORD_IDS). Reports, each deleted or dismissed, and
+     Characters, a name looked up and reassigned. Everyone else is told it's the
+     maintainer's. It reads /api/admin/ from the browser (admin/admin.ts). -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Moderation · Minerva</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../../assets/icon-16.png" />
+    <link rel="preload" href="../fonts/Maplestory-Light.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../fonts/Maplestory-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../../src/theme.css" />
+    <link rel="stylesheet" href="../site.css" />
+    <script type="module" src="../site.ts"></script>
+    <script type="module" src="./admin.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the page</a>
+    <div class="window">
+      @WINDOW_HEAD@
+
+      <main class="window-body" id="main">
+        <div class="part" data-street="Moderation">
+          <header class="lb-head stop" id="top" data-mini="Moderation">
+            <h1>Moderation</h1>
+            <p class="lb-said" id="said" aria-live="polite">Loading…</p>
+            <noscript><p class="lb-said">Moderation needs JavaScript.</p></noscript>
+            <p id="signed-out" hidden><a class="button" href="/api/auth/discord?return=%2Fadmin%2F">Sign in with Discord</a></p>
+            <div class="account-actions" id="views" role="tablist" aria-label="Moderation" hidden>
+              <button class="button small secondary" id="show-reports" type="button" role="tab" aria-selected="true" aria-controls="reports">Reports</button>
+              <button class="button small secondary" id="show-characters" type="button" role="tab" aria-selected="false" aria-controls="characters">Characters</button>
+            </div>
+          </header>
+
+          <section class="lb-section stop" id="reports" data-mini="Reports" role="tabpanel" aria-labelledby="reports-title" hidden>
+            <h2 id="reports-title">Reports</h2>
+            <p class="lb-said" id="reports-said" aria-live="polite"></p>
+            <ul class="account-list" id="report-list"></ul>
+          </section>
+
+          <section class="lb-section stop" id="characters" data-mini="Characters" role="tabpanel" aria-labelledby="characters-title" hidden>
+            <h2 id="characters-title">Characters</h2>
+            <form class="lb-search" id="character-form" action="javascript:void 0">
+              <label for="character-name">Character's name</label>
+              <input id="character-name" type="search" autocomplete="off" spellcheck="false" maxlength="16" />
+            </form>
+            <p class="lb-said" id="character-said" aria-live="polite"></p>
+            <div id="character" hidden>
+              <ul class="account-lines" id="character-lines"></ul>
+              <div class="account-actions">
+                <button class="button small secondary" id="reassign-refused" type="button">Reassign to refused key</button>
+              </div>
+              <form class="lb-search" id="account-form" action="javascript:void 0">
+                <label for="account-query">Reassign to an Account, by Discord username</label>
+                <input id="account-query" type="search" autocomplete="off" spellcheck="false" />
+              </form>
+              <ul class="account-list" id="account-list"></ul>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <footer class="window-foot" id="credits" data-mini="Credits">
+@CREDITS@
+      </footer>
+    </div>
+  </body>
+</html>

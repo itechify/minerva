@@ -2,11 +2,12 @@
 // The site's behaviours, on every page: on a wide screen the page's minimap shows where you
 // are in it (minimap.ts), following the scroll; on the home page the hero films how Minerva
 // reads the map you're on as the page scrolls past it (reel.ts); and a question the address
-// names opens. Without the script the pages still read whole, the hero is its still shot,
+// names opens; and who's signed in shows in the window's bar. Without the script the pages still read whole, the hero is its still shot,
 // and every question opens with a click.
 
 import { minimap } from "./minimap.ts";
 import { reel } from "./reel.ts";
+import { signedIn } from "./signed-in.ts";
 
 // Addresses from when the home page was the whole manual, which release notes and the old
 // site's address still link to: a part that has moved goes where it's answered now.
@@ -106,3 +107,5 @@ for (const img of document.querySelectorAll<HTMLImageElement>(".shot img")) {
   if (img.complete && img.naturalWidth === 0) missing();
   else img.addEventListener("error", missing);
 }
+
+signedIn();

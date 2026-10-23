@@ -23,6 +23,11 @@
       "migrations_dir": "./migrations"
     }
   ],
+  // Signing in with Discord (ADR 0023, docs/map-leaderboards-setup.md): the Discord
+  // application's client ID, and the maintainers' Discord user IDs, comma-separated. Neither
+  // is secret; the application's secret is the DISCORD_CLIENT_SECRET Worker secret. With
+  // the ID or the secret unset, signing in is off.
+  "vars": { "DISCORD_CLIENT_ID": "1563331160736661564", "MAINTAINER_DISCORD_IDS": "108388027469979648" },
   "routes": [
     { "pattern": "owlofminerva.app", "custom_domain": true },
     { "pattern": "www.owlofminerva.app", "custom_domain": true }

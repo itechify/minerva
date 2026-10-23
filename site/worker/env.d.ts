@@ -12,6 +12,14 @@ declare namespace Cloudflare {
      *  (docs/map-leaderboards-setup.md, ADR 0022). Without it, nothing is posted and
      *  uploads are unchanged. */
     DISCORD_WEBHOOK_URL?: string;
+    /** The Discord application's client ID, a variable (site/wrangler.jsonc), and its
+     *  secret, a Worker secret (docs/map-leaderboards-setup.md, ADR 0023). Without both,
+     *  signing in is off. */
+    DISCORD_CLIENT_ID?: string;
+    DISCORD_CLIENT_SECRET?: string;
+    /** The maintainers' Discord user IDs, comma-separated, a variable (site/wrangler.jsonc):
+     *  signed in with one, the maintainer's routes and /admin/ are theirs. */
+    MAINTAINER_DISCORD_IDS?: string;
     /** The tests' made-up solo ceilings, in place of osms-ceilings.json. */
     TEST_CEILINGS?: Record<string, number>;
   }
