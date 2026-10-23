@@ -362,11 +362,6 @@
   color: var(--frame);
 }
 
-.item-card-choice:focus-visible {
-  outline: 2px solid var(--edit);
-  outline-offset: 2px;
-}
-
 /* The same 32px box with or without its picture, so the card and the list don't jump when
    one arrives; the picture at its own size, drawn pixelated, as the game draws it. */
 .item-card-icon {

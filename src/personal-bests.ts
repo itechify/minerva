@@ -1,11 +1,10 @@
 import "./errors";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { dayText } from "./dates";
-import { byId, span } from "./dom";
-import { type LevelRange, levels, rate, sharePercent, whole } from "./figures";
+import { byId, span, svgEl } from "./dom";
+import { type LevelRange, levels, rate, sharePercent, short, whole } from "./figures";
 import { mapMark, type MapMarks } from "./map-marks";
+import { dragByHandles, followView, heightReporter, pressControls } from "./shell";
 import { soloExpHelp } from "./solo-exp-help";
 
 /** Mirror of `minerva_core::PersonalBestsVisit`: one of a map's Visits. */
@@ -182,19 +181,11 @@ function noShare(m: BestsMap) {
 
 /** The star on the best of all maps: the Grind Tracker's new-best star. */
 function star() {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("class", "best-star");
-  svg.setAttribute("viewBox", "0 0 16 16");
-  svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Your best of all maps");
-  const title = document.createElementNS(ns, "title");
+  const svg = svgEl("svg", { class: "best-star", viewBox: "0 0 16 16", role: "img", "aria-label": "Your best of all maps" });
+  const title = svgEl("title");
   title.textContent = "Your best of all maps";
-  const path = document.createElementNS(ns, "path");
-  path.setAttribute("d", "M8 1.5L9.76 6.07L14.66 6.34L10.85 9.43L12.11 14.16L8 11.5L3.89 14.16L5.15 9.43L1.34 6.34L6.24 6.07Z");
-  const lit = document.createElementNS(ns, "ellipse");
-  lit.setAttribute("class", "lit");
-  for (const [k, v] of Object.entries({ cx: 7.1, cy: 6.9, rx: 1.5, ry: 1.1 })) lit.setAttribute(k, String(v));
+  const path = svgEl("path", { d: "M8 1.5L9.76 6.07L14.66 6.34L10.85 9.43L12.11 14.16L8 11.5L3.89 14.16L5.15 9.43L1.34 6.34L6.24 6.07Z" });
+  const lit = svgEl("ellipse", { class: "lit", cx: 7.1, cy: 6.9, rx: 1.5, ry: 1.1 });
   svg.append(title, path, lit);
   return svg;
 }
@@ -211,13 +202,6 @@ function scaleOf(maps: BestsMap[]): Scale {
   const lines: number[] = [];
   for (let n = step; n <= top; n += step) lines.push(n);
   return { top, lines };
-}
-
-/** A step on the scale as its header writes it: 0, 500, 20k, 1.25M. */
-function short(n: number) {
-  if (n >= 1_000_000) return `${Number((n / 1_000_000).toFixed(2))}M`;
-  if (n >= 1_000) return `${Number((n / 1_000).toFixed(1))}k`;
-  return String(n);
 }
 
 /** How far along the lane an EXP/h is. */
@@ -253,7 +237,7 @@ function spaceScale() {
 }
 
 /** The scale's lines down a lane's cell, behind its bar. */
-const gridLines = () => scale.lines.map((n) => at("grid", n));
+const gridLines = () => scale.lines.map((n) => at("lane-grid", n));
 
 /** A map's lane, in its own column beside the figure. */
 function laneCell(m: BestsMap) {
@@ -267,7 +251,7 @@ function laneCell(m: BestsMap) {
 function lane(m: BestsMap) {
   const lane = document.createElement("div");
   lane.className = "lane";
-  lane.append(at("bar", m.expPerHour));
+  lane.append(at("lane-bar", m.expPerHour));
   const others = m.visits.slice(1).filter((v) => !v.thisVisit);
   lane.append(...others.map((v) => at("notch", v.expPerHour)));
   const now = m.visits.find((v) => v.thisVisit);
@@ -290,7 +274,7 @@ function visitLane(v: BestsVisit) {
   const lane = document.createElement("div");
   lane.className = "lane visit-lane";
   lane.setAttribute("aria-hidden", "true");
-  lane.append(at("bar", v.expPerHour));
+  lane.append(at("lane-bar", v.expPerHour));
   if (v.thisVisit) lane.append(at("visit-dot", v.expPerHour));
   td.append(...gridLines(), lane);
   return td;
@@ -371,14 +355,8 @@ function row(m: BestsMap, marks: MapMarks) {
 
 /** The disclosure's chevron: pointing right while the map is closed, down while open. */
 function chevron() {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("class", "chevron");
-  svg.setAttribute("viewBox", "0 0 8 8");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS(ns, "path");
-  path.setAttribute("d", "M3 1.5L5.5 4L3 6.5");
-  svg.append(path);
+  const svg = svgEl("svg", { class: "chevron", viewBox: "0 0 8 8", "aria-hidden": "true" });
+  svg.append(svgEl("path", { d: "M3 1.5L5.5 4L3 6.5" }));
   return svg;
 }
 
@@ -773,7 +751,6 @@ function leaderboardSwitch(name: string, t: Toggle) {
   button.type = "button";
   button.className = "switch";
   button.dataset.share = name;
-  button.dataset.on = String(t.on);
   button.setAttribute("role", "switch");
   button.setAttribute("aria-checked", String(t.on));
   button.setAttribute("aria-label", `Share ${name}'s bests on the Map Leaderboards`);
@@ -915,18 +892,8 @@ for (const th of headers) {
 }
 
 // The shell sizes the window to the content, as the Grind Tracker's is, up to its most;
-// past that the table scrolls. The panel is no taller than the window, so it is measured
-// without that limit, or the window could never grow.
-let reportedHeight = 0;
-function reportHeight() {
-  panelEl.classList.add("measuring");
-  const height = Math.ceil(panelEl.getBoundingClientRect().height);
-  panelEl.classList.remove("measuring");
-  if (height > 0 && height !== reportedHeight) {
-    reportedHeight = height;
-    invoke("personal_bests_height", { height });
-  }
-}
+// past that the table scrolls.
+const reportHeight = heightReporter(panelEl, "personal_bests_height");
 // Narrowed to a smaller game, the rows lay out again, as cards at the narrowest, and the
 // ruler spaces its figures for the lane's new length.
 window.addEventListener("resize", () => {
@@ -941,11 +908,7 @@ document.fonts.ready.then(() => {
 
 // Dragged by its header, never by its button. A click leaves the keyboard with the game:
 // the window can't be activated.
-document.addEventListener("mousedown", (e) => {
-  const target = e.target instanceof Element ? e.target : null;
-  const onHeader = !!target?.closest(".drag-handle") && !target?.closest("button");
-  if (e.button === 0 && onHeader) getCurrentWindow().startDragging();
-});
+dragByHandles();
 
 /** A Visit as the shell takes it back: by its best, with the level and job that set it. */
 function visitArgs(v: BestsVisit) {
@@ -986,8 +949,11 @@ function armedWords(arm: string) {
   return `${asks} Click again to confirm. It can't be undone.`;
 }
 
-// Its ×, through the core like the panel's icons; a map's name, to its MeowDB page, and its
-// Map Leaderboard to the site; a map's count, opening or closing its Visit History; a choice
+// Its ×, through the core like the panel's icons.
+pressControls(document);
+
+// A map's name, to its MeowDB page, and its Map Leaderboard to the site; a map's count,
+// opening or closing its Visit History; a choice
 // in the picker, showing it; a Character's Share, flipping it through the core; Manage, opening
 // or closing the Character's. A button that asks first (a Visit's × or Move, a Character's
 // Remove or Merge, Assign all, held uploads' Send) arms it, and asks again: a second click
@@ -995,8 +961,6 @@ function armedWords(arm: string) {
 // disarms it.
 document.addEventListener("click", (e) => {
   const target = e.target instanceof Element ? e.target : null;
-  const control = target?.closest<HTMLButtonElement>("button[data-control]");
-  if (control) invoke("panel_press", { control: control.dataset.control });
   const map = target?.closest<HTMLButtonElement>("button.row-map");
   if (map) invoke("personal_bests_open_map", { id: map.dataset.id });
   const board = target?.closest<HTMLButtonElement>("button.row-leaderboard");
@@ -1004,7 +968,7 @@ document.addEventListener("click", (e) => {
   const again = target?.closest<HTMLButtonElement>("button[data-send-again]");
   if (again) invoke("personal_bests_send_again", { name: again.dataset.sendAgain });
   const share = target?.closest<HTMLButtonElement>("button[data-share]");
-  if (share) invoke("personal_bests_show_on_leaderboards", { name: share.dataset.share, on: share.dataset.on !== "true" });
+  if (share) invoke("personal_bests_show_on_leaderboards", { name: share.dataset.share, on: share.getAttribute("aria-checked") !== "true" });
   const toggle = target?.closest<HTMLButtonElement>("button.visits-toggle");
   const pick = target?.closest<HTMLButtonElement>("button[data-pick]");
   const manage = target?.closest<HTMLButtonElement>("button.manage-toggle");
@@ -1036,9 +1000,5 @@ document.addEventListener("click", (e) => {
   if (armed !== null && armed !== before) announce.textContent = armedWords(armed);
 });
 
-listen<BestsView>("personal-bests-state", (e) => render(e.payload));
-// The rows may have been sent before the page was listening.
-invoke<BestsView | null>("personal_bests_view").then((view) => {
-  if (view) render(view);
-});
+followView<BestsView>("personal-bests-state", "personal_bests_view", render);
 reportHeight();

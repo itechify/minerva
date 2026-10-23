@@ -149,7 +149,7 @@ export function distanceText(distance: Distance): { text: string; title: string 
 }
 
 /** Each Step as a route and a travel marker name it ("5 · taxi, scroll"). */
-export const STEP_NAMES: Record<Step, string> = {
+const STEP_NAMES: Record<Step, string> = {
   portal: "portal",
   ship: "ship",
   taxi: "taxi",
@@ -157,7 +157,7 @@ export const STEP_NAMES: Record<Step, string> = {
 };
 
 /** Each Step in full, for tooltips. */
-export const STEP_TITLES: Record<Step, string> = {
+const STEP_TITLES: Record<Step, string> = {
   portal: "Portal",
   ship: "Ship",
   taxi: "Taxi",
@@ -168,7 +168,7 @@ export const STEP_TITLES: Record<Step, string> = {
 type Way = { distance: Distance; route: RouteStop[]; travel: Step[] };
 
 /** A way's travel marker: "ship", "taxi, ship", or "" for portals alone. */
-export const travelMarker = (way: Way) => way.travel.map((step) => STEP_NAMES[step]).join(", ");
+const travelMarker = (way: Way) => way.travel.map((step) => STEP_NAMES[step]).join(", ");
 
 /** The headline: "Nearest: Mushroom Field, 2 map changes away", or "" with none. */
 export function nearestLine(search: SearchState): string {

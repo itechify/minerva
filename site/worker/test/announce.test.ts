@@ -1,5 +1,5 @@
 // A new #1 on a Map Leaderboard is posted to Discord, and only when a Character really took
-// the spot from another (ADR 0017): a first entry in an empty band, a Character beating its
+// the spot from another (ADR 0022): a first entry in an empty band, a Character beating its
 // own best, a re-upload of the same set and an opt-out that hands the spot on all stay quiet.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MOST_TOLD, type Taken, type Top, postFor, takenTops, tell } from "../announce";

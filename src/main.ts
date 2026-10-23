@@ -7,8 +7,9 @@ import { dayText, momentText } from "./dates";
 import { byId, cardTop, span } from "./dom";
 import { LOADING_MAP_LIST, TITLE_LOST, recognitionProblem, type Recognition } from "./recognition";
 import type { ExpTracking } from "./exp-tracking";
-import { levels } from "./figures";
+import { levels, whole } from "./figures";
 import { mapMark, showMark, type MapMarks } from "./map-marks";
+import { dragByHandles, heightReporter, pressControls } from "./shell";
 import {
   initMapPreview,
   layOutMapPreview,
@@ -121,7 +122,6 @@ type PanelState = {
   recognition: Recognition;
   /** The shown map; its `mark` names its Map Mark in `mapMarks`. */
   map: { id: string; streetName: string; mapName: string; url: string; mark: string | null } | null;
-  confidence: number;
   notSure: boolean;
   candidates: Candidates | null;
   data: MapDataStatus;
@@ -289,9 +289,6 @@ function hotkeyCauses(panel: PanelState): string {
   return sentences.join(" ");
 }
 
-const number = (n: number) => n.toLocaleString("en-US");
-
-
 function cell(text: string): HTMLTableCellElement {
   const td = document.createElement("td");
   td.textContent = text;
@@ -400,10 +397,10 @@ function renderData(panel: PanelState) {
   summary.hidden = !ready?.summary;
   if (ready?.summary) {
     const { mobsPerHour, expPerHour } = ready.summary;
-    byId("mobs-solo").textContent = number(mobsPerHour.solo);
-    byId("mobs-party").textContent = number(mobsPerHour.fullParty);
-    byId("exp-solo").textContent = number(expPerHour.solo);
-    byId("exp-party").textContent = number(expPerHour.fullParty);
+    byId("mobs-solo").textContent = whole(mobsPerHour.solo);
+    byId("mobs-party").textContent = whole(mobsPerHour.fullParty);
+    byId("exp-solo").textContent = whole(expPerHour.solo);
+    byId("exp-party").textContent = whole(expPerHour.fullParty);
   }
   mobsTable.hidden = !ready || ready.mobs.length === 0;
   mobRows.replaceChildren(
@@ -426,8 +423,8 @@ function renderData(panel: PanelState) {
       row.append(
         name,
         cell(String(mob.level)),
-        cell(number(mob.hp)),
-        cell(number(mob.exp)),
+        cell(whole(mob.hp)),
+        cell(whole(mob.exp)),
         cell(`${mob.spawnSharePercent}%`),
       );
       ["Mob", "Lv", "HP", "EXP", "Share"].forEach((label, i) => {
@@ -1034,7 +1031,7 @@ function hoverMob(id: string | null) {
 }
 
 /** "—" for a figure the mob doesn't have. */
-const figure = (n: number | null) => (n === null ? "—" : number(n));
+const figure = (n: number | null) => (n === null ? "—" : whole(n));
 
 /** A tag per element: "Weak to Fire", "Resists Ice", "Immune to Poison". */
 function elementTags({ weak, strong, immune }: MobDetails["elements"]): HTMLElement {
@@ -1064,7 +1061,7 @@ function mobFigures(details: MobDetails): HTMLDListElement {
     return pair;
   };
   const touch = details.touchDamage;
-  add("Touch", touch ? `${number(touch.min)}–${number(touch.max)}` : "—");
+  add("Touch", touch ? `${whole(touch.min)}–${whole(touch.max)}` : "—");
   add("MP", figure(details.mp));
   add("ACC", figure(details.accuracy));
   add("AVOID", figure(details.avoid));
@@ -1278,19 +1275,9 @@ function render(panel: PanelState) {
 // padding would not count, and the window would shrink a little with every report.
 // Lifting the limit scrolls the long parts back to the top, so they are put back.
 let expanded = true;
-let reportedHeight = 0;
+const measurePanel = heightReporter(panelEl, "panel_height", true);
 function reportHeight() {
-  if (!expanded) return;
-  const scrolls = [...panelEl.querySelectorAll<HTMLElement>(".scroll")];
-  const scrolledTo = scrolls.map((el) => el.scrollTop);
-  panelEl.classList.add("measuring");
-  const height = Math.ceil(panelEl.getBoundingClientRect().height);
-  panelEl.classList.remove("measuring");
-  scrolls.forEach((el, i) => (el.scrollTop = scrolledTo[i]));
-  if (height > 0 && height !== reportedHeight) {
-    reportedHeight = height;
-    invoke("panel_height", { height });
-  }
+  if (expanded) measurePanel();
 }
 window.addEventListener("resize", reportHeight);
 // The panel's height depends on its font: measure again once it has loaded.
@@ -1303,13 +1290,8 @@ function startDrag() {
   getCurrentWindow().startDragging();
 }
 
-document.addEventListener("mousedown", (e) => {
-  const target = e.target instanceof Element ? e.target : null;
-  const onHeader = !!target?.closest(".drag-handle") && !target?.closest("button, input");
-  // The map's title is also a link: it drags only once the mouse moves (below).
-  const onLink = !!target?.closest(".titlebar.linked");
-  if (draggable && e.button === 0 && onHeader && !onLink) startDrag();
-});
+// The map's title is also a link: it drags only once the mouse moves (below).
+dragByHandles("button, input", (target) => draggable && !target.closest(".titlebar.linked"));
 
 // The expanded panel's bottom corners resize it, whatever its placement, as its edges
 // do: its width only, as the height follows the content. Once the player lets go the
@@ -1357,21 +1339,10 @@ function clickOrDrag(el: HTMLElement, control: string, clickable: () => boolean)
 clickOrDrag(icon, "togglePanel", () => true);
 clickOrDrag(titlebar, "openMeowdbPage", () => titlebar.classList.contains("linked"));
 
-// Each icon at the top of the panel does what its hotkey does.
-toolbar.addEventListener("click", (e) => {
-  const button = e.target instanceof Element ? e.target.closest<HTMLButtonElement>("button[data-control]") : null;
-  if (button) invoke("panel_press", { control: button.dataset.control });
-});
-// The line saying the minimap's title can't be found: its Help opens the FAQ's answer.
-recovery.addEventListener("click", (e) => {
-  const button = e.target instanceof Element ? e.target.closest<HTMLButtonElement>("button[data-control]") : null;
-  if (button) invoke("panel_press", { control: button.dataset.control });
-});
-// The Deal Finder's Turn off, like its hotkey.
-dealFinderEl.addEventListener("click", (e) => {
-  const button = e.target instanceof Element ? e.target.closest<HTMLButtonElement>("button[data-control]") : null;
-  if (button) invoke("panel_press", { control: button.dataset.control });
-});
+// Each icon at the top of the panel does what its hotkey does; the line saying the minimap's
+// title can't be found has a Help, opening the FAQ's answer; and the Deal Finder's Turn off
+// does what its hotkey does.
+pressControls(panelEl);
 searchBack.addEventListener("click", () => invoke("search_escape"));
 huntingReopen.addEventListener("click", () => invoke("hunting_reopen"));
 huntingClear.addEventListener("click", () => invoke("hunting_clear"));

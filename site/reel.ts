@@ -9,6 +9,8 @@
 // timer. With reduced motion, without the script, in print or on a screen too short to
 // hold it, the hero is the still shot.
 
+import { make, reducedMotion } from "../src/dom.ts";
+
 /** A rectangle in the game window's own pixels: game-window.png, 1922×1232. */
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -58,8 +60,6 @@ const FADE = 0.015;
 /** The share of the pinned scroll the film takes; the rest holds its last frame. */
 const PLAY = 0.85;
 
-const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-
 const clamp = (t: number) => Math.min(Math.max(t, 0), 1);
 /** How far through a beat the film is. */
 const seg = (p: number, [a, b]: number[]) => clamp((p - a) / (b - a));
@@ -80,13 +80,6 @@ function camera(p: number): Rect {
   if (p < PUSH[1]) return between(WHOLE, CLOSE, ease(seg(p, PUSH)));
   if (p < BACK[0]) return CLOSE;
   return between(CLOSE, HERO, ease(seg(p, BACK)));
-}
-
-function make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) {
-  const node = document.createElement(tag);
-  node.className = className;
-  if (text) node.textContent = text;
-  return node;
 }
 
 /**
@@ -207,7 +200,7 @@ export function reel(head: () => number) {
     // two lines of caption fit under the window's head.
     const fit = Math.floor(Math.min(figure!.clientWidth, HERO.w, ((bottom - top - 8 - 36) * HERO.w) / HERO.h));
     const missing = shot!.complete && shot!.naturalWidth === 0;
-    if (broken || missing || printing || reduced.matches || fit < 280) return set(false);
+    if (broken || missing || printing || reducedMotion().matches || fit < 280) return set(false);
     w = fit;
     set(true);
     const h = (w * HERO.h) / HERO.w;
@@ -283,6 +276,6 @@ export function reel(head: () => number) {
     });
   }
 
-  reduced.addEventListener("change", measure);
+  reducedMotion().addEventListener("change", measure);
   return { measure, draw };
 }

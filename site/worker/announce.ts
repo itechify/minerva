@@ -1,4 +1,4 @@
-// A new #1 on a Map Leaderboard, told to Discord (ADR 0017): when an upload takes a map and
+// A new #1 on a Map Leaderboard, told to Discord (ADR 0022): when an upload takes a map and
 // Level Band's top spot from another Character, the Worker posts a line about it to a Discord
 // webhook. Only a spot *taken* is told, so a first entry in an empty band, a Character
 // beating its own best, and a top spot that fell to someone because an entry was deleted all
@@ -61,7 +61,7 @@ export function takenTops(before: Top[], after: Top[], nameKey: string): Taken[]
 
 /** The Map Leaderboards link a line points at: the map's page, opened at the band with the
  *  Character's entry marked, as the app's deep links do (ADR 0015). */
-export function linkTo(taken: Taken): string {
+function linkTo(taken: Taken): string {
   const query = new URLSearchParams({ map: taken.map, band: String(taken.band), name: taken.name });
   return `https://owlofminerva.app/leaderboards/map/?${query}`;
 }
@@ -86,7 +86,7 @@ function lineFor(taken: Taken): string {
 }
 
 /** What a Discord webhook is posted. */
-export interface Post {
+interface Post {
   content: string;
   /** Nothing in a post ever pings: a Character's name is its own, not a mention. */
   allowed_mentions: { parse: [] };

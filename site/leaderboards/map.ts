@@ -3,7 +3,9 @@
 // and its rank, and a report link on each other entry. A click on a Level Band switches the
 // page to it in place, the Characters in both bands sliding to their new rank. Where it
 // opens and what it shows are worked out in leaderboards.ts.
-import { byId, make, names, read, said as saidWith, UNREACHABLE } from "./api.ts";
+import { make, reducedMotion, svgEl } from "../../src/dom.ts";
+import { STAR } from "../star.ts";
+import { byId, names, read, said as saidWith, UNREACHABLE } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
@@ -189,8 +191,6 @@ addEventListener("popstate", (event) => {
   switchTo(to, null, !(event as PopStateEvent & { hasUAVisualTransition?: boolean }).hasUAVisualTransition);
 });
 
-/** Reduced motion, where a switch is at once. */
-const still = matchMedia("(prefers-reduced-motion: reduce)");
 /** Which switch is the latest, so a slower answer to an earlier click is dropped. */
 let switches = 0;
 /** The switch moving now, cut short by another click. */
@@ -222,7 +222,7 @@ async function switchTo(to: Link, href: string | null, animate: boolean) {
     byId("switched").textContent = byId("caption").textContent || said.textContent || "";
   };
   moving?.skipTransition();
-  if (!animate || still.matches || !document.startViewTransition) return update(null, false);
+  if (!animate || reducedMotion().matches || !document.startViewTransition) return update(null, false);
 
   const next = bandTable(band, to.name, new Date());
   const morph = morphNames(before, next.yours === null ? next.rows : [...next.rows, next.yours]);
@@ -292,7 +292,7 @@ function laneCell(row: Row, steps: RulerStep[]): HTMLTableCellElement {
   const td = make("td", "lb-lane");
   td.setAttribute("aria-hidden", "true");
   for (const step of steps.slice(1)) {
-    const line = make("span", "lb-grid");
+    const line = make("span", "lane-grid");
     line.style.setProperty("--at", String(step.at));
     td.append(line);
   }
@@ -304,7 +304,7 @@ function laneCell(row: Row, steps: RulerStep[]): HTMLTableCellElement {
 function lane(row: Row, className: string): HTMLSpanElement {
   const track = make("span", className);
   track.setAttribute("aria-hidden", "true");
-  const bar = make("span", "lb-bar");
+  const bar = make("span", "lane-bar");
   bar.style.setProperty("--at", String(row.lane));
   track.append(bar);
   return track;
@@ -312,13 +312,8 @@ function lane(row: Row, className: string): HTMLSpanElement {
 
 /** The You Yellow star, the Personal Bests window's mark for a best of the player's. */
 function star(): SVGSVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 16 16");
-  svg.setAttribute("class", "lb-star");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("d", "M8 1.6l1.9 4.1 4.5.5-3.3 3.1.9 4.4L8 11.5l-3.9 2.2.9-4.4-3.3-3.1 4.5-.5z");
-  svg.append(path);
+  const svg = svgEl("svg", { viewBox: "0 0 16 16", class: "lb-star", "aria-hidden": "true" });
+  svg.append(svgEl("path", { d: STAR }));
   return svg;
 }
 

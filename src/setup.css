@@ -1,3 +1,4 @@
+@import "./fonts.css";
 @import "./theme.css";
 
 /* The setup window, in the shared window language of theme.css: the game's lavender
@@ -440,8 +441,6 @@ button.link:active {
 }
 
 button.link:focus-visible {
-  outline: 2px solid var(--edit);
-  outline-offset: 2px;
   border-radius: 2px;
 }
 

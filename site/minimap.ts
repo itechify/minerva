@@ -5,6 +5,9 @@
 // only as the character walks: never on its own, and with reduced motion it steps from
 // portal to portal.
 
+import { make, reducedMotion, svgEl } from "../src/dom.ts";
+import { STAR } from "./star.ts";
+
 /** How a stop is marked: as its topic's heading is, or else a portal ring. */
 type Mark = "portal" | "route" | "mob" | "star";
 
@@ -28,24 +31,12 @@ const STAND = 7;
 /** The scroll a drop down a rope takes, at most. */
 const DROP = 160;
 
-const STAR = "M8 1.6l1.9 4.1 4.5.5-3.3 3.1.9 4.4L8 11.5l-3.9 2.2.9-4.4-3.3-3.1 4.5-.5z";
 const MINUS = "M3.5 8.5h9";
 const PLUS = "M3.5 8.5h9M8 4v9";
 
-const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-
-function make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) {
-  const node = document.createElement(tag);
-  node.className = className;
-  if (text) node.textContent = text;
-  return node;
-}
-
-function icon(path: string, className = "") {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 16 16");
-  svg.setAttribute("class", className);
-  svg.innerHTML = `<path d="${path}" />`;
+function icon(path: string) {
+  const svg = svgEl("svg", { viewBox: "0 0 16 16" });
+  svg.append(svgEl("path", { d: path }));
   return svg;
 }
 
@@ -226,7 +217,7 @@ export function minimap(line: () => number) {
     while (k + 1 < steps.length && steps[k + 1].at <= s) k++;
     const here = steps[k];
     const next = steps[k + 1];
-    if (!next || reduced.matches) {
+    if (!next || reducedMotion().matches) {
       const stop = stops[here.stop];
       return { x: next ? stop.x : here.x, y: next ? stop.y : here.y, part: here.part, stop: here.stop };
     }

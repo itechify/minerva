@@ -6,6 +6,7 @@ import { defineConfig, type Plugin } from "vite";
 import pkg from "../package.json" with { type: "json" };
 import { hotkeyRows } from "./hotkeys.ts";
 import { fillFaqPage, fillQuestionLists, readFaq } from "./questions.ts";
+import { STAR } from "./star.ts";
 
 // The Minerva site for players: the home page (site/index.html), the FAQ
 // (site/faq/index.html) and the Map Leaderboards (site/leaderboards/index.html, and a map's
@@ -17,7 +18,10 @@ const HOME = fileURLToPath(new URL("./index.html", import.meta.url));
 const FAQ = fileURLToPath(new URL("./faq/index.html", import.meta.url));
 const LEADERBOARDS = fileURLToPath(new URL("./leaderboards/index.html", import.meta.url));
 const MAP_LEADERBOARD = fileURLToPath(new URL("./leaderboards/map/index.html", import.meta.url));
+const REPO = fileURLToPath(new URL("..", import.meta.url));
 const same = (a: string, b: string) => a.replace(/\\/g, "/") === b.replace(/\\/g, "/");
+/** The folder `to` from the folder of the page `page`, as an address: "", "..", "../.."… */
+const upTo = (page: string, to: string) => relative(dirname(page), to).replace(/\\/g, "/");
 /** Whether a page being built is the home page. */
 const isHome = (file: string) => same(file, HOME);
 /** Whether a page being built is the FAQ, where the questions are written. */
@@ -29,8 +33,8 @@ const RELEASES = "https://github.com/itechify/minerva/releases";
 
 /**
  * The pages' placeholders, filled at build: the version they describe (package.json's, which
- * at a release's tag is the release's), that version's downloads, the hotkey table and the
- * credits.
+ * at a release's tag is the release's), that version's downloads, the hotkey table, the
+ * star's path (site/star.ts), the window's head and the credits.
  */
 function fillPlaceholders(): Plugin {
   const version = pkg.version;
@@ -40,15 +44,27 @@ function fillPlaceholders(): Plugin {
     "@RELEASE_URL@": `${RELEASES}/tag/v${version}`,
     "@SITE_URL@": SITE_URL,
     "@HOTKEY_ROWS@": hotkeyRows(),
+    "@STAR@": STAR,
   };
-  // The credits close every page, written once.
+  // The window's head opens every page and the credits close it, each written once.
+  const windowHead = fileURLToPath(new URL("./window-head.html", import.meta.url));
   const credits = fileURLToPath(new URL("./credits.html", import.meta.url));
+  /** The head as `page` shows it: its icon from the repo's root, and its own tab marked open. */
+  function headFor(page: string) {
+    const tab = isHome(page) ? "/" : isFaq(page) ? "/faq/" : "/leaderboards/";
+    return readFileSync(windowHead, "utf8")
+      .replace(/^<!--[\s\S]*?-->\s*/, "")
+      .trim()
+      .replace("@ROOT@", () => upTo(page, REPO))
+      .replace(`<a class="tab" href="${tab}"`, (open) => `${open} aria-current="page"`);
+  }
   return {
     name: "minerva-site:placeholders",
     transformIndexHtml: {
       order: "pre",
-      handler: (html) =>
+      handler: (html, ctx) =>
         html
+          .replace("@WINDOW_HEAD@", () => headFor(ctx.filename))
           .replace("@CREDITS@", () => readFileSync(credits, "utf8").trim())
           .replace(/@[A-Z_]+@/g, (token) => values[token] ?? token),
     },
@@ -68,7 +84,7 @@ function questions(): Plugin {
         const faq = readFaq(readFileSync(FAQ, "utf8"));
         if (isFaq(ctx.filename)) return fillFaqPage(html, faq);
         // The site's folder from the page's: "./" for the home page, "../" a folder down.
-        const root = relative(dirname(ctx.filename), dirname(HOME)).replace(/\\/g, "/");
+        const root = upTo(ctx.filename, dirname(HOME));
         return fillQuestionLists(html, faq, root ? `${root}/` : "./");
       },
     },
@@ -195,21 +211,6 @@ function serveAppFiles(): Plugin {
   };
 }
 
-/**
- * The app's tokens without its typeface: theme.css names the TTFs the app bundles, and the
- * site serves lighter WOFF2 copies of the same files instead (site/fonts.css).
- */
-function themeWithoutFonts(): Plugin {
-  return {
-    name: "minerva-site:theme-tokens",
-    enforce: "pre",
-    transform(code, id) {
-      if (!id.split("?")[0].endsWith("/src/theme.css")) return;
-      return code.replace(/@font-face\s*\{[^}]*\}/g, "");
-    },
-  };
-}
-
 export default defineConfig({
   root: "site",
   base: "/",
@@ -225,7 +226,6 @@ export default defineConfig({
     webpScreenshots(),
     screenshots(),
     serveAppFiles(),
-    themeWithoutFonts(),
   ],
   build: {
     outDir: "dist",

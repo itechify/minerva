@@ -2,12 +2,13 @@
 // made-up maps: 100000000 (solo ceiling 100,000) and 100000001 (2,000,000), from the test
 // config's TEST_CEILINGS, and 100000002, with none.
 import { exports } from "cloudflare:workers";
+import type { BandAnswer } from "../../entries";
 
 export const FIELD = "100000000";
 export const RICH_FIELD = "100000001";
 export const NO_CEILING = "100000002";
 
-export const ADMIN = "made-up-maintainer-token";
+const ADMIN = "made-up-maintainer-token";
 
 /** A made-up Leaderboard Key, a different one for each `seed`. */
 export function key(seed: string): string {
@@ -47,24 +48,6 @@ export function upload(name: string, withKey: string, entries: Entry[]): Promise
 /** The app opting `name` out: all its entries go. */
 export function optOut(name: string, withKey: string): Promise<Response> {
   return call(`/api/characters/${encodeURIComponent(name)}/entries`, { method: "DELETE", headers: bearer(withKey) });
-}
-
-export interface Ranked {
-  rank: number;
-  name: string;
-  job: string;
-  level: number;
-  expPerHour: number;
-  setAt: number;
-}
-
-export interface BandAnswer {
-  map: string;
-  band: number;
-  levels: [number, number];
-  total: number;
-  entries: Ranked[];
-  character: Ranked | null;
 }
 
 /** A map's Level Band, as the site's page reads it, with `name`'s entry if given. */

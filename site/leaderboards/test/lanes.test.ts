@@ -2,18 +2,8 @@
 // scale from 0 to the band's #1, under a ruler of round steps, as the Personal Bests
 // window draws them.
 import { describe, expect, it } from "vitest";
-import { bandTable, type BandAnswer, type Ranked } from "../leaderboards.ts";
-
-const NOW = new Date(Date.UTC(2026, 9, 14, 12));
-const OCT_3 = Date.UTC(2026, 9, 3, 12);
-
-function ranked(rank: number, name: string, expPerHour: number): Ranked {
-  return { rank, name, job: "Magician", level: 23, expPerHour, setAt: OCT_3 };
-}
-
-function answer(entries: Ranked[], character: Ranked | null = null, total = entries.length): BandAnswer {
-  return { map: "100000000", band: 20, levels: [20, 29], total, entries, character };
-}
+import { bandTable } from "../leaderboards.ts";
+import { answer, NOW, ranked } from "./common.ts";
 
 describe("a Level Band's lanes", () => {
   it("run #1's lane full, and every other's as far as its EXP/h is of #1's", () => {

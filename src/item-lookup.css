@@ -106,11 +106,6 @@
   color: var(--frame);
 }
 
-.choice:focus-visible {
-  outline: 2px solid var(--edit);
-  outline-offset: 2px;
-}
-
 .choice-name {
   font-weight: 700;
   overflow-wrap: anywhere;

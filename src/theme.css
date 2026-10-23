@@ -1,25 +1,8 @@
 /* The game's own window language (the minimap and the Quest Helper), shared by every
    Minerva window: a light lavender body under a steel-blue title bar, navy text,
-   the map name in white lettering with a navy outline, and the minimap's blue portal
-   ring. Game orange only for doubt and problems. See DESIGN.md. */
-/* NEXON's Maplestory typeface, in its two weights (see assets/fonts/NOTICE.md): Light
-   for regular text and Bold for bold. Bundled with the app, so it loads at once; `block`
-   keeps text from drawing in Arial first and changing width. Arial stands in for the
-   few characters it lacks: the en and em dash and the minus sign. */
-@font-face {
-  font-family: "Maplestory";
-  src: url("../assets/fonts/Maplestory-Light.ttf") format("truetype");
-  font-weight: 100 500;
-  font-display: block;
-}
-
-@font-face {
-  font-family: "Maplestory";
-  src: url("../assets/fonts/Maplestory-Bold.ttf") format("truetype");
-  font-weight: 600 900;
-  font-display: block;
-}
-
+   the map name in light lettering outlined in blue as the Mini Map draws its title, and
+   the minimap's blue portal ring. Game orange only for doubt and problems. See DESIGN.md.
+   The tokens alone: the app's typeface is fonts.css, and the site serves its own copies. */
 :root {
   --font: "Maplestory", Arial, "Segoe UI", system-ui, sans-serif;
   --ink: #1b2648;
@@ -29,15 +12,6 @@
   /* The same lavender, opaque, for windows that aren't laid over the game. */
   --body-solid: #eae8f5;
   --frame: #3e527c;
-  --bar: linear-gradient(180deg, #dfe8f7 0%, #b4c6e6 48%, #94abd6 100%);
-  --bar-hairline: #2e4170;
-  --street: #1d2b52;
-  --outline: #22325a;
-  /* White lettering outlined in navy, as the minimap draws its title. Map names only. */
-  --lettering:
-    -1px -1px 0 var(--outline), 0 -1px 0 var(--outline), 1px -1px 0 var(--outline),
-    -1px 0 0 var(--outline), 1px 0 0 var(--outline), -1px 1px 0 var(--outline),
-    0 1px 0 var(--outline), 1px 1px 0 var(--outline), 0 2px 2px rgba(20, 30, 60, 0.35);
   --portal: #1f63d6;
   --portal-fill: #eef5ff;
   --portal-inner: #8db3ee;

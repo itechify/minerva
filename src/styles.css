@@ -1,3 +1,4 @@
+@import "./fonts.css";
 @import "./theme.css";
 
 /* The overlay panel: one of the game's own windows laid over the screen, built like
@@ -1903,9 +1904,23 @@ td:first-child {
   color: var(--ink-2);
 }
 
-/* The Deal Margin: its name and a percent field, laid out as a hotkey's row is, in the
-   same inset box. */
-.deal-margin {
+/* The settings' inset boxes, of the near-opaque body like the map list: the hotkeys' (below),
+   and one each for the Deal Margin (its name and a percent field), the Grind Tracker's and
+   Check for updates' switches (a name and a checkbox) and Game Data (when it was fetched,
+   or how a Refresh is going, and Refresh), each laid out as a hotkey's row is. */
+.deal-margin,
+.grind-switch,
+.game-data,
+.hotkey-rows {
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--body);
+  text-shadow: none;
+}
+
+.deal-margin,
+.grind-switch,
+.game-data {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1913,13 +1928,10 @@ td:first-child {
   margin-top: -3px;
   min-height: 23px;
   padding: 3px 5px 3px 11px;
-  border: 1px solid var(--inset-edge);
-  border-radius: 4px;
-  background: var(--body);
-  text-shadow: none;
 }
 
-.deal-margin .action {
+.deal-margin .action,
+.grind-switch .action {
   line-height: 16px;
   color: var(--ink-2);
 }
@@ -1949,46 +1961,15 @@ td:first-child {
   outline-offset: 1px;
 }
 
-/* The Grind Tracker's switch: its name and a checkbox, in the Deal Margin's inset box. */
+/* A switch's checkbox sits a little further in than the Deal Margin's field. */
 .grind-switch {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: -3px;
-  min-height: 23px;
-  padding: 3px 7px 3px 11px;
-  border: 1px solid var(--inset-edge);
-  border-radius: 4px;
-  background: var(--body);
-  text-shadow: none;
+  padding-right: 7px;
   cursor: pointer;
-}
-
-.grind-switch .action {
-  line-height: 16px;
-  color: var(--ink-2);
 }
 
 .grind-switch input {
   margin: 0;
   accent-color: var(--edit);
-}
-
-/* Game Data: when it was fetched, or how a Refresh is going, and Refresh, in the same
-   inset box. */
-.game-data {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: -3px;
-  min-height: 23px;
-  padding: 3px 5px 3px 11px;
-  border: 1px solid var(--inset-edge);
-  border-radius: 4px;
-  background: var(--body);
-  text-shadow: none;
 }
 
 .panel .game-data-state {
@@ -2010,10 +1991,6 @@ td:first-child {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  border: 1px solid var(--inset-edge);
-  border-radius: 4px;
-  background: var(--body);
-  text-shadow: none;
 }
 
 .hotkey-rows li {
