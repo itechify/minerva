@@ -1078,6 +1078,29 @@ fn a_shop_with_a_listing_that_couldnt_be_read_keeps_its_list_for_the_run() {
     assert_eq!(crop.get_pixel(0, 0).0, [(551 % 256) as u8, (503 % 256) as u8, 40, 255], "its corner at (551,503)");
 }
 
+/// The pointer on a listing breaks its band, and the game's tooltip by it covers those below,
+/// so the bands found end above them (#135's INT scroll): the crop still reaches down to every
+/// listing, the covered ones it is kept for included.
+#[test]
+fn a_shops_list_is_cut_down_to_its_covered_listings_past_the_bands_found() {
+    let mut shell = run_with_the_deal_finder();
+    let row = |slot: i32, name: Option<&str>| ShopRow {
+        area: ScreenRect { x: 619, y: 513 + 63 * slot, width: 253, height: 54 },
+        name: name.map(String::from),
+        price: name.map(|_| ListedPrice { quantity: 1, mesos: 999 }),
+        covered: name.is_none(),
+    };
+    let list = ShopList { area: ScreenRect { x: 561, y: 513, width: 311, height: 70 }, rows: vec![row(0, Some("Bronze Ore")), row(1, None), row(2, None)] };
+    assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
+    shell.minerva.on_player_shop_read(shop_capture(31 * S), ShopReading { shop: Some(list), hover: None, at_ms: 31 * S });
+
+    let (report, _) = shell.report();
+
+    let name = format!("crops/player-shop-{:010}.png", 31 * S);
+    let crop = image::load_from_memory(&zip_bytes(&report.zip, &name)).expect("a PNG").to_rgba8();
+    assert_eq!(crop.dimensions(), (362, 200), "from 10 px above the list (503) to 10 px below its third listing (693)");
+}
+
 /// #130's UI Size (ADR 0020): a listing's band 162 px wide, not 253, so the crop's margin
 /// and its reach past the scroll bar are as much smaller, and none of the shop's window
 /// beyond is kept.

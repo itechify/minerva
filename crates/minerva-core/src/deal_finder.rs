@@ -332,17 +332,13 @@ impl DealFinder {
     /// found.
     pub fn placement(&self, game: &GameWindow, size: Size, avoid: &[ScreenRect]) -> Option<ScreenRect> {
         let shop = self.shop.as_ref()?;
-        let list = shop.area;
-        // Down to every listing: a covered or selected one may lie past the bands found.
-        let bottom = |r: ScreenRect| r.y + r.height as i32;
-        let top = shop.rows.iter().map(|row| row.area.y).fold(list.y, i32::min);
-        let height = (shop.rows.iter().map(|row| bottom(row.area)).fold(bottom(list), i32::max) - top) as u32;
+        let (list, span) = (shop.area, shop.span());
         let client = game.client;
         let width = size.width.min(client.width);
         let (shop_left, shop_right) = shop_reach(shop);
         let left = list.x - shop_left - SHOP_GAP - width as i32;
         let x = if left >= client.x { left } else { list.x + shop_right + SHOP_GAP };
-        let strip = ScreenRect { x, y: top, width, height: height.min(client.height) };
+        let strip = ScreenRect { x, y: span.y, width, height: span.height.min(client.height) };
         Some(clear_of(strip, avoid, client))
     }
 }

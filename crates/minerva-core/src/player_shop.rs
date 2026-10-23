@@ -112,6 +112,15 @@ impl ShopList {
             None => self.area.width as f32 / (PICTURE_LEFT + BAND_W) as f32,
         }
     }
+
+    /// Where it is on screen down to every listing: a covered or selected one may lie past
+    /// the bands found, as the last one showing does under the pointer, which breaks its band.
+    pub(crate) fn span(&self) -> ScreenRect {
+        let bottom = |r: ScreenRect| r.y + r.height as i32;
+        let top = self.rows.iter().map(|row| row.area.y).fold(self.area.y, i32::min);
+        let end = self.rows.iter().map(|row| bottom(row.area)).fold(bottom(self.area), i32::max);
+        ScreenRect { y: top, height: (end - top) as u32, ..self.area }
+    }
 }
 
 /// Whether `point` lies in `rect`.
@@ -232,7 +241,7 @@ impl PlayerShopReader {
         let shop = img.as_ref().and_then(|img| self.read_rgb(img, capture.origin));
         // Only on the list: off it, no listing is hovered, and the search for the tooltip
         // costs as much again as finding the list.
-        let on_list = |pointer: &ScreenPoint| shop.as_ref().is_some_and(|shop| holds(shop.area, *pointer));
+        let on_list = |pointer: &ScreenPoint| shop.as_ref().is_some_and(|shop| holds(shop.span(), *pointer));
         let hover = img.as_ref().zip(capture.pointer.filter(on_list)).map(|(img, pointer)| ShopHover {
             pointer,
             tooltip: self.tooltips.read(img, capture.origin, pointer),
