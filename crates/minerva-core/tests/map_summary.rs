@@ -13,7 +13,7 @@ use minerva_core::{
 const KERNING: &str = "victoria-road__kerning-city--window";
 
 fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), at_ms }
+    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 /// Two confident readings of a title the minimap samples don't show.

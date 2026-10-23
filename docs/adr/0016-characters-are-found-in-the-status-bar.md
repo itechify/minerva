@@ -27,7 +27,7 @@ So Minerva finds the Status Bar itself, as the Deal Finder finds the Player Shop
 
 ## Considered options
 
-- **A region marked at setup**, as the Title Region is (and the EXP Bar Region was, until ADR 0017). Setup would grow a step every player has to take, asked for again whenever the game window changes size, for something Minerva can find by itself at the cost of a scan of a thin strip.
+- **A region marked at setup**, as the Title Region was until ADR 0021 (and the EXP Bar Region was, until ADR 0017). Setup would grow a step every player has to take, asked for again whenever the game window changes size, for something Minerva can find by itself at the cost of a scan of a thin strip.
 - **A fixed offset from the EXP Bar Region.** The bar's level and name sit at set distances from its EXP figures, but the EXP Bar Region is the player's mark, a box drawn by hand around the figures, as loose as they drew it; and Minerva would know no Character while EXP tracking is off. Finding the EXP figures in the Status Bar too, so that mark goes, came later (#112, ADR 0017).
 - **Reading the level from the EXP bar alone.** The Session's level is a range of totals learned from the bar (ADR 0005), with no level number and no EXP table: it can't say which level, only that it changed.
 - **Templates of the level's digits.** Exact and cheap at a fixed pixel size, but only 1 and 3 have been seen.

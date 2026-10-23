@@ -13,13 +13,12 @@ mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    Action, ClientOffset, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, PanelControl, PanelSizes, PanelState, Rect,
-    ScreenRect, Settings, Size, TitleRegion,
+    Action, ClientOffset, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, PanelControl, PanelSizes, PanelState,
+    ScreenRect, Settings, Size,
 };
 
 const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
 const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
-const CLIENT: Size = Size { width: 1920, height: 1200 };
 
 fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
     ScreenRect { x, y, width, height }
@@ -35,10 +34,10 @@ fn sizes(expanded_height: u32) -> PanelSizes {
     PanelSizes { expanded: Size { width: 340, height: expanded_height }, collapsed: Size { width: 44, height: 44 } }
 }
 
-/// Settings with the Title Region marked on the game's client area.
+/// Settings with setup finished.
 fn tracking_settings() -> Settings {
     Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client: CLIENT }),
+        setup_done: true,
         ..Settings::default()
     }
 }
@@ -109,10 +108,11 @@ fn without_room_on_its_side_of_the_panel_it_goes_on_the_other() {
     let mut minerva = started(tracking_settings());
     // Docked left of a game window near the screen's left edge: the panel at (9,110),
     // and no room left of it for the window, which goes right of it, over the game. There
-    // it would cover the Title Region (420..550, 150..198), so it moves the shortest way
-    // off it: down.
+    // it would cover the Minimap Title, found at (420..1040, 150..198), so it moves the
+    // shortest way off it: down.
     let near_the_edge = rect(350, 110, 1920, 1200);
     minerva.on_game_window(game(near_the_edge));
+    common::found_title(&mut minerva, common::title_on(near_the_edge), 0);
     minerva.press(PanelControl::CyclePlacement);
     let state = minerva.press_and_state(PanelControl::CyclePlacement);
 

@@ -118,21 +118,6 @@
         "resizable": false,
         "maximizable": false,
         "visible": false
-      },
-      {
-        "label": "region",
-        "title": "Mark the minimap title",
-        "url": "region.html",
-        "width": 800,
-        "height": 600,
-        "transparent": true,
-        "decorations": false,
-        "shadow": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false,
-        "visible": false,
-        "contentProtected": false
       }
     ],
     "security": {

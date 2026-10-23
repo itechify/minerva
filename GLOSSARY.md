@@ -23,7 +23,7 @@ The specific name of a map (e.g. "Henesys Hunting Ground I"). Not guaranteed uni
 _Avoid_: title, map title
 
 **Minimap Title**:
-The street name and map name as rendered at the top of the in-game minimap; the signal Minerva recognises the map from.
+The street name and map name as the game draws them in the minimap window: two lines when the minimap is open, one line ("Street : Map") when it is collapsed or the map has none. The signal Minerva recognises the map from, found wherever the minimap is (ADR 0021).
 
 **Map Mark**:
 The small emblem the in-game minimap draws beside its title, for the area a map belongs to (Henesys's shield, Kerning City's stone, Sleepywood's skull). Many maps share one; a few have none. Minerva shows it beside a map's name, so a glance says where in the world the map is.
@@ -37,10 +37,6 @@ Map and mob data cached earlier and shown, with its date, because its source can
 
 **Refresh**:
 The settings view's button under Game Data that has OSMS's map set and item files fetched afresh now, rather than at the next daily ask, for what a patch brought. It says what it came to: up to date, OSMS unreachable, or Minerva needing an update.
-
-**Title Region**:
-The rectangle the player marks around the minimap title, saved relative to the game window.
-_Avoid_: minimap region, capture area
 
 **UI Size**:
 How large the game draws its windows and text, which its UI Size setting (Default Ratio, sharpened or not, or Ideal Ratio, which picks a size for the resolution) and its window size decide together. Minerva reads the game at any UI Size.

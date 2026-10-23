@@ -10,8 +10,8 @@
 //!
 //! Where it goes, worked as in `grind_tracker_window.rs`: the game's client area at
 //! (812,110), 1920x1200 physical px, on one 3440x1440 monitor, and a Personal Bests window
-//! of 920x600, so centred at (1312,410). The Title Region is captured at (882,150)
-//! 130x48.
+//! of 920x600, so centred at (1312,410). The Minimap Title is found at (882,150)
+//! 620x48.
 
 mod common;
 
@@ -20,7 +20,7 @@ use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, osms, sharing_a_ti
 use minerva_core::{
     Action, BESTS_VERSION, CharacterBests, ClientOffset, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, LevelRange, MapBests,
     PanelControl, PanelSizes, PanelState, PersonalBestsMap, PersonalBestsVisit,
-    PersonalBestsWindow, Rect, Request, SavedBests, ScreenRect, Settings, Size, TitleRegion, VisitBest, meowdb,
+    PersonalBestsWindow, Request, SavedBests, ScreenRect, Settings, Size, VisitBest, meowdb,
 };
 
 const S: u64 = 1000;
@@ -607,7 +607,6 @@ fn removing_the_last_visit_anywhere_closes_the_window_and_the_button_goes() {
 
 const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
 const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
-const CLIENT: Size = Size { width: 1920, height: 1200 };
 const WINDOW: Size = Size { width: 920, height: 600 };
 
 fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
@@ -620,10 +619,10 @@ fn game(client: ScreenRect) -> Option<GameWindow> {
     Some(GameWindow { client, frame, screens: vec![SCREEN] })
 }
 
-/// Settings with the Title Region marked on the game's client area.
+/// Settings with setup finished.
 fn tracking_settings() -> Settings {
     Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client: CLIENT }),
+        setup_done: true,
         ..Settings::default()
     }
 }
@@ -646,6 +645,7 @@ fn started_on(client: ScreenRect, settings: Settings) -> Minerva {
     minerva.set_grind_tracker_size(Size { width: 300, height: 150 });
     minerva.set_personal_bests_size(WINDOW);
     minerva.on_game_window(game(client));
+    common::found_title(&mut minerva, common::title_on(client), 0);
     minerva
 }
 
@@ -684,15 +684,13 @@ fn as_its_rows_grow_it_stays_centred() {
 
 #[test]
 fn over_a_game_narrower_than_it_it_is_as_wide_as_the_game() {
-    // A 900x700 client area, its Title Region captured at (882,150) 130x48.
+    // A 900x700 client area, its Minimap Title found at (882,150) 620x48.
     let narrow = rect(812, 110, 900, 700);
-    let marked = Rect { x: 70, y: 40, width: 130, height: 48 };
-    let title_region = Some(TitleRegion { marked, client: Size { width: 900, height: 700 } });
-    let mut minerva = started_on(narrow, Settings { title_region, ..Settings::default() });
+    let mut minerva = started_on(narrow, Settings { setup_done: true, ..Settings::default() });
 
     minerva.press(PanelControl::TogglePersonalBests);
 
-    // Centred at (812,160), 900 wide, it would cover the Title Region: it moves below it.
+    // Centred at (812,160), 900 wide, it would cover the Minimap Title: it moves below it.
     assert_eq!(placed(minerva.panel_state()), Some(rect(812, 198, 900, 600)));
 }
 

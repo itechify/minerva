@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { dayText, momentText } from "./dates";
 import { byId, cardTop, span } from "./dom";
-import { LOADING_MAP_LIST, recognitionProblem, type Recognition } from "./recognition";
+import { LOADING_MAP_LIST, TITLE_LOST, recognitionProblem, type Recognition } from "./recognition";
 import type { ExpTracking } from "./exp-tracking";
 import { levels } from "./figures";
 import { mapMark, showMark, type MapMarks } from "./map-marks";
@@ -140,7 +140,9 @@ type PanelState = {
   layer: "onTop" | "hidden";
   /** The player can drag the panel by its header (inside or detached). */
   draggable: boolean;
-  setup: { needed: "firstRun" | "resolutionChanged" | "requested" | null };
+  setup: { needed: "firstRun" | "requested" | null };
+  /** No minimap title has been found for a while: the minimap may be closed. */
+  titleLost: boolean;
   hotkeys: Hotkeys;
   unavailableHotkeys: string[];
   /** Those of them that don't name a key combination; the rest another app has. */
@@ -1182,13 +1184,12 @@ function renderIcon(panel: PanelState) {
     (panel.candidates && !panel.candidates.chosen) ||
     panel.data.status === "savedCopy" ||
     panel.setup.needed === "firstRun" ||
-    panel.setup.needed === "resolutionChanged" ||
+    panel.titleLost ||
     panel.expTracking.state === "unreadable"
   );
 }
 
 function render(panel: PanelState) {
-  const { hotkeys } = panel;
   const { recognition, map: current, notSure } = panel;
   draggable = panel.draggable;
   // Hidden while the game is minimised or gone, or another app is in front: the window
@@ -1201,17 +1202,12 @@ function render(panel: PanelState) {
   const doubtful = !!current && (notSure || (!!panel.candidates && !panel.candidates.chosen));
   document.body.classList.toggle("not-sure", doubtful);
   uncertainty.hidden = !doubtful;
-  const setupHint = hotkeyAvailable(hotkeys.setup, panel.unavailableHotkeys)
-    ? `Re-mark with ${keyLabel(hotkeys.setup)}.`
-    : hotkeys.setup === ""
-      ? "Re-mark from Help & Setup, the ? at the top of the panel."
-      : "Setup shortcut unavailable. Close the app using it, or change it in Settings (the gear at the top of the panel).";
   // Why it isn't sure is the chip's tooltip, not a note taking room under the title.
   const doubt = !doubtful
     ? ""
     : panel.candidates && !panel.candidates.chosen
       ? `${panel.candidates.maps.length} maps share this title; not sure which you're on.`
-      : `Title not confirmed. Keep both minimap title lines visible. ${setupHint}`;
+      : "Title not confirmed. Keep the minimap's title in sight, open or collapsed.";
   uncertainty.title = doubt;
   uncertainty.setAttribute("aria-label", doubt ? `Not sure: ${doubt}` : "Current Map is uncertain");
   // Without a map, the title bar holds the status and the note under it what to do; the
@@ -1223,12 +1219,6 @@ function render(panel: PanelState) {
   const unrecognisable = recognitionProblem(recognition);
   if (!panel.gameFound) {
     map.textContent = `Looking for ${panel.gameWindowTitle}…`;
-  } else if (panel.setup.needed === "firstRun" || panel.setup.needed === "resolutionChanged") {
-    // Nothing is read until the Title Region is marked (again).
-    map.textContent =
-      panel.setup.needed === "firstRun" ? "Finish setup to start" : "The game window changed size";
-    recovery.textContent = `Mark the minimap title. ${setupHint}`;
-    problem = panel.setup.needed === "resolutionChanged";
   } else if (unrecognisable) {
     map.textContent = "Map recognition unavailable";
     recovery.textContent = unrecognisable;
@@ -1241,7 +1231,18 @@ function render(panel: PanelState) {
     map.textContent = "Reading the minimap title…";
     recovery.textContent = recognition.status === "starting"
       ? LOADING_MAP_LIST
-      : `Keep the minimap open with both title lines visible. If this persists, ${setupHint.charAt(0).toLowerCase() + setupHint.slice(1)}`;
+      : "Keep the minimap showing, open or collapsed: Minerva finds its title wherever it is.";
+  }
+  // No title found for a while (the minimap closed, say): said under the map, with the FAQ's
+  // answer on it.
+  if (panel.gameFound && !unrecognisable && panel.titleLost) {
+    const help = document.createElement("button");
+    help.type = "button";
+    help.className = "text-button";
+    help.dataset.control = "openTitleHelp";
+    help.textContent = "Help";
+    recovery.replaceChildren(`${TITLE_LOST} `, help);
+    problem = true;
   }
   // The map's Map Mark beside its title, as the Mini Map draws it; with none, no room for it.
   titleMark.hidden = !marked;
@@ -1358,6 +1359,11 @@ clickOrDrag(titlebar, "openMeowdbPage", () => titlebar.classList.contains("linke
 
 // Each icon at the top of the panel does what its hotkey does.
 toolbar.addEventListener("click", (e) => {
+  const button = e.target instanceof Element ? e.target.closest<HTMLButtonElement>("button[data-control]") : null;
+  if (button) invoke("panel_press", { control: button.dataset.control });
+});
+// The line saying the minimap's title can't be found: its Help opens the FAQ's answer.
+recovery.addEventListener("click", (e) => {
   const button = e.target instanceof Element ? e.target.closest<HTMLButtonElement>("button[data-control]") : null;
   if (button) invoke("panel_press", { control: button.dataset.control });
 });

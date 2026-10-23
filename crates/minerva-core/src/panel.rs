@@ -67,20 +67,8 @@ pub enum Action {
     /// Show the next of the maps sharing the shown map's title, when the core couldn't
     /// tell which one the player is on (see [`crate::Candidates`]).
     ChooseCandidate,
-    /// The player marked the Title Region (relative to the game client area) and wants
-    /// a test read of it.
-    MarkTitleRegion(crate::Rect),
-    /// Open the marking window on the Title Region, with a keyboard-adjustable selection.
-    BeginSelection(crate::MarkTarget),
-    /// Arrow keys move the selection; Alt resizes it, Shift uses ten-pixel steps.
-    AdjustSelection { direction: crate::SelectionDirection, resize: bool, coarse: bool },
-    /// Test-read the keyboard selection, as a mark around what it was opened on.
-    ConfirmSelection,
-    /// Close marking without changing the previous test read or saved region.
-    CancelSelection,
-    /// Finish setup: keep the marked Title Region if its test read recognised a map (or,
-    /// with none marked, the saved one if it still fits). Refused while its test read
-    /// hasn't succeeded.
+    /// Finish setup. Nothing has to be found first: the Minimap Title is looked for all along
+    /// (ADR 0021).
     FinishSetup,
     /// The player wants to redo setup (the re-setup hotkey).
     RequestSetup,
@@ -90,7 +78,7 @@ pub enum Action {
     /// An open setup window stays as it is (the shell brings it in front).
     LaunchedAgain,
     /// The player closed setup without finishing it. On the first run that quits
-    /// (`PanelState::quit`): there is nothing to read without a Title Region.
+    /// (`PanelState::quit`): the player hasn't been through its warning.
     CancelSetup,
     /// Start measuring afresh: the Session goes back to waiting for an EXP change. Until
     /// the EXP next changes, the reset can be undone.
@@ -344,9 +332,9 @@ pub(crate) struct Panel {
     pub mode: PlacementMode,
     /// The detached panel's top-left corner; `None` until it is first detached.
     pub detached_at: Option<ScreenPoint>,
-    /// Where the Title Region is captured on screen, and where the Status Bar's Character
-    /// and EXP figures were found. A panel inside the game is kept off them, or the capture
-    /// would read the panel instead.
+    /// Where the Minimap Title, the Status Bar's Character and its EXP figures were found on
+    /// screen. A panel inside the game is kept off them, or the capture would read the panel
+    /// instead.
     pub avoid: Vec<ScreenRect>,
     /// The monitors' work areas, as last known with the game window: a detached panel
     /// stays within them after the game is gone.

@@ -1,4 +1,8 @@
-//! Title preprocessing (from the recogniser spike, issue #2).
+//! Title preprocessing (from the recogniser spike, issue #2), for the Minimap Title's two
+//! layouts (ADR 0021). [`crate::minimap_title`] finds the title and hands it here at the
+//! samples' UI Size.
+//!
+//! The two-line layout, the open minimap's:
 //!
 //! 1. Locate the title band: the rows at the top of the minimap where the flat
 //!    light-blue panel colour (164,200,218) dominates. No band = minimap hidden or
@@ -9,6 +13,9 @@
 //!    panel is B-R = 54 and the outline a darker blue (B-R 60..80). So "ink" = how
 //!    neutral the pixel is, gated on luma. Rendered as black text on white.
 //! 4. Split the two lines (street, map) with a horizontal projection profile.
+//!
+//! The one-line layout ("Street : Map", a collapsed minimap's or a map's without one) is dark
+//! grey text on the bar's light grey: "ink" is how dark a neutral pixel is ([`prepare_one_line`]).
 
 use image::{GrayImage, Luma, RgbImage};
 
@@ -58,6 +65,15 @@ const STROKE_INK: f32 = 0.5;
 const STROKE_MAX_W: u32 = 4;
 /// "III": the most strokes a trailing numeral is read from.
 const NUMERAL_MAX_STROKES: usize = 3;
+/// The one-line layout: a neutral pixel has its channels at most this far apart...
+const BAR_TINT: u8 = 16;
+/// ...is ink from this luma down, wholly so this far below it...
+const BAR_INK_FROM: f32 = 190.0;
+const BAR_INK_SPAN: f32 = 110.0;
+/// ...and is the bar's light grey from this luma up (215 on the samples).
+const BAR_MIN_LUMA: f32 = 170.0;
+/// The bar is at least this wide left of its buttons.
+const BAR_MIN_W: u32 = 40;
 /// White padding around the masked text canvas.
 pub const PAD: u32 = 8;
 
@@ -69,11 +85,15 @@ pub struct Rect {
     pub h: u32,
 }
 
-/// A title ready for recognition: black-on-white ink canvas plus the street line and
-/// map line boxes in it (canvas coordinates, tight ink bounds).
+/// A title ready for recognition: black-on-white ink canvas plus its line boxes in it
+/// (canvas coordinates, tight ink bounds): the street line and the map line, or the one line
+/// "Street : Map".
 pub struct Prepared {
     pub canvas: GrayImage,
-    pub lines: [Rect; 2],
+    pub lines: Vec<Rect>,
+    /// Where the minimap window's left edge is in the image prepared: the panel's, or the
+    /// bar's.
+    pub left: u32,
     /// The map line ends in a Roman numeral I, II or III, counted from the mask.
     pub numeral: Option<Numeral>,
 }
@@ -193,7 +213,7 @@ pub fn prepare(img: &RgbImage) -> Option<Prepared> {
         let last = col_on.iter().rposition(|&b| b)? as u32 + 1;
         Some(Rect { x: first + PAD, y: ly0 + PAD, w: last - first, h: ly1 - ly0 })
     };
-    let lines = [line(row_runs[0])?, line(row_runs[1])?];
+    let lines = vec![line(row_runs[0])?, line(row_runs[1])?];
     let numeral = trailing_numeral(&at, lines[1]);
 
     let mut canvas = GrayImage::from_pixel(tw + 2 * PAD, th + 2 * PAD, Luma([255]));
@@ -202,7 +222,57 @@ pub fn prepare(img: &RgbImage) -> Option<Prepared> {
             canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - at(x, y))).round() as u8]));
         }
     }
-    Some(Prepared { canvas, lines, numeral })
+    Some(Prepared { canvas, lines, left: rx, numeral })
+}
+
+/// The one-line layout's ink (0.0 background ..= 1.0 text): how dark a neutral pixel is. The
+/// bar is (215,215,215), the text (45,45,45), anti-aliased between them.
+fn bar_ink(p: [u8; 3]) -> f32 {
+    let (max, min) = (p.iter().max().copied().unwrap_or(0), p.iter().min().copied().unwrap_or(0));
+    if max - min > BAR_TINT {
+        return 0.0;
+    }
+    ((BAR_INK_FROM - luma(p)) / BAR_INK_SPAN).clamp(0.0, 1.0)
+}
+
+/// The bar's light grey, at any brightness.
+fn is_bar(p: [u8; 3]) -> bool {
+    let (max, min) = (p.iter().max().copied().unwrap_or(0), p.iter().min().copied().unwrap_or(0));
+    max - min <= BAR_TINT && luma(p) >= BAR_MIN_LUMA
+}
+
+/// The one-line layout's title in `img`, at the samples' UI Size: dark grey text on the bar,
+/// on `rows`, ending at column `right` (where the bar's buttons start). The bar's left edge is
+/// where its light grey ends, left along the clear rows `clear` above and below the text.
+pub fn prepare_one_line(img: &RgbImage, rows: (u32, u32), right: u32, clear: [u32; 2]) -> Option<Prepared> {
+    let (y0, y1) = (rows.0, rows.1.min(img.height()));
+    let right = right.min(img.width());
+    if y0 >= y1 || clear.iter().any(|&y| y >= img.height()) {
+        return None;
+    }
+    // Left along both clear rows, as far as both are the bar's.
+    let left = (0..right).rev().find(|&x| clear.iter().any(|&y| !is_bar(img.get_pixel(x, y).0))).map_or(0, |x| x + 1);
+    if right < left + BAR_MIN_W {
+        return None;
+    }
+    let (tw, th) = (right - left, y1 - y0);
+    let inks: Vec<f32> = (0..th)
+        .flat_map(|y| (0..tw).map(move |x| (x, y)))
+        .map(|(x, y)| bar_ink(img.get_pixel(left + x, y0 + y).0))
+        .collect();
+    let at = |x: u32, y: u32| inks[(y * tw + x) as usize];
+    let col_on: Vec<bool> = (0..tw).map(|x| (0..th).map(|y| at(x, y)).sum::<f32>() > COL_MIN_INK).collect();
+    let row_on: Vec<bool> = (0..th).map(|y| (0..tw).map(|x| at(x, y)).sum::<f32>() > LINE_MIN_INK).collect();
+    let (first, last) = (col_on.iter().position(|&b| b)? as u32, col_on.iter().rposition(|&b| b)? as u32 + 1);
+    let (top, bottom) = (row_on.iter().position(|&b| b)? as u32, row_on.iter().rposition(|&b| b)? as u32 + 1);
+    let line = Rect { x: first + PAD, y: top + PAD, w: last - first, h: bottom - top };
+    let mut canvas = GrayImage::from_pixel(tw + 2 * PAD, th + 2 * PAD, Luma([255]));
+    for y in 0..th {
+        for x in 0..tw {
+            canvas.put_pixel(x + PAD, y + PAD, Luma([(255.0 * (1.0 - at(x, y))).round() as u8]));
+        }
+    }
+    Some(Prepared { canvas, lines: vec![line], left, numeral: None })
 }
 
 /// The Roman numeral I, II or III ending a line (`line` in canvas coordinates; `at`

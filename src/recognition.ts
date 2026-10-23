@@ -19,3 +19,7 @@ export function recognitionProblem(recognition: Recognition): string | null {
       return null;
   }
 }
+
+/** No minimap title has been found for a while (`PanelState::title_lost`): what the panel and
+ *  setup say. The FAQ answer it links to says more. */
+export const TITLE_LOST = "Can't find the minimap's title: is the minimap open?";

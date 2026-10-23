@@ -1,7 +1,7 @@
 [package]
 name = "minerva-core"
 version = "0.13.0"
-description = "Headless Minerva core: Title Region frames in, panel state out. No OS or UI dependencies."
+description = "Headless Minerva core: captures of the game in, panel state out. No OS or UI dependencies."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

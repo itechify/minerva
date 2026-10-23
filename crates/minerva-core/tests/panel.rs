@@ -14,8 +14,8 @@ use common::FakeSource;
 use common::world::SEARCH;
 use minerva_core::{
     Action, Minerva, DEFAULT_PANEL_WIDTH, ExpBarPlace, ExpBarReading, Foreground, GameWindow, Layer, MIN_PANEL_WIDTH, PanelSizes,
-    PlacementMode, Rect, ScreenRect,
-    Settings, Size, TitleRegion,
+    PlacementMode, ScreenRect, TitleLines, TitleReading,
+    Settings, Size,
 };
 
 fn minerva() -> Minerva {
@@ -465,23 +465,27 @@ fn a_hidden_overlay_cannot_be_dragged() {
     assert!(!state.draggable);
 }
 
-// The overlay shows up in screenshots and streams, so it must never cover the Title
-// Region: the core would read the panel instead of the minimap title. Worked example: a
-// small 640x200 client at (812,110) whose title was marked at client (70,40) 130x48. The
-// core captures it widened to the client's right edge: screen x 882..1452, y 150..198.
+// The overlay shows up in screenshots and streams, so it must never cover the Minimap Title
+// where it was found: the core would read the panel instead of the title. Worked example: a
+// small 640x200 client at (812,110) whose title was found at screen x 882..1452, y 150..198.
 
 const SMALL_GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 640, height: 200 };
 
-/// Set up on `SMALL_GAME`, with the minimap title marked at client (70,40) 130x48.
+/// Where the Minimap Title was found on `SMALL_GAME`.
+const TITLE: ScreenRect = ScreenRect { x: 882, y: 150, width: 570, height: 48 };
+
+/// The Minimap Title read where it was found, at [`TITLE`], on the game window as it is.
+fn found_title(minerva: &mut Minerva) {
+    let lines = Some(TitleLines { street: "Made-up Street".into(), map: "Field".into() });
+    minerva.on_reading(TitleReading { lines, found: Some(TITLE), at_ms: 0 });
+}
+
+/// Set up on `SMALL_GAME`, with the minimap title found at [`TITLE`].
 fn set_up_on_small_game() -> Minerva {
     let mut minerva = minerva();
-    minerva.restore(Settings {
-        title_region: Some(TitleRegion {
-            marked: Rect { x: 70, y: 40, width: 130, height: 48 },
-            client: Size { width: 640, height: 200 },
-        }),
-        ..Settings::default()
-    });
+    minerva.restore(Settings { setup_done: true, ..Settings::default() });
+    minerva.on_game_window(game(SMALL_GAME));
+    found_title(&mut minerva);
     minerva
 }
 
@@ -492,12 +496,11 @@ fn overlaps(a: ScreenRect, b: ScreenRect) -> bool {
 }
 
 #[test]
-fn the_default_spot_moves_below_the_title_region_when_it_would_cover_it() {
+fn the_default_spot_moves_below_the_minimap_title_when_it_would_cover_it() {
     let mut minerva = set_up_on_small_game();
 
     let state = minerva.on_game_window(game(SMALL_GAME));
 
-    assert_eq!(state.title_region, Some(rect(882, 150, 570, 48)));
     // Centred on the right edge it would span y 174..246; just below the title instead.
     assert_eq!(state.placement, Some(rect(1096, 198, 340, 72)));
 }
@@ -525,7 +528,7 @@ fn inside_the_panel_is_never_taller_than_the_game_client() {
 }
 
 #[test]
-fn inside_a_tall_panel_still_keeps_clear_of_the_title_region_in_the_space_below_it() {
+fn inside_a_tall_panel_still_keeps_clear_of_the_minimap_title_in_the_space_below_it() {
     let mut minerva = set_up_on_small_game();
     content_height(&mut minerva, 500);
 
@@ -535,7 +538,7 @@ fn inside_a_tall_panel_still_keeps_clear_of_the_title_region_in_the_space_below_
     // below it, down to the client's bottom at 310.
     let placement = state.placement.unwrap();
     assert_eq!(placement, rect(1096, 198, 340, 112));
-    assert!(!overlaps(placement, state.title_region.unwrap()));
+    assert!(!overlaps(placement, TITLE));
 }
 
 #[test]
@@ -575,7 +578,20 @@ fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_it() {
 
     let placement = state.placement.unwrap();
     assert_eq!(placement, rect(892, 198, 340, 72));
-    assert!(!overlaps(placement, state.title_region.unwrap()));
+    assert!(!overlaps(placement, TITLE));
+}
+
+/// While the title is looked for again (no capture found it where it was), the panel still
+/// keeps clear of where it was last found: over it, the panel would hide it from the search.
+#[test]
+fn a_panel_dragged_onto_where_the_title_was_last_found_is_moved_clear_of_it_while_it_is_looked_for() {
+    let mut minerva = set_up_on_small_game();
+    minerva.on_reading(TitleReading { lines: None, found: None, at_ms: 333 });
+
+    let state = minerva.act(Action::PanelMoved { x: 892, y: 140 });
+
+    let placement = state.placement.unwrap();
+    assert!(!overlaps(placement, TITLE), "{placement:?}");
 }
 
 #[test]
@@ -587,11 +603,11 @@ fn the_collapsed_icon_never_covers_the_minimap_title_either() {
     let state = minerva.act(Action::ToggleExpanded);
 
     let placement = state.placement.unwrap();
-    assert!(!overlaps(placement, state.title_region.unwrap()), "{placement:?}");
+    assert!(!overlaps(placement, TITLE), "{placement:?}");
 }
 
 // ...nor the EXP figures where they were found in the Status Bar. Worked example: a 640x400
-// client at (812,110) with the title marked as above (captured at client y 40..88) and the
+// client at (812,110) with the title found as above (client y 40..88) and the
 // EXP figures found at client (100,150) 312x26 (client x 100..412, y 150..176).
 
 const TALLER_SMALL_GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 640, height: 400 };
@@ -606,12 +622,9 @@ fn found_exp_figures(minerva: &mut Minerva) -> ScreenRect {
 #[test]
 fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_the_exp_bar_too() {
     let mut minerva = minerva();
-    let client = Size { width: 640, height: 400 };
-    minerva.restore(Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
-        ..Settings::default()
-    });
+    minerva.restore(Settings { setup_done: true, ..Settings::default() });
     minerva.on_game_window(game(TALLER_SMALL_GAME));
+    found_title(&mut minerva);
     let figures = found_exp_figures(&mut minerva);
 
     let state = minerva.act(Action::PanelMoved { x: 892, y: 140 }).clone();
@@ -619,19 +632,16 @@ fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_the_exp_bar_too() {
     // Just below the title (client y 88..160) would cover the EXP bar; below that instead.
     let placement = state.placement.unwrap();
     assert_eq!(placement, rect(892, 110 + 176, 340, 72));
-    assert!(!overlaps(placement, state.title_region.unwrap()));
+    assert!(!overlaps(placement, TITLE));
     assert!(!overlaps(placement, figures));
 }
 
 #[test]
 fn a_panel_dragged_onto_the_exp_bar_is_moved_clear_of_it() {
     let mut minerva = minerva();
-    let client = Size { width: 640, height: 400 };
-    minerva.restore(Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
-        ..Settings::default()
-    });
+    minerva.restore(Settings { setup_done: true, ..Settings::default() });
     minerva.on_game_window(game(TALLER_SMALL_GAME));
+    found_title(&mut minerva);
     let figures = found_exp_figures(&mut minerva);
 
     // Client (150,140): over the EXP bar (client y 150..176) and clear of the title.
@@ -640,7 +650,7 @@ fn a_panel_dragged_onto_the_exp_bar_is_moved_clear_of_it() {
     // Just below the EXP bar is the nearest clear spot.
     let placement = state.placement.unwrap();
     assert_eq!(placement, rect(962, 110 + 176, 340, 72));
-    assert!(!overlaps(placement, state.title_region.unwrap()));
+    assert!(!overlaps(placement, TITLE));
     assert!(!overlaps(placement, figures));
 }
 

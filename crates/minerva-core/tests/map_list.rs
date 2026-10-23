@@ -39,7 +39,7 @@ fn names_osms_gives_with_spaces_around_them_are_trimmed() {
 }
 
 fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), at_ms }
+    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 /// OSMS lists one map with neither a name nor a street. A map missing either can't be
@@ -83,8 +83,8 @@ fn when_osms_cannot_be_reached_and_nothing_is_saved_recognition_is_unavailable_a
     assert_eq!(state.map, None);
 }
 
-/// Setup's test read needs the map list before the first frame: there are no frames
-/// until a Title Region is marked.
+/// Setup's Finding your map needs the map list before the first frame, to name the map the
+/// first frames show.
 #[test]
 fn the_file_set_is_asked_for_at_startup_before_any_frame() {
     let source = FakeSource::osms();

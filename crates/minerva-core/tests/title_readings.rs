@@ -1,4 +1,4 @@
-//! Reading a title takes a while, so the shell reads Title Region frames with a
+//! Reading a title takes a while, so the shell reads title captures with a
 //! `TitleReader` on its own thread and hands the core each `TitleReading`: the window
 //! tracking and the panel never wait for recognition. A reading counts exactly as the
 //! frame it came from would.
@@ -7,7 +7,7 @@ mod common;
 
 use common::osms;
 use common::{FakeSource, sample_frame};
-use minerva_core::{Minerva, PanelState, TitleLines, TitleReader, TitleReading};
+use minerva_core::{Minerva, PanelState, ScreenPoint, TitleCapture, TitleLines, TitleReader, TitleReading};
 
 const KERNING: &str = "victoria-road__kerning-city--window";
 
@@ -16,14 +16,15 @@ fn shown(state: &PanelState) -> Option<(&str, &str)> {
 }
 
 fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), at_ms }
+    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 #[test]
 fn frames_read_on_another_thread_switch_the_map_like_frames_fed_to_the_core() {
     let readings = std::thread::spawn(|| {
-        let reader = TitleReader::bundled();
-        [0, 333].map(|at_ms| reader.read(&sample_frame(KERNING, at_ms)))
+        let mut reader = TitleReader::bundled();
+        let origin = ScreenPoint { x: 0, y: 0 };
+        [0, 333].map(|at_ms| reader.read(&TitleCapture { frame: sample_frame(KERNING, at_ms), origin }))
     })
     .join()
     .unwrap();
@@ -173,7 +174,7 @@ fn an_unreadable_reading_keeps_the_last_map_marked_not_sure() {
     minerva.on_reading(read_as("Victoria Road", "Kerning City", 0));
     minerva.on_reading(read_as("Victoria Road", "Kerning City", 333));
 
-    let state = minerva.on_reading(TitleReading { lines: None, at_ms: 666 });
+    let state = minerva.on_reading(TitleReading { lines: None, found: Some(common::TITLE_FOUND), at_ms: 666 });
 
     assert_eq!(shown(state), Some(("010003000", "Kerning City")));
     assert!(state.not_sure);

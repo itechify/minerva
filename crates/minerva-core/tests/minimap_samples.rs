@@ -1,13 +1,16 @@
 //! Every minimap sample, fed through the core's public inputs, shows the map its
-//! filename names: `street-name__map-name[--variant].png`.
+//! filename names: `street-name__map-name[--variant].png`. The title is found in it
+//! wherever it is (ADR 0021), open on two lines or on one, "Street : Map".
 //!
-//! `--title-region` samples are what the shell captures with `default_title_region`
-//! (the probe's capture, 560x96 at client (0, 16)), fed whole. The Tree That Grew II's
-//! is the probe's live capture. I's and III's are that same rectangle cropped from the
-//! player's screenshots of the game's client area (no Windows title bar, so the
-//! minimap starts at y = 0); those screenshots are hand-cropped to within a few px of
-//! the client area, so the crops can sit a pixel or three off the live capture. In
-//! I's, the mouse pointer covers the map icon.
+//! `--window` samples are whole game windows: their client area is fed whole, as the shell
+//! captures it while it looks for the title. The two with one-line titles, Perion
+//! Department Store and Subway Ticketing Booth, are maps without a minimap. `--title-region`
+//! samples are the 560x96 rectangle at client (0, 16) that the probe once captured, the
+//! WORLD button cut off at their top. The Tree That Grew II's is a live capture. I's and
+//! III's are that same rectangle cropped from the player's screenshots of the game's client
+//! area (no Windows title bar, so the minimap starts at y = 0); those screenshots are
+//! hand-cropped to within a few px of the client area, so the crops can sit a pixel or three
+//! off the live capture. In I's, the mouse pointer covers the map icon.
 
 mod common;
 
@@ -92,5 +95,61 @@ fn every_sample_shows_the_street_name_and_map_name_its_filename_names() {
             wrong.push(format!("{name}: panel shows {:?} (not sure: {})", state.map, state.not_sure));
         }
     }
+    assert!(wrong.is_empty(), "wrong maps:\n{}", wrong.join("\n"));
+}
+
+/// A map without a minimap shows its title on one line, "Street : Map", on the minimap
+/// window's bar, as a collapsed minimap does (ADR 0021).
+#[test]
+fn a_map_without_a_minimap_shows_the_map_its_one_line_title_names() {
+    for (sample, id, map_name) in [
+        ("victoria-road__perion-department-store--window", "010004002", "Perion Department Store"),
+        ("victoria-road__subway-ticketing-booth--window", "010003060", "Subway Ticketing Booth"),
+    ] {
+        let mut minerva = Minerva::new(FakeSource::osms());
+        let state = common::arrive(&mut minerva, sample, 0);
+
+        let shown = state.map.as_ref().map(|m| (m.id.as_str(), m.street_name.as_str(), m.map_name.as_str()));
+        assert_eq!(shown, Some((id, "Victoria Road", map_name)), "{sample}");
+        assert!(!state.not_sure, "{sample}");
+    }
+}
+
+/// Every sample at UI Sizes no sample is at (ADR 0020): the minimap found and read at the
+/// samples' size, as its map, or as unreadable, never as another map.
+#[test]
+fn every_sample_at_another_ui_size_shows_its_map_or_none() {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(samples_dir())
+        .expect("samples dir")
+        .map(|e| e.expect("dir entry").path())
+        .filter(|p| p.extension().is_some_and(|x| x == "png"))
+        .collect();
+    paths.sort();
+    let (mut wrong, mut unread) = (Vec::new(), Vec::new());
+    for path in &paths {
+        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let answer = name.split_once("--").map_or(name.as_str(), |(a, _)| a);
+        let (street, map) = answer.split_once("__").expect("street__map filename");
+        let img = common::load(&name);
+        // A window's client area, cut to its top, where the minimaps are: scaling the rest is slow.
+        let img = if name.ends_with("--window") {
+            let client = common::client_of(&img);
+            image::imageops::crop_imm(&client, 0, 0, client.width(), 300).to_image()
+        } else {
+            img
+        };
+        for size in common::OTHER_UI_SIZES {
+            let scaled = common::scaled(&img, size);
+            let mut minerva = Minerva::new(FakeSource::osms());
+            minerva.on_frame(common::frame(&scaled, 0));
+            let state = minerva.on_frame(common::frame(&scaled, 333));
+            match state.map.as_ref().map(|m| (slug(&m.street_name), slug(&m.map_name))) {
+                Some(shown) if shown == (street.to_string(), map.to_string()) => {}
+                Some(shown) => wrong.push(format!("{name} ×{size}: panel shows {shown:?}")),
+                None => unread.push(format!("{name} ×{size}")),
+            }
+        }
+    }
+    eprintln!("unreadable:\n{}", unread.join("\n"));
     assert!(wrong.is_empty(), "wrong maps:\n{}", wrong.join("\n"));
 }

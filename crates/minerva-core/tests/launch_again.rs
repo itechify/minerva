@@ -6,22 +6,21 @@ mod common;
 
 use common::FakeSource;
 use minerva_core::{
-    Action, Minerva, Foreground, GameWindow, PanelSizes, PlacementMode, Rect, ScreenRect, Settings, Size, TitleRegion,
+    Action, Minerva, Foreground, GameWindow, PanelSizes, PlacementMode, ScreenRect, Settings, Size,
 };
 
 const GAME: ScreenRect = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
 
-/// A core set up before (a Title Region marked on this game window's size), so no
+/// A core set up before, so no
 /// first-run setup is waiting, with or without the game window found.
 fn set_up(game_found: bool) -> Minerva {
-    let client = Size { width: 1920, height: 1200 };
     let mut minerva = Minerva::new(FakeSource::osms_offline());
     minerva.set_panel_sizes(PanelSizes {
         expanded: Size { width: 380, height: 72 },
         collapsed: Size { width: 44, height: 44 },
     });
     minerva.restore(Settings {
-        title_region: Some(TitleRegion { marked: Rect { x: 70, y: 40, width: 130, height: 48 }, client }),
+        setup_done: true,
         ..Settings::default()
     });
     let game = game_found.then(|| GameWindow { client: GAME, frame: GAME, screens: vec![GAME] });
@@ -68,7 +67,7 @@ fn launched_again_detached_without_the_game_opens_setup_too() {
     let mut minerva = set_up(false);
     minerva.restore(Settings {
         placement_mode: PlacementMode::Detached,
-        title_region: minerva.settings().title_region,
+        setup_done: minerva.settings().setup_done,
         ..Settings::default()
     });
 

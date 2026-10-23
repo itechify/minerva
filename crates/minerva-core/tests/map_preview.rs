@@ -21,7 +21,7 @@ use minerva_core::{
 const FIELD: u64 = 100_000_000;
 
 fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), at_ms }
+    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 /// The panel on the made-up Field, in `world`.

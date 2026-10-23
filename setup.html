@@ -56,8 +56,8 @@
         <h2 tabindex="-1">Set up the game</h2>
         <ul class="checklist">
           <li>
-            <strong>Keep the minimap open, with its title showing.</strong>
-            Minerva reads the street name and map name at the top of the minimap.
+            <strong>Keep the minimap showing, open or collapsed.</strong>
+            Minerva reads the street name and map name in its title, wherever you put it.
           </li>
           <li>
             <strong>Play in windowed or borderless mode.</strong>
@@ -71,23 +71,13 @@
         </footer>
       </section>
 
-      <section data-step="mark">
-        <h2 tabindex="-1">Mark the minimap title</h2>
+      <section data-step="find">
+        <h2 tabindex="-1">Finding your map</h2>
         <p>
-          Draw or adjust a box around the two lines of the minimap title: the street name and the map name.
-          Leave a little of the blue panel around them.
+          There's nothing to mark: Minerva finds the minimap's title by itself, wherever you put
+          the minimap, open or collapsed. On a map without a minimap, it reads the bar the game
+          shows there instead.
         </p>
-        <p class="muted">Drag to draw a box, or use Arrow keys to move it and Alt+Arrow to resize. Hold Shift for larger steps. Enter tests the box; Esc cancels.</p>
-        <p class="muted">Long map names are read whole, even if the title is short now.</p>
-        <footer>
-          <button class="secondary" data-action="back">Back</button>
-          <button class="secondary" id="keep-title" hidden>Keep the current title</button>
-          <button class="mark" id="mark">Mark the title</button>
-        </footer>
-      </section>
-
-      <section data-step="test">
-        <h2 tabindex="-1">Test read</h2>
         <div class="test-read" id="test-read" role="status" aria-atomic="true"></div>
         <p class="muted credit" id="test-credit"></p>
         <div id="handoff" hidden>
@@ -99,8 +89,8 @@
           </dl>
         </div>
         <footer>
-          <button class="secondary mark">Mark again</button>
-          <button id="title-next">Next</button>
+          <button class="secondary" data-action="back">Back</button>
+          <button data-action="next">Next</button>
         </footer>
       </section>
 

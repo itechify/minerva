@@ -6,16 +6,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hotkeyAvailable, keyLabel, type Hotkeys } from "./hotkeys";
 import { mapMark, type MapMarks } from "./map-marks";
 import { momentText } from "./dates";
-import { LOADING_MAP_LIST, recognitionProblem, type Recognition } from "./recognition";
+import { LOADING_MAP_LIST, TITLE_LOST, recognitionProblem, type Recognition } from "./recognition";
 
-/** Mirror of `minerva_core::TestRead`. */
-type TestRead =
-  | { status: "reading" }
-  | { status: "recognised"; map: { id: string; streetName: string; mapName: string; mark: string | null } }
-  | { status: "failed" };
+/** A map, as `minerva_core::CurrentMap` names it. */
+type FoundMap = { id: string; streetName: string; mapName: string; mark: string | null };
 
-
-type SetupReason = "firstRun" | "resolutionChanged" | "requested";
+type SetupReason = "firstRun" | "requested";
 
 /** Mirror of `minerva_core::UpdateStatus`. */
 type UpdateStatus = "notChecked" | "checking" | "upToDate" | "newerVersion" | "failed";
@@ -53,9 +49,12 @@ type Updates = {
 type SetupView = {
   setup: {
     needed: SetupReason | null;
-    testRead: TestRead | null;
+    /** The map the minimap title shows, once one is found. */
+    map: FoundMap | null;
     credit: string | null;
   };
+  /** No minimap title has been found for a while: the minimap may be closed. */
+  titleLost: boolean;
   /** The Grind Tracker is on (the panel's Settings). */
   grindTrackerOn: boolean;
   unavailableHotkeys: string[];
@@ -71,7 +70,7 @@ type SetupView = {
   updates: Updates;
 };
 
-const STEPS = ["warning", "window", "requirements", "mark", "test", "exp"] as const;
+const STEPS = ["warning", "window", "requirements", "find", "exp"] as const;
 /** Pages opened from the window bar, outside the walk-through: back returns to the step left. */
 const ASIDES = ["guide", "about"] as const;
 type Aside = (typeof ASIDES)[number];
@@ -105,8 +104,6 @@ function show(next: Step) {
 
 function move(by: number) {
   if (isAside(step)) return;
-  // Back from the Grind Tracker after keeping the title goes to the title, not its test read.
-  if (step === "exp" && by < 0 && !view?.setup.testRead) return show("mark");
   show(STEPS[Math.min(Math.max(STEPS.indexOf(step) + by, 0), STEPS.length - 1)]);
 }
 
@@ -119,8 +116,7 @@ function shortcut(name: keyof Hotkeys): string {
 
 const NOTICES: Record<SetupReason, string> = {
   firstRun: "",
-  resolutionChanged: "The game window changed size since setup, so the minimap title has probably moved. Mark it again.",
-  requested: "Mark the minimap title again, or keep it as it is. Until you finish, Minerva keeps reading the old spot.",
+  requested: "Here is setup again. Minerva finds the minimap title by itself, so there's nothing to redo.",
 };
 
 function render() {
@@ -130,8 +126,6 @@ function render() {
   const notice = openedFor && step !== "about" ? NOTICES[openedFor] : "";
   $("notice").hidden = !notice;
   $("notice").textContent = notice;
-  // A changed window size is a problem to fix; a requested re-setup is just information.
-  $("notice").classList.toggle("problem", openedFor === "resolutionChanged");
 
   const windowStatus = game
     ? `Found the “${gameTitle}” window (${game.width}×${game.height}).`
@@ -139,50 +133,42 @@ function render() {
   if ($("window-status").textContent !== windowStatus) $("window-status").textContent = windowStatus;
   ($("window-next") as HTMLButtonElement).disabled = !game;
   ($("pick") as HTMLButtonElement).disabled = picking;
-  for (const button of document.querySelectorAll<HTMLButtonElement>(".mark")) {
-    button.disabled = !game;
-  }
-  // On a requested setup the saved title still fits, and can be kept as it is.
-  $("keep-title").hidden = openedFor !== "requested" || setup.testRead !== null;
-
-  const read = setup.testRead;
+  const found = setup.map;
   const box = $("test-read");
-  const shownMark = read?.status === "recognised" && read.map.mark ? view.mapMarks[read.map.mark] : undefined;
-  const readKey = JSON.stringify([read, recognition.status, shownMark]);
+  const shownMark = found?.mark ? view.mapMarks[found.mark] : undefined;
+  const readKey = JSON.stringify([found, recognition.status, shownMark, view.titleLost]);
   if (readKey !== renderedRead) {
     renderedRead = readKey;
-    // Recognised, the map shows as the overlay's title bar will show it.
+    // Found, the map shows as the overlay's title bar will show it.
     let kind: "reading" | "recognised" | "problem" = "reading";
-    if (!read || read.status === "reading") {
-      box.textContent = "Reading the title…";
-    } else if (read.status === "recognised") {
+    if (found) {
       kind = "recognised";
       const title = document.createElement("div");
       title.className = "title";
       const street = document.createElement("p");
       street.className = "street";
-      street.textContent = read.map.streetName;
+      street.textContent = found.streetName;
       const map = document.createElement("p");
       map.className = "map";
-      map.textContent = read.map.mapName;
+      map.textContent = found.mapName;
       title.append(street, map);
       // Its Map Mark beside both lines, as the overlay's title bar draws it; with none, no
       // room for it.
-      const mark = read.map.mark && view.mapMarks[read.map.mark] ? [mapMark(view.mapMarks, read.map.mark)] : [];
-      box.replaceChildren(...mark, title, tag("Recognised"));
+      const mark = found.mark && view.mapMarks[found.mark] ? [mapMark(view.mapMarks, found.mark)] : [];
+      box.replaceChildren(...mark, title, tag("Found"));
     } else if (recognition.status === "starting") {
       box.textContent = LOADING_MAP_LIST;
     } else if (recognitionProblem(recognition)) {
       kind = "problem";
       box.textContent = recognitionProblem(recognition);
-    } else {
+    } else if (view.titleLost) {
       kind = "problem";
-      box.textContent =
-        "No map recognised in the marked box. Check that the minimap title is showing, then mark a box around both lines with a little of the blue panel around them.";
+      box.textContent = `${TITLE_LOST} Open it in the game, or carry on: Minerva keeps looking.`;
+    } else {
+      box.textContent = "Looking for the minimap title…";
     }
     box.className = `test-read ${kind}`;
   }
-  ($("title-next") as HTMLButtonElement).disabled = read?.status !== "recognised";
   $("test-credit").textContent = setup.credit ?? "";
 
   // The Grind Tracker needs no mark: it is on, or the player turned it off in Settings.
@@ -190,7 +176,7 @@ function render() {
     ? "It's on. To turn it off, open Settings, the gear at the top of the panel."
     : "It's off. To turn it on, open Settings, the gear at the top of the panel.";
 
-  $("handoff").hidden = read?.status !== "recognised";
+  $("handoff").hidden = !found;
   $("resetup-hint").textContent = hotkeyAvailable(view.hotkeys.setup, view.unavailableHotkeys)
     ? `${shortcut("setup")} reopens setup and this guide while you play.`
     : view.hotkeys.setup === ""
@@ -358,9 +344,6 @@ invoke<SetupView | null>("setup_view").then((v) => {
   if (v && !view) update(v);
 });
 
-listen("title-marked", () => show("test"));
-listen("marking-cancelled", () => document.querySelector<HTMLElement>(`[data-step="${step}"] .mark`)?.focus());
-listen<string>("marking-error", (e) => actionError(e.payload));
 $("guide-open").addEventListener("click", () => show("guide"));
 // The panel's settings view comes in front with the keyboard, its first Change focused.
 $("change-hotkeys").addEventListener("click", () => {
@@ -423,17 +406,6 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-action]
     else if (action === "close") getCurrentWindow().close();
   });
 }
-
-for (const button of document.querySelectorAll<HTMLButtonElement>(".mark")) {
-  button.addEventListener("click", () => {
-    $("action-error").hidden = true;
-    invoke("start_marking", { target: "title" }).catch(actionError);
-  });
-}
-
-
-$("keep-title").addEventListener("click", () => show("exp"));
-$("title-next").addEventListener("click", () => show("exp"));
 
 $("finish").addEventListener("click", () => invoke("finish_setup").catch(actionError));
 

@@ -33,7 +33,7 @@ fn result<'a>(state: &'a PanelState, map_name: &str) -> &'a SearchResult {
 }
 
 fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), at_ms }
+    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 #[test]

@@ -227,8 +227,8 @@ button.secondary:disabled {
   text-shadow: none;
 }
 
-/* The test read: a plain note while reading, the overlay's problem note when nothing
-   is recognised, and, recognised, the map as the overlay's title bar will show it. */
+/* Finding your map: a plain note while looking, the overlay's problem note when no title
+   has been found for a while, and, found, the map as the overlay's title bar will show it. */
 .test-read {
   position: relative;
   margin-bottom: 10px;

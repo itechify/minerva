@@ -24,7 +24,7 @@ The core holds no clock, and all the logic is in it, so feeding the same inputs 
   That leaves about four lines a second while playing, about 1 MB an hour. The trace reaches back to launch, but no more than a day; the lines that set the run up (the settings and Personal Bests restored) stay even then. It is held compressed.
 - **Crops:**
   - The EXP figures' from the last 10 minutes, where they changed: cut from the Status Bar's capture where they were read (ADR 0017).
-  - The Title Region's where its reading changed.
+  - The Minimap Title's where its reading changed: where it was found (ADR 0021), none of the rest of the client area.
   - The game's client area 400 px each way from the pointer, at each Item Card or Item Lookup press, from the last 10 minutes; named with the pointer's spot in it, as `samples/item-tooltip` names its frames.
   - For the whole run, the crops behind a reading the core found unusual or that changed the map shown, and behind an Item Tooltip whose name couldn't be read or isn't an item's.
   - Where a reader that looks for its place in a capture found nothing, one capture from the last 10 minutes, whole, as it was taken (#133): the Deal Finder's client area (`crops/client-area-<ms>.png`), the latest whose reader saw a near miss, else the latest; and the Status Bar's strip (`crops/status-bar-strip-<ms>.png`), the latest. A Deal Finder with no shop open finds nothing at every capture, so the near miss picks out the one with a shop it couldn't read. Such a reading also writes its near miss down in the trace (the stack of band rows, or the level tiles, it came closest with: where, how wide, how many), so the report says why at a glance.

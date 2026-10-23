@@ -538,15 +538,12 @@ figcaption {
   letter-spacing: 0.01em;
 }
 
-/* The title-marking window over the game: its navy veil, and the box being marked, dashed
-   Edit Blue over a white band (region.html). Clear inside, so what it frames reads. */
-.reel-veil,
+/* The box around the minimap title as Minerva finds it, dashed Edit Blue over a white band.
+   Clear inside, so what it frames reads. */
 .reel-box {
   position: absolute;
   box-sizing: border-box;
   pointer-events: none;
-}
-.reel-box {
   border: 2px solid rgba(255, 255, 255, 0.95);
   outline: 2px dashed var(--edit);
   outline-offset: -2px;
@@ -2121,7 +2118,7 @@ html.lb-morph::view-transition-group(lb-head) {
 }
 
 /* Reporting an entry: a small window over the page, framed as the site's window, under
-   the title-marking window's navy veil. */
+   the Navy Veil. */
 .lb-dialog {
   box-sizing: border-box;
   width: min(30em, calc(100vw - 36px));

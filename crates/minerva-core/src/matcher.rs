@@ -88,16 +88,6 @@ impl Matcher {
         (0..self.maps.len()).filter(|&i| self.same_title(i, index)).collect()
     }
 
-    /// The length, in characters, of the longest street name or map name.
-    pub fn longest_name(&self) -> usize {
-        let len = |s: &str| s.chars().count();
-        self.maps
-            .iter()
-            .map(|m| len(&m.entry.street_name).max(len(&m.entry.map_name)))
-            .max()
-            .unwrap_or(0)
-    }
-
     /// The map whose street name and map name best match the reading, if the match
     /// is confident and no other title matches as well; or, when the best is one of
     /// several names differing only in their trailing numeral and the reading's

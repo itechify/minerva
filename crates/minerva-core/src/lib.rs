@@ -1,7 +1,6 @@
 //! Minerva core: the single test seam.
 //!
-//! Inputs are plain data (captured Title Region frames and Status Bar captures or their
-//! readings, the game window, the clock, the player's actions and hotkeys); the output
+//! Inputs are plain data (title captures and Status Bar captures or their readings, the game window, the clock, the player's actions and hotkeys); the output
 //! is a [`PanelState`] holding everything the overlay renders. No OS or UI dependencies
 //! live here.
 
@@ -23,6 +22,7 @@ mod map_mark;
 mod map_preview;
 mod market_prices;
 mod matcher;
+mod minimap_title;
 pub mod meowdb;
 mod mob_card;
 pub mod osms;
@@ -87,10 +87,7 @@ pub use search::{
 };
 pub use session::{Character, Deaths, ExpRate, ExpTracking, Forecast, PacePoint, PaceTrace, TrackingState};
 pub use settings::{Hotkey, Hotkeys, Settings};
-pub use setup::{
-    MarkTarget, SelectionDirection, SetupReason, SetupState, TestRead,
-    TitleRegion,
-};
+pub use setup::{SetupReason, SetupState};
 pub use shown_map::{Candidate, Candidates, FIRST_MOBS, LevelRange, Outline};
 pub use status_bar::{MAX_LEVEL, STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarReader, StatusBarReading};
 pub use updates::{
@@ -118,7 +115,7 @@ use pictures::Pictures;
 use panel::Panel;
 use session::Session;
 use setup::Setup;
-pub use recogniser::{TitleLines, TitleReader, TitleReading};
+pub use recogniser::{TitleCapture, TitleLines, TitleReader, TitleReading};
 use tracker::Tracker;
 use updates::{Chosen, Updater};
 use serde::{Deserialize, Serialize};
@@ -126,7 +123,7 @@ use osms::MapSet;
 use std::collections::{BTreeMap, VecDeque};
 use std::task::Poll;
 
-/// A captured Title Region or Status Bar image, or the game's whole client area for
+/// A title capture's image or a Status Bar's, or the game's whole client area for
 /// Item Lookup: tightly packed RGBA, top-down rows.
 #[derive(Debug, Clone)]
 pub struct Frame {
@@ -145,23 +142,6 @@ pub struct Rect {
     pub y: u32,
     pub width: u32,
     pub height: u32,
-}
-
-/// A guess at the Title Region for a game client area of the given size (physical px),
-/// for the probe, which has no setup. The app captures the region the player marked
-/// (`PanelState::title_region`).
-///
-/// On the samples (1920x1200 client, default UI size) the title band is 66 px tall at
-/// client (0..4, 31). The region keeps ~15 px of slack above and below it, and is wide
-/// enough for the longest name in the map list ("Physical Fitness Test <Normal Waiting
-/// Room>", ~470 px of panel). The core trims each frame where the panel ends, so a
-/// narrow minimap's surroundings are never read. Clamped to the client area.
-pub fn default_title_region(client_width: u32, client_height: u32) -> Rect {
-    const Y: u32 = 16;
-    const WIDTH: u32 = 560;
-    const HEIGHT: u32 = 96;
-    let y = Y.min(client_height);
-    Rect { x: 0, y, width: WIDTH.min(client_width), height: HEIGHT.min(client_height - y) }
 }
 
 /// The map the panel shows: a real map from the map list.
@@ -191,6 +171,10 @@ pub const OSMS_AND_MEOWDB_CREDIT: &str =
 
 /// The Minerva site, the player manual, which Help & Setup's About & Credits opens.
 pub const SITE_URL: &str = "https://owlofminerva.app/";
+
+/// The FAQ's answer on a Minimap Title Minerva can't find, which the panel links to while it
+/// can't ([`PanelState::title_lost`]).
+pub const TITLE_HELP_URL: &str = "https://owlofminerva.app/faq/#minimap-not-found";
 
 /// Minerva's source and releases, which About & Credits opens.
 pub const GITHUB_URL: &str = "https://github.com/itechify/minerva";
@@ -247,8 +231,8 @@ pub struct PanelState {
     /// The Mob Card of each mob the panel lists, in its order; empty while it lists none.
     pub mob_cards: Vec<MobCard>,
     /// Every Map Mark, by OSMS's name for it, which each map shown anywhere names its own
-    /// by (the panel's title, Hidden Portals, the Map Preview, search, the route, setup's
-    /// test read and the Personal Bests window); empty until OSMS's file set is read.
+    /// by (the panel's title, Hidden Portals, the Map Preview, search, the route, the map
+    /// setup found and the Personal Bests window); empty until OSMS's file set is read.
     pub map_marks: BTreeMap<String, MapMark>,
     /// Expanded to the full panel, or collapsed to a small icon.
     pub expanded: bool,
@@ -262,7 +246,7 @@ pub struct PanelState {
     /// a bottom corner: never under [`MIN_PANEL_WIDTH`]. The shell sizes the window to it.
     pub panel_width: u32,
     /// Where the overlay goes on screen; `None` while there is no game window, unless
-    /// the panel is detached. Inside the game it never covers `title_region`, the Status
+    /// the panel is detached. Inside the game it never covers the Minimap Title where it was found, the Status
     /// Bar's Character or its EXP figures: the overlay shows in screen captures, ours
     /// included.
     pub placement: Option<ScreenRect>,
@@ -274,9 +258,16 @@ pub struct PanelState {
     pub draggable: bool,
     /// First-run setup and re-setup.
     pub setup: SetupState,
-    /// Where on screen to capture the Title Region (physical px); `None` while there
-    /// is no game window or the region isn't known to fit it.
-    pub title_region: Option<ScreenRect>,
+    /// Where on screen to capture for the Minimap Title (physical px, ADR 0021): where it was
+    /// last found, while it is there, or the game's whole client area while it is looked for;
+    /// only while there is a game window and the overlay can show (see [`Layer`]).
+    pub title_capture: Option<ScreenRect>,
+    /// `title_capture` is the whole client area, as the title is looked for: the shell
+    /// captures it every [`TITLE_SEARCH_MS`], not every [`TITLE_READ_MS`].
+    pub title_searching: bool,
+    /// No Minimap Title has been found for [`TITLE_LOST_AFTER_MS`]: the minimap may be
+    /// closed. Not while a title is found, even one that doesn't read.
+    pub title_lost: bool,
     /// Read the EXP figures in each capture of `status_bar_capture` (ADR 0017), and where
     /// they were last found; `None` while the Grind Tracker is off.
     pub exp_figures: Option<ExpFigures>,
@@ -322,8 +313,8 @@ pub struct PanelState {
     /// The settings view, which takes over the panel while it is open; `None` while it
     /// is closed. Like the search view, it has the keyboard while it is open.
     pub settings_view: Option<SettingsView>,
-    /// The player closed first-run setup: with no Title Region there is nothing to
-    /// read, so the app quits.
+    /// The player closed first-run setup without going through its warning, so the app
+    /// quits.
     pub quit: bool,
     /// Search, over every map in OSMS's file set and every item in its item files.
     pub search: SearchState,
@@ -373,6 +364,19 @@ pub enum Request {
     CaptureItemTooltip,
 }
 
+/// How often the shell captures [`PanelState::title_capture`] where the Minimap Title was
+/// found (ADR 0021)...
+pub const TITLE_READ_MS: u64 = 333;
+/// ...and how often while it looks for it in the whole client area: a player with the minimap
+/// closed doesn't pay for a search three times a second.
+pub const TITLE_SEARCH_MS: u64 = 1000;
+/// With no Minimap Title found for this long, the panel says it can't find it
+/// ([`PanelState::title_lost`]).
+pub const TITLE_LOST_AFTER_MS: u64 = 10_000;
+/// A title found where it was, but read as no map for this long, is looked for afresh in the
+/// whole client area.
+pub const TITLE_UNREAD_SEARCH_MS: u64 = 3_000;
+
 /// How often the shell captures [`PanelState::deal_finder_capture`] for the Deal Finder:
 /// a listing's badge follows the player's scrolling within half a second.
 pub const DEAL_FINDER_CAPTURE_MS: u64 = 400;
@@ -417,6 +421,9 @@ pub enum PanelControl {
     ClosePersonalBests,
     /// About & Credits' link in Help & Setup: open the Minerva site in the browser.
     OpenSite,
+    /// The panel's line saying it can't find the Minimap Title ([`PanelState::title_lost`]):
+    /// open the FAQ's answer on it in the browser.
+    OpenTitleHelp,
     /// About & Credits' GitHub link: open Minerva's source in the browser.
     OpenGithub,
     /// About & Credits' Discord link: open Minerva's Discord in the browser.
@@ -549,6 +556,17 @@ pub struct Minerva {
     /// Where the Status Bar's level, job and name were last found, and the game's client
     /// area then: our windows keep clear of them while the client area stays where it was.
     status_bar_area: Option<(ScreenRect, ScreenRect)>,
+    /// Where the Minimap Title was last found, and the game's client area then: our windows
+    /// keep clear of it while the client area stays where it was (ADR 0021)...
+    title_found: Option<(ScreenRect, ScreenRect)>,
+    /// ...and it is captured there while it is there: until a capture there finds none, or
+    /// reads it as no map for [`TITLE_UNREAD_SEARCH_MS`].
+    title_locked: bool,
+    /// When a capture first found no Minimap Title, since the last that found one.
+    title_missing_since: Option<u64>,
+    /// When a capture where the title was found first read it as no map, since the last that
+    /// read it as one.
+    title_unread_since: Option<u64>,
     /// The Characters shown on the Map Leaderboards, and the uploads for them.
     leaderboards: Leaderboards,
     /// The checks for a newer version, and its download and install when the player chooses.
@@ -611,6 +629,10 @@ impl Minerva {
             deal_badges_size: Size { width: 0, height: 0 },
             status_bar_reader: None,
             status_bar_area: None,
+            title_found: None,
+            title_locked: false,
+            title_missing_since: None,
+            title_unread_since: None,
             leaderboards: Leaderboards::default(),
             updater: Updater::default(),
             requests: VecDeque::new(),
@@ -634,33 +656,63 @@ impl Minerva {
         self
     }
 
-    /// Read a captured Title Region frame and update the panel state: the same as
-    /// [`Minerva::on_title_frame_read`] with what a [`TitleReader`] reads in the frame, here.
+    /// Read a title capture's frame, captured at the screen's top-left, and update the panel
+    /// state: as [`Minerva::on_title_capture`] does.
     pub fn on_frame(&mut self, frame: Frame) -> &PanelState {
-        let reading = self.reader.get_or_insert_with(TitleReader::bundled).read(&frame);
-        self.on_title_frame_read(frame, reading)
+        self.on_title_capture(TitleCapture { frame, origin: ScreenPoint { x: 0, y: 0 } })
     }
 
-    /// Take what a Title Region frame read as (read by a [`TitleReader`], possibly on
-    /// another thread) and update the panel state.
+    /// Read a capture of [`PanelState::title_capture`] and update the panel state: the same as
+    /// [`Minerva::on_title_read`] with what a [`TitleReader`] reads in it, here.
+    pub fn on_title_capture(&mut self, capture: TitleCapture) -> &PanelState {
+        let reading = self.reader.get_or_insert_with(TitleReader::bundled).read(&capture);
+        self.on_title_read(capture, reading)
+    }
+
+    /// Take what a title capture read as (read by a [`TitleReader`], possibly on another
+    /// thread) and update the panel state.
     pub fn on_reading(&mut self, reading: TitleReading) -> &PanelState {
-        let event = Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), same: false };
+        let event = Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), found: reading.found, same: false };
         self.record_input(event, Some(reading.at_ms), None);
         self.take_title_reading(reading)
     }
 
-    /// As [`Minerva::on_reading`], with the frame read, whose crop a Bug Report may keep.
-    pub fn on_title_frame_read(&mut self, frame: Frame, reading: TitleReading) -> &PanelState {
-        let event = Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), same: false };
-        self.record_input(event, Some(reading.at_ms), Some((Region::Title, frame)));
+    /// As [`Minerva::on_reading`], with the capture read, whose crop of the title a Bug
+    /// Report may keep.
+    pub fn on_title_read(&mut self, capture: TitleCapture, reading: TitleReading) -> &PanelState {
+        let crop = bug_report::title_crop(&capture, reading.found);
+        let event = Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), found: reading.found, same: false };
+        self.record_input(event, Some(reading.at_ms), crop);
         self.take_title_reading(reading)
     }
 
+    /// Where the Minimap Title is to be captured next (ADR 0021): where `reading` found it,
+    /// while it is there; the whole client area once it isn't. And since when none has been
+    /// found.
+    fn follow_title(&mut self, reading: &TitleReading) {
+        let client = self.panel.game.as_ref().map(|game| game.client);
+        match (reading.found, client) {
+            (Some(found), Some(client)) => {
+                self.title_found = Some((client, found));
+                self.title_locked = true;
+                self.title_missing_since = None;
+            }
+            (Some(_), None) => self.title_missing_since = None,
+            (None, _) => {
+                self.title_locked = false;
+                self.title_unread_since = None;
+                self.title_missing_since.get_or_insert(reading.at_ms);
+            }
+        }
+        self.state.title_lost =
+            self.title_missing_since.is_some_and(|since| reading.at_ms.saturating_sub(since) >= TITLE_LOST_AFTER_MS);
+    }
+
     fn take_title_reading(&mut self, reading: TitleReading) -> &PanelState {
+        self.follow_title(&reading);
         self.load_osms(reading.at_ms);
         let (Some(matcher), Some(set)) = (&self.matcher, &self.set) else {
             // Without the map list nothing can be recognised.
-            self.setup.on_read(None);
             return self.sync_panel();
         };
         let snap = reading.lines.and_then(|lines| match matcher.snap(&lines.street, &lines.map)? {
@@ -688,9 +740,17 @@ impl Minerva {
                 mark: entry.mark.clone(),
             }
         };
-        // A test read judges this one frame: the tracker would keep showing the last
-        // confident map through a badly marked region.
-        self.setup.on_read(snap.map(|s| current_map(s.index)));
+        // Found where it was, but read as no map for a while: the box may cut a moved minimap's
+        // title. It is looked for afresh.
+        if reading.found.is_some() && snap.is_none() {
+            let since = *self.title_unread_since.get_or_insert(reading.at_ms);
+            if reading.at_ms.saturating_sub(since) >= TITLE_UNREAD_SEARCH_MS {
+                self.title_locked = false;
+                self.title_unread_since = None;
+            }
+        } else {
+            self.title_unread_since = None;
+        }
         let tracked = self.tracker.update(snap);
         let titled = tracked.current.map_or_else(Vec::new, |i| matcher.same_title_as(i));
         let maps = titled.into_iter().map(current_map).collect();
@@ -820,7 +880,6 @@ impl Minerva {
     /// minimised).
     pub fn on_game_window(&mut self, game: Option<GameWindow>) -> &PanelState {
         self.record(Event::GameWindow { game: game.clone() });
-        self.setup.game = game.as_ref().map(|g| g.client);
         if let Some(game) = &game {
             self.panel.screens = game.screens.clone();
         }
@@ -896,19 +955,10 @@ impl Minerva {
                 self.shown_map.choose_next();
                 self.sync_shown_map();
             }
-            Action::MarkTitleRegion(marked) => self.setup.mark(marked),
-            Action::BeginSelection(target) => self.setup.begin_selection(target),
-            Action::AdjustSelection { direction, resize, coarse } => {
-                self.setup.adjust_selection(direction, resize, coarse);
-            }
-            Action::ConfirmSelection => {
-                self.setup.confirm_selection();
-            }
-            Action::CancelSelection => self.setup.cancel_selection(),
             Action::FinishSetup => self.setup.finish(),
             Action::RequestSetup => self.setup.request(),
             Action::LaunchedAgain => {
-                if self.setup.state().window_open {
+                if self.state.setup.window_open {
                     // Setup shows already.
                 } else if self.panel.game.is_some() {
                     // It shows with the game, even if the app the player started it from
@@ -919,7 +969,7 @@ impl Minerva {
                 }
             }
             Action::CancelSetup => {
-                self.state.quit |= self.setup.state().needed == Some(SetupReason::FirstRun);
+                self.state.quit |= self.setup.needed() == Some(SetupReason::FirstRun);
                 self.setup.cancel();
             }
             Action::ResetSession => self.session.reset_by_player(),
@@ -1234,6 +1284,7 @@ impl Minerva {
                 return self.state.map.as_ref().map(|map| Request::OpenInBrowser { url: map.url.clone() });
             }
             PanelControl::OpenSite => return Some(Request::OpenInBrowser { url: SITE_URL.into() }),
+            PanelControl::OpenTitleHelp => return Some(Request::OpenInBrowser { url: TITLE_HELP_URL.into() }),
             PanelControl::OpenGithub => return Some(Request::OpenInBrowser { url: GITHUB_URL.into() }),
             PanelControl::OpenDiscord => return Some(Request::OpenInBrowser { url: DISCORD_URL.into() }),
             PanelControl::OpenRelease => return self.open_release(),
@@ -1743,7 +1794,7 @@ impl Minerva {
         self.panel.mode = settings.placement_mode;
         self.panel.detached_at = settings.detached_at;
         self.panel.resized_to(settings.panel_width.unwrap_or(DEFAULT_PANEL_WIDTH));
-        self.setup.saved = settings.title_region;
+        self.setup.done = settings.setup_done;
         self.grind_tracker.open = settings.grind_tracker_open;
         self.grind_tracker.at = settings.grind_tracker_at;
         self.bests_window.at = settings.personal_bests_at;
@@ -1770,7 +1821,7 @@ impl Minerva {
             placement_mode: self.panel.mode,
             detached_at: self.panel.detached_at,
             panel_width: (self.panel.width != DEFAULT_PANEL_WIDTH).then_some(self.panel.width),
-            title_region: self.setup.saved,
+            setup_done: self.setup.done,
             grind_tracker_open: self.grind_tracker.open,
             grind_tracker_at: self.grind_tracker.at,
             personal_bests_at: self.bests_window.at,
@@ -2015,7 +2066,7 @@ impl Minerva {
         let client = self.panel.game.as_ref().map(|game| game.client);
         let status_bar = self.status_bar_area.filter(|&(at, _)| Some(at) == client).map(|(_, area)| area);
         let exp_figures = self.state.exp_figures.and_then(|figures| figures.last_found);
-        self.panel.avoid = [self.state.title_region, status_bar, exp_figures].into_iter().flatten().collect();
+        self.panel.avoid = [self.title_area(), status_bar, exp_figures].into_iter().flatten().collect();
         self.state.expanded = self.panel.expanded;
         self.state.collapsed_sections = self.settings.collapsed_sections;
         self.state.game_found = self.panel.game.is_some();
@@ -2127,10 +2178,39 @@ impl Minerva {
         self.state.character = self.session.character().cloned();
     }
 
+    /// Where the Minimap Title was last found, inside the game's client area, while the client
+    /// area is where it was then.
+    fn title_area(&self) -> Option<ScreenRect> {
+        let client = self.panel.game.as_ref()?.client;
+        let (at, found) = self.title_found.filter(|&(at, _)| at == client)?;
+        let (x0, y0) = (found.x.max(at.x), found.y.max(at.y));
+        let x1 = (found.x + found.width as i32).min(at.x + at.width as i32);
+        let y1 = (found.y + found.height as i32).min(at.y + at.height as i32);
+        (x1 > x0 && y1 > y0).then(|| ScreenRect { x: x0, y: y0, width: (x1 - x0) as u32, height: (y1 - y0) as u32 })
+    }
+
+    /// Where to capture for the Minimap Title (ADR 0021), while the overlay can show (see
+    /// [`Layer`]): another app's pixels are never read. Where it was last found, or the whole
+    /// client area while it is looked for.
+    fn sync_title(&mut self) {
+        let shows = self.panel.layer() != Layer::Hidden;
+        let client = self.panel.game.as_ref().filter(|_| shows).map(|game| game.client);
+        let found = self.title_area().filter(|_| shows && self.title_locked);
+        if !shows {
+            // No time behind another app counts as time the title wasn't found: none was
+            // looked for.
+            self.title_missing_since = None;
+            self.title_unread_since = None;
+            self.state.title_lost = false;
+        }
+        self.state.title_capture = found.or(client);
+        self.state.title_searching = found.is_none() && client.is_some();
+    }
+
     fn sync_setup(&mut self) {
         self.setup.follow_needed();
-        self.state.setup = self.setup.state();
-        self.state.title_region = self.setup.title_region(self.matcher.as_ref().map(Matcher::longest_name));
+        self.state.setup = self.setup.state(self.state.map.clone());
+        self.sync_title();
         let last_found = self.exp_figures_last_found();
         self.state.exp_figures = self.tracking_on().then_some(ExpFigures { last_found });
         if !self.tracking_on() {
