@@ -5,23 +5,10 @@
 mod common;
 
 use common::osms::{self, HENESYS_HUNTING_GROUND_I, map, mob};
-use common::{FakeSource, arrive};
+use common::{FakeSource, arrive, KERNING_SAMPLE};
 use minerva_core::{
-    Minerva, MapData, MapDataStatus, MapSummary, Mob, PanelState, PerParty, Recognition, TitleLines, TitleReading,
+    Minerva, MapData, MapDataStatus, MapSummary, Mob, PanelState, PerParty, Recognition,
 };
-
-const KERNING: &str = "victoria-road__kerning-city--window";
-
-fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
-}
-
-/// Two confident readings of a title the minimap samples don't show.
-fn arrive_at(world: osms::World, street: &str, name: &str) -> PanelState {
-    let mut minerva = Minerva::new(FakeSource::with_world(world));
-    minerva.on_reading(read_as(street, name, 0));
-    minerva.on_reading(read_as(street, name, 333)).clone()
-}
 
 fn data(state: &PanelState) -> &MapData {
     match &state.data {
@@ -46,7 +33,7 @@ fn summary(solo: (u64, u64), full_party: (u64, u64)) -> Option<MapSummary> {
 /// rounded half up.
 #[test]
 fn a_maps_mobs_are_its_spawn_points_grouped_by_mob_with_their_figures_from_the_mobs_record() {
-    let state = arrive_at(osms::game(), "Victoria Road", "Henesys Hunting Ground I");
+    let state = common::on_title(osms::game(), "Victoria Road", "Henesys Hunting Ground I");
 
     assert_eq!(
         data(&state).mobs,
@@ -69,7 +56,7 @@ fn a_maps_mobs_are_its_spawn_points_grouped_by_mob_with_their_figures_from_the_m
 /// Mob Rate isn't applied.
 #[test]
 fn the_map_summary_counts_every_untimed_spawn_point_as_meowdb_does() {
-    let state = arrive_at(osms::game(), "Victoria Road", "Henesys Hunting Ground I");
+    let state = common::on_title(osms::game(), "Victoria Road", "Henesys Hunting Ground I");
 
     assert_eq!(data(&state).summary, summary((13_930, 153_216), (18_572, 204_285)));
 }
@@ -82,7 +69,7 @@ fn a_timed_spawn_point_gives_3600_over_its_timer_mobs_an_hour_alone_or_in_a_part
         .with_mob(mob(1_100_000, "Iron Hog", 27, 1000, 52))
         .changing(HENESYS_HUNTING_GROUND_I, |m| m.timed(1_100_000, 1, "3600.00"));
 
-    let state = arrive_at(world, "Victoria Road", "Henesys Hunting Ground I");
+    let state = common::on_title(world, "Victoria Road", "Henesys Hunting Ground I");
 
     assert_eq!(data(&state).summary, summary((13_931, 153_268), (18_573, 204_337)));
 }
@@ -101,7 +88,7 @@ fn a_ranged_timer_counts_as_the_average_osms_gives() {
         vec![mob(20, "Ghost Stump", 19, 300, 100), mob(21, "Pig", 7, 80, 7)],
     );
 
-    let state = arrive_at(world, "Made-up Street", "Ghost Field");
+    let state = common::on_title(world, "Made-up Street", "Ghost Field");
 
     assert_eq!(data(&state).summary, summary((269, 2810), (269, 2810)));
 }
@@ -136,7 +123,7 @@ fn hill() -> osms::World {
 
 #[test]
 fn a_mob_folded_into_another_of_its_name_is_counted_as_that_mob() {
-    let state = arrive_at(hill(), "Made-up Street", "Hill");
+    let state = common::on_title(hill(), "Made-up Street", "Hill");
 
     assert_eq!(
         data(&state).mobs,
@@ -156,8 +143,8 @@ fn a_mob_folded_into_another_counts_towards_the_map_summary_as_that_mob() {
         osms::Map { spawns: Vec::new(), ..m }.spawns(30, 2).spawns(31, 2).spawns(32, 3).spawns(34, 3)
     });
 
-    let folded = arrive_at(hill(), "Made-up Street", "Hill");
-    let own = arrive_at(as_own, "Made-up Street", "Hill");
+    let folded = common::on_title(hill(), "Made-up Street", "Hill");
+    let own = common::on_title(as_own, "Made-up Street", "Hill");
 
     assert!(data(&folded).summary.is_some());
     assert_eq!(data(&folded).summary, data(&own).summary);
@@ -169,7 +156,7 @@ fn a_mob_folded_into_another_counts_towards_the_map_summary_as_that_mob() {
 fn of_two_mobs_of_its_name_a_folded_mob_is_counted_as_the_one_whose_count_has_its_points() {
     let world = hill().folding(36, 31).with_mob(mob(36, "Stirge", 12, 210, 37)).changing(100_000_000, |m| m.spawns(36, 2));
 
-    let state = arrive_at(world, "Made-up Street", "Hill");
+    let state = common::on_title(world, "Made-up Street", "Hill");
 
     let stirges: Vec<(&str, u32)> =
         data(&state).mobs.iter().filter(|m| m.name == "Stirge").map(|m| (m.id.as_str(), m.spawn_count)).collect();
@@ -180,7 +167,7 @@ fn of_two_mobs_of_its_name_a_folded_mob_is_counted_as_the_one_whose_count_has_it
 fn a_town_has_no_mobs_and_no_map_summary_which_is_not_an_error() {
     let mut minerva = Minerva::new(FakeSource::osms());
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     let data = data(&state);
     assert_eq!(data.summary, None);
@@ -215,7 +202,7 @@ fn a_file_set_whose_mobs_are_not_as_expected_is_a_format_change_with_no_map_show
     for (how, files) in altered {
         let mut minerva = Minerva::new(FakeSource::answering_osms(vec![common::fresh_files(files)]));
 
-        let state = arrive(&mut minerva, KERNING, 0);
+        let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
         assert_eq!(state.recognition, Recognition::FormatChanged, "{how}");
         assert_eq!(state.map, None, "{how}");

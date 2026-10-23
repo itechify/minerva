@@ -8,10 +8,9 @@ mod common;
 
 use common::items::{etc, item_world};
 use common::osms::{self, map};
-use common::{FakeSource, ItemSetAnswer, OsmsAnswer, fresh, fresh_files};
-use minerva_core::osms::OsmsFiles;
+use common::{FakeSource, ItemSetAnswer, OsmsAnswer, fresh, osms_unreachable, osms_changed_format};
 use minerva_core::osms_items::ItemFiles;
-use minerva_core::{Action, Minerva, PanelState, Refresh, SourceError};
+use minerva_core::{Action, Minerva, PanelState, Refresh};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::task::Poll;
@@ -19,21 +18,8 @@ use std::task::Poll;
 /// When the launch was: 2026-10-21 16:00 UTC, in ms since the Unix epoch.
 const NOW: u64 = 1_792_598_400_000;
 
-fn unreachable() -> OsmsAnswer {
-    Poll::Ready(Err(SourceError::Unreachable("offline".into())))
-}
-
-/// A set that doesn't read.
-fn changed_format() -> OsmsAnswer {
-    fresh_files(OsmsFiles { maps: "<html>".into(), ..osms::game().files() })
-}
-
 fn items() -> ItemSetAnswer {
     Poll::Ready(Ok(item_world(vec![etc(4_000_000, "Blue Snail Shell")]).files()))
-}
-
-fn items_unreachable() -> ItemSetAnswer {
-    Poll::Ready(Err(SourceError::Unreachable("offline".into())))
 }
 
 fn items_changed_format() -> ItemSetAnswer {
@@ -128,11 +114,11 @@ fn refresh_is_under_way_until_both_arrive_and_pressing_it_again_starts_nothing_n
 #[test]
 fn refresh_says_what_kept_the_data_held() {
     let cases = [
-        ("set unreachable", unreachable(), items(), Refresh::Unreachable),
-        ("item files unreachable", fresh(osms::game()), items_unreachable(), Refresh::Unreachable),
-        ("set changed format", changed_format(), items(), Refresh::NeedsUpdate),
+        ("set unreachable", osms_unreachable(), items(), Refresh::Unreachable),
+        ("item files unreachable", fresh(osms::game()), common::items_unreachable(), Refresh::Unreachable),
+        ("set changed format", osms_changed_format(), items(), Refresh::NeedsUpdate),
         ("item files changed format", fresh(osms::game()), items_changed_format(), Refresh::NeedsUpdate),
-        ("both", changed_format(), items_unreachable(), Refresh::NeedsUpdate),
+        ("both", osms_changed_format(), common::items_unreachable(), Refresh::NeedsUpdate),
     ];
     for (how, set, item_set, said) in cases {
         let (mut minerva, _) = started(vec![fresh(osms::game()), set], vec![items(), item_set]);

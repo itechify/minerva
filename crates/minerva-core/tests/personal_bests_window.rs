@@ -16,19 +16,13 @@
 mod common;
 
 use common::player::Player;
-use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, osms, sharing_a_title, tracking, tracking_with};
+use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, osms, sharing_a_title, tracking, tracking_with, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, KERNING_SAMPLE, S, MIN, GAME};
 use minerva_core::{
-    Action, BESTS_VERSION, CharacterBests, ClientOffset, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, LevelRange, MapBests,
+    Action, BESTS_VERSION, CharacterBests, ClientOffset, Minerva, Foreground, GameWindow, LevelRange, MapBests,
     PanelControl, PanelSizes, PanelState, PersonalBestsMap, PersonalBestsVisit,
     PersonalBestsWindow, Request, SavedBests, ScreenRect, Settings, Size, VisitBest, meowdb,
 };
 
-const S: u64 = 1000;
-const MIN: u64 = 60 * S;
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const CONSTRUCTION_SITE: &str = "victoria-road__construction-site-north-of-kerning-city--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
 const ROCKY_ROAD: &str = "victoria-road__rocky-road-i--title-region";
 
 /// The player presses the Grind Tracker's star: the Personal Bests window then.
@@ -111,7 +105,7 @@ const CONSTRUCTION_SITE_LEVELS: LevelRange = LevelRange { lowest: 4, highest: 19
 #[test]
 fn with_no_best_anywhere_there_is_no_button_and_the_window_doesnt_open() {
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     // 4 minutes: not a best yet.
     let four = player.hunt(4 * MIN, 20);
     assert!(!button(&four));
@@ -125,7 +119,7 @@ fn with_no_best_anywhere_there_is_no_button_and_the_window_doesnt_open() {
 #[test]
 fn a_first_visits_best_is_in_the_window_with_the_maps_names_levels_and_share_marked_here() {
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     // 7,200 EXP/h, the best set 5 minutes in.
     let five = player.hunt(5 * MIN, 20);
     let set = player.wall_clock();
@@ -162,9 +156,9 @@ fn a_first_visits_best_is_in_the_window_with_the_maps_names_levels_and_share_mar
 #[test]
 fn maps_are_highest_first_and_only_the_one_the_player_is_on_is_marked_here() {
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(6 * MIN, 30);
 
     let window = toggle(&mut player);
@@ -181,12 +175,12 @@ fn maps_are_highest_first_and_only_the_one_the_player_is_on_is_marked_here() {
 fn open_it_follows_the_bests_and_the_player_as_they_hunt() {
     // Open on Sunset Sky's first best.
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
     assert_eq!(rows(&toggle(&mut player)), [(SUNSET_SKY_ID, 7200, true)]);
 
     // Off to the Construction Site, where a best comes without opening it again.
-    let arrived = player.arrive(CONSTRUCTION_SITE);
+    let arrived = player.arrive(CONSTRUCTION_SAMPLE);
     assert_eq!(rows(&arrived.personal_bests), [(SUNSET_SKY_ID, 7200, false)]);
     let hunted = player.hunt(6 * MIN, 30);
     assert_eq!(rows(&hunted.personal_bests), [(CONSTRUCTION_SITE_ID, 10_800, true), (SUNSET_SKY_ID, 7200, false)]);
@@ -200,7 +194,7 @@ fn a_best_on_a_map_the_player_has_not_been_on_has_its_names_region_levels_and_sh
     let mut minerva = tracking_with(FakeSource::with_world(world));
     minerva.restore_bests(bests_of(&[(HENESYS_HUNTING_GROUND_I_ID, 7661), (MAPLE_HILL_ID, 2857)]));
     let mut player = Player::clocked(minerva);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
 
     let window = toggle(&mut player);
     assert_eq!(
@@ -252,11 +246,11 @@ fn a_best_on_a_map_the_player_has_not_been_on_has_its_names_region_levels_and_sh
 fn the_window_has_this_visits_best_as_the_best_row_does() {
     // Sunset Sky at 7,200 EXP/h, then 2 minutes on the Construction Site, and back.
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(2 * MIN, 30);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
 
     // 10,800 EXP/h beats it: both show this Visit's.
     let beaten = player.hunt(5 * MIN, 30);
@@ -271,7 +265,7 @@ fn the_window_has_this_visits_best_as_the_best_row_does() {
 fn while_candidates_wait_for_a_choice_no_map_is_marked_here() {
     // A first Visit, choosing the Construction Site past Sunset Sky: 3,600 EXP/h there.
     let mut player = Player::clocked(tracking_with(sharing_a_title()));
-    player.arrive(KERNING);
+    player.arrive(KERNING_SAMPLE);
     player.hunt(6 * MIN, 10);
     player.choose_next();
     player.choose_next();
@@ -281,7 +275,7 @@ fn while_candidates_wait_for_a_choice_no_map_is_marked_here() {
     // the Construction Site, but the player may be on Sunset Sky.
     player.arrive(ROCKY_ROAD);
     player.hunt(MIN, 10);
-    let back = player.arrive(KERNING);
+    let back = player.arrive(KERNING_SAMPLE);
     assert_eq!(back.candidates.map(|c| c.chosen), Some(false));
     assert_eq!(rows(&back.personal_bests), [(CONSTRUCTION_SITE_ID, 3600, false)]);
 }
@@ -292,7 +286,7 @@ fn a_best_on_a_map_not_in_the_map_list_is_kept_and_goes_by_its_id() {
     let mut minerva = tracking();
     minerva.restore_bests(bests_of(&[(gone, 5000)]));
     let mut player = Player::clocked(minerva);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
 
     let window = toggle(&mut player);
     assert_eq!(
@@ -338,7 +332,7 @@ fn a_characters_best_of_all_maps_is_starred_and_each_map_in_the_list_links_to_it
     let mut minerva = tracking();
     minerva.restore_bests(bests);
     let mut player = Player::clocked(minerva);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     let window = toggle(&mut player);
 
     // Egbert's best of all maps has the star; a map not in the list has no Map Leaderboard.
@@ -363,11 +357,11 @@ fn a_characters_best_of_all_maps_is_starred_and_each_map_in_the_list_links_to_it
 fn removing_the_last_best_closes_the_window_and_the_button_goes() {
     // Sunset Sky's only best, 7,200 EXP/h, then back on it with the window open.
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(MIN, 30);
-    let back = player.arrive(SUNSET);
+    let back = player.arrive(SUNSET_SAMPLE);
     assert!(button(&back));
     assert!(toggle(&mut player).open);
 
@@ -380,7 +374,7 @@ fn removing_the_last_best_closes_the_window_and_the_button_goes() {
 #[test]
 fn without_the_wall_clock_its_bests_have_no_date() {
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
 
     let window = toggle(&mut player);
@@ -390,7 +384,7 @@ fn without_the_wall_clock_its_bests_have_no_date() {
 #[test]
 fn pressing_the_star_again_closes_it_and_closed_it_holds_no_rows() {
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
     assert!(toggle(&mut player).open);
 
@@ -406,7 +400,7 @@ fn pressing_the_star_again_closes_it_and_closed_it_holds_no_rows() {
 #[test]
 fn clicking_a_maps_name_opens_its_meowdb_page() {
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
     assert_eq!(player.minerva.open_bests_map_page(SUNSET_SKY_ID), None, "closed, it lists none");
     toggle(&mut player);
@@ -419,7 +413,7 @@ fn clicking_a_maps_name_opens_its_meowdb_page() {
 #[test]
 fn the_shell_gets_the_window_and_the_button_as_they_render_them() {
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     let state = serde_json::to_value(player.hunt(6 * MIN, 20)).unwrap();
     assert_eq!(state["grindTracker"]["personalBests"], true);
 
@@ -454,17 +448,17 @@ fn each_row_holds_its_maps_visit_history_highest_first_this_visits_best_marked()
     // Sunset Sky at 7,200 EXP/h, then at 3,600, each Visit ended by stepping onto the
     // Construction Site; then a third Visit, under way, at 10,800.
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(5 * MIN, 20);
     let first = player.wall_clock();
     player.hunt(MIN, 20);
-    player.arrive(CONSTRUCTION_SITE);
-    player.arrive(SUNSET);
+    player.arrive(CONSTRUCTION_SAMPLE);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(5 * MIN, 10);
     let second = player.wall_clock();
     player.hunt(MIN, 10);
-    player.arrive(CONSTRUCTION_SITE);
-    player.arrive(SUNSET);
+    player.arrive(CONSTRUCTION_SAMPLE);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(5 * MIN, 30);
     let third = player.wall_clock();
 
@@ -489,7 +483,7 @@ fn this_visits_best_is_listed_only_once_it_makes_its_maps_10() {
     let mut minerva = tracking();
     minerva.restore_bests(histories_of(&[(SUNSET_SKY_ID, earlier.clone())]));
     let mut player = Player::clocked(minerva);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
 
     // 7,200 EXP/h doesn't make them: the window lists the ten.
     player.hunt(6 * MIN, 20);
@@ -512,7 +506,7 @@ fn removing_a_visit_takes_exactly_it_on_any_map_and_the_maps_row_follows() {
     minerva
         .restore_bests(histories_of(&[(SUNSET_SKY_ID, vec![10_800, 7200, 3600]), (CONSTRUCTION_SITE_ID, vec![5000])]));
     let mut player = Player::clocked(minerva);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     toggle(&mut player);
 
     // Sunset Sky's middle Visit: its row stays at its best.
@@ -535,7 +529,7 @@ fn removing_the_best_on_the_map_the_player_is_on_moves_the_best_row_at_once() {
     let mut minerva = tracking();
     minerva.restore_bests(histories_of(&[(SUNSET_SKY_ID, vec![10_800, 7200])]));
     let mut player = Player::clocked(minerva);
-    let arrived = player.arrive(SUNSET);
+    let arrived = player.arrive(SUNSET_SAMPLE);
     assert_eq!(arrived.exp_tracking.personal_best, Some(10_800));
     toggle(&mut player);
 
@@ -551,7 +545,7 @@ fn this_visits_best_is_removed_at_once_and_only_the_play_since_counts_again() {
     let mut minerva = tracking();
     minerva.restore_bests(histories_of(&[(SUNSET_SKY_ID, vec![3600])]));
     let mut player = Player::saved_by_the_shell(minerva);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
     let window = toggle(&mut player);
     let this_visit = row(&window, SUNSET_SKY_ID).visits[0].clone();
@@ -578,7 +572,7 @@ fn a_visit_no_longer_listed_cannot_be_removed() {
     let mut minerva = tracking();
     minerva.restore_bests(histories_of(&[(SUNSET_SKY_ID, vec![3600])]));
     let mut player = Player::saved_by_the_shell(minerva);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
     let window = toggle(&mut player);
     let saves = player.saves();
@@ -593,7 +587,7 @@ fn removing_the_last_visit_anywhere_closes_the_window_and_the_button_goes() {
     let mut minerva = tracking();
     minerva.restore_bests(bests_of(&[(SUNSET_SKY_ID, 7200)]));
     let mut player = Player::clocked(minerva);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     assert!(toggle(&mut player).open);
 
     let removed = player.remove_visit(SUNSET_SKY_ID, saved_best(7200));
@@ -605,8 +599,6 @@ fn removing_the_last_visit_anywhere_closes_the_window_and_the_button_goes() {
 
 // Where it goes.
 
-const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
-const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
 const WINDOW: Size = Size { width: 920, height: 600 };
 
 fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
@@ -615,16 +607,7 @@ fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
 
 /// The game window with this client area, framed as measured, on `SCREEN`.
 fn game(client: ScreenRect) -> Option<GameWindow> {
-    let frame = rect(client.x - 1, client.y - 31, client.width + 2, client.height + 32);
-    Some(GameWindow { client, frame, screens: vec![SCREEN] })
-}
-
-/// Settings with setup finished.
-fn tracking_settings() -> Settings {
-    Settings {
-        setup_done: true,
-        ..Settings::default()
-    }
+    Some(common::window_on_wide_screen(client))
 }
 
 /// A core restored from `settings` with a best on Sunset Sky, the game window found and
@@ -662,20 +645,19 @@ fn placed(state: &PanelState) -> Option<ScreenRect> {
 
 /// What the shell does on restart: save the settings as JSON, load them into a new core.
 fn restart(minerva: &Minerva) -> Minerva {
-    let json = serde_json::to_string(&minerva.settings()).unwrap();
-    started(serde_json::from_str(&json).unwrap())
+    started(common::settings_after_restart(minerva))
 }
 
 #[test]
 fn it_opens_centred_over_the_game() {
-    let minerva = opened(tracking_settings());
+    let minerva = opened(common::set_up());
 
     assert_eq!(placed(minerva.panel_state()), Some(rect(1312, 410, 920, 600)));
 }
 
 #[test]
 fn as_its_rows_grow_it_stays_centred() {
-    let mut minerva = opened(tracking_settings());
+    let mut minerva = opened(common::set_up());
 
     let state = minerva.set_personal_bests_size(Size { width: 920, height: 200 });
 
@@ -686,7 +668,7 @@ fn as_its_rows_grow_it_stays_centred() {
 fn over_a_game_narrower_than_it_it_is_as_wide_as_the_game() {
     // A 900x700 client area, its Minimap Title found at (882,150) 620x48.
     let narrow = rect(812, 110, 900, 700);
-    let mut minerva = started_on(narrow, Settings { setup_done: true, ..Settings::default() });
+    let mut minerva = started_on(narrow, common::set_up());
 
     minerva.press(PanelControl::TogglePersonalBests);
 
@@ -696,7 +678,7 @@ fn over_a_game_narrower_than_it_it_is_as_wide_as_the_game() {
 
 #[test]
 fn dragged_it_keeps_its_spot_relative_to_the_game_window_after_a_restart_too() {
-    let mut minerva = opened(tracking_settings());
+    let mut minerva = opened(common::set_up());
 
     let state = minerva.act(Action::PersonalBestsMoved { x: 1000, y: 300 });
     assert_eq!(placed(state), Some(rect(1000, 300, 920, 600)));
@@ -713,7 +695,7 @@ fn dragged_it_keeps_its_spot_relative_to_the_game_window_after_a_restart_too() {
 
 #[test]
 fn dragged_back_to_the_middle_it_stays_centred_again() {
-    let mut minerva = opened(tracking_settings());
+    let mut minerva = opened(common::set_up());
     minerva.act(Action::PersonalBestsMoved { x: 1000, y: 300 });
 
     // Let go within an eighth of its width (115 px) of the middle (1312,410).
@@ -724,9 +706,9 @@ fn dragged_back_to_the_middle_it_stays_centred_again() {
 
 #[test]
 fn dragged_onto_a_captured_region_it_moves_off_it() {
-    let mut minerva = opened(tracking_settings());
+    let mut minerva = opened(common::set_up());
     let area = rect(1817, 1254, 384, 32);
-    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place: Some(ExpBarPlace { area, remembered: false }) });
+    common::found_exp_figures(&mut minerva, area);
 
     // Over the EXP figures found in the Status Bar (1817..2201, 1254..1286): our windows
     // show in the capture, so it moves the shortest way off them, here above.
@@ -737,7 +719,7 @@ fn dragged_onto_a_captured_region_it_moves_off_it() {
 
 #[test]
 fn it_hides_without_the_game_while_setup_is_open_and_while_another_app_is_in_front() {
-    let mut minerva = opened(tracking_settings());
+    let mut minerva = opened(common::set_up());
     let shown = placed(minerva.panel_state());
     assert!(shown.is_some());
 
@@ -756,7 +738,7 @@ fn it_hides_without_the_game_while_setup_is_open_and_while_another_app_is_in_fro
 
 #[test]
 fn it_shows_with_exp_tracking_off() {
-    let mut minerva = opened(tracking_settings());
+    let mut minerva = opened(common::set_up());
 
     let state = minerva.act(Action::SetGrindTracker { on: false });
 
@@ -766,7 +748,7 @@ fn it_shows_with_exp_tracking_off() {
 
 #[test]
 fn each_launch_starts_with_it_closed() {
-    let minerva = opened(tracking_settings());
+    let minerva = opened(common::set_up());
 
     let restarted = restart(&minerva);
 

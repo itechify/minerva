@@ -111,7 +111,7 @@ fn a_rebound_hotkey_is_saved_and_the_others_are_kept() {
     let saved = minerva.settings().hotkeys;
     assert_eq!(saved, Hotkeys { item_lookup: "alt+f5".into(), ..Hotkeys::default() });
     let mut later = Minerva::new(FakeSource::osms());
-    later.restore(serde_json::from_str(&serde_json::to_string(&minerva.settings()).unwrap()).unwrap());
+    later.restore(common::settings_after_restart(&minerva));
     assert_eq!(later.panel_state().hotkeys.item_lookup, "alt+f5", "and kept at the next launch");
 }
 
@@ -338,7 +338,7 @@ fn a_hotkey_turned_off_stays_off_at_the_next_launch_and_can_be_turned_on_again()
     minerva.rebind_key(press("", "Delete"));
 
     let mut later = Minerva::new(FakeSource::osms());
-    later.restore(serde_json::from_str(&serde_json::to_string(&minerva.settings()).unwrap()).unwrap());
+    later.restore(common::settings_after_restart(&minerva));
     assert_eq!(later.panel_state().hotkeys.item_lookup, "", "still off");
     assert!(later.panel_state().hotkeys.all().iter().all(|hotkey| !hotkey.is_empty()));
 

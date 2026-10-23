@@ -8,16 +8,12 @@ use common::player::{Player, WALL_AT_START};
 use common::{
     CONSTRUCTION_SITE_ID, NORTHERN_TOP_ID, SUNSET_SKY_ID, sharing_a_title, three_sharing_a_title, tracking,
     tracking_with,
+    SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, KERNING_SAMPLE, DAY, S, MIN,
+    best_row,
+    shown_id,
 };
-use minerva_core::{BESTS_VERSION, Minerva, ExpBar, ExpBarReading, PanelControl, PanelState, SavedBests, VisitBest};
+use minerva_core::{BESTS_VERSION, Minerva, ExpBar, ExpBarReading, PanelControl, SavedBests, VisitBest};
 
-const S: u64 = 1000;
-const MIN: u64 = 60 * S;
-const DAY: u64 = 24 * 60 * MIN;
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const CONSTRUCTION_SITE: &str = "victoria-road__construction-site-north-of-kerning-city--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
 const ROCKY_ROAD: &str = "victoria-road__rocky-road-i--title-region";
 
 /// The bests a launch hands out, as the shell would save them (JSON).
@@ -40,11 +36,6 @@ fn relaunch(bests: SavedBests, wall_at_start: u64) -> Player {
     Player::clocked_at(minerva, wall_at_start)
 }
 
-/// The Best row's EXP/h: the map's Personal Best from earlier Visits.
-fn best_row(state: &PanelState) -> Option<u64> {
-    state.exp_tracking.personal_best
-}
-
 /// `map`'s Visit bests in what `minerva` hands out, highest first.
 fn saved(minerva: &Minerva, map: &str) -> Vec<VisitBest> {
     handed_out(minerva).unassigned.into_iter().find(|m| m.id == map).map_or_else(Vec::new, |m| m.visits)
@@ -60,13 +51,13 @@ fn bests_handed_out_by_one_launch_show_the_same_best_row_and_star_in_the_next() 
     // A first Visit to Sunset Sky at 7,200 EXP/h, its best set 5 minutes in; 2 minutes on
     // the Construction Site, and back.
     let mut first = first_launch();
-    first.arrive(SUNSET);
+    first.arrive(SUNSET_SAMPLE);
     first.hunt(5 * MIN, 20);
     let set = first.wall_clock();
     first.hunt(MIN, 20);
-    first.arrive(CONSTRUCTION_SITE);
+    first.arrive(CONSTRUCTION_SAMPLE);
     first.hunt(2 * MIN, 30);
-    let back = first.arrive(SUNSET);
+    let back = first.arrive(SUNSET_SAMPLE);
     assert_eq!(best_row(&back), Some(7200));
     let saved_then = handed_out(&first.minerva);
     // 5 minutes at 10,800 EXP/h: a new best on it.
@@ -75,7 +66,7 @@ fn bests_handed_out_by_one_launch_show_the_same_best_row_and_star_in_the_next() 
 
     // A day later, the next launch shows the same, and keeps when the best was set.
     let mut next = relaunch(saved_then, WALL_AT_START + DAY);
-    assert_eq!(best_row(&next.arrive(SUNSET)), best_row(&back));
+    assert_eq!(best_row(&next.arrive(SUNSET_SAMPLE)), best_row(&back));
     let next_five = next.hunt(5 * MIN, 30);
     assert_eq!((best_row(&next_five), next_five.exp_tracking.new_best), (Some(10_800), true));
     assert_eq!(saved(&next.minerva, SUNSET_SKY_ID)[1], best(7200, set));
@@ -86,21 +77,21 @@ fn a_visit_cut_short_by_closing_minerva_keeps_its_best() {
     // A first Visit to Sunset Sky at 7,200 EXP/h, its best set 5 minutes in, closed a
     // minute later.
     let mut first = first_launch();
-    first.arrive(SUNSET);
+    first.arrive(SUNSET_SAMPLE);
     first.hunt(5 * MIN, 20);
     let set = first.wall_clock();
     first.hunt(MIN, 20);
 
     // Closing ended the Visit: the next launch has its best as the earlier Visits'.
     let mut next = relaunch(handed_out(&first.minerva), WALL_AT_START + DAY);
-    assert_eq!(best_row(&next.arrive(SUNSET)), Some(7200));
+    assert_eq!(best_row(&next.arrive(SUNSET_SAMPLE)), Some(7200));
     assert_eq!(saved(&next.minerva, SUNSET_SKY_ID), [best(7200, set)]);
 
     // 10,800 EXP/h beats it, and that Visit is closed in turn: it is the best after.
     next.hunt(5 * MIN, 30);
     let beaten = next.wall_clock();
     let mut third = relaunch(handed_out(&next.minerva), WALL_AT_START + 2 * DAY);
-    assert_eq!(best_row(&third.arrive(SUNSET)), Some(10_800));
+    assert_eq!(best_row(&third.arrive(SUNSET_SAMPLE)), Some(10_800));
     assert_eq!(saved(&third.minerva, SUNSET_SKY_ID), [best(10_800, beaten), best(7200, set)]);
 }
 
@@ -108,7 +99,7 @@ fn a_visit_cut_short_by_closing_minerva_keeps_its_best() {
 /// launch hands out.
 fn a_best_of_7200_on_sunset_sky() -> SavedBests {
     let mut first = first_launch();
-    first.arrive(SUNSET);
+    first.arrive(SUNSET_SAMPLE);
     first.hunt(6 * MIN, 20);
     handed_out(&first.minerva)
 }
@@ -118,7 +109,7 @@ fn bests_saved_in_another_shape_are_left_and_the_app_starts_with_none() {
     let other_shape = SavedBests { version: BESTS_VERSION + 1, ..a_best_of_7200_on_sunset_sky() };
 
     let mut next = relaunch(other_shape, WALL_AT_START + DAY);
-    assert_eq!(best_row(&next.arrive(SUNSET)), None);
+    assert_eq!(best_row(&next.arrive(SUNSET_SAMPLE)), None);
     // 5 minutes at 3,600 EXP/h: a first Visit's best.
     next.hunt(5 * MIN, 10);
     assert_eq!(saved(&next.minerva, SUNSET_SKY_ID), [best(3600, next.wall_clock())]);
@@ -143,13 +134,13 @@ fn bests_of_no_exp_in_a_hand_edited_file_are_left_out() {
     assert_eq!(saved_rates(&handed, CONSTRUCTION_SITE_ID), [7200]);
 
     // Sunset Sky has no best: a first Visit, with its own best from 5 minutes there.
-    assert_eq!(best_row(&next.arrive(SUNSET)), None);
+    assert_eq!(best_row(&next.arrive(SUNSET_SAMPLE)), None);
     next.hunt(5 * MIN, 10);
     assert_eq!(saved(&next.minerva, SUNSET_SKY_ID), [best(3600, next.wall_clock())]);
 
     // The Construction Site's best is the 7,200; removing it leaves the map no history,
     // and this Visit's 3,600 on the row and to save.
-    assert_eq!(best_row(&next.arrive(CONSTRUCTION_SITE)), Some(7200));
+    assert_eq!(best_row(&next.arrive(CONSTRUCTION_SAMPLE)), Some(7200));
     next.hunt(5 * MIN, 10);
     let set = next.wall_clock();
     assert_eq!(best_row(&next.press(PanelControl::RemoveBest)), Some(3600));
@@ -170,9 +161,9 @@ fn each_map_keeps_only_its_10_best_visits() {
     let mut first = Player::saved_by_the_shell(tracking());
     for (i, gain) in [15, 11, 10, 20, 18, 12, 19, 13, 17, 14, 16].into_iter().enumerate() {
         if i > 0 {
-            first.arrive(CONSTRUCTION_SITE);
+            first.arrive(CONSTRUCTION_SAMPLE);
         }
-        first.arrive(SUNSET);
+        first.arrive(SUNSET_SAMPLE);
         first.hunt(5 * MIN, gain);
     }
 
@@ -182,12 +173,12 @@ fn each_map_keeps_only_its_10_best_visits() {
 
     // A twelfth Visit at 3,240 EXP/h doesn't make them either, ended or not, so the
     // shell has nothing to save.
-    first.arrive(CONSTRUCTION_SITE);
-    first.arrive(SUNSET);
+    first.arrive(CONSTRUCTION_SAMPLE);
+    first.arrive(SUNSET_SAMPLE);
     let saves = first.saves();
     first.hunt(5 * MIN, 9);
     assert_eq!(saved_rates(&handed_out(&first.minerva), SUNSET_SKY_ID), kept);
-    first.arrive(CONSTRUCTION_SITE);
+    first.arrive(CONSTRUCTION_SAMPLE);
     assert_eq!(saved_rates(&handed_out(&first.minerva), SUNSET_SKY_ID), kept);
     assert_eq!(first.saves(), saves);
 }
@@ -202,7 +193,7 @@ fn the_next_launch_shows_the_best_row_on_arriving_before_the_sessions_first_gain
         minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place: None });
     }
 
-    common::arrive(&mut minerva, SUNSET, 20 * S);
+    common::arrive(&mut minerva, SUNSET_SAMPLE, 20 * S);
 
     // What the Grind Tracker gets: the Best row while the Session waits for EXP.
     let state = serde_json::to_value(minerva.panel_state()).unwrap();
@@ -213,7 +204,7 @@ fn the_next_launch_shows_the_best_row_on_arriving_before_the_sessions_first_gain
 #[test]
 fn with_no_bests_saved_the_app_starts_with_none() {
     let mut next = relaunch(SavedBests::default(), WALL_AT_START + DAY);
-    assert_eq!(best_row(&next.arrive(SUNSET)), None);
+    assert_eq!(best_row(&next.arrive(SUNSET_SAMPLE)), None);
 }
 
 #[test]
@@ -221,7 +212,7 @@ fn the_shell_saves_the_bests_whenever_they_change_and_only_then() {
     let mut player = Player::saved_by_the_shell(tracking_with(sharing_a_title()));
 
     // 10,800 EXP/h while the Candidates wait for a choice: no best, nothing to save.
-    player.arrive(KERNING);
+    player.arrive(KERNING_SAMPLE);
     player.hunt(6 * MIN, 30);
     assert_eq!(player.saves(), 0);
 
@@ -250,7 +241,7 @@ fn the_shell_saves_the_bests_whenever_they_change_and_only_then() {
 
     // Back, choosing the Construction Site past Sunset Sky: a slower Visit's best joins
     // its others.
-    player.arrive(KERNING);
+    player.arrive(KERNING_SAMPLE);
     player.choose_next();
     player.choose_next();
     player.hunt(6 * MIN, 20);
@@ -270,10 +261,6 @@ fn the_shell_saves_the_bests_whenever_they_change_and_only_then() {
     assert_eq!((player.saves(), site_rates(&player)), (joined, vec![14_400, 7200]));
 }
 
-fn shown_map(state: &PanelState) -> Option<&str> {
-    state.map.as_ref().map(|m| m.id.as_str())
-}
-
 #[test]
 fn a_candidate_chosen_again_with_no_rate_removes_nothing_and_leaves_the_visits_best_where_it_counted() {
     let mut player = Player::saved_by_the_shell(tracking_with(sharing_a_title()));
@@ -282,7 +269,7 @@ fn a_candidate_chosen_again_with_no_rate_removes_nothing_and_leaves_the_visits_b
 
     // 10,800 EXP/h with the Candidates waiting, then the hotkey shows Sunset Sky, which
     // takes it as this Visit's best.
-    player.arrive(KERNING);
+    player.arrive(KERNING_SAMPLE);
     player.hunt(6 * MIN, 30);
     player.choose_next();
     // 3,600 EXP/h, and on to the Construction Site, which takes the Visit's best.
@@ -296,7 +283,7 @@ fn a_candidate_chosen_again_with_no_rate_removes_nothing_and_leaves_the_visits_b
     player.press(PanelControl::ResetSession);
     let saves = player.saves();
     let sunset = player.choose_next();
-    assert_eq!(shown_map(&sunset), Some(SUNSET_SKY_ID));
+    assert_eq!(shown_id(&sunset), Some(SUNSET_SKY_ID));
     assert_eq!(best_row(&sunset), None);
     assert_eq!((sunset_rates(&player), site_rates(&player)), (vec![], vec![3600]));
 
@@ -317,23 +304,23 @@ fn the_hotkey_passing_a_candidate_that_had_a_best_this_visit_leaves_the_visits_b
     let rates = |player: &Player, map| saved_rates(&player.minerva.bests(), map);
 
     // Three Candidates: the Northern Top shows first, waiting for a choice.
-    let arrived = player.arrive(KERNING);
-    assert_eq!(shown_map(&arrived), Some(NORTHERN_TOP_ID));
+    let arrived = player.arrive(KERNING_SAMPLE);
+    assert_eq!(shown_id(&arrived), Some(NORTHERN_TOP_ID));
     assert_eq!(arrived.candidates.as_ref().map(|c| (c.maps.len(), c.chosen)), Some((3, false)));
     assert!(arrived.data.solo_exp_ceiling().is_some());
 
     // 10,800 EXP/h, then the player chooses the Construction Site, and the hotkey goes on
     // to Sunset Sky, which takes the Visit's best: 10,800 there.
     player.hunt(6 * MIN, 30);
-    assert_eq!(shown_map(&player.choose_next()), Some(CONSTRUCTION_SITE_ID));
-    assert_eq!(shown_map(&player.choose_next()), Some(SUNSET_SKY_ID));
+    assert_eq!(shown_id(&player.choose_next()), Some(CONSTRUCTION_SITE_ID));
+    assert_eq!(shown_id(&player.choose_next()), Some(SUNSET_SKY_ID));
     assert_eq!((rates(&player, CONSTRUCTION_SITE_ID), rates(&player, SUNSET_SKY_ID)), (vec![], vec![10_800]));
 
     // After a reset, the hotkey goes past the Northern Top back to the Construction Site,
     // and 21,600 EXP/h for 6 minutes there: the Visit's best is the Construction Site's.
     player.press(PanelControl::ResetSession);
     player.choose_next();
-    assert_eq!(shown_map(&player.choose_next()), Some(CONSTRUCTION_SITE_ID));
+    assert_eq!(shown_id(&player.choose_next()), Some(CONSTRUCTION_SITE_ID));
     player.hunt(6 * MIN, 60);
     assert_eq!((rates(&player, CONSTRUCTION_SITE_ID), rates(&player, SUNSET_SKY_ID)), (vec![21_600], vec![]));
 
@@ -342,10 +329,10 @@ fn the_hotkey_passing_a_candidate_that_had_a_best_this_visit_leaves_the_visits_b
     player.press(PanelControl::ResetSession);
     let saves = player.saves();
     let sunset = player.choose_next();
-    assert_eq!(shown_map(&sunset), Some(SUNSET_SKY_ID));
+    assert_eq!(shown_id(&sunset), Some(SUNSET_SKY_ID));
     assert_eq!((rates(&player, CONSTRUCTION_SITE_ID), rates(&player, SUNSET_SKY_ID)), (vec![21_600], vec![]));
     let top = player.choose_next();
-    assert_eq!(shown_map(&top), Some(NORTHERN_TOP_ID));
+    assert_eq!(shown_id(&top), Some(NORTHERN_TOP_ID));
     assert_eq!(player.saves(), saves);
     assert_eq!((rates(&player, CONSTRUCTION_SITE_ID), rates(&player, SUNSET_SKY_ID)), (vec![21_600], vec![]));
 
@@ -362,7 +349,7 @@ fn removing_a_best_from_the_history_changes_the_bests_the_shell_saves() {
     let sunset_rates = |player: &Player| saved_rates(&player.minerva.bests(), SUNSET_SKY_ID);
 
     // A first Visit's best at 7,200 EXP/h.
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(5 * MIN, 20);
     let set = player.wall_clock();
     player.hunt(MIN, 20);
@@ -370,11 +357,11 @@ fn removing_a_best_from_the_history_changes_the_bests_the_shell_saves() {
 
     // A second Visit at 10,800 EXP/h, then back a third time: removing the 10,800 leaves
     // the 7,200, and the shell saves that.
-    player.arrive(CONSTRUCTION_SITE);
-    player.arrive(SUNSET);
+    player.arrive(CONSTRUCTION_SAMPLE);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 30);
-    player.arrive(CONSTRUCTION_SITE);
-    player.arrive(SUNSET);
+    player.arrive(CONSTRUCTION_SAMPLE);
+    player.arrive(SUNSET_SAMPLE);
     assert_eq!(sunset_rates(&player), [10_800, 7200]);
     let saves = player.saves();
     player.press(PanelControl::RemoveBest);
@@ -382,7 +369,7 @@ fn removing_a_best_from_the_history_changes_the_bests_the_shell_saves() {
 
     // The next launch has it gone: the 7,200 is the best, set when it was.
     let mut next = relaunch(handed_out(&player.minerva), WALL_AT_START + DAY);
-    assert_eq!(best_row(&next.arrive(SUNSET)), Some(7200));
+    assert_eq!(best_row(&next.arrive(SUNSET_SAMPLE)), Some(7200));
     assert_eq!(saved(&next.minerva, SUNSET_SKY_ID), [best(7200, set)]);
 
     // Removing the map's only best leaves it none to save.
@@ -397,11 +384,11 @@ fn a_visit_removed_in_the_personal_bests_window_is_gone_from_what_the_shell_save
     let mut player = Player::saved_by_the_shell(tracking());
     let mut set = Vec::new();
     for gain in [30, 20, 10] {
-        player.arrive(SUNSET);
+        player.arrive(SUNSET_SAMPLE);
         player.hunt(5 * MIN, gain);
         set.push(player.wall_clock());
         player.hunt(MIN, gain);
-        player.arrive(CONSTRUCTION_SITE);
+        player.arrive(CONSTRUCTION_SAMPLE);
     }
     assert_eq!(saved_rates(&player.minerva.bests(), SUNSET_SKY_ID), [10_800, 7200, 3600]);
 
@@ -420,7 +407,7 @@ fn removing_the_best_from_the_history_leaves_every_candidates_best_from_this_vis
     let mut player = Player::saved_by_the_shell(tracking_with(sharing_a_title()));
 
     // An earlier Visit's best on Sunset Sky: 72,000 EXP/h.
-    player.arrive(KERNING);
+    player.arrive(KERNING_SAMPLE);
     player.choose_next();
     player.hunt(5 * MIN, 200);
     let earlier_set = player.wall_clock();
@@ -430,7 +417,7 @@ fn removing_the_best_from_the_history_leaves_every_candidates_best_from_this_vis
 
     // Back, 36,000 EXP/h on Sunset Sky, then on the Construction Site with the hotkey,
     // and back on Sunset Sky: half its best.
-    player.arrive(KERNING);
+    player.arrive(KERNING_SAMPLE);
     player.choose_next();
     player.hunt(5 * MIN, 100);
     let sunset_set = player.wall_clock();

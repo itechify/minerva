@@ -7,7 +7,7 @@ mod common;
 
 use common::items::{ItemWorld, equip, etc, item_world, scroll};
 use common::osms;
-use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame};
+use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame, HOUR, S, MIN, percent};
 use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES};
 use minerva_core::{
     ListedPrice, ShopCapture, ShopHover, ShopList, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
@@ -15,10 +15,6 @@ use minerva_core::{
     CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
 };
-
-const S: u64 = 1000;
-const MIN: u64 = 60 * S;
-const HOUR: u64 = 60 * MIN;
 
 /// The wall clock at capture time 0: 11 Oct 2026, 12:00 UTC.
 const WALL_AT_START: u64 = 1_791_720_000_000;
@@ -37,13 +33,7 @@ fn about() -> ReportAbout {
 
 /// The game window, at the screen's origin.
 fn game() -> GameWindow {
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    GameWindow { client: screen, frame: screen, screens: vec![screen] }
-}
-
-/// The percentage the game shows for `exp` on a level of `total` EXP, to hundredths.
-fn percent(exp: u64, total: u64) -> u32 {
-    ((exp * 20_000 + total) / (2 * total)) as u32
+    common::window_at_origin(1920, 1200)
 }
 
 /// The core as the shell runs it: the settings and Personal Bests restored at launch, then
@@ -57,10 +47,7 @@ struct Shell {
 impl Shell {
     fn new(source: FakeSource) -> Self {
         let mut minerva = Minerva::new(source);
-        minerva.restore(Settings {
-            setup_done: true,
-            ..Settings::default()
-        });
+        minerva.restore(common::set_up());
         minerva.restore_bests(SavedBests::default());
         let mut shell = Shell { minerva, at: 0 };
         shell.step();

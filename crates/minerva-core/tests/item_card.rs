@@ -15,32 +15,19 @@
 
 mod common;
 
-use common::{FakeSource, ItemSetAnswer};
+use common::{FakeSource, ItemSetAnswer, GAME, SAVED_AT, DAY, overlaps, POINTER, NAME, found, requests};
 use common::items::{ItemWorld, cash, equip, etc, item_world, scroll, setup, use_item, weapon};
 use minerva_core::{
-    Action, ExpBarPlace, ExpBarReading, Minerva, Foreground, GameWindow, Hotkey, ItemCard, ItemHit, ItemCardChoice, ItemCardView, ItemLookup, ItemTooltip,
-    ItemTooltipReading, MarketEdit, MarketImport, MarketPrice, NameProblem, OurWindow, PanelSizes, PanelState, Request, ScreenPoint, ScreenRect, Settings, ShopPrice,
+    Action, Minerva, Foreground, Hotkey, ItemCard, ItemHit, ItemCardChoice, ItemCardView, ItemLookup, ItemTooltip,
+    ItemTooltipReading, MarketEdit, MarketImport, MarketPrice, NameProblem, OurWindow, PanelSizes, PanelState, Request, ScreenPoint, ScreenRect, ShopPrice,
     Recognition, Size, SourceError, meowdb,
 };
 use minerva_core::osms_items::ItemFiles;
 use std::sync::atomic::Ordering;
 use std::task::Poll;
 
-const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
-const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
-/// Where the pointer is when the player presses the hotkey.
-const POINTER: ScreenPoint = ScreenPoint { x: 1000, y: 580 };
-/// Where the name line of the Item Tooltip read is on screen.
-const NAME: ScreenRect = ScreenRect { x: 1000, y: 600, width: 200, height: 19 };
 /// The Item Card's size.
 const CARD: Size = Size { width: 300, height: 160 };
-
-fn settings() -> Settings {
-    Settings {
-        setup_done: true,
-        ..Settings::default()
-    }
-}
 
 /// Made-up item data: a few items of each kind.
 fn shop() -> ItemWorld {
@@ -54,14 +41,13 @@ fn shop() -> ItemWorld {
 /// A core over the game window, its windows' sizes known, with `source`'s item data in.
 fn started_with(source: FakeSource) -> Minerva {
     let mut minerva = Minerva::new(source);
-    minerva.restore(settings());
+    minerva.restore(common::set_up());
     minerva.set_panel_sizes(PanelSizes {
         expanded: Size { width: 340, height: 72 },
         collapsed: Size { width: 44, height: 44 },
     });
     minerva.set_item_card_size(CARD);
-    let frame = ScreenRect { x: GAME.x - 1, y: GAME.y - 31, width: GAME.width + 2, height: GAME.height + 32 };
-    minerva.on_game_window(Some(GameWindow { client: GAME, frame, screens: vec![SCREEN] }));
+    minerva.on_game_window(Some(common::window_on_wide_screen(GAME)));
     common::found_title(&mut minerva, common::title_on(GAME), 0);
     minerva.tick(0);
     minerva
@@ -70,14 +56,6 @@ fn started_with(source: FakeSource) -> Minerva {
 /// The made-up item data in.
 fn started() -> Minerva {
     started_with(FakeSource::osms_offline().with_items(shop()))
-}
-
-fn found(name: &str, at_ms: u64) -> Option<ItemTooltipReading> {
-    Some(ItemTooltipReading {
-        tooltip: ItemTooltip::Found { area: NAME, name: Some(name.into()) },
-        pointer: POINTER,
-        at_ms,
-    })
 }
 
 /// The Item Tooltip by the pointer read as `name`, after the player pressed Ctrl+Shift+I.
@@ -147,8 +125,7 @@ fn by_the_game_windows_bottom_edge_the_card_goes_above_the_pointer() {
 #[test]
 fn the_card_goes_to_the_pointers_other_side_rather_than_cover_the_exp_figures() {
     let mut minerva = started();
-    let place = Some(ExpBarPlace { area: EXP_FIGURES, remembered: false });
-    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place });
+    common::found_exp_figures(&mut minerva, EXP_FIGURES);
     assert_eq!(minerva.panel_state().exp_figures.and_then(|figures| figures.last_found), Some(EXP_FIGURES));
 
     let state = press_at(&mut minerva, ScreenPoint { x: 1800, y: 1100 }, "Bronze Ore");
@@ -580,10 +557,6 @@ fn the_picked_items_card_shows_the_picture_it_was_listed_with() {
     assert_eq!(card(&state).expect("a card").icon.as_deref(), Some("picture:current/images/items/01032001.png"));
 }
 
-/// When a saved copy was made: 2026-10-01 00:00 UTC, in ms since the Unix epoch.
-const SAVED_AT: u64 = 1_790_812_800_000;
-const DAY_MS: u64 = 24 * 60 * 60 * 1000;
-
 /// Item files that don't read.
 fn changed_format() -> ItemSetAnswer {
     Poll::Ready(Ok(ItemFiles { items: "<html>".into(), ..shop().files() }))
@@ -600,10 +573,9 @@ fn bronze_ore_at(mesos: u64) -> ItemWorld {
 fn started_at(source: FakeSource, now_unix_ms: u64) -> Minerva {
     let mut minerva = Minerva::new(source);
     minerva.on_wall_clock(now_unix_ms);
-    minerva.restore(settings());
+    minerva.restore(common::set_up());
     minerva.set_item_card_size(CARD);
-    let frame = ScreenRect { x: GAME.x - 1, y: GAME.y - 31, width: GAME.width + 2, height: GAME.height + 32 };
-    minerva.on_game_window(Some(GameWindow { client: GAME, frame, screens: vec![SCREEN] }));
+    minerva.on_game_window(Some(common::window_on_wide_screen(GAME)));
     common::found_title(&mut minerva, common::title_on(GAME), 0);
     minerva.tick(0);
     minerva
@@ -659,7 +631,7 @@ fn item_files_that_dont_read_leave_the_map_set_as_it_is() {
 fn item_files_saved_under_a_day_ago_are_used_at_launch_without_fetching_them() {
     let source = FakeSource::osms_offline().with_items(bronze_ore_at(500)).with_saved_items(bronze_ore_at(450), SAVED_AT);
     let asked = source.item_set_requests.clone();
-    let mut minerva = started_at(source, SAVED_AT + DAY_MS - 60_000);
+    let mut minerva = started_at(source, SAVED_AT + DAY - 60_000);
 
     assert_eq!(bronze_ore_price(&mut minerva, 1_000), Some(ShopPrice::Sells { mesos: 450 }));
     assert_eq!(asked.load(Ordering::SeqCst), 0);
@@ -668,7 +640,7 @@ fn item_files_saved_under_a_day_ago_are_used_at_launch_without_fetching_them() {
 #[test]
 fn item_files_saved_over_a_day_ago_are_fetched_afresh_at_launch() {
     let source = FakeSource::osms_offline().with_items(bronze_ore_at(500)).with_saved_items(bronze_ore_at(450), SAVED_AT);
-    let mut minerva = started_at(source, SAVED_AT + DAY_MS + 60_000);
+    let mut minerva = started_at(source, SAVED_AT + DAY + 60_000);
 
     assert_eq!(bronze_ore_price(&mut minerva, 1_000), Some(ShopPrice::Sells { mesos: 500 }));
 }
@@ -676,7 +648,7 @@ fn item_files_saved_over_a_day_ago_are_fetched_afresh_at_launch() {
 #[test]
 fn with_osms_unreachable_the_item_files_saved_are_used_however_old() {
     let source = FakeSource::osms_offline().with_saved_items(bronze_ore_at(450), SAVED_AT);
-    let mut minerva = started_at(source, SAVED_AT + 30 * DAY_MS);
+    let mut minerva = started_at(source, SAVED_AT + 30 * DAY);
 
     assert_eq!(bronze_ore_price(&mut minerva, 1_000), Some(ShopPrice::Sells { mesos: 450 }));
 }
@@ -711,20 +683,20 @@ fn item_files_are_fetched_afresh_every_day_and_swapped_in_once_they_read() {
     let asked = source.item_set_requests.clone();
     let mut minerva = started_at(source, SAVED_AT);
 
-    minerva.tick(DAY_MS - 1_000);
+    minerva.tick(DAY - 1_000);
     assert_eq!(asked.load(Ordering::SeqCst), 1);
-    minerva.tick(DAY_MS);
+    minerva.tick(DAY);
     assert_eq!(asked.load(Ordering::SeqCst), 2);
-    assert_eq!(bronze_ore_price(&mut minerva, DAY_MS + 1_000), Some(ShopPrice::Sells { mesos: 450 }), "kept: the new ones didn't read");
+    assert_eq!(bronze_ore_price(&mut minerva, DAY + 1_000), Some(ShopPrice::Sells { mesos: 450 }), "kept: the new ones didn't read");
 
-    minerva.tick(2 * DAY_MS);
-    assert_eq!(bronze_ore_price(&mut minerva, 2 * DAY_MS + 1_000), Some(ShopPrice::Sells { mesos: 500 }));
+    minerva.tick(2 * DAY);
+    assert_eq!(bronze_ore_price(&mut minerva, 2 * DAY + 1_000), Some(ShopPrice::Sells { mesos: 500 }));
 }
 
 #[test]
 fn a_card_from_item_files_saved_over_7_days_ago_says_it_is_a_saved_copy_from_then() {
     let source = FakeSource::osms_offline().with_saved_items(shop(), SAVED_AT);
-    let mut minerva = started_at(source, SAVED_AT + 7 * DAY_MS + 60_000);
+    let mut minerva = started_at(source, SAVED_AT + 7 * DAY + 60_000);
 
     let card = card(&press_over(&mut minerva, "Bronze Ore", 1_000)).expect("a card");
 
@@ -734,7 +706,7 @@ fn a_card_from_item_files_saved_over_7_days_ago_says_it_is_a_saved_copy_from_the
 #[test]
 fn a_card_from_item_files_saved_under_7_days_ago_says_nothing_of_it() {
     let source = FakeSource::osms_offline().with_saved_items(shop(), SAVED_AT);
-    let mut minerva = started_at(source, SAVED_AT + 7 * DAY_MS - 60_000);
+    let mut minerva = started_at(source, SAVED_AT + 7 * DAY - 60_000);
 
     let card = card(&press_over(&mut minerva, "Bronze Ore", 1_000)).expect("a card");
 
@@ -754,11 +726,6 @@ fn made_up_search(query: &str) -> Result<Vec<ItemHit>, SourceError> {
         _ => return Err(SourceError::Unreachable(format!("no made-up answer for {query:?}"))),
     };
     meowdb::read_item_search(answer)
-}
-
-/// Everything the shell has been asked to do since it last asked.
-fn requests(minerva: &mut Minerva) -> Vec<Request> {
-    std::iter::from_fn(|| minerva.take_request()).collect()
 }
 
 fn with_meowdb() -> Minerva {
@@ -814,10 +781,6 @@ fn the_card_credits_osms_for_its_data_and_the_sites_it_links_to() {
     assert_eq!(card.credit, "Data: OSMS Data Explorer · Pages: NiaMeowDB, MesoWatch");
 }
 
-fn overlaps(a: ScreenRect, b: ScreenRect) -> bool {
-    a.x < b.x + b.width as i32 && b.x < a.x + a.width as i32 && a.y < b.y + b.height as i32 && b.y < a.y + a.height as i32
-}
-
 #[test]
 fn a_card_dragged_by_its_bar_stays_where_the_player_left_it() {
     let mut minerva = started();
@@ -847,8 +810,7 @@ fn a_dragged_card_moves_with_the_game_window() {
     minerva.act(Action::ItemCardMoved { x: 1500, y: 300 });
 
     let moved = ScreenRect { x: GAME.x + 100, ..GAME };
-    let frame = ScreenRect { x: moved.x - 1, y: moved.y - 31, width: moved.width + 2, height: moved.height + 32 };
-    let state = minerva.on_game_window(Some(GameWindow { client: moved, frame, screens: vec![SCREEN] })).clone();
+    let state = minerva.on_game_window(Some(common::window_on_wide_screen(moved))).clone();
 
     assert_eq!(state.item_card_placement.map(|at| (at.x, at.y)), Some((1600, 300)));
 }
@@ -1024,7 +986,7 @@ fn the_prices_and_lines_are_saved_and_restored_at_the_next_launch() {
     assert_ne!(minerva.market_prices_revision(), before, "a change to save");
 
     let saved = serde_json::to_string(&minerva.market_prices()).expect("saves as JSON");
-    let mut next = started_at(FakeSource::osms_offline().with_items(shop()), SAVED_AT + DAY_MS);
+    let mut next = started_at(FakeSource::osms_offline().with_items(shop()), SAVED_AT + DAY);
     next.restore_market_prices(serde_json::from_str(&saved).expect("reads back"));
     let restored = press_over(&mut next, "Bronze Ore", 1_000);
 
@@ -1340,7 +1302,7 @@ fn an_imported_price_takes_the_place_of_an_older_one_on_its_line() {
     let mut minerva = started();
     minerva.import_market_prices(typical(500_000, SAVED_AT));
 
-    minerva.import_market_prices(typical(520_000, SAVED_AT + DAY_MS));
+    minerva.import_market_prices(typical(520_000, SAVED_AT + DAY));
     let state = press_over(&mut minerva, "Bronze Ore", 1_000);
 
     assert_eq!(market(&state), [("Your price".to_string(), None), ("Typical".to_string(), Some(520_000))]);
@@ -1349,16 +1311,16 @@ fn an_imported_price_takes_the_place_of_an_older_one_on_its_line() {
 #[test]
 fn a_price_the_player_typed_after_the_imported_one_was_set_stays() {
     let mut minerva = started_at(FakeSource::osms_offline().with_items(shop()), SAVED_AT);
-    minerva.import_market_prices(typical(500_000, SAVED_AT - DAY_MS));
+    minerva.import_market_prices(typical(500_000, SAVED_AT - DAY));
     let state = press_over(&mut minerva, "Bronze Ore", 1_000);
     set_price(&mut minerva, &state, "Typical", "480k");
     let before = minerva.market_prices_revision();
 
-    let state = minerva.import_market_prices(typical(500_000, SAVED_AT - DAY_MS)).clone();
+    let state = minerva.import_market_prices(typical(500_000, SAVED_AT - DAY)).clone();
     assert_eq!(market(&state)[1], ("Typical".to_string(), Some(480_000)));
     assert_eq!(minerva.market_prices_revision(), before, "nothing to save");
 
-    let state = minerva.import_market_prices(typical(510_000, SAVED_AT + DAY_MS)).clone();
+    let state = minerva.import_market_prices(typical(510_000, SAVED_AT + DAY)).clone();
     assert_eq!(market(&state)[1], ("Typical".to_string(), Some(510_000)), "set since the player typed theirs");
 }
 
@@ -1390,7 +1352,7 @@ fn an_imported_line_keeps_the_name_and_place_the_player_gave_it() {
     let state = add_line(&mut minerva, "Mine");
     assert_eq!(market(&state), [("Your price".to_string(), None), ("Median".to_string(), Some(500_000)), ("Mine".to_string(), None)]);
 
-    let state = minerva.import_market_prices(typical(520_000, SAVED_AT + DAY_MS)).clone();
+    let state = minerva.import_market_prices(typical(520_000, SAVED_AT + DAY)).clone();
 
     assert_eq!(market(&state), [("Your price".to_string(), None), ("Median".to_string(), Some(520_000)), ("Mine".to_string(), None)]);
 }

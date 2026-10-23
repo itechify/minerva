@@ -2,18 +2,17 @@
 //! 10 s, the panel confirming maps, the Grind Tracker's buttons pressed, and, if a test
 //! asks, the shell's saves of the bests followed after each.
 
+use super::S;
 use minerva_core::{
     ExpBar, ExpBarReading, Minerva, PanelControl, PanelState, SavedBests, ScreenRect, StatusBar, StatusBarReading, VisitBest,
 };
-
-const S: u64 = 1000;
 
 /// The wall clock at capture time 0 when the shell tells it: 9 Oct 2026, 12:00 UTC.
 pub const WALL_AT_START: u64 = 1_791_547_200_000;
 
 /// The percentage the game shows for `exp` on a 20,000 EXP level, rounded to hundredths.
 fn percent(exp: u64) -> u32 {
-    ((exp * 20_000 + 20_000) / (2 * 20_000)) as u32
+    super::percent(exp, 20_000)
 }
 
 /// The player hunting on a 20,000 EXP level, the EXP bar read every 10 s. Readings at

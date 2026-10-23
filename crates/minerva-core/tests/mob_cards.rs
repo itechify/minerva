@@ -5,29 +5,15 @@
 
 mod common;
 
+use common::world::tick_through;
+
 use common::osms;
-use common::{FakeSource, arrive, fresh_files, requests_for};
+use common::{FakeSource, arrive, fresh_files, requests_for, SUNSET_SAMPLE, KERNING_SAMPLE, CONSTRUCTION_SAMPLE};
 use minerva_core::osms::OsmsFiles;
 use minerva_core::{
     Minerva, DamageRange, Elements, HpPerExp, MapDataStatus, MobCard, MobDetails, OSMS_AND_MEOWDB_CREDIT, PanelState,
     Recognition, Request, SourceError,
 };
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
-const CONSTRUCTION_SITE: &str = "victoria-road__construction-site-north-of-kerning-city--window";
-
-/// Tick every 50 ms (the shell ticks at least that often) from `from_ms` up to `to_ms`.
-fn tick_through(minerva: &mut Minerva, from_ms: u64, to_ms: u64) -> PanelState {
-    let mut at = from_ms;
-    loop {
-        let state = minerva.tick(at).clone();
-        if at >= to_ms {
-            return state;
-        }
-        at = (at + 50).min(to_ms);
-    }
-}
 
 /// The card of the listed mob with this ID.
 fn card<'a>(state: &'a PanelState, id: &str) -> &'a MobCard {
@@ -68,7 +54,7 @@ fn a_listed_mobs_card_shows_its_figures_from_the_set_as_soon_as_the_map_is_shown
         .speed(5);
     let mut minerva = Minerva::new(sunset_listing(vec![blue_snail, mushmom]));
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     // In the order the panel lists them.
     let ids: Vec<&str> = state.mob_cards.iter().map(|c| c.id.as_str()).collect();
@@ -92,7 +78,7 @@ fn touch_dmg_runs_from_1_1_times_p_atk_rounded_down_to_1_5_times_rounded_up_less
     let mobs = p_atks.iter().map(|&p| osms::mob(9000 + p, &format!("P.ATK {p}"), p as u32, 100, 10).p_atk(p));
     let mut minerva = Minerva::new(sunset_listing(mobs.collect()));
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     let touch = |p: u64| details(&state, &(9000 + p).to_string()).touch_damage;
     assert_eq!(touch(7), Some(DamageRange { min: 7, max: 10 }));
@@ -108,7 +94,7 @@ fn a_figure_a_mob_lacks_or_has_as_0_shows_as_none_and_speed_without_one_is_norma
         osms::mob(9002, "Zeros", 11, 100, 10).p_atk(0).p_def(0).m_def(0).mp(0).acc(0).avoid(0).speed(0),
     ]));
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     for id in ["9001", "9002"] {
         let mob = details(&state, id);
@@ -132,7 +118,7 @@ fn hp_per_exp_is_ranked_among_all_the_sets_mobs() {
         osms::mob(9004, "No EXP", 13, 500, 0),
     ]));
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     // The set's mobs: the made-up game's, all between 8 and 14 HP per EXP, and these 5.
     let ranked = osms::game_mobs().len() as u32 + 5;
@@ -152,7 +138,7 @@ fn a_cards_elements_read_as_weak_strong_and_immune() {
         osms::mob(9003, "Plain Mushroom", 10, 100, 10),
     ]));
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     let names = |names: &[&str]| names.iter().map(|n| n.to_string()).collect::<Vec<_>>();
     let elements = |id: &str| details(&state, id).elements.clone();
@@ -192,7 +178,7 @@ fn animation(hash: &str) -> String {
 fn a_cards_image_is_osmss_default_animation_of_its_mob_asked_for_by_its_path() {
     let blue_snail = osms::mob(3, "Blue Snail", 2, 51, 4).animation("43d30603411fc517");
     let mut minerva = Minerva::new(sunset_listing(vec![blue_snail]));
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     let state = minerva.tick(400).clone();
 
@@ -203,7 +189,7 @@ fn a_cards_image_is_osmss_default_animation_of_its_mob_asked_for_by_its_path() {
 #[test]
 fn saved_animations_are_on_the_cards_by_the_next_tick() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
     assert_eq!(state.mob_cards.len(), 5);
 
     let state = minerva.tick(400).clone();
@@ -217,7 +203,7 @@ fn saved_animations_are_on_the_cards_by_the_next_tick() {
 fn while_its_animation_is_on_its_way_a_card_shows_its_figures_without_it() {
     let mut minerva = Minerva::new(FakeSource::osms().pictures_taking(20));
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
     assert!(state.mob_cards.iter().all(|c| c.image.is_none()), "{:?}", state.mob_cards);
     assert_eq!(details(&state, "3").speed, "Normal");
 
@@ -238,7 +224,7 @@ fn a_mob_without_an_animation_still_has_its_card() {
     });
     let requests = source.picture_requests.clone();
     let mut minerva = Minerva::new(source);
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     let state = tick_through(&mut minerva, 400, 20_000);
 
@@ -261,12 +247,12 @@ fn an_animation_that_couldnt_be_fetched_is_asked_for_again_a_few_minutes_later()
     let source = FakeSource::osms().with_pictures(move |path| match (path.contains("gif3"), first) {
         (true, true) => {
             first = false;
-            Err(SourceError::Unreachable("offline".into()))
+            Err(common::unreachable())
         }
         _ => Ok(format!("picture:{path}")),
     });
     let mut minerva = Minerva::new(source);
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     let mut at = 400;
     let mut image_at = |minerva: &mut Minerva, until: u64| {
@@ -287,7 +273,7 @@ fn animations_are_asked_for_one_at_a_time_with_no_other_pace() {
     let source = FakeSource::osms().pictures_taking(20);
     let requests = source.picture_requests.clone();
     let mut minerva = Minerva::new(source);
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
     let listed = listed_ids(&state).len();
 
     let mut starts = Vec::new();
@@ -308,12 +294,12 @@ fn an_animation_on_its_way_when_the_player_leaves_its_map_is_seen_through_before
     let source = FakeSource::osms().pictures_taking(20);
     let requests = source.picture_requests.clone();
     let mut minerva = Minerva::new(source);
-    arrive(&mut minerva, CONSTRUCTION_SITE, 0);
+    arrive(&mut minerva, CONSTRUCTION_SAMPLE, 0);
     minerva.tick(400);
     let first = requests.lock().unwrap().clone();
     assert_eq!(first.len(), 1, "{first:?}");
 
-    arrive(&mut minerva, SUNSET, 450);
+    arrive(&mut minerva, SUNSET_SAMPLE, 450);
     let mut starts = vec![400];
     for at in (800..=20_000).step_by(50) {
         let before = requests.lock().unwrap().len();
@@ -331,16 +317,16 @@ fn every_shown_maps_mobs_animations_are_asked_for_and_each_only_once() {
     let requests = source.picture_requests.clone();
     let mut minerva = Minerva::new(source);
 
-    let state = arrive(&mut minerva, CONSTRUCTION_SITE, 0);
+    let state = arrive(&mut minerva, CONSTRUCTION_SAMPLE, 0);
     let construction_site = listed_ids(&state);
     assert!(construction_site.len() > 5, "a map with more mobs than the panel once listed");
     tick_through(&mut minerva, 400, 20_000);
-    arrive(&mut minerva, KERNING, 20_050);
+    arrive(&mut minerva, KERNING_SAMPLE, 20_050);
     tick_through(&mut minerva, 20_400, 40_000);
-    let state = arrive(&mut minerva, SUNSET, 40_050);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 40_050);
     let sunset = listed_ids(&state);
     tick_through(&mut minerva, 40_400, 60_000);
-    arrive(&mut minerva, CONSTRUCTION_SITE, 60_050);
+    arrive(&mut minerva, CONSTRUCTION_SAMPLE, 60_050);
     tick_through(&mut minerva, 60_400, 80_000);
 
     let shown: Vec<&String> = construction_site.iter().chain(&sunset).collect();
@@ -360,7 +346,7 @@ fn without_a_map_or_its_mobs_there_are_no_cards() {
     assert!(minerva.tick(0).mob_cards.is_empty());
 
     // Kerning City is a town.
-    let state = arrive(&mut minerva, KERNING, 100);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 100);
     assert!(matches!(state.data, MapDataStatus::Ready(_)));
     assert!(state.mob_cards.is_empty());
 }
@@ -368,7 +354,7 @@ fn without_a_map_or_its_mobs_there_are_no_cards() {
 #[test]
 fn clicking_a_listed_mobs_name_opens_its_meowdb_page() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     assert_eq!(card(minerva.panel_state(), "3").url, "https://meowdb.com/msclassic/monsters/3");
     assert_eq!(
@@ -382,7 +368,7 @@ fn clicking_a_listed_mobs_name_opens_its_meowdb_page() {
 #[test]
 fn with_mob_cards_the_panel_credits_only_osms_and_meowdb() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     let state = minerva.tick(400).clone();
 

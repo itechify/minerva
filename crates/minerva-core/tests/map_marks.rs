@@ -7,21 +7,15 @@
 
 mod common;
 
+
 use common::osms::{self, CONSTRUCTION_SITE, KERNING_CITY, NORTHERN_TOP, SUNSET_SKY};
-use common::world::search_for;
-use common::{FakeSource, SUNSET_SKY_ID, arrive, fresh_files};
+use common::world::{search_for, tick_through};
+use common::{FakeSource, SUNSET_SKY_ID, arrive, fresh_files, SUNSET_SAMPLE, KERNING_SAMPLE, CONSTRUCTION_SAMPLE, shown_id, NORTHERN_TOP_ID};
 use minerva_core::osms::OsmsFiles;
 use minerva_core::{
     BESTS_VERSION, Minerva, MapBests, MapDataStatus, MapMark, PanelControl, PanelState, Recognition, SavedBests,
     VisitBest,
 };
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
-const CONSTRUCTION: &str = "victoria-road__construction-site-north-of-kerning-city--window";
-
-/// The Northern Top of Construction Site's map ID.
-const NORTHERN_TOP_ID: &str = "010003081";
 
 /// Where OSMS keeps mark `mark`'s picture, as the source is asked for it: below its
 /// pictures, in the current data set.
@@ -49,19 +43,11 @@ fn title_mark(state: &PanelState) -> Option<&str> {
     state.map.as_ref().and_then(|map| map.mark.as_deref())
 }
 
-/// Tick every 50 ms from `from_ms` up to `to_ms`.
-fn tick_through(minerva: &mut Minerva, from_ms: u64, to_ms: u64) -> PanelState {
-    for at in (from_ms..to_ms).step_by(50) {
-        minerva.tick(at);
-    }
-    minerva.tick(to_ms).clone()
-}
-
 #[test]
 fn the_title_names_its_maps_mark_and_the_table_each_marks_area_and_picture() {
     let mut minerva = Minerva::new(FakeSource::with_world(marked()));
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
     assert_eq!(title_mark(&state), Some("KerningCity"));
     let names: Vec<(&str, &str)> = state.map_marks.iter().map(|(mark, m)| (mark.as_str(), m.name.as_str())).collect();
     assert_eq!(
@@ -83,9 +69,9 @@ fn every_marks_picture_is_asked_for_first_and_once() {
     let requests = source.picture_requests.clone();
     let mut minerva = Minerva::new(source);
 
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
     tick_through(&mut minerva, 400, 5_000);
-    arrive(&mut minerva, CONSTRUCTION, 5_050);
+    arrive(&mut minerva, CONSTRUCTION_SAMPLE, 5_050);
     tick_through(&mut minerva, 5_400, 10_000);
 
     let asked = requests.lock().unwrap().clone();
@@ -103,8 +89,8 @@ fn a_map_without_a_mark_or_with_one_osms_has_no_picture_of_has_none() {
     let world = osms::game().with_mark_icon("KerningCity").changing(SUNSET_SKY, |m| m.marked("Amherst"));
     let mut minerva = Minerva::new(FakeSource::with_world(world));
 
-    assert_eq!(title_mark(&arrive(&mut minerva, KERNING, 0)), None);
-    let state = arrive(&mut minerva, SUNSET, 1_000);
+    assert_eq!(title_mark(&arrive(&mut minerva, KERNING_SAMPLE, 0)), None);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 1_000);
     assert_eq!(title_mark(&state), None);
     assert!(!state.map_marks.contains_key("Amherst"));
 }
@@ -113,7 +99,7 @@ fn a_map_without_a_mark_or_with_one_osms_has_no_picture_of_has_none() {
 fn without_map_mark_icons_the_set_reads_and_no_map_has_a_mark() {
     let mut minerva = Minerva::new(FakeSource::with_world(marked().without_mark_icons()));
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     assert_eq!(state.recognition, Recognition::Ready);
     assert_eq!(title_mark(&state), None);
@@ -126,7 +112,7 @@ fn a_marks_picture_path_that_isnt_a_plain_one_is_a_format_change() {
         let files: OsmsFiles = marked().with_mark_icon_at("Dungeon", path).files();
         let mut minerva = Minerva::new(FakeSource::answering_osms(vec![fresh_files(files)]));
 
-        let state = arrive(&mut minerva, KERNING, 0);
+        let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
         assert_eq!(state.recognition, Recognition::FormatChanged, "{path}");
     }
@@ -136,7 +122,7 @@ fn a_marks_picture_path_that_isnt_a_plain_one_is_a_format_change() {
 fn hidden_portals_and_the_map_previews_marks_name_their_destinations_mark() {
     let mut minerva = Minerva::new(FakeSource::with_world(marked()));
 
-    let state = arrive(&mut minerva, CONSTRUCTION, 0);
+    let state = arrive(&mut minerva, CONSTRUCTION_SAMPLE, 0);
 
     let MapDataStatus::Ready(data) = &state.data else { panic!("no data: {:?}", state.data) };
     let hidden: Vec<(&str, Option<&str>)> =
@@ -151,7 +137,7 @@ fn hidden_portals_and_the_map_previews_marks_name_their_destinations_mark() {
 #[test]
 fn search_results_and_their_routes_name_each_maps_mark() {
     let mut minerva = Minerva::new(FakeSource::with_world(marked()));
-    arrive(&mut minerva, KERNING, 0);
+    arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     // Octopuses spawn on the Construction Site and the Northern Top above it.
     let state = search_for(&mut minerva, "octopus");
@@ -179,19 +165,19 @@ fn sharing_a_title_marked(construction_site: &str) -> FakeSource {
 #[test]
 fn while_candidates_wait_for_a_choice_the_title_shows_a_mark_only_if_they_share_it() {
     let mut minerva = Minerva::new(sharing_a_title_marked("Rith"));
-    let unsure = arrive(&mut minerva, KERNING, 0);
+    let unsure = arrive(&mut minerva, KERNING_SAMPLE, 0);
     assert_eq!(unsure.candidates.as_ref().map(|c| c.chosen), Some(false));
     assert_eq!(title_mark(&unsure), None, "the Construction Site's or Sunset Sky's");
 
     // Chosen, it's the shown map's.
     minerva.on_hotkey("ctrl+shift+n");
     let chosen = minerva.panel_state();
-    assert_eq!(chosen.map.as_ref().map(|m| m.id.as_str()), Some(SUNSET_SKY_ID));
+    assert_eq!(shown_id(chosen), Some(SUNSET_SKY_ID));
     assert_eq!(title_mark(chosen), Some("KerningCity"));
 
     // Sharing it, they show it from the start.
     let mut minerva = Minerva::new(sharing_a_title_marked("KerningCity"));
-    assert_eq!(title_mark(&arrive(&mut minerva, KERNING, 0)), Some("KerningCity"));
+    assert_eq!(title_mark(&arrive(&mut minerva, KERNING_SAMPLE, 0)), Some("KerningCity"));
 }
 
 #[test]
@@ -200,7 +186,7 @@ fn the_personal_bests_window_names_each_maps_mark() {
     let best = |id: &str| MapBests { id: id.into(), visits: vec![VisitBest { exp_per_hour: 7200, ..VisitBest::default() }] };
     let unassigned = vec![best(SUNSET_SKY_ID), best(NORTHERN_TOP_ID)];
     minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned, characters: Vec::new() });
-    arrive(&mut minerva, KERNING, 0);
+    arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     minerva.press(PanelControl::TogglePersonalBests);
 
@@ -216,7 +202,7 @@ fn a_marks_area_is_named_as_players_know_it() {
     let world = marks.iter().fold(marked(), |world, mark| world.with_mark_icon(mark));
     let mut minerva = Minerva::new(FakeSource::with_world(world));
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     let names: Vec<&str> = marks.iter().map(|mark| state.map_marks[*mark].name.as_str()).collect();
     assert_eq!(
@@ -228,7 +214,7 @@ fn a_marks_area_is_named_as_players_know_it() {
 #[test]
 fn the_overlay_gets_the_marks_as_it_renders_them() {
     let mut minerva = Minerva::new(FakeSource::with_world(marked()));
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
     let state = serde_json::to_value(tick_through(&mut minerva, 400, 1_000)).unwrap();
 
     assert_eq!(state["map"]["mark"], "KerningCity");

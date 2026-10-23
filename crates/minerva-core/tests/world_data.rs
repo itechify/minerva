@@ -11,17 +11,15 @@ mod common;
 
 use common::osms::{self, CONSTRUCTION_SITE, DEAD_END, HENESYS_HUNTING_GROUND_I, NORTHERN_TOP};
 use common::world::search_for;
-use common::{FakeSource, arrive, fresh_files};
+use common::{FakeSource, arrive, fresh_files, KERNING_SAMPLE, read_as};
 use minerva_core::osms::OsmsFiles;
-use minerva_core::{Action, Minerva, Distance, PanelState, Recognition, SearchResult, Step, TitleLines, TitleReading};
-
-const KERNING: &str = "victoria-road__kerning-city--window";
+use minerva_core::{Action, Minerva, Distance, PanelState, Recognition, SearchResult, Step};
 
 /// OSMS serving `world`, the player arrived on Kerning City as the set comes, and `mob`
 /// searched for.
 fn searched_from_kerning(world: osms::World, mob: &str) -> (Minerva, PanelState) {
     let mut minerva = Minerva::new(FakeSource::with_world(world));
-    arrive(&mut minerva, KERNING, 0);
+    arrive(&mut minerva, KERNING_SAMPLE, 0);
     let state = search_for(&mut minerva, mob);
     (minerva, state)
 }
@@ -30,10 +28,6 @@ fn searched_from_kerning(world: osms::World, mob: &str) -> (Minerva, PanelState)
 fn result<'a>(state: &'a PanelState, map_name: &str) -> &'a SearchResult {
     let found = state.search.results.iter().find(|r| r.map_name == map_name);
     found.unwrap_or_else(|| panic!("no result on {map_name}: {:?}", state.search.results))
-}
-
-fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
 }
 
 #[test]
@@ -139,7 +133,7 @@ fn a_mob_rate_nearest_town_or_exits_not_as_expected_is_a_format_change() {
         assert_ne!(maps, files.maps, "{how}");
         let mut minerva = Minerva::new(FakeSource::answering_osms(vec![fresh_files(OsmsFiles { maps, ..files.clone() })]));
 
-        let state = arrive(&mut minerva, KERNING, 0);
+        let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
         assert_eq!(state.recognition, Recognition::FormatChanged, "{how}");
     }

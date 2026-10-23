@@ -13,17 +13,14 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, GAME, SCREEN};
 use common::items::{ItemWorld, equip, etc, item_world, scroll, use_item};
 use minerva_core::{
     Action, DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Edge, Foreground, GameWindow, Hotkey, Hotkeys, ItemCardView, ListedPrice,
-    MarketPrice, Minerva, PanelControl, PanelSizes, PanelState, Request, SavedMarketLine, SavedMarketPrices, ScreenRect,
-    Settings, ShopHover, ShopList, ShopReading, ShopRow, Size, Verdict, ItemTooltip, ScreenPoint,
+    MarketPrice, Minerva, PanelControl, PanelSizes, PanelState, Request, SavedMarketLine, SavedMarketPrices, ScreenRect, ShopHover, ShopList, ShopReading, ShopRow, Size, Verdict, ItemTooltip, ScreenPoint,
 };
 use std::task::Poll;
 
-const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
-const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
 /// The shop's item list, from its first listing to its sixth.
 const LIST: ScreenRect = ScreenRect { x: 1373, y: 600, width: 311, height: 367 };
 const BADGES: Size = Size { width: 160, height: 0 };
@@ -34,13 +31,6 @@ const GARNET_ORE: &str = "04020000";
 const BRONZE_ORE: &str = "04010000";
 const EMERALD_STAFF: &str = "01382004";
 const WOODEN_TOP: &str = "02070000";
-
-fn settings() -> Settings {
-    Settings {
-        setup_done: true,
-        ..Settings::default()
-    }
-}
 
 /// Made-up item data: ores and gems, a staff, two Blue Moons that don't look alike, and two
 /// Pet Equip Speed Scrolls.
@@ -83,13 +73,12 @@ fn market() -> SavedMarketPrices {
 /// prices restored.
 fn started() -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms_offline().with_items(items()));
-    minerva.restore(settings());
+    minerva.restore(common::set_up());
     minerva.restore_market_prices(market());
     minerva.set_panel_sizes(PanelSizes { expanded: Size { width: 340, height: 72 }, collapsed: Size { width: 44, height: 44 } });
     minerva.set_item_card_size(CARD);
     minerva.set_deal_badges_size(BADGES);
-    let frame = ScreenRect { x: GAME.x - 1, y: GAME.y - 31, width: GAME.width + 2, height: GAME.height + 32 };
-    minerva.on_game_window(Some(GameWindow { client: GAME, frame, screens: vec![SCREEN] }));
+    minerva.on_game_window(Some(common::window_on_wide_screen(GAME)));
     minerva.on_foreground(Foreground::Game);
     minerva.tick(0);
     minerva
@@ -280,7 +269,7 @@ fn a_name_cut_short_is_the_one_item_whose_name_starts_so() {
 #[test]
 fn before_the_item_files_are_in_every_badge_is_a_question_mark() {
     let mut minerva = Minerva::new(FakeSource::osms_offline().answering_item_set(vec![Poll::Pending]));
-    minerva.restore(settings());
+    minerva.restore(common::set_up());
     minerva.set_deal_badges_size(BADGES);
     minerva.on_game_window(Some(GameWindow { client: GAME, frame: GAME, screens: vec![SCREEN] }));
     minerva.tick(0);

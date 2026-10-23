@@ -10,7 +10,7 @@
 mod common;
 
 use common::osms::{self, CONSTRUCTION_SITE, KERNING_CITY, SUNSET_SKY, mob};
-use common::{FakeSource, arrive, black_frame, sample_frame};
+use common::{FakeSource, arrive, black_frame, sample_frame, KERNING_SAMPLE, SUNSET_SAMPLE, shown_id};
 use minerva_core::{Action, Minerva, LevelRange, MapDataStatus, Outline, PanelState};
 
 /// The titles OSMS's map list gives to more than one map: Maple Road / Mushroom Town and
@@ -19,15 +19,8 @@ use minerva_core::{Action, Minerva, LevelRange, MapDataStatus, Outline, PanelSta
 const MUSHROOM_TOWNS: [&str; 2] = ["000000010", "000000020"];
 const COCONUT_HARVESTS: [&str; 3] = ["090040200", "090040201", "090040202"];
 
-const KERNING: &str = "victoria-road__kerning-city--window";
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-
 fn id(id: &str) -> u64 {
     id.parse().unwrap()
-}
-
-fn shown_id(state: &PanelState) -> Option<&str> {
-    state.map.as_ref().map(|m| m.id.as_str())
 }
 
 /// `world`, with the Kerning City sample's title given to the maps `ids` and to no other.
@@ -71,7 +64,7 @@ fn osmss_map_list_gives_the_mushroom_town_title_to_two_maps_and_coconut_harvest_
     ] {
         let mut minerva = Minerva::new(FakeSource::with_world(real_shared_title_reading_as_kerning_city(street, map)));
 
-        let state = arrive(&mut minerva, KERNING, 0);
+        let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
         assert_eq!(candidates(&state), Some((ids, 0, false)), "{street} / {map}");
     }
@@ -80,9 +73,9 @@ fn osmss_map_list_gives_the_mushroom_town_title_to_two_maps_and_coconut_harvest_
 #[test]
 fn arriving_in_mushroom_town_shows_it_without_asking_since_both_mushroom_towns_show_the_same() {
     let mut minerva = Minerva::new(FakeSource::with_world(titled_like_kerning_city(osms::game(), &MUSHROOM_TOWNS)));
-    minerva.on_frame(sample_frame(KERNING, 0));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 0));
 
-    let state = minerva.on_frame(sample_frame(KERNING, 333));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 333));
 
     assert!(MUSHROOM_TOWNS.contains(&shown_id(state).unwrap()));
     assert_eq!(state.candidates, None);
@@ -96,7 +89,7 @@ fn maps_alike_but_for_their_hidden_portals_are_offered_as_candidates() {
     let world = osms::game().changing(id(MUSHROOM_TOWNS[1]), |m| m.portal("hide00", 10, 1_000_000));
     let mut minerva = Minerva::new(FakeSource::with_world(titled_like_kerning_city(world, &MUSHROOM_TOWNS)));
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     assert_eq!(candidates(&state), Some((MUSHROOM_TOWNS.to_vec(), 0, false)));
     // What sets them apart: no mobs either way, but one Hidden Portal against none.
@@ -120,7 +113,7 @@ fn hidden_portals_are_compared_by_destination_and_kind() {
             .changing(id(MUSHROOM_TOWNS[1]), |m| m.portal(name_b, kind_b, to_b));
         let mut minerva = Minerva::new(FakeSource::with_world(titled_like_kerning_city(world, &MUSHROOM_TOWNS)));
 
-        let state = arrive(&mut minerva, KERNING, 0);
+        let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
         assert_eq!(state.candidates.is_some(), offered, "{how}");
     }
@@ -162,7 +155,7 @@ fn mobs_at_a_glance(state: &PanelState) -> Vec<Option<(LevelRange, Vec<String>)>
 fn each_candidate_is_listed_with_its_mob_levels_and_first_mobs_to_tell_them_apart() {
     let mut minerva = Minerva::new(coconut_harvests_that_differ());
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     let names = |names: &[&str]| names.iter().map(|n| n.to_string()).collect::<Vec<_>>();
     assert_eq!(
@@ -179,7 +172,7 @@ fn each_candidate_is_listed_with_its_mob_levels_and_first_mobs_to_tell_them_apar
 fn arriving_with_nothing_to_go_on_in_one_of_maps_that_differ_shows_the_first_and_offers_the_others() {
     let mut minerva = Minerva::new(coconut_harvests_that_differ());
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     assert_eq!(shown_id(&state), Some("090040200"));
     assert_eq!(candidates(&state), coconut_candidates(0, false));
@@ -195,10 +188,10 @@ fn kerning_city_and_northern_top() -> osms::World {
 #[test]
 fn coming_from_a_map_connected_to_just_one_of_them_shows_that_one() {
     let mut minerva = Minerva::new(FakeSource::with_world(kerning_city_and_northern_top()));
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
-    minerva.on_frame(sample_frame(KERNING, 666));
-    let state = minerva.on_frame(sample_frame(KERNING, 1000));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 666));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 1000));
 
     assert_eq!(shown_id(state), Some("010003000"));
     assert_eq!(state.candidates, None);
@@ -213,10 +206,10 @@ fn coming_from_a_connected_map_settles_it_from_a_saved_copy_too() {
     let source = FakeSource::osms_offline().with_saved_set(kerning_city_and_northern_top(), SAVED_AT);
     let mut minerva = Minerva::new(source);
     minerva.on_wall_clock(SAVED_AT + 8 * 24 * 60 * 60 * 1000);
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
-    minerva.on_frame(sample_frame(KERNING, 666));
-    let state = minerva.on_frame(sample_frame(KERNING, 1000));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 666));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 1000));
 
     assert_eq!(shown_id(state), Some("010003000"));
     assert_eq!(state.candidates, None);
@@ -226,7 +219,7 @@ fn coming_from_a_connected_map_settles_it_from_a_saved_copy_too() {
 #[test]
 fn the_choose_candidate_hotkey_shows_each_candidate_in_turn_with_its_own_data() {
     let mut minerva = Minerva::new(coconut_harvests_that_differ());
-    arrive(&mut minerva, KERNING, 0);
+    arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     let state = minerva.act(Action::ChooseCandidate);
     assert_eq!(shown_id(state), Some("090040201"));
@@ -245,21 +238,21 @@ fn the_choose_candidate_hotkey_shows_each_candidate_in_turn_with_its_own_data() 
 #[test]
 fn a_chosen_candidate_holds_through_unreadable_frames_until_the_map_changes() {
     let mut minerva = Minerva::new(coconut_harvests_that_differ());
-    arrive(&mut minerva, KERNING, 0);
+    arrive(&mut minerva, KERNING_SAMPLE, 0);
     minerva.act(Action::ChooseCandidate);
 
     minerva.on_frame(black_frame(666));
-    let state = minerva.on_frame(sample_frame(KERNING, 1000));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 1000));
     assert_eq!(shown_id(state), Some("090040201"));
     assert_eq!(candidates(state), coconut_candidates(1, true));
 
     // Off to Sunset Sky and back: the choice is gone, and the first is shown again.
-    minerva.on_frame(sample_frame(SUNSET, 1333));
-    let state = minerva.on_frame(sample_frame(SUNSET, 1666));
+    minerva.on_frame(sample_frame(SUNSET_SAMPLE, 1333));
+    let state = minerva.on_frame(sample_frame(SUNSET_SAMPLE, 1666));
     assert_eq!(shown_id(state), Some("010003070"));
     assert_eq!(state.candidates, None);
-    minerva.on_frame(sample_frame(KERNING, 2000));
-    let state = minerva.on_frame(sample_frame(KERNING, 2333));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 2000));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 2333));
     assert_eq!(shown_id(state), Some("090040200"));
     assert_eq!(candidates(state), coconut_candidates(0, false));
 }
@@ -270,7 +263,7 @@ fn ctrl_shift_n_shows_the_next_candidate_even_with_settings_from_before_it_exist
     let older = r#"{"version":1,"expanded":true,"hotkeys":{"togglePanel":"ctrl+shift+m","openMeowdbPage":"ctrl+shift+o"}}"#;
     let mut minerva = Minerva::new(coconut_harvests_that_differ());
     minerva.restore(serde_json::from_str(older).unwrap());
-    arrive(&mut minerva, KERNING, 0);
+    arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     minerva.on_hotkey("ctrl+shift+n");
 
@@ -280,8 +273,8 @@ fn ctrl_shift_n_shows_the_next_candidate_even_with_settings_from_before_it_exist
 #[test]
 fn the_choose_candidate_hotkey_does_nothing_when_there_is_nothing_to_choose() {
     let mut minerva = Minerva::new(FakeSource::with_world(titled_like_kerning_city(osms::game(), &MUSHROOM_TOWNS)));
-    minerva.on_frame(sample_frame(KERNING, 0));
-    let before = minerva.on_frame(sample_frame(KERNING, 333)).clone();
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 0));
+    let before = minerva.on_frame(sample_frame(KERNING_SAMPLE, 333)).clone();
 
     let state = minerva.act(Action::ChooseCandidate);
 
@@ -300,7 +293,7 @@ fn previewed(state: &PanelState) -> Option<&str> {
 fn no_map_preview_shows_while_candidates_wait_for_a_choice_and_the_chosen_ones_shows_after() {
     let mut minerva = Minerva::new(coconut_harvests_that_differ());
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
     assert_eq!(mob_count(&state), Some(5));
     assert_eq!(previewed(&state), None);
 
@@ -314,7 +307,7 @@ fn no_map_preview_shows_while_candidates_wait_for_a_choice_and_the_chosen_ones_s
 fn maps_alike_show_their_figures_without_asking_but_no_map_preview() {
     let mut minerva = Minerva::new(FakeSource::with_world(titled_like_kerning_city(osms::game(), &MUSHROOM_TOWNS)));
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     assert_eq!(state.candidates, None);
     assert!(matches!(state.data, MapDataStatus::Ready(_)));
@@ -324,10 +317,10 @@ fn maps_alike_show_their_figures_without_asking_but_no_map_preview() {
 #[test]
 fn coming_from_a_map_connected_to_just_one_of_them_shows_its_map_preview() {
     let mut minerva = Minerva::new(FakeSource::with_world(kerning_city_and_northern_top()));
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
-    minerva.on_frame(sample_frame(KERNING, 666));
-    let state = minerva.on_frame(sample_frame(KERNING, 1000));
+    minerva.on_frame(sample_frame(KERNING_SAMPLE, 666));
+    let state = minerva.on_frame(sample_frame(KERNING_SAMPLE, 1000));
 
     assert_eq!(previewed(state), Some("picture010003000"));
 }

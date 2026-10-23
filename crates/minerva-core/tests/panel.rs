@@ -10,10 +10,10 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, GAME, SCREEN, overlaps};
 use common::world::SEARCH;
 use minerva_core::{
-    Action, Minerva, DEFAULT_PANEL_WIDTH, ExpBarPlace, ExpBarReading, Foreground, GameWindow, Layer, MIN_PANEL_WIDTH, PanelSizes,
+    Action, Minerva, DEFAULT_PANEL_WIDTH, Foreground, GameWindow, Layer, MIN_PANEL_WIDTH, PanelSizes,
     PlacementMode, ScreenRect, TitleLines, TitleReading,
     Settings, Size,
 };
@@ -28,18 +28,13 @@ fn minerva() -> Minerva {
     minerva
 }
 
-const GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 1920, height: 1200 };
-
-const SCREEN: ScreenRect = ScreenRect { x: 0, y: 0, width: 3440, height: 1440 };
-
 fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
     ScreenRect { x, y, width, height }
 }
 
 /// The game window with this client area, framed as measured, on `SCREEN`.
 fn game(client: ScreenRect) -> Option<GameWindow> {
-    let frame = rect(client.x - 1, client.y - 31, client.width + 2, client.height + 32);
-    Some(GameWindow { client, frame, screens: vec![SCREEN] })
+    Some(common::window_on_wide_screen(client))
 }
 
 #[test]
@@ -132,9 +127,8 @@ fn the_panel_stays_inside_the_game_window_when_the_window_shrinks() {
 
 /// What the shell does on restart: save the settings as JSON, load them into a new core.
 fn restart(minerva: &Minerva) -> Minerva {
-    let json = serde_json::to_string(&minerva.settings()).unwrap();
     let mut restarted = self::minerva();
-    restarted.restore(serde_json::from_str(&json).unwrap());
+    restarted.restore(common::settings_after_restart(minerva));
     restarted
 }
 
@@ -483,16 +477,10 @@ fn found_title(minerva: &mut Minerva) {
 /// Set up on `SMALL_GAME`, with the minimap title found at [`TITLE`].
 fn set_up_on_small_game() -> Minerva {
     let mut minerva = minerva();
-    minerva.restore(Settings { setup_done: true, ..Settings::default() });
+    minerva.restore(common::set_up());
     minerva.on_game_window(game(SMALL_GAME));
     found_title(&mut minerva);
     minerva
-}
-
-fn overlaps(a: ScreenRect, b: ScreenRect) -> bool {
-    let (ar, ab) = (a.x + a.width as i32, a.y + a.height as i32);
-    let (br, bb) = (b.x + b.width as i32, b.y + b.height as i32);
-    a.x < br && b.x < ar && a.y < bb && b.y < ab
 }
 
 #[test]
@@ -615,14 +603,14 @@ const TALLER_SMALL_GAME: ScreenRect = ScreenRect { x: 812, y: 110, width: 640, h
 /// The EXP figures read where they were found, at client (100,150) 312x26.
 fn found_exp_figures(minerva: &mut Minerva) -> ScreenRect {
     let area = rect(912, 260, 312, 26);
-    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: 0, place: Some(ExpBarPlace { area, remembered: false }) });
+    common::found_exp_figures(minerva, area);
     area
 }
 
 #[test]
 fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_the_exp_bar_too() {
     let mut minerva = minerva();
-    minerva.restore(Settings { setup_done: true, ..Settings::default() });
+    minerva.restore(common::set_up());
     minerva.on_game_window(game(TALLER_SMALL_GAME));
     found_title(&mut minerva);
     let figures = found_exp_figures(&mut minerva);
@@ -639,7 +627,7 @@ fn a_panel_dragged_onto_the_minimap_title_is_moved_clear_of_the_exp_bar_too() {
 #[test]
 fn a_panel_dragged_onto_the_exp_bar_is_moved_clear_of_it() {
     let mut minerva = minerva();
-    minerva.restore(Settings { setup_done: true, ..Settings::default() });
+    minerva.restore(common::set_up());
     minerva.on_game_window(game(TALLER_SMALL_GAME));
     found_title(&mut minerva);
     let figures = found_exp_figures(&mut minerva);

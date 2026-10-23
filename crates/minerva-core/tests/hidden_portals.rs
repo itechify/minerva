@@ -7,21 +7,11 @@
 mod common;
 
 use common::osms::{self, CONSTRUCTION_SITE, DEAD_END, KERNING_CITY, NORTHERN_TOP, map};
-use common::{FakeSource, arrive, fresh_files};
+use common::{FakeSource, arrive, fresh_files, CONSTRUCTION_SAMPLE, KERNING_SAMPLE, SUNSET_SAMPLE, read_as, FIELD};
 use minerva_core::osms::OsmsFiles;
-use minerva_core::{Minerva, HiddenPortal, MapDataStatus, PanelState, PortalOverride, Recognition, TitleLines, TitleReading};
+use minerva_core::{Minerva, HiddenPortal, MapDataStatus, PanelState, PortalOverride, Recognition};
 
-const CONSTRUCTION: &str = "victoria-road__construction-site-north-of-kerning-city--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
-const SUNSET: &str = "victoria-road__sunset-sky--window";
 const NORTHERN: &str = "hidden-street__northern-top-of-construction-site--window";
-
-/// A made-up map whose portals the tests give, on a street of its own.
-const FIELD: u64 = 100_000_000;
-
-fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
-}
 
 /// The panel on the made-up Field, with the game's maps around it.
 fn on_field(change: impl FnOnce(osms::Map) -> osms::Map) -> PanelState {
@@ -55,7 +45,7 @@ fn destinations(state: &PanelState) -> Vec<(&str, bool)> {
 fn the_construction_sites_invisible_exit_is_a_hidden_portal_up_to_a_hidden_street() {
     let mut minerva = Minerva::new(FakeSource::osms());
 
-    let state = arrive(&mut minerva, CONSTRUCTION, 0);
+    let state = arrive(&mut minerva, CONSTRUCTION_SAMPLE, 0);
 
     assert_eq!(
         hidden_portals(&state),
@@ -77,7 +67,7 @@ fn the_construction_sites_invisible_exit_is_a_hidden_portal_up_to_a_hidden_stree
 fn the_doors_of_a_town_are_not_hidden_portals() {
     let mut minerva = Minerva::new(FakeSource::osms());
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     assert_eq!(hidden_portals(&state), []);
 }
@@ -86,7 +76,7 @@ fn the_doors_of_a_town_are_not_hidden_portals() {
 /// exit is visible (type 2); a walk-into exit (type 3) counts as visible.
 #[test]
 fn visible_exits_walk_into_exits_and_teleports_within_the_map_are_not_hidden_portals() {
-    for sample in [SUNSET, NORTHERN] {
+    for sample in [SUNSET_SAMPLE, NORTHERN] {
         let mut minerva = Minerva::new(FakeSource::osms());
         let state = arrive(&mut minerva, sample, 0);
         assert_eq!(hidden_portals(&state), [], "{sample}");
@@ -204,7 +194,7 @@ fn a_file_set_whose_portals_are_not_as_expected_is_a_format_change() {
     for (how, files) in altered {
         let mut minerva = Minerva::new(FakeSource::answering_osms(vec![fresh_files(files)]));
 
-        let state = arrive(&mut minerva, KERNING, 0);
+        let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
         assert_eq!(state.recognition, Recognition::FormatChanged, "{how}");
         assert_eq!(state.map, None, "{how}");

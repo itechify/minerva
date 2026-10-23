@@ -11,25 +11,16 @@
 mod common;
 
 use common::osms::{self, CONSTRUCTION_SITE, DEAD_END, KERNING_CITY, NORTHERN_TOP, SUNSET_SKY, map};
-use common::{FakeSource, arrive, fresh_files};
+use common::{FakeSource, arrive, fresh_files, SUNSET_SAMPLE, KERNING_SAMPLE, read_as, FIELD};
 use minerva_core::{
     Minerva, Landing, Leads, MapDataStatus, MapPreview, PanelState, PicturePoint, PortalKind, PortalMark, PreviewImage,
-    SourceError, TitleLines, TitleReading,
+    SourceError,
 };
-
-/// A made-up map whose portals the tests give, on a street of its own.
-const FIELD: u64 = 100_000_000;
-
-fn read_as(street: &str, map: &str, at_ms: u64) -> TitleReading {
-    TitleReading { lines: Some(TitleLines { street: street.into(), map: map.into() }), found: Some(common::TITLE_FOUND), at_ms }
-}
 
 /// The panel on the made-up Field, in `world`.
 fn on_field_in(world: osms::World, change: impl FnOnce(osms::Map) -> osms::Map) -> PanelState {
     let world = world.with(change(map(FIELD, "Made-up Street", "Field")));
-    let mut minerva = Minerva::new(FakeSource::with_world(world));
-    minerva.on_reading(read_as("Made-up Street", "Field", 0));
-    minerva.on_reading(read_as("Made-up Street", "Field", 333)).clone()
+    common::on_title(world, "Made-up Street", "Field")
 }
 
 /// The panel on the made-up Field, with the game's maps around it.
@@ -101,7 +92,7 @@ fn destinations(state: &PanelState) -> Vec<(&str, Leads, PortalKind)> {
 fn a_town_has_a_map_preview_with_its_doors_marked_as_doors_to_other_maps() {
     let mut minerva = Minerva::new(FakeSource::osms());
 
-    let state = arrive(&mut minerva, "victoria-road__kerning-city--window", 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     assert_eq!(preview(&state).picture, "picture010003000");
     assert_eq!(
@@ -263,7 +254,7 @@ fn no_map_preview_shows_before_a_map_is() {
 /// The panel on Kerning City, from `source`, at 0 ms.
 fn in_kerning_city(source: FakeSource) -> (Minerva, PanelState) {
     let mut minerva = Minerva::new(source);
-    let state = arrive(&mut minerva, "victoria-road__kerning-city--window", 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
     (minerva, state)
 }
 
@@ -295,7 +286,7 @@ fn the_shown_maps_picture_is_asked_for_by_its_path_and_loads_from_where_the_sour
 
 #[test]
 fn a_picture_that_cant_be_had_is_unavailable() {
-    for error in [SourceError::Unreachable("offline".into()), SourceError::FormatChanged("404".into())] {
+    for error in [common::unreachable(), SourceError::FormatChanged("404".into())] {
         let source = FakeSource::osms().with_pictures(move |_| Err(error.clone()));
         let (mut minerva, _) = in_kerning_city(source);
 
@@ -311,7 +302,7 @@ fn a_picture_that_cant_be_had_is_unavailable() {
 fn an_unreachable_picture_is_asked_for_again_five_minutes_on() {
     let mut reachable = false;
     let source = FakeSource::osms().with_pictures(move |path| {
-        let answer = if reachable { Ok(format!("picture:{path}")) } else { Err(SourceError::Unreachable("offline".into())) };
+        let answer = if reachable { Ok(format!("picture:{path}")) } else { Err(common::unreachable()) };
         reachable = true;
         answer
     });
@@ -334,10 +325,10 @@ fn a_map_shown_again_shows_its_picture_without_asking_again() {
     let requests = source.picture_requests.clone();
     let (mut minerva, _) = in_kerning_city(source);
     minerva.tick(400);
-    arrive(&mut minerva, "victoria-road__sunset-sky--window", 1000);
+    arrive(&mut minerva, SUNSET_SAMPLE, 1000);
     minerva.tick(1400);
 
-    let state = arrive(&mut minerva, "victoria-road__kerning-city--window", 2000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 2000);
 
     assert_eq!(*image(&state), PreviewImage::Ready { url: "picture:maps/picture010003000.webp".into() });
     assert_eq!(map_pictures(&requests), ["maps/picture010003000.webp", "maps/picture010003070.webp"]);
@@ -363,7 +354,7 @@ fn the_maps_picture_is_asked_for_before_the_mob_cards_animations() {
     let source = FakeSource::osms().pictures_taking(1);
     let requests = source.picture_requests.clone();
     let mut minerva = Minerva::new(source);
-    arrive(&mut minerva, "victoria-road__sunset-sky--window", 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     minerva.tick(400);
 

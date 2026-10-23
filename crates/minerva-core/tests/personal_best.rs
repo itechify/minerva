@@ -7,25 +7,14 @@
 mod common;
 
 use common::player::Player;
-use common::{CONSTRUCTION_SITE_ID, SUNSET_SKY_ID, sharing_a_title, tracking, tracking_with};
+use common::{CONSTRUCTION_SITE_ID, SUNSET_SKY_ID, sharing_a_title, tracking, tracking_with, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, KERNING_SAMPLE, S, MIN, best_row, shown_id};
 use minerva_core::{ExpBar, ExpBarReading, PanelControl, PanelState, TrackingState, VisitBest};
 
-const S: u64 = 1000;
-const MIN: u64 = 60 * S;
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const CONSTRUCTION_SITE: &str = "victoria-road__construction-site-north-of-kerning-city--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
 const ROCKY_ROAD: &str = "victoria-road__rocky-road-i--title-region";
 
 /// The Rolling Rate's EXP/h as the Grind Tracker shows it ("Last 5 min").
 fn rolling(state: &PanelState) -> Option<i64> {
     state.exp_tracking.rolling.map(|r| r.exp_per_hour)
-}
-
-/// The Best row's EXP/h: the map's Personal Best from earlier Visits.
-fn best_row(state: &PanelState) -> Option<u64> {
-    state.exp_tracking.personal_best
 }
 
 /// Whether the Best row's figure was set on this Visit, and is marked so.
@@ -53,7 +42,7 @@ fn saved_rates(player: &Player, map: &str) -> Vec<u64> {
 #[test]
 fn a_first_visits_best_is_dated_by_the_wall_clock_at_the_refresh_that_showed_it() {
     let mut player = Player::clocked(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     let best = |exp_per_hour, set_at_unix_ms| vec![VisitBest { exp_per_hour, set_at_unix_ms, ..VisitBest::default() }];
 
     // 3,600 EXP/h: the first best is the refresh's 5 minutes in, and was set then.
@@ -82,9 +71,9 @@ fn a_first_visits_best_is_dated_by_the_wall_clock_at_the_refresh_that_showed_it(
 fn a_first_visits_best_shows_on_the_best_row_from_five_minutes_of_play_there_marked_as_this_visits() {
     let mut player = Player::new(tracking());
     // 10,800 EXP/h on the Construction Site for 6 minutes, then on to Sunset Sky.
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(6 * MIN, 30);
-    assert_eq!(best_row(&player.arrive(SUNSET)), None);
+    assert_eq!(best_row(&player.arrive(SUNSET_SAMPLE)), None);
 
     // 3,600 EXP/h there. Under 5 minutes in, the Rolling Rate still counts some of the
     // Construction Site's play: no best yet, so no Best row.
@@ -112,11 +101,11 @@ fn a_first_visits_best_shows_on_the_best_row_from_five_minutes_of_play_there_mar
 /// Construction Site at 10,800, and back to Sunset Sky.
 fn back_on_sunset_sky_after_a_best_of_7200() -> (Player, PanelState) {
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(2 * MIN, 30);
-    let back = player.arrive(SUNSET);
+    let back = player.arrive(SUNSET_SAMPLE);
     (player, back)
 }
 
@@ -161,7 +150,7 @@ fn the_star_marks_last_5_min_while_it_is_the_best_this_visit_set_on_the_map() {
 #[test]
 fn a_first_visits_star_marks_last_5_min_while_it_is_the_visits_best() {
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     let five = player.hunt(5 * MIN, 20);
     assert_eq!((rolling(&five), best_row(&five), starred(&five)), (Some(7200), Some(7200), true));
     let slower = player.hunt(5 * MIN, 10);
@@ -172,11 +161,11 @@ fn a_first_visits_star_marks_last_5_min_while_it_is_the_visits_best() {
 fn this_visits_best_takes_the_row_once_it_reads_higher_as_the_grind_tracker_writes_them() {
     // Sunset Sky's best: 10,800 EXP/h on a first Visit.
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 30);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(2 * MIN, 30);
-    assert_eq!(best_row(&player.arrive(SUNSET)), Some(10_800));
+    assert_eq!(best_row(&player.arrive(SUNSET_SAMPLE)), Some(10_800));
 
     // 3 EXP more in 5 minutes: 10,836 EXP/h is more, but reads 10,800 as the best does.
     // The tie stays the earlier Visit's: no mark, and no star.
@@ -199,9 +188,9 @@ fn a_best_set_this_visit_is_an_earlier_visits_on_the_next() {
     assert_eq!((rolling(&after), best_row(&after), this_visits(&after)), (Some(9000), Some(10_800), true));
 
     // The next Visit shows it from arriving, as the earlier Visits' best: no mark.
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(MIN, 30);
-    let back = player.arrive(SUNSET);
+    let back = player.arrive(SUNSET_SAMPLE);
     assert_eq!((best_row(&back), this_visits(&back)), (Some(10_800), false));
     let five = player.hunt(5 * MIN, 25);
     assert_eq!((rolling(&five), starred(&five), this_visits(&five)), (Some(9000), false, false));
@@ -212,25 +201,21 @@ fn nothing_is_recorded_on_a_map_without_a_map_summary() {
     let mut player = Player::new(tracking());
 
     // A town has none: no best there, however long the play.
-    player.arrive(KERNING);
+    player.arrive(KERNING_SAMPLE);
     assert_eq!(best_row(&player.hunt(6 * MIN, 30)), None);
     assert!(player.minerva.bests().unassigned.is_empty());
 
     // Sunset Sky has one: its best from 5 minutes there.
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(5 * MIN, 10);
     assert_eq!(saved_rates(&player, SUNSET_SKY_ID), [3600]);
-}
-
-fn shown_map(state: &PanelState) -> Option<&str> {
-    state.map.as_ref().map(|m| m.id.as_str())
 }
 
 #[test]
 fn nothing_is_recorded_while_candidates_wait_for_a_choice() {
     let mut player = Player::new(tracking_with(sharing_a_title()));
-    let arrived = player.arrive(KERNING);
-    assert_eq!(shown_map(&arrived), Some(CONSTRUCTION_SITE_ID));
+    let arrived = player.arrive(KERNING_SAMPLE);
+    assert_eq!(shown_id(&arrived), Some(CONSTRUCTION_SITE_ID));
     assert_eq!(arrived.candidates.map(|c| c.chosen), Some(false));
 
     // 10,800 EXP/h, then 3,600, with nothing chosen: no best.
@@ -241,7 +226,7 @@ fn nothing_is_recorded_while_candidates_wait_for_a_choice() {
     // The player chooses the Construction Site: the hotkey shows Sunset Sky, then it.
     player.choose_next();
     let chosen = player.choose_next();
-    assert_eq!(shown_map(&chosen), Some(CONSTRUCTION_SITE_ID));
+    assert_eq!(shown_id(&chosen), Some(CONSTRUCTION_SITE_ID));
     // Its first best is the Rolling Rate as it shows now: the 10,800 shown before the
     // choice never counted.
     assert_eq!(saved_rates(&player, CONSTRUCTION_SITE_ID), [3600]);
@@ -252,7 +237,7 @@ fn nothing_is_recorded_while_candidates_wait_for_a_choice() {
 fn the_best_row_shows_only_once_the_player_has_chosen_among_candidates() {
     let mut player = Player::new(tracking_with(sharing_a_title()));
     // A first Visit, choosing the Construction Site past Sunset Sky: 3,600 EXP/h there.
-    player.arrive(KERNING);
+    player.arrive(KERNING_SAMPLE);
     player.hunt(6 * MIN, 10);
     player.choose_next();
     player.choose_next();
@@ -260,9 +245,9 @@ fn the_best_row_shows_only_once_the_player_has_chosen_among_candidates() {
     // On Rocky Road I, whose page doesn't settle which map the title is on the way back.
     player.arrive(ROCKY_ROAD);
     player.hunt(MIN, 10);
-    let back = player.arrive(KERNING);
+    let back = player.arrive(KERNING_SAMPLE);
     assert_eq!(back.candidates.as_ref().map(|c| c.chosen), Some(false));
-    assert_eq!(shown_map(&back), Some(CONSTRUCTION_SITE_ID));
+    assert_eq!(shown_id(&back), Some(CONSTRUCTION_SITE_ID));
     // Waiting for a choice, the map isn't certain: no Best row, though the one shown has
     // a best.
     assert_eq!(best_row(&back), None);
@@ -272,11 +257,11 @@ fn the_best_row_shows_only_once_the_player_has_chosen_among_candidates() {
     // Chosen, the map is certain: the Rolling Rate shown now, 10,800 EXP/h over 5 minutes
     // of the Visit, is Sunset Sky's first best, on its row at once...
     let sunset = player.choose_next();
-    assert_eq!(shown_map(&sunset), Some(SUNSET_SKY_ID));
+    assert_eq!(shown_id(&sunset), Some(SUNSET_SKY_ID));
     assert_eq!((best_row(&sunset), this_visits(&sunset)), (Some(10_800), true));
     // ...and the Construction Site's, chosen instead, beating its 3,600 from the first Visit.
     let site = player.choose_next();
-    assert_eq!(shown_map(&site), Some(CONSTRUCTION_SITE_ID));
+    assert_eq!(shown_id(&site), Some(CONSTRUCTION_SITE_ID));
     assert_eq!((best_row(&site), this_visits(&site)), (Some(10_800), true));
     assert_eq!(saved_rates(&player, CONSTRUCTION_SITE_ID), [10_800, 3600]);
     assert_eq!(saved_rates(&player, SUNSET_SKY_ID), [] as [u64; 0]);
@@ -285,7 +270,7 @@ fn the_best_row_shows_only_once_the_player_has_chosen_among_candidates() {
 #[test]
 fn nothing_is_recorded_while_the_exp_bar_cannot_be_read() {
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(4 * MIN, 30);
 
     // The bar goes unread past 5 minutes on the map: nothing is known of the EXP.
@@ -294,9 +279,9 @@ fn nothing_is_recorded_while_the_exp_bar_cannot_be_read() {
 
     // Off to the Construction Site before it reads again, then back: nothing came of the
     // Visit.
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(MIN, 10);
-    let back = player.arrive(SUNSET);
+    let back = player.arrive(SUNSET_SAMPLE);
     assert_eq!(best_row(&back), None);
     assert_eq!(saved_rates(&player, SUNSET_SKY_ID), [] as [u64; 0]);
 }
@@ -304,7 +289,7 @@ fn nothing_is_recorded_while_the_exp_bar_cannot_be_read() {
 #[test]
 fn a_best_is_last_5_min_as_shown_at_a_refresh_never_a_peak_between() {
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 10);
     assert_eq!(saved_rates(&player, SUNSET_SKY_ID), [3600]);
 
@@ -354,8 +339,8 @@ fn a_session_reset_or_a_character_switch_leaves_the_bests_as_they_were() {
     assert_eq!(saved_rates(&player, SUNSET_SKY_ID), [10_800, 7200]);
 
     // This Visit's best joins Sunset Sky's when it ends, whoever plays.
-    player.arrive(CONSTRUCTION_SITE);
-    let back = player.arrive(SUNSET);
+    player.arrive(CONSTRUCTION_SAMPLE);
+    let back = player.arrive(SUNSET_SAMPLE);
     assert_eq!((best_row(&back), this_visits(&back)), (Some(10_800), false));
 }
 
@@ -384,7 +369,7 @@ fn with_the_bar_unreadable_or_paused_the_best_row_and_star_hold_like_the_other_f
 fn the_overlay_gets_the_best_row_and_star_as_the_grind_tracker_renders_them() {
     // A first Visit, under 5 minutes: no Best row, no star.
     let mut first = Player::new(tracking());
-    first.arrive(SUNSET);
+    first.arrive(SUNSET_SAMPLE);
     let under = serde_json::to_value(first.hunt(4 * MIN, 10)).unwrap();
     assert_eq!(under["expTracking"]["personalBest"], serde_json::Value::Null);
     assert_eq!(under["expTracking"]["personalBestThisVisit"], false);
@@ -407,15 +392,15 @@ fn the_overlay_gets_the_best_row_and_star_as_the_grind_tracker_renders_them() {
 /// it a third time.
 fn back_on_sunset_sky_after_bests_of_10800_and_7200() -> (Player, PanelState) {
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 30);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(2 * MIN, 30);
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 20);
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(2 * MIN, 30);
-    let back = player.arrive(SUNSET);
+    let back = player.arrive(SUNSET_SAMPLE);
     (player, back)
 }
 
@@ -477,15 +462,15 @@ fn this_visits_best_removed_after_a_reset_isnt_counted_again_when_the_reset_is_u
 #[test]
 fn a_first_visits_best_can_be_removed_at_once() {
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     player.hunt(6 * MIN, 30);
 
     // With no history, the row goes with it, and nothing joins the history when the Visit ends.
     let removed = player.press(PanelControl::RemoveBest);
     assert_eq!((best_row(&removed), starred(&removed)), (None, false));
     assert_eq!(saved_rates(&player, SUNSET_SKY_ID), [] as [u64; 0]);
-    player.arrive(CONSTRUCTION_SITE);
-    assert_eq!(best_row(&player.arrive(SUNSET)), None);
+    player.arrive(CONSTRUCTION_SAMPLE);
+    assert_eq!(best_row(&player.arrive(SUNSET_SAMPLE)), None);
     assert_eq!(saved_rates(&player, SUNSET_SKY_ID), [] as [u64; 0]);
 }
 
@@ -519,16 +504,16 @@ fn the_pace_trace_shows_the_bests_pace_once_within_reach_for_the_rest_of_the_vis
     assert_eq!(race(&fallen), Some((600, 444)));
 
     // On the next Visit it is out of reach until it comes within reach there.
-    player.arrive(CONSTRUCTION_SITE);
+    player.arrive(CONSTRUCTION_SAMPLE);
     player.hunt(MIN, 30);
-    assert_eq!(race(&player.arrive(SUNSET)), None);
+    assert_eq!(race(&player.arrive(SUNSET_SAMPLE)), None);
     assert_eq!(race(&player.hunt(MIN, 10)), None);
 }
 
 #[test]
 fn a_first_visit_races_its_own_best_and_keeps_it_when_the_pace_falls_back() {
     let mut player = Player::new(tracking());
-    player.arrive(SUNSET);
+    player.arrive(SUNSET_SAMPLE);
     let state = player.hunt(11 * MIN, 20);
     let trace = state.exp_tracking.pace.clone().unwrap();
     // 20 EXP every 10 s, as in the 5 minutes before: level with them, and with this

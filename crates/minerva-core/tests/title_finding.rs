@@ -7,7 +7,7 @@
 
 mod common;
 
-use common::FakeSource;
+use common::{FakeSource, KERNING_SAMPLE};
 use minerva_core::{
     BugReport, Foreground, GameWindow, Minerva, PanelState, ReportAbout, ScreenPoint, ScreenRect, TITLE_LOST_AFTER_MS,
     TITLE_UNREAD_SEARCH_MS, TitleCapture,
@@ -15,40 +15,25 @@ use minerva_core::{
 };
 use std::io::Read;
 
-const KERNING: &str = "victoria-road__kerning-city--window";
 const PERION: &str = "victoria-road__perion-department-store--window";
 
-/// The client area of a window sample shown at (812,110).
-fn game(sample: &str) -> ScreenRect {
-    let client = common::client_of(&common::load(sample));
-    ScreenRect { x: 812, y: 110, width: client.width(), height: client.height() }
-}
-
+/// The game window as the shell reports it, with this client area on a 3440x1440 screen.
 fn window(client: ScreenRect) -> Option<GameWindow> {
-    let frame = ScreenRect { x: client.x - 1, y: client.y - 31, width: client.width + 2, height: client.height + 32 };
-    Some(GameWindow { client, frame, screens: vec![ScreenRect { x: 0, y: 0, width: 3440, height: 1440 }] })
+    Some(common::window_on_wide_screen(client))
 }
 
 /// Set up, with the game in front on `sample`'s client area.
 fn started(sample: &str) -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.restore(minerva_core::Settings { setup_done: true, ..Default::default() });
-    minerva.on_game_window(window(game(sample)));
+    minerva.restore(common::set_up());
+    minerva.on_game_window(window(common::game_of(sample)));
     minerva.on_foreground(Foreground::Game);
     minerva
 }
 
-/// The capture the core asks for, taken of `sample`'s client area.
-fn capture(minerva: &Minerva, sample: &str, at_ms: u64) -> TitleCapture {
-    let client = common::client_of(&common::load(sample));
-    let region = minerva.panel_state().title_capture.expect("a title capture with the game in front");
-    let ours = minerva.panel_state().our_windows.clone();
-    TitleCapture { frame: common::capture(&client, game(sample), region, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ours }
-}
-
 /// Capture what the core asks for of `sample`, and read it.
 fn read(minerva: &mut Minerva, sample: &str, at_ms: u64) -> PanelState {
-    let capture = capture(minerva, sample, at_ms);
+    let capture = common::title_capture(minerva, sample, at_ms);
     minerva.on_title_capture(capture).clone()
 }
 
@@ -65,28 +50,28 @@ fn inside(inner: ScreenRect, outer: ScreenRect) -> bool {
 
 #[test]
 fn until_the_title_is_found_the_whole_client_area_is_looked_through() {
-    let minerva = started(KERNING);
+    let minerva = started(KERNING_SAMPLE);
     let state = minerva.panel_state();
 
-    assert_eq!(state.title_capture, Some(game(KERNING)));
+    assert_eq!(state.title_capture, Some(common::game_of(KERNING_SAMPLE)));
     assert!(state.title_searching);
     assert!(!state.title_lost);
 }
 
 #[test]
 fn once_found_only_where_it_was_found_is_captured_and_it_reads_there() {
-    let mut minerva = started(KERNING);
+    let mut minerva = started(KERNING_SAMPLE);
 
-    let state = read(&mut minerva, KERNING, 0);
+    let state = read(&mut minerva, KERNING_SAMPLE, 0);
 
     let found = state.title_capture.expect("captured where it was found");
     assert!(!state.title_searching);
-    assert!(inside(found, game(KERNING)), "{found:?}");
+    assert!(inside(found, common::game_of(KERNING_SAMPLE)), "{found:?}");
     assert!(found.width < 800 && found.height < 150, "the minimap's top, not the client area: {found:?}");
     // The open minimap is at the client area's top-left.
     assert_eq!((found.x, found.y), (812, 110));
 
-    let state = read(&mut minerva, KERNING, 333);
+    let state = read(&mut minerva, KERNING_SAMPLE, 333);
     assert_eq!(shown(&state), Some(("Victoria Road", "Kerning City")));
     assert!(!state.not_sure);
     assert_eq!(state.title_capture, Some(found), "still there");
@@ -105,9 +90,9 @@ fn a_map_without_a_minimap_is_found_by_its_one_line_title_and_read_where_it_was_
 
 #[test]
 fn when_the_title_is_no_longer_where_it_was_found_the_whole_client_area_is_looked_through_again() {
-    let mut minerva = started(KERNING);
-    read(&mut minerva, KERNING, 0);
-    read(&mut minerva, KERNING, 333);
+    let mut minerva = started(KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
+    read(&mut minerva, KERNING_SAMPLE, 333);
     let found = minerva.panel_state().title_capture.unwrap();
 
     // The player moved the minimap: nothing of it is there now.
@@ -115,7 +100,7 @@ fn when_the_title_is_no_longer_where_it_was_found_the_whole_client_area_is_looke
     let origin = ScreenPoint { x: found.x, y: found.y };
     let state = minerva.on_title_capture(TitleCapture { frame: common::frame(&blank, 666), origin, ours: Vec::new() });
 
-    assert_eq!(state.title_capture, Some(game(KERNING)));
+    assert_eq!(state.title_capture, Some(common::game_of(KERNING_SAMPLE)));
     assert!(state.title_searching);
     assert_eq!(shown(state), Some(("Victoria Road", "Kerning City")), "the map shown stays");
     assert!(state.not_sure);
@@ -124,8 +109,8 @@ fn when_the_title_is_no_longer_where_it_was_found_the_whole_client_area_is_looke
 /// The pointer over the title, say: it is still there.
 #[test]
 fn a_title_found_but_unreadable_is_still_captured_where_it_was_found() {
-    let mut minerva = started(KERNING);
-    read(&mut minerva, KERNING, 0);
+    let mut minerva = started(KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
     let found = minerva.panel_state().title_capture.unwrap();
 
     let state = minerva.on_reading(TitleReading { lines: None, found: Some(found), at_ms: 333 });
@@ -136,10 +121,10 @@ fn a_title_found_but_unreadable_is_still_captured_where_it_was_found() {
 
 #[test]
 fn the_game_window_moving_has_the_title_looked_for_again() {
-    let mut minerva = started(KERNING);
-    read(&mut minerva, KERNING, 0);
+    let mut minerva = started(KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
 
-    let moved = ScreenRect { x: 900, ..game(KERNING) };
+    let moved = ScreenRect { x: 900, ..common::game_of(KERNING_SAMPLE) };
     let state = minerva.on_game_window(window(moved));
 
     assert_eq!(state.title_capture, Some(moved));
@@ -156,7 +141,7 @@ fn the_panel_in_the_capture_is_never_read_as_the_minimap_title() {
     let client = ScreenRect { x: 1512, y: 93, width: 1920, height: 1200 };
     let mut minerva = Minerva::new(FakeSource::osms());
     let offset = minerva_core::InsideOffset { x: 321, y: 393 };
-    minerva.restore(minerva_core::Settings { setup_done: true, inside_offset: Some(offset), ..Default::default() });
+    minerva.restore(minerva_core::Settings { inside_offset: Some(offset), ..common::set_up() });
     let size = |width, height| minerva_core::Size { width, height };
     minerva.set_panel_sizes(minerva_core::PanelSizes { expanded: size(320, 338), collapsed: size(44, 44) });
     minerva.on_game_window(window(client));
@@ -178,7 +163,7 @@ fn the_panel_in_the_capture_is_never_read_as_the_minimap_title() {
 
 #[test]
 fn nothing_is_captured_while_another_app_is_in_front() {
-    let mut minerva = started(KERNING);
+    let mut minerva = started(KERNING_SAMPLE);
 
     let state = minerva.on_foreground(Foreground::OtherApp);
 
@@ -192,9 +177,9 @@ fn not_found(at_ms: u64) -> TitleReading {
 
 #[test]
 fn with_no_title_found_for_a_while_the_panel_says_it_cant_find_it_until_one_is() {
-    let mut minerva = started(KERNING);
-    read(&mut minerva, KERNING, 0);
-    read(&mut minerva, KERNING, 333);
+    let mut minerva = started(KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
+    read(&mut minerva, KERNING_SAMPLE, 333);
 
     assert!(!minerva.on_reading(not_found(1_000)).title_lost);
     assert!(!minerva.on_reading(not_found(1_000 + TITLE_LOST_AFTER_MS - 1)).title_lost);
@@ -202,13 +187,13 @@ fn with_no_title_found_for_a_while_the_panel_says_it_cant_find_it_until_one_is()
     assert!(state.title_lost);
     assert_eq!(shown(&state), Some(("Victoria Road", "Kerning City")), "the map shown stays");
 
-    let state = read(&mut minerva, KERNING, 12_000);
+    let state = read(&mut minerva, KERNING_SAMPLE, 12_000);
     assert!(!state.title_lost);
 }
 
 #[test]
 fn a_title_found_but_unreadable_is_not_lost() {
-    let mut minerva = started(KERNING);
+    let mut minerva = started(KERNING_SAMPLE);
 
     minerva.on_reading(TitleReading { lines: None, found: Some(common::TITLE_FOUND), at_ms: 0 });
     let state = minerva.on_reading(TitleReading { lines: None, found: Some(common::TITLE_FOUND), at_ms: 20_000 });
@@ -218,7 +203,7 @@ fn a_title_found_but_unreadable_is_not_lost() {
 
 #[test]
 fn with_no_title_ever_found_the_panel_says_so_after_a_while_too() {
-    let mut minerva = started(KERNING);
+    let mut minerva = started(KERNING_SAMPLE);
 
     minerva.on_reading(not_found(0));
     let state = minerva.on_reading(not_found(TITLE_LOST_AFTER_MS));
@@ -247,10 +232,10 @@ fn crops(report: &BugReport) -> Vec<(String, image::RgbaImage)> {
 /// the title's.
 #[test]
 fn a_bug_report_keeps_the_title_where_it_was_found_and_none_of_the_rest_of_the_client_area() {
-    let mut minerva = started(KERNING);
-    read(&mut minerva, KERNING, 0);
+    let mut minerva = started(KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
     let found = minerva.panel_state().title_capture.unwrap();
-    read(&mut minerva, KERNING, 333);
+    read(&mut minerva, KERNING_SAMPLE, 333);
 
     let report = minerva.bug_report(&ReportAbout::default());
 
@@ -263,7 +248,7 @@ fn a_bug_report_keeps_the_title_where_it_was_found_and_none_of_the_rest_of_the_c
 
 #[test]
 fn the_panels_line_saying_it_cant_find_the_title_opens_the_faqs_answer_on_it() {
-    let mut minerva = started(KERNING);
+    let mut minerva = started(KERNING_SAMPLE);
     minerva.on_reading(not_found(0));
     assert!(minerva.on_reading(not_found(TITLE_LOST_AFTER_MS)).title_lost);
 
@@ -277,9 +262,9 @@ fn the_panels_line_saying_it_cant_find_the_title_opens_the_faqs_answer_on_it() {
 /// cuts, say): it is looked for afresh in the whole client area.
 #[test]
 fn a_title_found_but_read_as_no_map_for_a_few_seconds_is_looked_for_afresh() {
-    let mut minerva = started(KERNING);
-    read(&mut minerva, KERNING, 0);
-    read(&mut minerva, KERNING, 333);
+    let mut minerva = started(KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
+    read(&mut minerva, KERNING_SAMPLE, 333);
     let found = minerva.panel_state().title_capture.unwrap();
     let misread = |at_ms| TitleReading {
         lines: Some(minerva_core::TitleLines { street: "Vxqz Rozd".into(), map: "Qwrtp Czty".into() }),
@@ -292,17 +277,17 @@ fn a_title_found_but_read_as_no_map_for_a_few_seconds_is_looked_for_afresh() {
     let state = minerva.on_reading(misread(1_000 + TITLE_UNREAD_SEARCH_MS));
 
     assert!(state.title_searching);
-    assert_eq!(state.title_capture, Some(game(KERNING)));
+    assert_eq!(state.title_capture, Some(common::game_of(KERNING_SAMPLE)));
 }
 
 #[test]
 fn a_title_read_as_its_map_again_in_time_stays_where_it_was_found() {
-    let mut minerva = started(KERNING);
-    read(&mut minerva, KERNING, 0);
+    let mut minerva = started(KERNING_SAMPLE);
+    read(&mut minerva, KERNING_SAMPLE, 0);
     let found = minerva.panel_state().title_capture.unwrap();
 
     minerva.on_reading(TitleReading { lines: None, found: Some(found), at_ms: 333 });
-    read(&mut minerva, KERNING, 666);
+    read(&mut minerva, KERNING_SAMPLE, 666);
     let state = minerva.on_reading(TitleReading { lines: None, found: Some(found), at_ms: 333 + TITLE_UNREAD_SEARCH_MS });
 
     assert!(!state.title_searching, "the read at 666 ms started the wait afresh");
@@ -311,7 +296,7 @@ fn a_title_read_as_its_map_again_in_time_stays_where_it_was_found() {
 /// Time behind another app isn't time the title wasn't found: none was looked for.
 #[test]
 fn the_cant_find_line_counts_afresh_after_another_app_was_in_front() {
-    let mut minerva = started(KERNING);
+    let mut minerva = started(KERNING_SAMPLE);
     minerva.on_reading(not_found(0));
 
     minerva.on_foreground(Foreground::OtherApp);

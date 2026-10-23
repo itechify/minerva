@@ -8,18 +8,11 @@
 
 mod common;
 
-use common::tracking;
+use common::{tracking, S, overlaps, percent, unread};
 use minerva_core::{
-    Action, Character, Deaths, ExpBar, ExpBarReading, ExpTracking, Foreground, Minerva, PanelSizes, PanelState, STATUS_BAR_STRIP,
+    Action, Character, Deaths, ExpBar, ExpTracking, Foreground, Minerva, PanelSizes, PanelState, STATUS_BAR_STRIP,
     ScreenRect, Size, StatusBar, StatusBarReading, TrackingState,
 };
-
-const S: u64 = 1000;
-
-/// The percentage the game shows for `exp` on a level of `total` EXP, to the hundredth.
-fn percent(exp: u64, total: u64) -> u32 {
-    ((exp * 20_000 + total) / (2 * total)) as u32
-}
 
 const LV13: u64 = 4200;
 const LV14: u64 = 4600;
@@ -27,13 +20,7 @@ const OTHER: u64 = 16_682;
 
 /// The EXP bar read as `exp` on a level of `total` EXP, at `at_ms`.
 fn read(minerva: &mut Minerva, at_ms: u64, exp: u64, total: u64) -> PanelState {
-    let bar = Some(ExpBar { exp, percent_hundredths: percent(exp, total) });
-    minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place: None }).clone()
-}
-
-/// A frame of the EXP bar at `at_ms` whose figures don't read whole.
-fn unread(minerva: &mut Minerva, at_ms: u64) -> PanelState {
-    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms, place: None }).clone()
+    common::read(minerva, at_ms, exp, percent(exp, total))
 }
 
 /// The Status Bar read at `at_ms`, showing a Magician named `name` (`None`: unreadable) at
@@ -232,12 +219,6 @@ fn a_level_up_the_status_bar_shows_is_taken_at_once_however_far_the_bar_was_from
     let levelled_late = read(&mut late, 40 * S, 520, LV14);
     assert_eq!(levelled_late.exp_tracking.bar, Some(ExpBar { exp: 520, percent_hundredths: percent(520, LV14) }));
     assert_eq!(levelled_late.exp_tracking.deaths, Deaths::default());
-}
-
-fn overlaps(a: ScreenRect, b: ScreenRect) -> bool {
-    let (ar, ab) = (a.x + a.width as i32, a.y + a.height as i32);
-    let (br, bb) = (b.x + b.width as i32, b.y + b.height as i32);
-    a.x < br && b.x < ar && a.y < bb && b.y < ab
 }
 
 #[test]

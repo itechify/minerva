@@ -8,26 +8,13 @@
 
 mod common;
 
-use common::arrive;
-use common::world::{WorldMap, map, mob, orange, search_for, world};
+use common::{arrive, SUNSET_SAMPLE, KERNING_SAMPLE, shown_map_name, shown_id};
+use common::world::{WorldMap, map, mob, orange, search_for, world, searched_from_sunset_sky};
 use minerva_core::{Action, Minerva, Distance, PanelState, PortalKind};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
 
 /// The map the player arrives on with the Sunset Sky sample.
 fn sunset_sky(id: &str) -> WorldMap {
     map(id, "Sunset Sky", 100, vec![])
-}
-
-/// A core over `maps`, its file set in hand, with the player arrived on Sunset Sky and
-/// the Orange Mushroom picked.
-fn searched_from_sunset_sky(maps: Vec<WorldMap>) -> PanelState {
-    let mut minerva = Minerva::new(world(maps));
-    minerva.tick(0);
-    minerva.tick(50);
-    arrive(&mut minerva, SUNSET, 100);
-    search_for(&mut minerva, "orange")
 }
 
 /// Each result as "Map Name: Distance".
@@ -221,13 +208,13 @@ fn distances_are_measured_again_when_the_player_changes_map() {
     ]));
     minerva.tick(0);
     minerva.tick(50);
-    arrive(&mut minerva, SUNSET, 100);
+    arrive(&mut minerva, SUNSET_SAMPLE, 100);
     let state = search_for(&mut minerva, "orange");
     assert_eq!(distances(&state), ["Mushroom Field: 2"]);
 
-    let state = arrive(&mut minerva, KERNING, 1_000);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 1_000);
 
-    assert_eq!(state.map.as_ref().map(|m| m.map_name.as_str()), Some("Kerning City"));
+    assert_eq!(shown_map_name(&state), Some("Kerning City"));
     assert_eq!(distances(&state), ["Mushroom Field: 1"]);
     assert_eq!(nearest(&state).as_deref(), Some("Mushroom Field: 1"));
 }
@@ -244,14 +231,14 @@ fn on_a_title_several_maps_share_distance_is_measured_from_the_candidate_shown()
     ]));
     minerva.tick(0);
     minerva.tick(50);
-    let state = arrive(&mut minerva, KERNING, 100);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 100);
     assert!(state.candidates.is_some(), "the player may choose");
     let state = search_for(&mut minerva, "orange");
     assert_eq!(distances(&state), ["Mushroom Field: 1"]);
 
     let state = minerva.act(Action::ChooseCandidate);
 
-    assert_eq!(state.map.as_ref().map(|m| m.id.as_str()), Some("100000001"));
+    assert_eq!(shown_id(state), Some("100000001"));
     assert_eq!(distances(state), ["Mushroom Field: 2"]);
 }
 
@@ -263,7 +250,7 @@ fn from_the_first_launch_distances_reach_across_every_map_in_the_set() {
     maps.push(map("100000024", "Mushroom Field", 100, vec![orange(10)]));
     let mut minerva = Minerva::new(world(maps));
     minerva.tick(0);
-    arrive(&mut minerva, SUNSET, 100);
+    arrive(&mut minerva, SUNSET_SAMPLE, 100);
 
     let state = search_for(&mut minerva, "orange");
 

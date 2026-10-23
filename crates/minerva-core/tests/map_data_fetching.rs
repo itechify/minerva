@@ -5,22 +5,15 @@
 mod common;
 
 use common::osms::{self, SUNSET_SKY, map, mob};
-use common::{FakeSource, arrive, sample_frame};
-use minerva_core::{Minerva, MapData, MapDataStatus, OSMS_AND_MEOWDB_CREDIT, PanelState, Request};
-
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
-
-fn shown_map_name(state: &PanelState) -> Option<&str> {
-    state.map.as_ref().map(|m| m.map_name.as_str())
-}
+use common::{FakeSource, arrive, sample_frame, SUNSET_SAMPLE, KERNING_SAMPLE, shown_map_name};
+use minerva_core::{Minerva, MapData, MapDataStatus, OSMS_AND_MEOWDB_CREDIT, Request};
 
 #[test]
 fn the_recognised_map_shows_at_once_with_its_data() {
     let mut minerva = Minerva::new(FakeSource::osms());
-    minerva.on_frame(sample_frame(SUNSET, 0));
+    minerva.on_frame(sample_frame(SUNSET_SAMPLE, 0));
 
-    let state = minerva.on_frame(sample_frame(SUNSET, 333));
+    let state = minerva.on_frame(sample_frame(SUNSET_SAMPLE, 333));
 
     assert_eq!(shown_map_name(state), Some("Sunset Sky"));
     assert!(matches!(&state.data, MapDataStatus::Ready(data) if data.mobs.len() == 5));
@@ -30,7 +23,7 @@ fn the_recognised_map_shows_at_once_with_its_data() {
 fn before_any_map_is_shown_there_is_no_data_and_no_credit() {
     let mut minerva = Minerva::new(FakeSource::osms());
 
-    let state = minerva.on_frame(sample_frame(SUNSET, 0));
+    let state = minerva.on_frame(sample_frame(SUNSET_SAMPLE, 0));
 
     assert_eq!(state.data, MapDataStatus::NoMap);
     assert_eq!(state.credit, None);
@@ -44,7 +37,7 @@ fn sunset_with(mobs: &[(u64, &str, u32, u32)]) -> MapData {
         world = world.with_mob(mob(id, name, level, 100, 10)).changing(SUNSET_SKY, |m| m.spawns(id, points));
     }
     let mut minerva = Minerva::new(FakeSource::with_world(world));
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
     let MapDataStatus::Ready(data) = &state.data else { panic!("{:?}", state.data) };
     data.clone()
 }
@@ -84,7 +77,7 @@ fn the_panel_lists_every_mob_on_the_map_by_level() {
 fn the_shown_map_credits_osms_for_its_data_and_meowdb_for_its_pages() {
     let mut minerva = Minerva::new(FakeSource::osms());
 
-    let state = arrive(&mut minerva, KERNING, 0);
+    let state = arrive(&mut minerva, KERNING_SAMPLE, 0);
 
     assert_eq!(state.credit, Some(OSMS_AND_MEOWDB_CREDIT));
     assert_eq!(OSMS_AND_MEOWDB_CREDIT, "Data: OSMS Data Explorer (osmsdataexplorer.com) · Pages: NiaMeowDB (meowdb.com)");
@@ -94,7 +87,7 @@ fn the_shown_map_credits_osms_for_its_data_and_meowdb_for_its_pages() {
 fn the_shown_map_still_links_to_its_meowdb_page() {
     let mut minerva = Minerva::new(FakeSource::osms());
 
-    let state = arrive(&mut minerva, SUNSET, 0);
+    let state = arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     assert_eq!(state.map.as_ref().map(|m| m.url.as_str()), Some("https://meowdb.com/msclassic/maps/010003070"));
 }
@@ -105,7 +98,7 @@ fn ctrl_shift_m_opens_the_shown_maps_meowdb_page_even_with_settings_from_before_
     let older = r#"{"version":1,"expanded":true,"hotkeys":{"togglePanel":"ctrl+shift+m","editMode":"ctrl+shift+e"}}"#;
     let mut minerva = Minerva::new(FakeSource::osms());
     minerva.restore(serde_json::from_str(older).unwrap());
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
 
     let opened = minerva.on_hotkey("ctrl+shift+m");
 
@@ -118,7 +111,7 @@ fn ctrl_shift_m_opens_the_shown_maps_meowdb_page_even_with_settings_from_before_
 fn the_overlay_receives_the_shown_maps_data_without_its_portal_graph() {
     let mut minerva = Minerva::new(FakeSource::osms());
 
-    let json = serde_json::to_value(arrive(&mut minerva, SUNSET, 0)).unwrap();
+    let json = serde_json::to_value(arrive(&mut minerva, SUNSET_SAMPLE, 0)).unwrap();
 
     assert_eq!(json["data"]["status"], "ready");
     assert_eq!(json["data"]["mobs"].as_array().map(Vec::len), Some(5));

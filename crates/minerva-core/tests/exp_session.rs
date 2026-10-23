@@ -10,21 +10,10 @@
 mod common;
 
 use common::osms;
-use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, arrive, sharing_a_title, tracking, tracking_with};
-use std::path::Path;
+use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, arrive, sharing_a_title, tracking, tracking_with, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, KERNING_SAMPLE, MIN, S, shown_id, read, unread};
 use minerva_core::{
-    Action, Minerva, Deaths, ExpBar, ExpBarReading, ExpRate, ExpTracking, GameWindow, PacePoint, PanelControl, PanelState,
-    ScreenRect, TrackingState,
+    Action, Minerva, Deaths, ExpBar, ExpRate, ExpTracking, PacePoint, PanelControl, PanelState, TrackingState,
 };
-
-const S: u64 = 1000;
-const MIN: u64 = 60 * S;
-
-/// The EXP bar read as `exp [percent_hundredths / 100 %]` at `at_ms`.
-fn read(minerva: &mut Minerva, at_ms: u64, exp: u64, percent_hundredths: u32) -> PanelState {
-    let bar = Some(ExpBar { exp, percent_hundredths });
-    minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms, place: None }).clone()
-}
 
 #[test]
 fn with_the_grind_tracker_turned_off_tracking_is_off() {
@@ -132,7 +121,7 @@ fn more_than_two_minutes_without_an_exp_change_pauses_the_session_until_the_next
 /// The percentage the game shows for `exp` on the 4,200 EXP level of the single
 /// samples, rounded to hundredths as the game does.
 fn percent(exp: u64) -> u32 {
-    ((exp * 20_000 + 4200) / (2 * 4200)) as u32
+    common::percent(exp, 4200)
 }
 
 #[test]
@@ -162,7 +151,7 @@ fn the_rolling_rate_covers_the_last_five_minutes_of_active_time_and_drives_time_
 
 /// A single EXP bar sample, captured at `at_ms`.
 fn sample(minerva: &mut Minerva, at_ms: u64, name: &str) -> PanelState {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/exp-bar").join(format!("{name}.png"));
+    let path = common::samples_in("exp-bar").join(format!("{name}.png"));
     let img = image::open(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display())).to_rgba8();
     minerva.on_exp_bar_frame(common::frame(&img, at_ms)).clone()
 }
@@ -230,7 +219,7 @@ fn misreads_in_the_middle_of_a_session_move_nothing() {
 
 /// The percentage the game shows for `exp` on the recording's ~16,682 EXP level.
 fn percent_lv15(exp: u64) -> u32 {
-    ((exp * 20_000 + 16_682) / (2 * 16_682)) as u32
+    common::percent(exp, 16_682)
 }
 
 #[test]
@@ -264,7 +253,7 @@ fn a_level_up_counts_what_was_left_of_the_old_level_and_what_is_in_the_new() {
 
 /// The percentage the game shows for `exp` on a level of 20,000 EXP.
 fn percent_20k(exp: u64) -> u32 {
-    ((exp * 20_000 + 20_000) / (2 * 20_000)) as u32
+    common::percent(exp, 20_000)
 }
 
 #[test]
@@ -624,14 +613,10 @@ fn readings_rejected_before_a_reset_never_count_towards_a_character_switch() {
     assert_eq!(exp_per_hour(&state), (Some(14_400), Some(14_400)), "40 EXP in 10 s");
 }
 
-const SUNSET: &str = "victoria-road__sunset-sky--window";
-const CONSTRUCTION_SITE: &str = "victoria-road__construction-site-north-of-kerning-city--window";
-const KERNING: &str = "victoria-road__kerning-city--window";
-
 #[test]
 fn the_overlay_gets_tracking_as_the_panel_renders_it() {
     let mut minerva = tracking();
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
     read(&mut minerva, 0, 160, 381);
     let warming_up = serde_json::to_value(read(&mut minerva, 10 * S, 266, 633)).unwrap();
     assert_eq!(
@@ -720,7 +705,7 @@ fn the_rate_on_a_map_is_compared_with_its_solo_ceiling_after_a_minute_of_play_th
 
     // Arriving on Sunset Sky, nothing has been earned there yet: the minute's 69 EXP came
     // before it showed. The Session carries on all the same.
-    let sunset = arrive(&mut minerva, SUNSET, 70 * S);
+    let sunset = arrive(&mut minerva, SUNSET_SAMPLE, 70 * S);
     assert_eq!(held(&sunset.exp_tracking), held(&unrecognised.exp_tracking));
 
     // A minute there, 65 EXP: 3,900 EXP/h of its 213,571 solo, 1.83%.
@@ -732,13 +717,13 @@ fn the_rate_on_a_map_is_compared_with_its_solo_ceiling_after_a_minute_of_play_th
 
     // On the Construction Site its 281,786 is measured against what is earned there, from
     // nothing again: never Sunset Sky's EXP against its ceiling.
-    let site = arrive(&mut minerva, CONSTRUCTION_SITE, 131 * S);
+    let site = arrive(&mut minerva, CONSTRUCTION_SAMPLE, 131 * S);
     assert_eq!(site.exp_tracking.ceiling_share_hundredths, None);
     assert_eq!(site.exp_tracking.solo_exp_ceiling, None);
     assert_eq!(site.exp_tracking.state, TrackingState::Active);
 
     // A town has no Map Summary, so no ceiling. The Session carries on.
-    let town = arrive(&mut minerva, KERNING, 140 * S);
+    let town = arrive(&mut minerva, KERNING_SAMPLE, 140 * S);
     assert_eq!(town.exp_tracking.ceiling_share_hundredths, None);
     let on = read(&mut minerva, 150 * S, 410, 976);
     assert_eq!(on.exp_tracking.state, TrackingState::Active);
@@ -757,7 +742,7 @@ fn site_like_sunset_sky() -> FakeSource {
 fn on_the_second_of_two_maps_with_the_same_ceiling_the_share_counts_only_play_since_arriving() {
     // The Construction Site with Sunset Sky's spawn points: the same 213,571 solo ceiling.
     let mut minerva = tracking_with(site_like_sunset_sky());
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
     read(&mut minerva, 0, 160, 381);
     read(&mut minerva, 10 * S, 266, 633);
     let sunset = read(&mut minerva, 70 * S, 335, 798);
@@ -765,7 +750,7 @@ fn on_the_second_of_two_maps_with_the_same_ceiling_the_share_counts_only_play_si
 
     // Straight on to the Construction Site: nothing has been earned there yet, though its
     // ceiling is the same. Sunset Sky's minute is never measured against it.
-    let site = arrive(&mut minerva, CONSTRUCTION_SITE, 70 * S);
+    let site = arrive(&mut minerva, CONSTRUCTION_SAMPLE, 70 * S);
     assert_eq!(site.exp_tracking.ceiling_share_hundredths, None);
     assert_eq!(site.exp_tracking.solo_exp_ceiling, None);
     assert_eq!(read(&mut minerva, 100 * S, 360, 857).exp_tracking.ceiling_share_hundredths, None);
@@ -781,7 +766,7 @@ fn choosing_among_candidates_with_the_hotkey_counts_play_since_arriving_for_the_
     // The Construction Site and Sunset Sky share the Kerning City sample's title here.
     // The first in the map list, the Construction Site, shows first.
     let mut minerva = tracking_with(sharing_a_title());
-    arrive(&mut minerva, KERNING, 0);
+    arrive(&mut minerva, KERNING_SAMPLE, 0);
     read(&mut minerva, 0, 160, 381);
     read(&mut minerva, 10 * S, 266, 633);
     let first = read(&mut minerva, 70 * S, 335, 798);
@@ -793,7 +778,7 @@ fn choosing_among_candidates_with_the_hotkey_counts_play_since_arriving_for_the_
     minerva.tick(80 * S);
     minerva.on_hotkey("ctrl+shift+n");
     let chosen = minerva.panel_state();
-    assert_eq!(chosen.map.as_ref().map(|m| m.id.as_str()), Some(SUNSET_SKY_ID));
+    assert_eq!(shown_id(chosen), Some(SUNSET_SKY_ID));
     assert_eq!(chosen.exp_tracking.ceiling_share_hundredths, Some(166));
     assert_eq!(chosen.exp_tracking.solo_exp_ceiling, Some(213_571));
 }
@@ -801,7 +786,7 @@ fn choosing_among_candidates_with_the_hotkey_counts_play_since_arriving_for_the_
 #[test]
 fn undoing_a_reset_made_on_another_map_counts_the_share_from_arriving_on_this_one() {
     let mut minerva = tracking();
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
     read(&mut minerva, 0, 160, 381);
     read(&mut minerva, 10 * S, 266, 633);
     read(&mut minerva, 70 * S, 335, 798);
@@ -811,7 +796,7 @@ fn undoing_a_reset_made_on_another_map_counts_the_share_from_arriving_on_this_on
     // On to the Construction Site at 80 s, then the reset undone at 90 s: Sunset Sky's
     // minute comes back, but not into the share here.
     minerva.tick(80 * S);
-    arrive(&mut minerva, CONSTRUCTION_SITE, 80 * S);
+    arrive(&mut minerva, CONSTRUCTION_SAMPLE, 80 * S);
     minerva.tick(90 * S);
     let undone = press(&mut minerva, PanelControl::UndoReset);
     assert_eq!(exp_per_hour(&undone).1, Some(3105), "69 EXP in the Session's 80 s");
@@ -825,7 +810,7 @@ fn undoing_a_reset_made_on_another_map_counts_the_share_from_arriving_on_this_on
 #[test]
 fn there_is_no_share_of_the_ceiling_at_a_zero_or_negative_rate_on_the_map() {
     let mut minerva = tracking();
-    arrive(&mut minerva, SUNSET, 0);
+    arrive(&mut minerva, SUNSET_SAMPLE, 0);
     read(&mut minerva, 0, 160, 381);
     read(&mut minerva, 10 * S, 266, 633);
     let earning = read(&mut minerva, 70 * S, 335, 798);
@@ -841,11 +826,10 @@ fn there_is_no_share_of_the_ceiling_at_a_zero_or_negative_rate_on_the_map() {
     assert_eq!(negative.exp_tracking.solo_exp_ceiling, None);
 }
 
-
 #[test]
 fn replaying_the_2026_10_07_recording_waits_warms_up_and_then_shows_its_rates() {
     // 150 s of hunting at Lv 15, one crop of the EXP figures a second, named by capture ms.
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/exp-bar/recording-2026-10-07");
+    let dir = common::samples_in("exp-bar").join("recording-2026-10-07");
     let mut files: Vec<String> = std::fs::read_dir(&dir)
         .expect("recording")
         .map(|e| e.expect("dir entry").file_name().to_string_lossy().into_owned())
@@ -895,11 +879,6 @@ fn replaying_the_2026_10_07_recording_waits_warms_up_and_then_shows_its_rates() 
 /// with it, the Pace Trace, the forecast and the ground a death took back.
 fn held(tracking: &ExpTracking) -> ExpTracking {
     ExpTracking { bar: None, pace: None, forecast: Vec::new(), lost_from_hundredths: None, ..tracking.clone() }
-}
-
-/// A frame of the EXP bar at `at_ms` whose figures don't read whole.
-fn unread(minerva: &mut Minerva, at_ms: u64) -> PanelState {
-    minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms, place: None }).clone()
 }
 
 #[test]
@@ -1052,8 +1031,7 @@ fn without_the_game_window_tracking_shows_off_and_the_session_carries_on() {
     assert_eq!(gone.exp_tracking, ExpTracking::default());
     assert_eq!(gone.exp_tracking.state, TrackingState::Off);
 
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    let back = minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    let back = minerva.on_game_window(Some(common::window_at_origin(1920, 1200)));
     assert_eq!(back.exp_tracking, before);
 }
 

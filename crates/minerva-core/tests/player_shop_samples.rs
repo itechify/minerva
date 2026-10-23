@@ -29,24 +29,19 @@ mod common;
 use common::FakeSource;
 use common::items::{ItemWorld, etc, item_world};
 use minerva_core::{
-    DealBadge, Frame, GameWindow, ListedPrice, Minerva, PanelState, ScreenPoint, ScreenRect, Settings, ShopCapture, Size,
+    DealBadge, Frame, ListedPrice, Minerva, PanelState, ScreenPoint, Settings, ShopCapture, Size,
     Verdict,
 };
-use image::imageops::{self, FilterType};
+use image::imageops::{self};
 use image::{Rgba, RgbaImage};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 
 /// A listing's band is this wide at the UI Size most samples were taken at.
 const SAMPLES_BAND_W: f32 = 253.0;
 /// The UI Sizes every sample is also read at, next to the samples': #130's (a band 162 px
 /// wide), and two larger.
 const OTHER_UI_SIZES: [f32; 3] = [0.64, 1.5, 1.8];
-
-fn samples_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/player-shop")
-}
 
 /// One listing as a sample's readings write it: read, or covered; and the item an Item
 /// Tooltip names it as, for one whose name the game cut short so that it could be several.
@@ -85,7 +80,7 @@ struct Sample {
 }
 
 fn samples() -> Vec<Sample> {
-    let mut files: Vec<String> = std::fs::read_dir(samples_dir())
+    let mut files: Vec<String> = std::fs::read_dir(common::samples_in("player-shop"))
         .expect("samples/player-shop")
         .map(|entry| entry.expect("dir entry").file_name().to_string_lossy().to_string())
         .filter(|name| name.ends_with(".png"))
@@ -94,7 +89,7 @@ fn samples() -> Vec<Sample> {
     files
         .into_iter()
         .map(|file| {
-            let readings = samples_dir().join(file.replace(".png", ".json"));
+            let readings = common::samples_in("player-shop").join(file.replace(".png", ".json"));
             let text = std::fs::read_to_string(&readings).unwrap_or_else(|e| panic!("{}: {e}", readings.display()));
             let listings: Vec<Listing> = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", readings.display()));
             let written = listings.iter().all(|l| !matches!(l, Listing::Covered { covered: false, .. }));
@@ -149,8 +144,7 @@ fn sample_items(samples: &[Sample]) -> ItemWorld {
 fn started(samples: &[Sample]) -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms_offline().with_items(sample_items(samples)));
     minerva.restore(Settings::default());
-    let screen = ScreenRect { x: 0, y: 0, width: 1920, height: 1200 };
-    minerva.on_game_window(Some(GameWindow { client: screen, frame: screen, screens: vec![screen] }));
+    minerva.on_game_window(Some(common::window_at_origin(1920, 1200)));
     minerva.set_deal_badges_size(Size { width: 160, height: 0 });
     minerva.tick(0);
     assert!(minerva.on_hotkey("ctrl+shift+d").is_none());
@@ -158,13 +152,7 @@ fn started(samples: &[Sample]) -> Minerva {
 }
 
 fn image_of(file: &str) -> RgbaImage {
-    image::open(samples_dir().join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8()
-}
-
-/// `img` at `factor` times its size, scaled smoothly.
-fn scaled(img: &RgbaImage, factor: f32) -> RgbaImage {
-    let size = |px: u32| (px as f32 * factor).round() as u32;
-    imageops::resize(img, size(img.width()), size(img.height()), FilterType::Triangle)
+    image::open(common::samples_in("player-shop").join(file)).unwrap_or_else(|e| panic!("{file}: {e}")).to_rgba8()
 }
 
 /// The UI Size `img` shows, next to the samples': the widest its listings' bands run on a
@@ -200,17 +188,6 @@ fn captures(sample: &Sample, factor: f32, frame: impl Fn(&RgbaImage) -> Frame) -
     let pointer = sample.pointer.map(|p| ScreenPoint { x: at(p.x), y: at(p.y) });
     let capture = |file: &str, pointer| ShopCapture { frame: frame(&image_of(file)), origin: ScreenPoint { x: 0, y: 0 }, pointer };
     sample.partner.iter().map(|partner| capture(partner, None)).chain([capture(&sample.file, pointer)]).collect()
-}
-
-/// `img` as a frame, its colours times `brightness`.
-fn frame_of(img: &RgbaImage, brightness: f32) -> Frame {
-    let mut rgba = img.as_raw().clone();
-    for (i, channel) in rgba.iter_mut().enumerate() {
-        if i % 4 != 3 {
-            *channel = (*channel as f32 * brightness).round() as u8;
-        }
-    }
-    Frame { width: img.width(), height: img.height(), rgba, at_ms: 1_000 }
 }
 
 fn badges(state: &PanelState) -> Vec<DealBadge> {
@@ -303,7 +280,7 @@ fn every_samples_listings_read_as_its_readings_say_or_as_unreadable_never_wrong(
     for sample in &samples {
         for brightness in [1.0, 0.935] {
             let label = format!("{} ×{brightness}", sample.file);
-            let captures = captures(sample, 1.0, |img| frame_of(img, brightness));
+            let captures = captures(sample, 1.0, |img| common::dimmed(img, brightness));
             if let Some(checked) = check(&samples, sample, captures, &label, &mut wrong) {
                 unreadable += checked.unreadable;
             }
@@ -323,7 +300,7 @@ fn every_samples_listings_read_at_other_ui_sizes_as_its_readings_say_or_as_unrea
     for sample in &samples {
         let img = image_of(&sample.file);
         let own = sample_ui_size(&img);
-        let at_own = check(&samples, sample, captures(sample, 1.0, |img| frame_of(img, 1.0)), &sample.file, &mut wrong);
+        let at_own = check(&samples, sample, captures(sample, 1.0, |img| common::dimmed(img, 1.0)), &sample.file, &mut wrong);
         for size in OTHER_UI_SIZES {
             let factor = size / own;
             if (factor - 1.0).abs() < 0.05 {
@@ -331,7 +308,7 @@ fn every_samples_listings_read_at_other_ui_sizes_as_its_readings_say_or_as_unrea
             }
             for brightness in [1.0, 0.935] {
                 let label = format!("{} at ×{size} ×{brightness}", sample.file);
-                let captures = captures(sample, factor, |img| frame_of(&scaled(img, factor), brightness));
+                let captures = captures(sample, factor, |img| common::dimmed(&common::scaled(img, factor), brightness));
                 let Some(checked) = check(&samples, sample, captures, &label, &mut wrong) else {
                     continue;
                 };
@@ -362,7 +339,7 @@ fn bands_too_narrow_or_too_wide_for_any_ui_size_or_with_no_listing_show_no_badge
         let own = sample_ui_size(&img);
         for size in [0.5, 2.0] {
             let mut minerva = started(&samples);
-            let frame = frame_of(&scaled(&img, size / own), 1.0);
+            let frame = common::dimmed(&common::scaled(&img, size / own), 1.0);
             let state = minerva.on_player_shop_capture(ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
             assert!(badges(state).is_empty(), "{} at ×{size}", sample.file);
         }
@@ -370,7 +347,7 @@ fn bands_too_narrow_or_too_wide_for_any_ui_size_or_with_no_listing_show_no_badge
     let mut client = RgbaImage::from_pixel(1920, 1200, Rgba([96, 150, 210, 255]));
     imageops::replace(&mut client, &RgbaImage::from_pixel(300, 400, Rgba([202, 213, 223, 255])), 800, 400);
     let mut minerva = started(&samples);
-    let state = minerva.on_player_shop_capture(ShopCapture { frame: frame_of(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
+    let state = minerva.on_player_shop_capture(ShopCapture { frame: common::dimmed(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
     assert!(badges(state).is_empty(), "a plain stack of the band's colour");
 }
 
@@ -385,7 +362,7 @@ fn listings_read_before_the_pointer_and_its_tooltip_came_over_them_keep_their_ba
     let samples = samples();
     let mut minerva = started(&samples);
     let capture =
-        |file: &str| ShopCapture { frame: frame_of(&scaled(&image_of(file), size), 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None };
+        |file: &str| ShopCapture { frame: common::dimmed(&common::scaled(&image_of(file), size), 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None };
     let shown = |state: &PanelState| -> Vec<(bool, Option<String>)> {
         badges(state).iter().map(|b| (b.covered, read(b).map(|(name, _)| name))).collect()
     };
@@ -412,7 +389,7 @@ fn listings_read_before_the_pointer_and_its_tooltip_came_over_them_keep_their_ba
 fn placed(file: &str, at: (u32, u32), at_ms: u64, size: f32) -> ShopCapture {
     let mut client = RgbaImage::from_pixel(1920, 1200, Rgba([96, 150, 210, 255]));
     imageops::replace(&mut client, &image_of(file), at.0 as i64, at.1 as i64);
-    let client = if size == 1.0 { client } else { scaled(&client, size) };
+    let client = if size == 1.0 { client } else { common::scaled(&client, size) };
     let frame = Frame { width: client.width(), height: client.height(), rgba: client.into_raw(), at_ms };
     ShopCapture { frame, origin: ScreenPoint { x: 0, y: 0 }, pointer: None }
 }
@@ -460,7 +437,7 @@ fn a_larger_stack_of_the_bands_colour_elsewhere_doesnt_hide_the_shop() {
     imageops::replace(&mut client, &RgbaImage::from_pixel(300, 900, Rgba([202, 213, 223, 255])), 100, 100);
     imageops::replace(&mut client, &image_of("gems-and-ores.png"), 1343, 643);
 
-    let state = minerva.on_player_shop_capture(ShopCapture { frame: frame_of(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
+    let state = minerva.on_player_shop_capture(ShopCapture { frame: common::dimmed(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
 
     assert_eq!(badges(state).iter().filter_map(read).count(), 5, "the shop's five listings");
 }

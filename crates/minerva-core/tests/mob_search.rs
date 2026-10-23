@@ -6,8 +6,8 @@
 
 mod common;
 
-use common::world::{SEARCH, WorldMap, loaded, map, mob, orange, search_for, world};
-use minerva_core::{Action, Minerva, DensityTier, Mob, PanelState, Request, SearchView};
+use common::world::{SEARCH, WorldMap, loaded, map, mob, orange, search_for, world, sharing};
+use minerva_core::{Action, Minerva, DensityTier, PanelState, Request, SearchView};
 
 fn mushroom_world() -> Vec<WorldMap> {
     vec![
@@ -243,12 +243,6 @@ fn search_keys_do_nothing_with_the_search_view_closed() {
     let state = minerva.act(Action::SearchEscape);
 
     assert_eq!(*state, before);
-}
-
-/// A mob with this Spawn Share (whole percent).
-fn sharing(share: u32, mut mob: Mob) -> Mob {
-    mob.spawn_share_percent = share;
-    mob
 }
 
 /// Each result as "Map Name: Density (hundredths), Tier".
