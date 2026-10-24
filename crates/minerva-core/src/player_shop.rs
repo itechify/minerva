@@ -70,6 +70,24 @@ pub struct ShopReading {
     pub hover: Option<ShopHover>,
     /// When the frame was captured, as in [`Frame::at_ms`].
     pub at_ms: u64,
+    /// With no shop found, what the reader came closest with (#133); `None` with a shop, or
+    /// with nothing near.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub near_miss: Option<ShopNearMiss>,
+}
+
+/// What a Deal Finder capture with no Player Shop found came closest to one with: the stack of
+/// band rows, of any width, with the most rows. Bands at a UI Size the reader doesn't take
+/// (ADR 0020) show here, as another of the game's windows in the band's colour may.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShopNearMiss {
+    /// Where its rows are on screen, from the first to the last: as wide as they are.
+    pub area: ScreenRect,
+    /// How many band rows it has.
+    pub rows: u32,
+    /// The band's brightness next to the screenshots' colour, in hundredths (100: theirs).
+    pub brightness_hundredths: u32,
 }
 
 /// The pointer on a Player Shop's list, and the Item Tooltip the game shows by it.
@@ -163,6 +181,13 @@ const BAND_WIDTHS: RangeInclusive<u32> = 140..=480;
 /// Size, fewer at a smaller one: two listings' worth of the rows above, between and below their
 /// text.
 const MIN_BAND_ROWS: usize = 12;
+/// A stack of band rows is what a capture with no list came closest with (#133) when its rows
+/// are this wide at least, at most a quarter of the samples' band and narrower than the game
+/// draws it at any UI Size...
+const NEAR_MISS_W: u32 = 64;
+/// ...and it has this many rows at least: fewer are any light blue-grey in the game, and would
+/// make a near miss of nearly every capture.
+const NEAR_MISS_ROWS: usize = MIN_BAND_ROWS / 2;
 /// Kept around the list's part of the capture when it is scaled to the samples' UI Size, past
 /// the scaling's reach (px at their size).
 const VIEW_MARGIN: u32 = 4;
@@ -263,7 +288,11 @@ impl PlayerShopReader {
 
     pub fn read(&mut self, capture: &ShopCapture) -> ShopReading {
         let img = frame_to_rgb(&capture.frame);
-        let shop = img.as_ref().and_then(|img| self.read_rgb(img, capture.origin));
+        let (shop, near_miss) = match img.as_ref().map(|img| self.read_rgb(img, capture.origin)) {
+            Some(Ok(shop)) => (Some(shop), None),
+            Some(Err(near_miss)) => (None, near_miss),
+            None => (None, None),
+        };
         // Only on the list: off it, no listing is hovered, and the search for the tooltip
         // costs as much again as finding the list.
         let on_list = |pointer: &ScreenPoint| shop.as_ref().is_some_and(|shop| shop.span().holds(*pointer));
@@ -275,16 +304,18 @@ impl PlayerShopReader {
         if let Some((shop, hover)) = shop.as_mut().zip(hover.as_ref()) {
             hide_covered_pictures(shop, hover);
         }
-        ShopReading { shop, hover, at_ms: capture.frame.at_ms }
+        ShopReading { shop, hover, at_ms: capture.frame.at_ms, near_miss }
     }
 
-    fn read_rgb(&mut self, capture: &RgbImage, origin: ScreenPoint) -> Option<ShopList> {
+    /// The shop's list in `capture`; or, with none, what came closest to one.
+    fn read_rgb(&mut self, capture: &RgbImage, origin: ScreenPoint) -> Result<ShopList, Option<ShopNearMiss>> {
         // The list: the likeliest stack of bands that holds a listing, else the likeliest
         // (every listing sold out). Another of the game's windows may be drawn in the band's
         // colour too.
         let mut first = None;
         let mut chosen = None;
-        for found in find_lists(capture, BAND_WIDTHS) {
+        let (found_lists, nearest) = find_lists(capture, BAND_WIDTHS);
+        for found in found_lists {
             // The slots listings were read clean in at this spot (capture px).
             let known = match &self.slots {
                 Some((x0, slots)) if *x0 == found.x0 => slots.clone(),
@@ -298,7 +329,13 @@ impl PlayerShopReader {
             }
             first = first.or(Some((found, known, view, list, listings)));
         }
-        let (found, known, view, list, listings) = chosen.or(first)?;
+        let Some((found, known, view, list, listings)) = chosen.or(first) else {
+            return Err(nearest.map(|(list, rows)| ShopNearMiss {
+                area: Rect { x: list.x0, y: list.y0, w: list.w, h: list.y1 - list.y0 }.on_screen(origin),
+                rows: rows as u32,
+                brightness_hundredths: (list.brightness * 100.0).round() as u32,
+            }));
+        };
         let img = view.img.as_ref();
         let on_screen = |r: Rect| view.to_capture(r).on_screen(origin);
         // Every clean line, read at once.
@@ -356,7 +393,7 @@ impl PlayerShopReader {
         let rows = rows.into_iter().map(|(_, row)| row).collect();
         let x = list.x0.saturating_sub(PICTURE_LEFT);
         let area = Rect { x, y: list.y0, w: list.x0 + BAND_W - x, h: list.y1 - list.y0 };
-        Some(ShopList { area: on_screen(area), rows })
+        Ok(ShopList { area: on_screen(area), rows })
     }
 
     /// Read `lines` of `img` (each its own ink, black on white), remembering what each
@@ -409,7 +446,7 @@ impl<'a> View<'a> {
         let y1 = (bottom + out(reach)).min(capture.height());
         let part = imageops::crop_imm(capture, x0, y0, x1 - x0, y1 - y0).to_image();
         let img = ui_size::to_samples_size(&part, ui_size);
-        let list = List { scaled: true, ..find_lists(&img, BAND_W..=BAND_W).into_iter().next()? };
+        let list = List { scaled: true, ..find_lists(&img, BAND_W..=BAND_W).0.into_iter().next()? };
         Some((View { img: Cow::Owned(img), x: x0, y: y0, ui_size }, list))
     }
 
@@ -513,12 +550,14 @@ fn band_brightness(p: [u8; 3]) -> Option<f32> {
 }
 
 /// Where the item list may be, likeliest first: where band rows of one width in `widths` end
-/// at one column, enough of them and held by no wider stack, the most rows first.
-fn find_lists(img: &RgbImage, widths: RangeInclusive<u32>) -> Vec<List> {
+/// at one column, enough of them and held by no wider stack, the most rows first. And, from the
+/// same scan, the stack of band rows at any width (at least [`NEAR_MISS_W`]) with the most
+/// rows, if it has [`NEAR_MISS_ROWS`]: what a capture with no list came closest with (#133).
+fn find_lists(img: &RgbImage, widths: RangeInclusive<u32>) -> (Vec<List>, Option<(List, usize)>) {
     let (w, h) = img.dimensions();
     let lengths = widths.start().saturating_sub(BAND_SLACK)..=widths.end() + BAND_SLACK;
-    // Each band row at least as wide as the narrowest band, by its end and its width: its
-    // scanline and brightness.
+    // Each band row at least as wide as a near miss's, by its end and its width: its scanline
+    // and brightness.
     let mut ends: HashMap<(u32, u32), Vec<(u32, f32)>> = HashMap::new();
     for y in 0..h {
         let mut x = 0;
@@ -531,21 +570,28 @@ fn find_lists(img: &RgbImage, widths: RangeInclusive<u32>) -> Vec<List> {
             while x < w && band_brightness(img.get_pixel(x, y).0).is_some() {
                 x += 1;
             }
-            if x - start >= *lengths.start() {
+            if x - start >= NEAR_MISS_W.min(*lengths.start()) {
                 ends.entry((x, x - start)).or_default().push((y, k));
             }
         }
     }
     // A run a pixel short at one end ends a column over, or is narrower: count each end and
     // width with its neighbours.
+    // A stack as wide as a band counts no rows narrower than the narrowest band: those are kept
+    // for near misses alone.
     let near = |end: u32, width: u32| {
+        let floor = if width >= *lengths.start() { *lengths.start() } else { 0 };
         (end.saturating_sub(1)..=end + 1)
-            .flat_map(move |e| (width.saturating_sub(BAND_SLACK)..=width + BAND_SLACK).map(move |w| (e, w)))
+            .flat_map(move |e| (width.saturating_sub(BAND_SLACK).max(floor)..=width + BAND_SLACK).map(move |w| (e, w)))
             .filter_map(|key| ends.get(&key))
     };
     let count = |end: u32, width: u32| near(end, width).map(Vec::len).sum::<usize>();
     let min_rows = |width: u32| (MIN_BAND_ROWS as f32 * width as f32 / BAND_W as f32).round() as usize;
-    let stacks: Vec<(u32, u32)> = ends.keys().copied().filter(|&(end, width)| count(end, width) >= min_rows(width)).collect();
+    let stacks: Vec<(u32, u32)> = ends
+        .keys()
+        .copied()
+        .filter(|&(end, width)| width >= *lengths.start() && count(end, width) >= min_rows(width))
+        .collect();
     // A stack is a part of a wider one's bands, of any width, where it starts as they do and
     // something covers their right ends (the game's tooltip), or where it ends as they do and
     // has fewer rows, beside their text. The other way about, a wider stack with fewer rows
@@ -562,19 +608,24 @@ fn find_lists(img: &RgbImage, widths: RangeInclusive<u32>) -> Vec<List> {
         .copied()
         .filter(|&(end, width)| lengths.contains(&width) && !stacks.iter().any(|&other| inside((end, width), other)))
         .collect();
-    lists.sort_by_key(|&(end, width)| (std::cmp::Reverse((count(end, width), ends[&(end, width)].len(), width)), end));
-    lists
-        .into_iter()
-        .map(|(end, width)| {
-            let mut rows: Vec<(u32, f32)> = near(end, width).flatten().copied().collect();
-            rows.sort_by_key(|row| row.0);
-            let mut brightnesses: Vec<f32> = rows.iter().map(|&(_, k)| k).collect();
-            brightnesses.sort_by(f32::total_cmp);
-            let brightness = brightnesses[brightnesses.len() / 2];
-            let (y0, y1) = (rows[0].0, rows[rows.len() - 1].0 + 1);
-            List { x0: end - width, w: width, y0, y1, brightness, scaled: false }
-        })
-        .collect()
+    let likeliest = |&(end, width): &(u32, u32)| (std::cmp::Reverse((count(end, width), ends[&(end, width)].len(), width)), end);
+    lists.sort_by_key(likeliest);
+    let list = |(end, width): (u32, u32)| {
+        let mut rows: Vec<(u32, f32)> = near(end, width).flatten().copied().collect();
+        rows.sort_by_key(|row| row.0);
+        let mut brightnesses: Vec<f32> = rows.iter().map(|&(_, k)| k).collect();
+        brightnesses.sort_by(f32::total_cmp);
+        let brightness = brightnesses[brightnesses.len() / 2];
+        let (y0, y1) = (rows[0].0, rows[rows.len() - 1].0 + 1);
+        List { x0: end - width, w: width, y0, y1, brightness, scaled: false }
+    };
+    let nearest = ends
+        .keys()
+        .copied()
+        .filter(|&(end, width)| count(end, width) >= NEAR_MISS_ROWS)
+        .min_by_key(likeliest)
+        .map(|stack| (list(stack), count(stack.0, stack.1)));
+    (lists.into_iter().map(list).collect(), nearest)
 }
 
 /// A line of text in a listing: its inked columns and rows (ends exclusive), and the band

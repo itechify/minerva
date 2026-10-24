@@ -28,12 +28,12 @@ fn read(minerva: &mut Minerva, at_ms: u64, exp: u64, total: u64) -> PanelState {
 fn status(minerva: &mut Minerva, at_ms: u64, name: Option<&str>, level: Option<u32>) -> PanelState {
     let area = ScreenRect { x: 334, y: 1145, width: 331, height: 55 };
     let bar = StatusBar { area, level, job: Some("Magician".to_string()), name: name.map(String::from), exp_figures: None };
-    minerva.on_status_bar_reading(StatusBarReading { bar: Some(bar), at_ms }).clone()
+    minerva.on_status_bar_reading(StatusBarReading { bar: Some(bar), at_ms, near_miss: None }).clone()
 }
 
 /// A Status Bar capture at `at_ms` with no Status Bar in it: the character select screen.
 fn no_status_bar(minerva: &mut Minerva, at_ms: u64) -> PanelState {
-    minerva.on_status_bar_reading(StatusBarReading { bar: None, at_ms }).clone()
+    minerva.on_status_bar_reading(StatusBarReading { bar: None, at_ms, near_miss: None }).clone()
 }
 
 /// Egbert, a level 13 Magician, a minute and more into a Session: 100 EXP every 10 s up to

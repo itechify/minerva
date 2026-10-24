@@ -510,7 +510,7 @@ fn each_map_links_to_its_map_leaderboard_at_the_band_of_the_character_playing() 
     let mut minerva = launched();
     let area = ScreenRect { x: 334, y: 1145, width: 331, height: 55 };
     let bar = StatusBar { area, level: Some(27), job: Some("Magician".to_string()), name: Some("Egbert".to_string()), exp_figures: None };
-    let state = minerva.on_status_bar_reading(StatusBarReading { bar: Some(bar), at_ms: S }).clone();
+    let state = minerva.on_status_bar_reading(StatusBarReading { bar: Some(bar), at_ms: S, near_miss: None }).clone();
     let site = "https://owlofminerva.app/leaderboards/map/";
 
     // Egbert, playing at level 27: his band, 20–29, on every map, and his name.

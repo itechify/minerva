@@ -116,7 +116,7 @@ fn covered(slot: u32) -> ShopRow {
 }
 
 fn shop(rows: Vec<ShopRow>, at_ms: u64) -> ShopReading {
-    ShopReading { shop: Some(ShopList { area: LIST, rows }), hover: None, at_ms }
+    ShopReading { shop: Some(ShopList { area: LIST, rows }), hover: None, at_ms, near_miss: None }
 }
 
 fn listed(quantity: u64, mesos: u64) -> ListedPrice {
@@ -144,7 +144,7 @@ fn it_is_off_at_launch_and_its_hotkey_turns_it_on_and_off() {
     assert_eq!(minerva.panel_state().deal_badges, None, "no shop read yet");
 
     // It stays on with no shop open, waiting for one.
-    minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 400 });
+    minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 400, near_miss: None });
     assert!(minerva.panel_state().deal_finder.on);
     assert_eq!(minerva.panel_state().deal_finder_capture, Some(GAME));
 
@@ -360,7 +360,7 @@ fn the_badges_sit_beside_the_shops_window_level_with_each_listing() {
 fn with_no_room_left_of_the_shop_the_badges_go_right_of_it() {
     let mut minerva = on();
     let list = ScreenRect { x: GAME.x + 100, ..LIST };
-    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![] }), hover: None, at_ms: 400 };
+    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![] }), hover: None, at_ms: 400, near_miss: None };
     let state = minerva.on_player_shop_reading(reading);
     assert_eq!(state.deal_badges.as_ref().map(|b| b.placement.x), Some(list.x + 809 + 6));
 }
@@ -372,7 +372,7 @@ fn at_another_ui_size_the_shops_window_is_as_much_smaller() {
     let mut minerva = on();
     let list = ScreenRect { x: GAME.x + 100, y: 600, width: 199, height: 235 };
     let band = ShopRow { area: ScreenRect { x: list.x + 37, y: 600, width: 162, height: 35 }, ..row(0, None, None) };
-    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![band] }), hover: None, at_ms: 400 };
+    let reading = ShopReading { shop: Some(ShopList { area: list, rows: vec![band] }), hover: None, at_ms: 400, near_miss: None };
     let state = minerva.on_player_shop_reading(reading);
     let DealBadges { placement, badges } = state.deal_badges.clone().expect("badges");
     assert_eq!(placement.x, list.x + 518 + 6, "right of a window 809 × 162/253 px right of the list");
@@ -383,7 +383,7 @@ fn at_another_ui_size_the_shops_window_is_as_much_smaller() {
 fn the_badges_go_when_the_shop_closes_or_the_deal_finder_is_turned_off() {
     let mut minerva = on();
     minerva.on_player_shop_reading(shop(vec![row(0, Some("Garnet"), Some((1, 999)))], 400));
-    let state = minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 800 });
+    let state = minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 800, near_miss: None });
     assert_eq!(state.deal_badges, None);
     assert!(!state.deal_finder.shop_found);
 
@@ -524,7 +524,7 @@ fn once_the_list_has_changed_a_covered_listing_keeps_nothing_read_before() {
     let mut minerva = on();
     minerva.on_player_shop_reading(shop(vec![row(0, Some("Garnet"), Some((1, 999)))], 400));
     let moved = ShopRow { area: ScreenRect { x: LIST.x + 100, ..covered(0).area }, ..covered(0) };
-    let reading = ShopReading { shop: Some(ShopList { area: ScreenRect { x: LIST.x + 42, ..LIST }, rows: vec![moved] }), hover: None, at_ms: 800 };
+    let reading = ShopReading { shop: Some(ShopList { area: ScreenRect { x: LIST.x + 42, ..LIST }, rows: vec![moved] }), hover: None, at_ms: 800, near_miss: None };
     let state = minerva.on_player_shop_reading(reading);
     assert_eq!(badge(state, 0), (true, Verdict::Unknown));
 
@@ -663,7 +663,7 @@ fn a_name_a_tooltip_gave_is_forgotten_once_the_list_changes() {
     let mut minerva = named();
     let moved = |row: ShopRow| ShopRow { area: ScreenRect { x: row.area.x + 42, ..row.area }, ..row };
     let list = ShopList { area: ScreenRect { x: LIST.x + 42, ..LIST }, rows: scrolls_listed().into_iter().map(moved).collect() };
-    let state = minerva.on_player_shop_reading(ShopReading { shop: Some(list), hover: None, at_ms: 1_200 });
+    let state = minerva.on_player_shop_reading(ShopReading { shop: Some(list), hover: None, at_ms: 1_200, near_miss: None });
     assert_eq!(badge(state, 0), (false, Verdict::Unknown));
 
     // Turned off and on again.

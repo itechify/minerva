@@ -19,7 +19,8 @@
 mod common;
 
 use common::{FakeSource, client_of, SUNSET_SAMPLE, KERNING_SAMPLE, CONSTRUCTION_SAMPLE};
-use minerva_core::{Minerva, PanelState, ScreenPoint, ScreenRect, Settings, StatusBar, StatusBarCapture};
+use minerva_core::bug_report::{self, Event};
+use minerva_core::{Minerva, PanelState, ReportAbout, ScreenPoint, ScreenRect, Settings, StatusBar, StatusBarCapture, StatusBarNearMiss};
 
 /// What a sample's name says it shows: `None` for no Status Bar, else its level, its job
 /// (as the file names it) and its name, if the crop keeps it.
@@ -236,4 +237,29 @@ fn the_top_of_a_client_area_has_no_status_bar() {
         let capture = StatusBarCapture { frame: common::dimmed(&top, 1.0), origin: ScreenPoint { x: 0, y: 0 } };
         assert_eq!(minerva.on_status_bar_capture(capture).status_bar, None, "{window}");
     }
+}
+
+/// Two of the level's orange tiles at their pitch with no LV box round them are no Status Bar,
+/// and a Bug Report writes them down as what the reader came closest with (#133); its timeline
+/// says so.
+#[test]
+fn level_tiles_with_no_lv_box_round_them_are_written_down_as_the_near_miss() {
+    let mut strip = image::RgbaImage::from_pixel(1920, 128, image::Rgba([120, 130, 160, 255]));
+    for x in [400, 418] {
+        image::imageops::replace(&mut strip, &image::RgbaImage::from_pixel(17, 20, image::Rgba([255, 148, 21, 255])), x, 60);
+    }
+    let mut minerva = started();
+
+    let state = minerva.on_status_bar_capture(StatusBarCapture { frame: common::dimmed(&strip, 1.0), origin: ScreenPoint { x: 0, y: 1072 } });
+
+    assert_eq!(state.status_bar, None);
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).expect("the report reads back");
+    let near = recording.lines.iter().find_map(|line| match &line.event {
+        Event::StatusBar { bar: None, near_miss, .. } => *near_miss,
+        _ => None,
+    });
+    let area = ScreenRect { x: 400, y: 1132, width: 35, height: 20 };
+    assert_eq!(near, Some(StatusBarNearMiss { area, tiles: 2, box_height: None }));
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains("no Status Bar; nearest, 2 level tiles at (400, 1132), 35x20, no LV box round them"), "{timeline}");
 }

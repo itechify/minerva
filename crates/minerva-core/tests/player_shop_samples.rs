@@ -32,8 +32,9 @@ mod common;
 
 use common::FakeSource;
 use common::items::{ItemWorld, etc, item_world, scroll};
+use minerva_core::bug_report::{self, Event};
 use minerva_core::{
-    DealBadge, Frame, ListedPrice, Minerva, PanelState, ScreenPoint, Settings, ShopCapture, Size,
+    DealBadge, Frame, ListedPrice, Minerva, PanelState, ReportAbout, ScreenPoint, Settings, ShopCapture, Size,
     Verdict,
 };
 use image::imageops::{self};
@@ -549,4 +550,38 @@ fn hovered_listings_are_named_by_their_tooltip_where_their_picture_cant() {
     }
     assert!(wrong.is_empty(), "wrong readings:\n{}", wrong.join("\n"));
     assert!(unnamed.is_empty(), "hovered listings unnamed:\n{}", unnamed.join("\n"));
+}
+
+/// A shop whose bands are a list's but too wide for any UI Size the reader takes (ADR 0020) is
+/// no shop, and a Bug Report writes down what the reader came closest with (#133): those bands,
+/// where they are, how wide, and how many rows of them; and its timeline says so.
+#[test]
+fn a_list_too_wide_for_any_ui_size_is_written_down_as_the_near_miss() {
+    let samples = samples();
+    let img = image_of("gems-and-ores.png");
+    let wide = common::scaled(&img, 2.0 / sample_ui_size(&img));
+    let mut client = RgbaImage::from_pixel(1920, 1200, Rgba([96, 150, 210, 255]));
+    imageops::replace(&mut client, &wide, 100, 100);
+    let mut minerva = started(&world(&samples, true));
+
+    let state = minerva.on_player_shop_capture(ShopCapture { frame: common::dimmed(&client, 1.0), origin: ScreenPoint { x: 0, y: 0 }, pointer: None });
+
+    assert!(badges(state).is_empty());
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).expect("the report reads back");
+    let near = recording
+        .lines
+        .iter()
+        .find_map(|line| match &line.event {
+            Event::PlayerShop { shop: None, near_miss, .. } => *near_miss,
+            _ => None,
+        })
+        .expect("a near miss");
+    assert!((504..=508).contains(&near.area.width), "bands twice as wide as the samples': {near:?}");
+    assert!(near.rows >= 24, "two listings' worth of rows at least: {near:?}");
+    let inside = |at: i32, size: u32, from: i32, within: u32| at >= from && at + size as i32 <= from + within as i32;
+    assert!(inside(near.area.x, near.area.width, 100, wide.width()) && inside(near.area.y, near.area.height, 100, wide.height()), "{near:?}");
+    assert_eq!(near.brightness_hundredths, 100);
+    let timeline = recording.timeline(0).join("\n");
+    let says = format!("no Player Shop; nearest, {} band rows {} px wide at ({}, {})", near.rows, near.area.width, near.area.x, near.area.y);
+    assert!(timeline.contains(&says), "{timeline}");
 }

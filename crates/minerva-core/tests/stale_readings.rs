@@ -86,7 +86,7 @@ fn read_shop(minerva: &mut Minerva, region: ScreenRect, at_ms: u64) -> PanelStat
     };
     let shop = ShopList { area: ScreenRect { x: region.x + 600, y: region.y + 500, width: 300, height: 300 }, rows: vec![row] };
     let capture = ShopCapture { frame: blank(region, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, pointer: None };
-    minerva.on_player_shop_read(capture, ShopReading { shop: Some(shop), hover: None, at_ms }).clone()
+    minerva.on_player_shop_read(capture, ShopReading { shop: Some(shop), hover: None, at_ms, near_miss: None }).clone()
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn read_status_bar(minerva: &mut Minerva, region: ScreenRect, name: &str, exp: O
     let bar = StatusBar { area, level: Some(13), job: Some("Magician".into()), name: Some(name.into()), exp_figures: None };
     let capture = StatusBarCapture { frame: blank(region, at_ms), origin: ScreenPoint { x: region.x, y: region.y } };
     let exp = exp.map(|bar| ExpBarReading { bar: Some(bar), at_ms, place: None });
-    minerva.on_status_bar_read(capture, StatusBarReading { bar: Some(bar), at_ms }, exp).clone()
+    minerva.on_status_bar_read(capture, StatusBarReading { bar: Some(bar), at_ms, near_miss: None }, exp).clone()
 }
 
 fn character(state: &PanelState) -> Option<&str> {
