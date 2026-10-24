@@ -30,7 +30,7 @@
             <button type="button" class="icon-button" data-control="cyclePlacement" aria-label="Change placement: Inside, Docked Right, Docked Left or Detached">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5h8v8h-8zM5.5 2.5h8v8" /></svg>
             </button>
-            <button type="button" class="icon-button" data-control="settings" aria-label="Settings: change the hotkeys">
+            <button type="button" class="icon-button" id="settings-button" data-control="settings" aria-label="Settings" aria-pressed="false">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.67 3.91L6.8 1.82L9.2 1.82L9.33 3.91A4.3 4.3 0 0 1 10.88 4.8L12.75 3.87L13.96 5.95L12.21 7.11A4.3 4.3 0 0 1 12.21 8.89L13.96 10.05L12.75 12.13L10.88 11.2A4.3 4.3 0 0 1 9.33 12.09L9.2 14.18L6.8 14.18L6.67 12.09A4.3 4.3 0 0 1 5.12 11.2L3.25 12.13L2.04 10.05L3.79 8.89A4.3 4.3 0 0 1 3.79 7.11L2.04 5.95L3.25 3.87L5.12 4.8A4.3 4.3 0 0 1 6.67 3.91Z" /><circle cx="8" cy="8" r="1.6" /></svg>
             </button>
             <button type="button" class="icon-button" data-control="setup" aria-label="Help &amp; Setup">
@@ -198,61 +198,6 @@
           <p class="keys">↑ ↓ choose a map · Enter or a click makes it your Hunting Target · Esc goes back</p>
         </div>
         <p class="search-credit" id="search-credit" hidden></p>
-      </section>
-      <section class="view settings-view" id="settings-view" aria-labelledby="settings-title" tabindex="-1" hidden>
-        <header class="window-bar drag-handle search-bar">
-          <button type="button" class="icon-button" id="settings-back" aria-label="Back" title="Back (Esc)">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8H3.5M7.5 4 3.5 8l4 4" /></svg>
-          </button>
-          <h2 id="settings-title">Settings</h2>
-        </header>
-        <div class="settings-head">
-          <h3 class="settings-heading" id="hotkeys-heading">Hotkeys</h3>
-          <p class="settings-intro" id="hotkeys-intro">While the game or Minerva is in front, these keys act here and never reach the game.</p>
-        </div>
-        <ul class="hotkey-rows" id="hotkey-rows" aria-labelledby="hotkeys-heading" aria-describedby="hotkeys-intro"></ul>
-        <div class="settings-actions">
-          <p class="settings-notice" id="settings-notice"></p>
-          <button type="button" class="text-button" id="hotkeys-undo" data-focus="undo" aria-label="Undo Restore defaults" hidden>Undo</button>
-          <button type="button" class="text-button" id="hotkeys-reset" data-focus="reset">Restore defaults</button>
-        </div>
-        <div class="settings-head">
-          <h3 class="settings-heading" id="deal-heading">Deal Finder</h3>
-          <p class="settings-intro" id="deal-intro">A listing is a deal when one item costs at least this much less than its price on the Deal Line. Choose the Deal Line on any Item Card.</p>
-        </div>
-        <div class="deal-margin" role="group" aria-labelledby="deal-heading" aria-describedby="deal-intro">
-          <label class="action" for="deal-margin">Deal Margin</label>
-          <span class="deal-margin-field">
-            <input type="number" id="deal-margin" min="0" max="99" step="1" inputmode="numeric" data-focus="deal-margin" />
-            <span aria-hidden="true">% below</span>
-          </span>
-        </div>
-        <div class="settings-head">
-          <h3 class="settings-heading">Grind Tracker</h3>
-          <p class="settings-intro" id="grind-intro">Reads your EXP from the game's Status Bar, by itself, to show how fast you level. Off, Minerva doesn't read your EXP at all.</p>
-        </div>
-        <label class="grind-switch" aria-describedby="grind-intro">
-          <span class="action">Grind Tracker</span>
-          <input type="checkbox" id="grind-tracker-on" data-focus="grind-tracker" />
-        </label>
-        <div class="settings-head">
-          <h3 class="settings-heading" id="game-data-heading">Game Data</h3>
-          <p class="settings-intro" id="game-data-intro">Maps, mobs and items come from OSMS Data Explorer. Minerva gets them again once a day, and when it's updated. After a patch, Refresh gets them now.</p>
-        </div>
-        <div class="game-data" role="group" aria-labelledby="game-data-heading" aria-describedby="game-data-intro">
-          <p class="game-data-state" id="game-data-state" role="status"></p>
-          <button type="button" class="text-button" id="game-data-refresh" data-focus="game-data-refresh">Refresh</button>
-        </div>
-        <div class="settings-head">
-          <h3 class="settings-heading">Updates</h3>
-          <p class="settings-intro" id="updates-intro">Minerva checks GitHub for a new version when it starts and every 6 hours, sending only its version. It never updates without you. Off, it checks only when you press Check for updates in Help &amp; Setup.</p>
-        </div>
-        <label class="grind-switch" aria-describedby="updates-intro">
-          <span class="action">Check for updates</span>
-          <input type="checkbox" id="check-for-updates-on" data-focus="check-for-updates" />
-        </label>
-        <!-- What changed, for screen readers: the rows are drawn anew on every change. -->
-        <p class="sr-only" id="settings-announce" aria-live="polite"></p>
       </section>
       <div class="grip left" data-resize="West" title="Drag to resize" aria-hidden="true"></div>
       <div class="grip right" data-resize="East" title="Drag to resize" aria-hidden="true"></div>

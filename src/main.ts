@@ -3,7 +3,7 @@ import { soloExpHelp } from "./solo-exp-help";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { dayText, momentText } from "./dates";
+import { dayText } from "./dates";
 import { byId, cardTop, span } from "./dom";
 import { LOADING_MAP_LIST, TITLE_LOST, recognitionProblem, type Recognition } from "./recognition";
 import type { ExpTracking } from "./exp-tracking";
@@ -20,19 +20,7 @@ import {
   type HiddenPortal,
   type MapPreview,
 } from "./map-preview";
-import {
-  HOTKEY_NAMES,
-  KEY_ONLY,
-  codeLabel,
-  hotkeyAvailable,
-  keyLabel,
-  sameHotkey,
-  type Hotkey,
-  type Hotkeys,
-  type RebindProblem,
-  type SettingsNotice,
-  type SettingsView,
-} from "./hotkeys";
+import { hotkeyAvailable, keyLabel, type Hotkeys, type SettingsWindow } from "./hotkeys";
 import {
   TIER_NAMES,
   density,
@@ -149,25 +137,18 @@ type PanelState = {
   invalidHotkeys: string[];
   /** The shell has the hotkeys registered: the game or one of our windows is in front. */
   hotkeysLive: boolean;
-  /** The settings view, which takes over the panel; null while it is closed. */
-  settingsView: SettingsView | null;
+  /** The Settings window, while it is open: the gear shows as on. */
+  settingsWindow: SettingsWindow | null;
   gameWindowTitle: string;
   expBar: ExpBar | null;
   expTracking: ExpTracking;
-  /** Mirror of `minerva_core::GrindTrackerWindow`: it is on (the settings view's switch),
+  /** Mirror of `minerva_core::GrindTrackerWindow`: it is on (the Settings window's switch),
    * and the player wants it open. */
   grindTracker: { on: boolean; open: boolean };
   search: SearchState;
   /** Mirror of `minerva_core::DealFinderView`. */
   dealFinder: { on: boolean; dealLine: string | null; marginPercent: number; shopFound: boolean };
-  /** Mirror of `minerva_core::GameData`: when the map set was fetched, and the player's Refresh. */
-  gameData: { fetchedAtUnixMs: number | null; refresh: Refresh | null };
-  /** Of `minerva_core::Updates`, the settings view needs only whether "Check for updates" is on. */
-  updates: { checksOn: boolean };
 };
-
-/** Mirror of `minerva_core::Refresh`. */
-type Refresh = "upToDate" | "unreachable" | "needsUpdate" | "refreshing";
 
 const panelEl = byId("panel");
 const street = byId("street");
@@ -228,21 +209,10 @@ const searchNote = byId("search-note");
 const resultsBox = byId("results-box");
 const resultsTable = byId("search-results") as HTMLTableElement;
 const searchCredit = byId("search-credit");
-const settingsView = byId("settings-view");
-const settingsBack = byId("settings-back");
-const hotkeyRows = byId("hotkey-rows");
-const settingsNotice = byId("settings-notice");
-const settingsAnnounce = byId("settings-announce");
-const hotkeysUndo = byId("hotkeys-undo") as HTMLButtonElement;
-const hotkeysReset = byId("hotkeys-reset") as HTMLButtonElement;
+const settingsButton = byId("settings-button");
 const dealFinderEl = byId("deal-finder");
 const dealState = byId("deal-state");
 const dealDetail = byId("deal-detail");
-const dealMargin = byId("deal-margin") as HTMLInputElement;
-const grindTrackerOn = byId("grind-tracker-on") as HTMLInputElement;
-const checkForUpdatesOn = byId("check-for-updates-on") as HTMLInputElement;
-const gameDataState = byId("game-data-state");
-const gameDataRefresh = byId("game-data-refresh") as HTMLButtonElement;
 const iconArt = byId("icon-art") as HTMLImageElement;
 const resultsHeader = resultsHead();
 resultsTable.append(resultsHeader);
@@ -262,8 +232,6 @@ function changed(part: string, ...inputs: unknown[]): boolean {
 }
 /** The search view's open step, as last rendered. */
 let step: SearchState["view"] = null;
-/** The settings view, as last rendered: null while it is closed. */
-let settings: SettingsView | null = null;
 
 /**
  * "Ctrl+Shift+N is taken by another app, so it does nothing here." and "Ctrl+Shift+Banana
@@ -311,23 +279,6 @@ function candidateRow(id: string, outline: Outline): HTMLLIElement {
 
 /** "7 Oct 2026", in the player's time zone. */
 const savedOn = (unixMs: number) => dayText(new Date(unixMs), true);
-
-/** Game Data's line: how the player's Refresh is going or what it came to, or else when
- *  the map set was fetched. */
-function gameDataText({ fetchedAtUnixMs, refresh }: PanelState["gameData"]): string {
-  switch (refresh) {
-    case "refreshing":
-      return "Refreshing…";
-    case "upToDate":
-      return "Up to date";
-    case "unreachable":
-      return "Couldn't reach OSMS Data Explorer";
-    case "needsUpdate":
-      return "OSMS's data changed: update Minerva to read it";
-    case null:
-      return fetchedAtUnixMs === null ? "Not fetched yet" : `Fetched ${momentText(fetchedAtUnixMs)}`;
-  }
-}
 
 /** The note shown above the map's data: only that it comes from a saved copy over a week old. */
 function dataNote(data: MapDataStatus): string {
@@ -521,6 +472,11 @@ function renderToolbar(panel: PanelState) {
   dealFinderButton.title = hotkeyAvailable(dealKey, panel.unavailableHotkeys)
     ? `${dealFinderButton.getAttribute("aria-label")} (${keyLabel(dealKey)})`
     : dealFinderButton.getAttribute("aria-label") ?? "";
+  // Pressed while the Settings window is open, which it closes again.
+  const settingsOpen = panel.settingsWindow !== null;
+  settingsButton.setAttribute("aria-pressed", String(settingsOpen));
+  settingsButton.setAttribute("aria-label", settingsOpen ? "Close Settings" : "Settings");
+  settingsButton.title = settingsButton.getAttribute("aria-label") ?? "";
   icon.title = hotkeyAvailable(panel.hotkeys.togglePanel, panel.unavailableHotkeys)
     ? `Click to expand (${keyLabel(panel.hotkeys.togglePanel)})` : "Click to expand";
 }
@@ -637,7 +593,7 @@ function renderNavigation(panel: PanelState) {
 function renderSearchView(panel: PanelState) {
   const { search } = panel;
   const view = search.view;
-  normalView.hidden = view !== null || panel.settingsView !== null;
+  normalView.hidden = view !== null;
   searchView.hidden = view === null;
   const opened = view !== step;
   step = view;
@@ -661,182 +617,6 @@ function renderSearchView(panel: PanelState) {
     renderMaps(search, panel.mapMarks);
     if (opened) resultsBox.focus({ preventScroll: true });
   }
-}
-
-/** What a hotkey does, as the settings view and the setup guide name it. */
-const hotkeyName = (hotkey: Hotkey) => HOTKEY_NAMES.find(([h]) => h === hotkey)?.[1] ?? hotkey;
-
-/** A combination as read aloud or in a sentence: "Ctrl+Shift+F", or "off". */
-const spokenKeys = (binding: string) => (binding === "" ? "off" : keyLabel(binding));
-
-/**
- * A combination as the settings view draws it: "Ctrl+Shift+F", breaking only after a "+"
- * so a long one wraps rather than squeezing what the hotkey does; "Off" with none.
- */
-function keysElement(binding: string, kind: "set" | "refused" = "set"): HTMLElement {
-  const keys = document.createElement("kbd");
-  keys.className = `keys ${kind}`;
-  if (binding === "") {
-    keys.classList.add("off");
-    keys.textContent = "Off";
-    return keys;
-  }
-  const parts = keyLabel(binding).split("+");
-  parts.forEach((key, i) => {
-    keys.append(key);
-    if (i < parts.length - 1) keys.append("+", document.createElement("wbr"));
-  });
-  return keys;
-}
-
-/** "Ctrl+Shift+F is already “Search”. …": why the combination pressed wasn't taken. */
-function rebindProblemText(problem: RebindProblem): string {
-  switch (problem.kind) {
-    case "noModifier":
-      return `Add Ctrl, Alt or Win: as a hotkey, ${keyLabel(problem.pressed)} would never reach the game, not even its chat.`;
-    case "unsupportedKey":
-      return `${codeLabel(problem.code)} can't be part of a hotkey. Press another key.`;
-    case "inUse":
-      return `${keyLabel(problem.pressed)} is already “${hotkeyName(problem.by)}”. Swap them, or press other keys.`;
-  }
-}
-
-/** "Saved: Search is now Ctrl+Alt+F.": what the player's last change came to. */
-function settingsNoticeText(notice: SettingsNotice, hotkeys: Hotkeys): string {
-  switch (notice.kind) {
-    case "saved": {
-      const now = (hotkey: Hotkey) => `${hotkeyName(hotkey)} is now ${spokenKeys(hotkeys[hotkey])}`;
-      const swapped = notice.swappedWith ? `, and ${now(notice.swappedWith)}` : "";
-      return `Saved: ${now(notice.hotkey)}${swapped}.`;
-    }
-    case "restored":
-      return "Every hotkey is back to its default, and on.";
-    case "restoreUndone":
-      return "Saved: your hotkeys are back as they were.";
-  }
-}
-
-function textButton(text: string, focusKey: string, label: string): HTMLButtonElement {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "text-button";
-  button.textContent = text;
-  button.dataset.focus = focusKey;
-  button.setAttribute("aria-label", label);
-  return button;
-}
-
-/** A row's second line: what to press while it waits, why its keys were refused, or why they do nothing. */
-function rowNote(text: string, kind: "help" | "problem" | "broken", tag?: string, button?: HTMLButtonElement): HTMLElement {
-  const note = document.createElement("p");
-  note.className = `row-note ${kind}`;
-  const words = span("words", text);
-  if (tag) words.prepend(span("tag", tag), " ");
-  note.append(words);
-  if (button) note.append(button);
-  return note;
-}
-
-/** One hotkey's row: what it does, its keys and Change; waiting, its instruction or problem under it. */
-function hotkeyRow(hotkey: Hotkey, name: string, panel: PanelState, view: SettingsView): HTMLLIElement {
-  const row = document.createElement("li");
-  row.dataset.focus = `row:${hotkey}`;
-  row.tabIndex = -1;
-  const binding = panel.hotkeys[hotkey];
-  const waiting = view.rebinding === hotkey;
-  row.classList.toggle("rebinding", waiting);
-  const { problem } = view;
-  let keys: HTMLElement;
-  if (!waiting) keys = keysElement(binding);
-  else if (problem?.kind === "unsupportedKey") keys = keysElement(codeLabel(problem.code), "refused");
-  else if (problem) keys = keysElement(problem.pressed, "refused");
-  else keys = span("keys pending", "Press keys…");
-  const change = textButton(
-    waiting ? "Cancel" : "Change",
-    `change:${hotkey}`,
-    waiting ? `Cancel changing ${name}` : `Change ${name}, now ${spokenKeys(binding)}`,
-  );
-  change.dataset.hotkey = hotkey;
-  row.append(span("action", name), keys, change);
-  if (waiting && problem) {
-    const swap =
-      problem.kind === "inUse" ? textButton("Swap", `swap:${hotkey}`, `Swap with ${hotkeyName(problem.by)}`) : undefined;
-    swap?.addEventListener("click", () => invoke("act", { action: "swapHotkeys" }));
-    row.append(rowNote(rebindProblemText(problem), "problem", undefined, swap));
-  } else if (waiting) {
-    const turnOff =
-      binding === "" ? undefined : textButton("Turn off", `turn-off:${hotkey}`, `Turn off ${name}`);
-    if (turnOff) turnOff.title = "Turn off (Backspace)";
-    turnOff?.addEventListener("click", () => invoke("act", { action: "turnOffHotkey" }));
-    row.append(rowNote("Hold Ctrl+Shift and press a key · Esc cancels", "help", undefined, turnOff));
-  } else if (binding === "" && KEY_ONLY.includes(hotkey)) {
-    row.append(rowNote("It has no button, so it can't be used while it is off.", "help"));
-  } else if (binding !== "" && !hotkeyAvailable(binding, panel.unavailableHotkeys)) {
-    const invalid = panel.invalidHotkeys.some((key) => sameHotkey(key, binding));
-    const why = invalid ? "These aren't keys a hotkey can use." : "Windows or another app has these keys.";
-    row.append(rowNote(why, "broken", invalid ? "Invalid" : "Taken"));
-    change.setAttribute("aria-label", `Change ${name}, now ${spokenKeys(binding)}, which does nothing: ${why}`);
-  }
-  return row;
-}
-
-/** What to announce for the settings view's latest change: the problem, the wait, or the notice. */
-function settingsAnnouncement(view: SettingsView, hotkeys: Hotkeys): string {
-  if (view.problem) return rebindProblemText(view.problem);
-  if (view.rebinding) {
-    return `Press the new keys for ${hotkeyName(view.rebinding)}, holding Ctrl and Shift. Escape cancels; Backspace turns it off.`;
-  }
-  return view.notice ? settingsNoticeText(view.notice, hotkeys) : "";
-}
-
-/**
- * The settings view, in the search view's place: each hotkey with what it does, its keys and
- * a Change button. Changing one, its row waits for the new keys, which the keys pressed now
- * are (see the keydown handler below), with its instruction, or why the keys pressed were
- * refused, under it. Every change is saved at once, and the line by Restore defaults says
- * so. The rows are drawn anew on every change, so the focus is put back where it was.
- */
-function renderSettingsView(panel: PanelState) {
-  const view = panel.settingsView;
-  settingsView.hidden = view === null;
-  const was = settings;
-  settings = view;
-  if (view === null) return;
-  const focused = (document.activeElement as HTMLElement | null)?.dataset?.focus;
-  const { hotkeys, unavailableHotkeys, invalidHotkeys } = panel;
-  const redrawn = changed("hotkey-rows", hotkeys, unavailableHotkeys, invalidHotkeys, view.rebinding, view.problem);
-  if (redrawn) {
-    hotkeyRows.replaceChildren(...HOTKEY_NAMES.map(([hotkey, name]) => hotkeyRow(hotkey, name, panel, view)));
-  }
-  // The Deal Margin as saved, unless the player is typing one.
-  if (document.activeElement !== dealMargin) dealMargin.value = String(panel.dealFinder.marginPercent);
-  grindTrackerOn.checked = panel.grindTracker.on;
-  checkForUpdatesOn.checked = panel.updates.checksOn;
-  const gameData = gameDataText(panel.gameData);
-  if (changed("game-data", gameData)) gameDataState.textContent = gameData;
-  settingsNotice.textContent = view.notice ? settingsNoticeText(view.notice, hotkeys) : "";
-  hotkeysUndo.hidden = view.notice?.kind !== "restored";
-  // Nothing to restore, or a row waiting: one change at a time.
-  hotkeysReset.disabled = view.atDefaults || view.rebinding !== null;
-  const announcement = settingsAnnouncement(view, hotkeys);
-  if (changed("settings-announce", announcement)) settingsAnnounce.textContent = announcement;
-  // Opened: the first Change. Waiting: its row, so no key presses a button. Done: that
-  // row's Change. Restored: Undo, and undone: Restore defaults. Otherwise where it was.
-  const target =
-    was === null
-      ? `change:${HOTKEY_NAMES[0][0]}`
-      : view.rebinding && view.rebinding !== was.rebinding
-        ? `row:${view.rebinding}`
-        : !view.rebinding && was.rebinding
-          ? `change:${was.rebinding}`
-          : view.notice?.kind !== was.notice?.kind && view.notice?.kind === "restored"
-            ? "undo"
-            : view.notice?.kind !== was.notice?.kind && view.notice?.kind === "restoreUndone"
-              ? "reset"
-              : redrawn
-                ? focused
-                : undefined;
-  if (target) settingsView.querySelector<HTMLElement>(`[data-focus="${target}"]`)?.focus({ preventScroll: true });
 }
 
 /** Each kind of match: its section's heading, and how a click or Enter on one picks it. */
@@ -1258,7 +1038,6 @@ function render(panel: PanelState) {
   renderNavigation(panel);
   renderCredit(panel);
   renderSearchView(panel);
-  renderSettingsView(panel);
   shownPanel = panel;
   renderMobCard();
   renderBadge(panel);
@@ -1401,66 +1180,10 @@ teleportScrolls.addEventListener("change", () => {
   invoke("act", { action: "toggleTeleportScrolls" });
   resultsBox.focus({ preventScroll: true });
 });
-// Whenever the overlay comes in front with the search view or the settings view open, the
-// keys go to it.
+// Whenever the overlay comes in front with the search view open, the keys go to it.
 window.addEventListener("focus", () => {
   if (step === "matches") query.focus({ preventScroll: true });
   else if (step === "maps") resultsBox.focus({ preventScroll: true });
-  else if (settings && !settingsView.contains(document.activeElement)) {
-    const target = settings.rebinding ? `row:${settings.rebinding}` : `change:${HOTKEY_NAMES[0][0]}`;
-    settingsView.querySelector<HTMLElement>(`[data-focus="${target}"]`)?.focus({ preventScroll: true });
-  }
-});
-
-settingsBack.addEventListener("click", () => invoke("act", { action: "closeSettings" }));
-// The Deal Margin is saved once the player is done with it (Enter, or leaving the field): a
-// whole percent from 0 to 99. What isn't one goes back to the margin saved.
-dealMargin.addEventListener("change", () => {
-  const percent = Math.round(Number(dealMargin.value));
-  if (dealMargin.value.trim() !== "" && Number.isFinite(percent) && percent >= 0) {
-    invoke("act", { action: { setDealMargin: { percent: Math.min(percent, 99) } } });
-  } else if (shownPanel) {
-    dealMargin.value = String(shownPanel.dealFinder.marginPercent);
-  }
-});
-dealMargin.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") dealMargin.blur();
-});
-grindTrackerOn.addEventListener("change", () => invoke("act", { action: { setGrindTracker: { on: grindTrackerOn.checked } } }));
-checkForUpdatesOn.addEventListener("change", () =>
-  invoke("act", { action: { setCheckForUpdates: { on: checkForUpdatesOn.checked } } }),
-);
-hotkeysReset.addEventListener("click", () => invoke("act", { action: "resetHotkeys" }));
-gameDataRefresh.addEventListener("click", () => invoke("act", { action: "refreshGameData" }));
-hotkeysUndo.addEventListener("click", () => invoke("act", { action: "undoResetHotkeys" }));
-// A row's Change button waits for its new combination; while it waits, it cancels.
-hotkeyRows.addEventListener("click", (e) => {
-  const button = e.target instanceof Element ? e.target.closest<HTMLButtonElement>("button[data-hotkey]") : null;
-  const hotkey = button?.dataset.hotkey as Hotkey | undefined;
-  if (!hotkey) return;
-  if (settings?.rebinding === hotkey) invoke("act", { action: "cancelRebind" });
-  else invoke("act", { action: { beginRebind: hotkey } });
-});
-// The settings view's keys. While a hotkey waits for its new combination, every key goes
-// to the core as part of it (a modifier on its own waits for the key, Esc cancels, and
-// Backspace turns it off), and none does what it would do here, but for two that no hotkey
-// could be: Tab alone moves to the waiting row's buttons, and Enter or Space alone presses
-// the one focused. Otherwise Esc goes back.
-document.addEventListener("keydown", (e) => {
-  if (!settings || e.isComposing) return;
-  if (settings.rebinding) {
-    const plain = !(e.ctrlKey || e.altKey || e.metaKey);
-    const onButton = e.target instanceof HTMLButtonElement && (e.key === "Enter" || e.key === " ");
-    if (plain && (e.key === "Tab" || onButton)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.repeat) return;
-    const press = { code: e.code, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, win: e.metaKey };
-    invoke("rebind_key", { press });
-  } else if (e.key === "Escape") {
-    e.preventDefault();
-    invoke("act", { action: "closeSettings" });
-  }
 });
 
 listen<PanelState>("overlay-state", (e) => render(e.payload));

@@ -17,7 +17,7 @@ pub struct ClientOffset {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GrindTrackerWindow {
-    /// The Grind Tracker is on (the settings view's switch): the EXP figures are read.
+    /// The Grind Tracker is on (the Settings window's switch): the EXP figures are read.
     pub on: bool,
     /// The player wants it open: the panel's Grind Tracker button shows as on.
     pub open: bool,

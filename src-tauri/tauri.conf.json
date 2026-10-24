@@ -61,6 +61,22 @@
         "contentProtected": false
       },
       {
+        "label": "settings",
+        "title": "Settings",
+        "url": "settings.html",
+        "width": 420,
+        "height": 500,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": false,
+        "focusable": false,
+        "contentProtected": false
+      },
+      {
         "label": "item-lookup",
         "title": "Item Lookup",
         "url": "item-lookup.html",

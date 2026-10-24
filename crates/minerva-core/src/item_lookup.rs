@@ -89,6 +89,7 @@ pub enum OurWindow {
     /// The last Item Lookup's alert, still showing.
     Alert,
     PersonalBests,
+    Settings,
 }
 
 /// The latest Item Lookup's alert.

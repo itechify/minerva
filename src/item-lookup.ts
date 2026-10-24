@@ -46,6 +46,7 @@ const COVERS = {
   grindTracker: "The Grind Tracker",
   alert: "The last lookup's alert",
   personalBests: "The Personal Bests window",
+  settings: "The Settings window",
 };
 
 /** What the latest Item Lookup came to, in a sentence; and whether it's a problem. */

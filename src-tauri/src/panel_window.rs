@@ -190,6 +190,15 @@ impl PanelWindow {
         }
     }
 
+    /// The window has the keyboard already, but another of ours took the foreground (setup,
+    /// whose Change hotkeys opens the Settings window again): it comes back in front, right
+    /// after the player's click, as it did when it took the keyboard.
+    pub fn take_focus_again(&self) {
+        if self.takes_keyboard {
+            search::take_focus(&self.window);
+        }
+    }
+
     /// Before a capture of the game while the window takes clicks (it shows a card, or
     /// badges): move it off the screen now, so it is never read in place of an Item Tooltip
     /// it covers; whether it moved, so the capture waits for the screen to be drawn without

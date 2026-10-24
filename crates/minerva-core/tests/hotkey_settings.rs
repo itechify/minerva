@@ -1,8 +1,9 @@
-//! The settings view: the gear at the top of the panel opens it, and there the player
-//! rebinds a hotkey by clicking its Change button and pressing the new combination. It
+//! The hotkeys in the Settings window: the gear at the top of the panel opens it (see
+//! `settings_window.rs`), and there the player rebinds a hotkey by clicking its Change button
+//! and pressing the new combination. It
 //! needs Ctrl, Alt or Win, and can't be another hotkey's (Swap trades the two); Esc
 //! cancels, and Backspace, Delete or Turn off turns the hotkey off. While the player
-//! rebinds, the hotkeys aren't live, so the combination reaches the overlay rather than
+//! rebinds, the hotkeys aren't live, so the combination reaches the window rather than
 //! acting. Every change is saved at once and acts at once; Restore defaults can be undone
 //! until the player changes another.
 
@@ -11,7 +12,7 @@ mod common;
 use common::FakeSource;
 use minerva_core::{
     Action, Minerva, Foreground, Hotkey, Hotkeys, KeyPress, PanelControl, RebindProblem, Settings, SettingsNotice,
-    SettingsView,
+    SettingsWindow,
 };
 
 /// The key `code` (a `KeyboardEvent.code`) pressed with the modifiers in `held`, such as
@@ -21,16 +22,23 @@ fn press(held: &str, code: &str) -> KeyPress {
     KeyPress { code: code.into(), ctrl: has("ctrl"), alt: has("alt"), shift: has("shift"), win: has("win") }
 }
 
-/// A core with the game in front and the settings view open.
-fn settings_open() -> Minerva {
+/// A core with the game window found and in front: the Settings window shows over it.
+fn over_the_game() -> Minerva {
     let mut minerva = Minerva::new(FakeSource::osms());
+    minerva.on_game_window(Some(common::window_on_wide_screen(common::GAME)));
     minerva.on_foreground(Foreground::Game);
+    minerva
+}
+
+/// A core with the game in front and the Settings window open.
+fn settings_open() -> Minerva {
+    let mut minerva = over_the_game();
     minerva.press(PanelControl::Settings);
     minerva
 }
 
-fn view(minerva: &Minerva) -> SettingsView {
-    minerva.panel_state().settings_view.clone().expect("the settings view is open")
+fn view(minerva: &Minerva) -> SettingsWindow {
+    minerva.panel_state().settings_window.clone().expect("the Settings window is open")
 }
 
 /// The hotkey waiting for its new combination, and why the last one pressed wasn't taken.
@@ -44,47 +52,21 @@ fn saved(hotkey: Hotkey) -> Option<SettingsNotice> {
 }
 
 #[test]
-fn the_gear_opens_the_settings_view_on_the_expanded_panel() {
-    let mut minerva = Minerva::new(FakeSource::osms());
-    assert_eq!(minerva.panel_state().settings_view, None);
-    minerva.on_hotkey("ctrl+shift+c");
-    assert!(!minerva.panel_state().expanded);
+fn the_gear_opens_the_settings_window_with_no_hotkey_waiting() {
+    let mut minerva = over_the_game();
+    assert_eq!(minerva.panel_state().settings_window, None);
 
     assert_eq!(minerva.press(PanelControl::Settings), None);
 
-    let state = minerva.panel_state();
-    assert!(state.expanded);
-    assert_eq!(
-        state.settings_view,
-        Some(SettingsView { rebinding: None, problem: None, notice: None, at_defaults: true })
-    );
+    let view = view(&minerva);
+    assert_eq!((view.rebinding, view.problem, view.notice, view.at_defaults), (None, None, None, true));
 }
 
 #[test]
-fn the_settings_view_and_the_search_view_take_each_others_place() {
-    let mut minerva = settings_open();
-
-    minerva.press(PanelControl::Search);
-    assert!(minerva.panel_state().search.view.is_some());
-    assert_eq!(minerva.panel_state().settings_view, None);
-    assert!(minerva.panel_state().overlay_takes_keyboard);
-
-    minerva.press(PanelControl::Settings);
-    assert_eq!(minerva.panel_state().search.view, None);
-    assert!(minerva.panel_state().settings_view.is_some());
-    assert!(minerva.panel_state().overlay_takes_keyboard);
-}
-
-#[test]
-fn the_back_arrow_or_collapsing_the_panel_closes_the_settings_view() {
+fn its_close_button_or_esc_closes_the_settings_window() {
     let mut minerva = settings_open();
     minerva.act(Action::CloseSettings);
-    assert_eq!(minerva.panel_state().settings_view, None);
-    assert!(!minerva.panel_state().overlay_takes_keyboard);
-
-    minerva.press(PanelControl::Settings);
-    minerva.on_hotkey("ctrl+shift+c");
-    assert_eq!(minerva.panel_state().settings_view, None);
+    assert_eq!(minerva.panel_state().settings_window, None);
 }
 
 #[test]
@@ -96,7 +78,7 @@ fn the_new_combination_acts_at_once_and_the_old_one_does_nothing() {
     let state = minerva.rebind_key(press("ctrl+shift", "KeyK")).clone();
 
     assert_eq!(state.hotkeys.toggle_panel, "ctrl+shift+k");
-    let view = state.settings_view.expect("still open");
+    let view = state.settings_window.expect("still open");
     assert_eq!((view.rebinding, view.notice), (None, saved(Hotkey::TogglePanel)), "and says it is saved");
     assert_eq!(minerva.on_hotkey("ctrl+shift+c"), None);
     assert!(minerva.panel_state().expanded);
@@ -124,7 +106,7 @@ fn the_hotkeys_are_not_live_while_the_player_rebinds_one() {
     assert!(minerva.panel_state().hotkeys_live);
 
     minerva.act(Action::BeginRebind(Hotkey::Search));
-    assert!(!minerva.panel_state().hotkeys_live, "the combination pressed must reach the overlay");
+    assert!(!minerva.panel_state().hotkeys_live, "the combination pressed must reach the window");
     minerva.rebind_key(press("ctrl+alt", "KeyF"));
     assert!(minerva.panel_state().hotkeys_live, "live again, the new one with them");
 
@@ -196,7 +178,7 @@ fn swap_gives_the_combination_to_the_hotkey_being_rebound_and_its_old_one_to_the
 
     assert_eq!(state.hotkeys.toggle_panel, "ctrl+shift+f");
     assert_eq!(state.hotkeys.search, "ctrl+shift+c");
-    let view = state.settings_view.expect("still open");
+    let view = state.settings_window.expect("still open");
     assert_eq!((view.rebinding, view.problem), (None, None));
     assert_eq!(view.notice, Some(SettingsNotice::Saved { hotkey: Hotkey::TogglePanel, swapped_with: Some(Hotkey::Search) }));
     minerva.on_hotkey("ctrl+shift+f");
@@ -269,13 +251,13 @@ fn esc_stops_waiting_and_changes_nothing() {
 
     minerva.rebind_key(press("", "Escape"));
 
-    assert_eq!(waiting(&minerva), (None, None), "the view stays, its problem gone");
+    assert_eq!(waiting(&minerva), (None, None), "the window stays, its problem gone");
     assert_eq!(view(&minerva).notice, None, "nothing was saved");
     assert_eq!(minerva.panel_state().hotkeys, Hotkeys::default());
 }
 
 #[test]
-fn closing_the_settings_view_mid_rebind_changes_nothing_and_the_hotkeys_are_live_again() {
+fn closing_the_settings_window_mid_rebind_changes_nothing_and_the_hotkeys_are_live_again() {
     let mut minerva = settings_open();
     minerva.act(Action::BeginRebind(Hotkey::Search));
 
@@ -283,7 +265,7 @@ fn closing_the_settings_view_mid_rebind_changes_nothing_and_the_hotkeys_are_live
     minerva.rebind_key(press("ctrl", "KeyQ"));
 
     let state = minerva.panel_state();
-    assert_eq!(state.settings_view, None);
+    assert_eq!(state.settings_window, None);
     assert_eq!(state.hotkeys, Hotkeys::default());
     assert!(state.hotkeys_live);
 }
@@ -314,7 +296,7 @@ fn backspace_delete_or_turn_off_turns_a_hotkey_off_and_its_old_combination_does_
         assert_eq!(state.hotkeys.toggle_panel, "", "{turn_off}");
         assert!(!state.hotkeys.all().contains(&"ctrl+shift+c"), "{turn_off}: not registered");
         assert_eq!(state.hotkeys.all().len(), 9, "the other nine");
-        let view = state.settings_view.expect("still open");
+        let view = state.settings_window.expect("still open");
         assert_eq!((view.rebinding, view.notice), (None, saved(Hotkey::TogglePanel)));
         assert_eq!(minerva.on_hotkey("ctrl+shift+c"), None);
         assert!(minerva.panel_state().expanded, "{turn_off}: the old combination does nothing");
@@ -340,7 +322,7 @@ fn a_hotkey_turned_off_stays_off_at_the_next_launch_and_can_be_turned_on_again()
     minerva.act(Action::BeginRebind(Hotkey::ItemLookup));
     minerva.rebind_key(press("", "Delete"));
 
-    let mut later = Minerva::new(FakeSource::osms());
+    let mut later = over_the_game();
     later.restore(common::settings_after_restart(&minerva));
     assert_eq!(later.panel_state().hotkeys.item_lookup, "", "still off");
     assert!(later.panel_state().hotkeys.all().iter().all(|hotkey| !hotkey.is_empty()));
@@ -394,7 +376,7 @@ fn starting_another_change_clears_the_last_ones_notice() {
 
 #[test]
 fn restore_defaults_puts_every_hotkey_back_and_on() {
-    let mut minerva = Minerva::new(FakeSource::osms());
+    let mut minerva = over_the_game();
     let hotkeys = Hotkeys { toggle_panel: "ctrl+shift+x".into(), search: "".into(), ..Hotkeys::default() };
     minerva.restore(Settings { hotkeys, ..Settings::default() });
     minerva.press(PanelControl::Settings);
@@ -404,16 +386,17 @@ fn restore_defaults_puts_every_hotkey_back_and_on() {
     let state = minerva.act(Action::ResetHotkeys).clone();
 
     assert_eq!(state.hotkeys, Hotkeys::default());
+    let window = state.settings_window.expect("still open");
     assert_eq!(
-        state.settings_view,
-        Some(SettingsView { rebinding: None, problem: None, notice: Some(SettingsNotice::Restored), at_defaults: true })
+        (window.rebinding, window.problem, window.notice, window.at_defaults),
+        (None, None, Some(SettingsNotice::Restored), true)
     );
     assert_eq!(minerva.settings().hotkeys, Hotkeys::default(), "and saved");
 }
 
 #[test]
 fn undo_after_restore_defaults_brings_the_hotkeys_from_before_back() {
-    let mut minerva = Minerva::new(FakeSource::osms());
+    let mut minerva = over_the_game();
     let mine = Hotkeys { toggle_panel: "ctrl+shift+x".into(), search: "".into(), ..Hotkeys::default() };
     minerva.restore(Settings { hotkeys: mine.clone(), ..Settings::default() });
     minerva.press(PanelControl::Settings);
@@ -422,7 +405,7 @@ fn undo_after_restore_defaults_brings_the_hotkeys_from_before_back() {
     let state = minerva.act(Action::UndoResetHotkeys).clone();
 
     assert_eq!(state.hotkeys, mine);
-    let view = state.settings_view.expect("still open");
+    let view = state.settings_window.expect("still open");
     assert_eq!((view.notice, view.at_defaults), (Some(SettingsNotice::RestoreUndone), false));
     assert_eq!(minerva.settings().hotkeys, mine, "and saved");
     minerva.act(Action::UndoResetHotkeys);
@@ -430,9 +413,9 @@ fn undo_after_restore_defaults_brings_the_hotkeys_from_before_back() {
 }
 
 #[test]
-fn restore_defaults_can_no_longer_be_undone_once_another_change_starts_or_the_view_closes() {
+fn restore_defaults_can_no_longer_be_undone_once_another_change_starts_or_the_window_closes() {
     for after in [Action::BeginRebind(Hotkey::Search), Action::CloseSettings] {
-        let mut minerva = Minerva::new(FakeSource::osms());
+        let mut minerva = over_the_game();
         let mine = Hotkeys { toggle_panel: "ctrl+shift+x".into(), ..Hotkeys::default() };
         minerva.restore(Settings { hotkeys: mine, ..Settings::default() });
         minerva.press(PanelControl::Settings);
@@ -457,15 +440,15 @@ fn restore_defaults_with_every_hotkey_at_its_default_changes_and_says_nothing() 
 }
 
 #[test]
-fn the_overlay_gets_the_settings_view_with_the_names_it_reads() {
+fn the_page_gets_the_settings_window_with_the_names_it_reads() {
     let mut minerva = settings_open();
     minerva.act(Action::BeginRebind(Hotkey::TogglePanel));
     minerva.rebind_key(press("ctrl+shift", "KeyF"));
-    let refused = serde_json::to_string(&minerva.panel_state().settings_view).unwrap();
+    let refused = serde_json::to_string(&minerva.panel_state().settings_window).unwrap();
     minerva.act(Action::SwapHotkeys);
-    let swapped = serde_json::to_string(&minerva.panel_state().settings_view).unwrap();
+    let swapped = serde_json::to_string(&minerva.panel_state().settings_window).unwrap();
     minerva.act(Action::ResetHotkeys);
-    let restored = serde_json::to_string(&minerva.panel_state().settings_view).unwrap();
+    let restored = serde_json::to_string(&minerva.panel_state().settings_window).unwrap();
 
     assert!(refused.contains(r#""problem":{"kind":"inUse","pressed":"ctrl+shift+f","by":"search"}"#), "{refused}");
     assert!(refused.contains(r#""rebinding":"togglePanel""#), "{refused}");
@@ -480,7 +463,7 @@ fn the_overlay_gets_the_settings_view_with_the_names_it_reads() {
 
 #[test]
 fn a_combination_rebound_away_from_is_no_longer_reported_unavailable() {
-    let mut minerva = Minerva::new(FakeSource::osms());
+    let mut minerva = over_the_game();
     let hotkeys = Hotkeys { setup: "ctrl+shift+banana".into(), ..Hotkeys::default() };
     minerva.restore(Settings { hotkeys, ..Settings::default() });
     minerva.hotkeys_unavailable(vec!["ctrl+shift+n".into()], vec!["ctrl+shift+banana".into()]);
