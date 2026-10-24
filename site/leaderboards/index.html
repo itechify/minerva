@@ -1,6 +1,6 @@
 <!doctype html>
-<!-- The Map Leaderboards page: Where to train, a Level Band's maps with what each gives solo
-     and the best players got there; find a map by its name (from the map names fixture, as
+<!-- The Map Leaderboards page: Where to train, a Level Band's maps with the best players got
+     on each; find a map by its name (from the map names fixture, as
      the panel names maps); and Latest, the newest bests (ADR 0024). A map's own page is
      leaderboards/map/. Both read the site's API (ADR 0015) from the browser, so without
      script the page says it needs it. -->
@@ -11,7 +11,7 @@
     <title>Map Leaderboards · Minerva</title>
     <meta
       name="description"
-      content="Where to train at your level in MapleStory Classic World: each map's solo EXP per hour beside the best Minerva players got there, and their Personal Bests ranked by Level Band."
+      content="Where to train at your level in MapleStory Classic World: the maps for your Level Band, with the best EXP per hour Minerva players got on each, and their Personal Bests ranked by band."
     />
     <link rel="canonical" href="@SITE_URL@leaderboards/" />
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icon-32.png" />
@@ -21,7 +21,7 @@
     <meta property="og:title" content="Map Leaderboards · Minerva" />
     <meta
       property="og:description"
-      content="Where should you train at your level? Each map's solo EXP per hour beside what Minerva players really got there, each Level Band ranked."
+      content="Where should you train at your level? The maps for your Level Band, with what Minerva players really got on each, each band ranked."
     />
     <meta property="og:url" content="@SITE_URL@leaderboards/" />
     <meta property="og:image" content="@CARD_IMAGE@" />
@@ -60,11 +60,6 @@
             <h2 id="train-title">Where to train</h2>
             <nav class="lb-bands" id="train-bands" aria-label="Level Bands" hidden></nav>
             <div class="lb-train-tools" id="train-tools" hidden>
-              <nav class="lb-sort" id="train-sort" aria-label="Sort the maps by">
-                <span class="lb-sort-name" aria-hidden="true">Sort by</span>
-                <a class="lb-sort-choice" data-sort="best" href="/leaderboards/">Players' best</a>
-                <a class="lb-sort-choice" data-sort="ceiling" href="/leaderboards/?sort=ceiling">Solo ceiling</a>
-              </nav>
               <label class="lb-street-filter" for="train-street">
                 Street
                 <select id="train-street"></select>
@@ -80,9 +75,7 @@
                 <tr role="row">
                   <th scope="col" role="columnheader" class="lb-train-map">Map</th>
                   <th scope="col" role="columnheader" class="lb-train-mobs">Mobs</th>
-                  <th scope="col" role="columnheader" class="lb-train-ceiling">Solo ceiling</th>
                   <th scope="col" role="columnheader" class="lb-train-best">Players' best</th>
-                  <th scope="col" role="columnheader" class="lb-train-share">Of solo</th>
                   <th scope="col" role="columnheader" class="lb-train-entries">Entries</th>
                 </tr>
               </thead>
@@ -110,7 +103,7 @@
 
           <section class="lb-questions stop" id="questions" data-mini="Questions" aria-labelledby="questions-title">
             <h2 id="questions-title">How they work</h2>
-            <div class="qa-list" data-qa="map-leaderboards where-to-train level-bands leaderboard-exp leaderboard-over-ceiling report-entry" data-group="leaderboards"></div>
+            <div class="qa-list" data-qa="map-leaderboards where-to-train level-bands leaderboard-exp report-entry" data-group="leaderboards"></div>
           </section>
         </div>
       </main>

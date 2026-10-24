@@ -1,6 +1,6 @@
 // Where to train lists, for each Level Band, the maps whose middle half of spawns is at its
-// levels (the ceilings table) and any map with an entry in it, each with its ceiling and the
-// band's #1 there (ADR 0024). The test config's table puts 100000062 in Lv 1–9, 100000060 in
+// levels (the ceilings table) and any map with an entry in it, each with its mob levels and
+// the band's #1 there (ADR 0024). The test config's table puts 100000062 in Lv 1–9, 100000060 in
 // Lv 20–29, 100000061 in both Lv 20–29 and Lv 30–39, and api.ts's FIELD and RICH_FIELD in
 // Lv 70–79 and Lv 100–109. (D1 starts empty for each test file.)
 import { describe, expect, it } from "vitest";
@@ -37,7 +37,7 @@ describe("where to train", () => {
     });
   });
 
-  it("lists a band's maps with their ceilings, mob levels, entries and #1", async () => {
+  it("lists a band's maps with their mob levels, entries and #1", async () => {
     const response = await call("/api/bands/20");
 
     expect(response.headers.get("cache-control")).toBe("public, max-age=60");
@@ -47,23 +47,21 @@ describe("where to train", () => {
       maps: [
         {
           map: TWENTIES,
-          ceiling: 300_000,
           mobs: [22, 27],
           entries: 2,
           best: { name: "Bea", job: "Magician", level: 25, expPerHour: 250_000, setAt: 1_760_000_000_001 },
         },
-        { map: STRADDLING, ceiling: 500_000, mobs: [25, 34], entries: 0, best: null },
+        { map: STRADDLING, mobs: [25, 34], entries: 0, best: null },
       ],
     });
   });
 
-  it("lists a map with an entry in the band that the table doesn't hold, without a ceiling", async () => {
+  it("lists a map with an entry in the band that the table doesn't hold, without mob levels", async () => {
     const { maps } = await read<{ maps: unknown[] }>("/api/bands/40");
 
     expect(maps).toEqual([
       {
         map: UNLISTED,
-        ceiling: null,
         mobs: null,
         entries: 1,
         best: { name: "Ada", job: "Magician", level: 45, expPerHour: 10_000, setAt: 1_760_000_000_000 },

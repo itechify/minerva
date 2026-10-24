@@ -5,7 +5,7 @@
 // draw what this gives them.
 
 import { dayText } from "../../src/dates.ts";
-import { levels, rate, sharePercent, short, whole } from "../../src/figures.ts";
+import { levels, rate, short, whole } from "../../src/figures.ts";
 import { type BandAnswer, type BandsAnswer, isMap, isName, type LatestAnswer, type Ranked, type TrainingAnswer } from "../entries.ts";
 import { bandOf, levelsOf } from "../level-bands.ts";
 import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts";
@@ -364,31 +364,25 @@ export function mapPicture(manifest: unknown, map: string): string | null {
   return typeof hash === "string" && /^[a-f0-9]{32}$/i.test(hash) ? `https://osmsdataexplorer.com/data/maps/${hash}.webp` : null;
 }
 
-/** How Where to train orders a band's maps: by players' bests, or by the maps' solo ceilings. */
-export type TrainingSort = "best" | "ceiling";
-
 /** The Map Leaderboards page as its address names it:
- *  `/leaderboards/?band=<first level>&sort=ceiling&street=<street>`. Any part may be
- *  missing, or dropped for not being one: with no band, Where to train asks for one; sorted
- *  by players' bests unless it says `ceiling`; on every street unless it names one. */
+ *  `/leaderboards/?band=<first level>&street=<street>`. Either part may be missing, or
+ *  dropped for not being one: with no band, Where to train asks for one; on every street
+ *  unless it names one. */
 export interface TrainingLink {
   band: number | null;
-  sort: TrainingSort;
   street: string | null;
 }
 
 /** Where the Map Leaderboards page's address (its `location.search`) opens. */
 export function readTrainingLink(search: string): TrainingLink {
   const query = new URLSearchParams(search);
-  const street = query.get("street")?.trim() || null;
-  return { band: bandIn(query.get("band")), sort: query.get("sort") === "ceiling" ? "ceiling" : "best", street };
+  return { band: bandIn(query.get("band")), street: query.get("street")?.trim() || null };
 }
 
 /** The address of the Map Leaderboards page, from the site's root. */
 export function trainingLinkTo(link: TrainingLink): string {
   const query = new URLSearchParams();
   if (link.band !== null) query.set("band", String(link.band));
-  if (link.sort !== "best") query.set("sort", link.sort);
   if (link.street !== null) query.set("street", link.street);
   const search = String(query);
   return search === "" ? "/leaderboards/" : `/leaderboards/?${search}`;
@@ -405,8 +399,7 @@ export interface TrainingBand {
   open: boolean;
 }
 
-/** Where to train's Level Bands, from GET /api/bands, each keeping the link's sort and
- *  street. */
+/** Where to train's Level Bands, from GET /api/bands, each keeping the link's street. */
 export function trainingBands(answer: BandsAnswer, link: TrainingLink): TrainingBand[] {
   return answer.bands.map(({ band, maps }) => ({
     band,
@@ -426,16 +419,9 @@ export interface TrainingRow {
   /** The levels of the middle half of its spawns: "Lv 22–27"; `null` for a map the
    *  ceilings table doesn't hold. */
   mobs: string | null;
-  /** Its solo EXP/h ceiling: "300,000"; `null` for a map the table doesn't hold. */
-  ceiling: string | null;
   /** The band's #1 there: its EXP/h, who set it ("Bea · Magician Lv 25") and when; `null`
    *  with no entries. */
   best: { expPerHour: string; who: string; date: string } | null;
-  /** The #1 as a share of the ceiling: "83%"; `null` without both. */
-  share: string | null;
-  /** Whether the #1 is above the ceiling: more than the map gives solo, so a party, an EXP
-   *  event or a buff. */
-  over: boolean;
   entries: string;
 }
 
@@ -450,24 +436,11 @@ export interface TrainingTable {
   empty: Said | null;
 }
 
-/** Where an over-ceiling #1's mark leads: what more than a map gives solo means. */
-export const OVER_CEILING = {
-  text: "Above what this map gives solo: a party, an EXP event or a buff",
-  href: "/faq/#leaderboard-over-ceiling",
-};
-
-/** `expPerHour` as a share of `ceiling` (> 0), in hundredths of a percent, rounded, halves
- *  up, as the Personal Bests window works it out (`share_hundredths`, bests_window.rs). */
-function shareHundredths(expPerHour: number, ceiling: number): number {
-  return Math.floor((expPerHour * 10_000 + Math.floor(ceiling / 2)) / ceiling);
-}
-
-/** Where to train's table for the band GET /api/bands/<band> answered, as `link` filters
- *  and sorts it, with dates written as of `now`. A map the player can't normally enter
- *  (an Event or Dev map) is left out unless it has entries, as search leaves it out. A
- *  street the band has no maps on shows every street. By players' bests: the maps with
- *  entries, highest #1 first, then the rest by ceiling; by ceiling: highest first, then by
- *  the #1. Ties by name. */
+/** Where to train's table for the band GET /api/bands/<band> answered, on the street `link`
+ *  names, with dates written as of `now`. A map the player can't normally enter (an Event
+ *  or Dev map) is left out unless it has entries, as search leaves it out. A street the
+ *  band has no maps on shows every street. The maps with entries come first, highest #1
+ *  first, then the rest by their mob levels, lowest first. Ties by name. */
 export function trainingTable(answer: TrainingAnswer, names: MapNames, link: TrainingLink, now: Date): TrainingTable {
   const maps = answer.maps
     .map((m) => ({ ...m, place: placeOf(names, m.map) }))
@@ -476,29 +449,32 @@ export function trainingTable(answer: TrainingAnswer, names: MapNames, link: Tra
   const street = link.street !== null && streets.includes(link.street) ? link.street : null;
   const shown = maps.filter((m) => street === null || m.place.street === street);
   type Shown = (typeof shown)[number];
-  const bestOf = (m: Shown) => m.best?.expPerHour ?? -1;
-  const ceilingOf = (m: Shown) => m.ceiling ?? -1;
-  const [first, then] = link.sort === "best" ? [bestOf, ceilingOf] : [ceilingOf, bestOf];
-  shown.sort((a, b) => first(b) - first(a) || then(b) - then(a) || byText(a.place.name, b.place.name) || byText(a.map, b.map));
+  const best = (m: Shown) => m.best?.expPerHour ?? -1;
+  // A map the ceilings table doesn't hold, with no mob levels, goes after the rest.
+  const mobs = (m: Shown, end: 0 | 1) => m.mobs?.[end] ?? Number.MAX_SAFE_INTEGER;
+  shown.sort(
+    (a, b) =>
+      best(b) - best(a) ||
+      mobs(a, 0) - mobs(b, 0) ||
+      mobs(a, 1) - mobs(b, 1) ||
+      byText(a.place.name, b.place.name) ||
+      byText(a.map, b.map),
+  );
   const rows = shown.map((m): TrainingRow => {
-    const best = m.best;
-    const set = best === null ? null : new Date(best.setAt);
+    const set = m.best === null ? null : new Date(m.best.setAt);
     return {
       name: m.place.name,
       street: m.place.street,
       href: linkTo({ map: m.map, band: answer.band, name: null }),
       mobs: m.mobs === null ? null : levels({ lowest: m.mobs[0], highest: m.mobs[1] }),
-      ceiling: m.ceiling === null ? null : whole(m.ceiling),
       best:
-        best === null || set === null
+        m.best === null || set === null
           ? null
           : {
-              expPerHour: rate(best.expPerHour),
-              who: `${best.name} · ${best.job} Lv ${best.level}`,
+              expPerHour: rate(m.best.expPerHour),
+              who: `${m.best.name} · ${m.best.job} Lv ${m.best.level}`,
               date: dayText(set, set.getFullYear() !== now.getFullYear()),
             },
-      share: best === null || m.ceiling === null ? null : sharePercent(shareHundredths(best.expPerHour, m.ceiling)),
-      over: best !== null && m.ceiling !== null && best.expPerHour > m.ceiling,
       entries: m.entries === 0 ? "No entries yet" : entriesCounted(m.entries),
     };
   });
@@ -515,7 +491,7 @@ export function trainingTable(answer: TrainingAnswer, names: MapNames, link: Tra
 }
 
 /** What Where to train says before a band is picked. */
-export const PICK_A_BAND = "Pick a Level Band to see the maps for it: what each gives solo, and the best players got there.";
+export const PICK_A_BAND = "Pick a Level Band to see the maps for it, and the best players got on each.";
 
 /** An entry as Latest lists it. */
 export interface LatestLine {

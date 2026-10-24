@@ -1841,7 +1841,7 @@ button.icon-button:active {
   line-height: 16px;
 }
 
-/* Where to train: the Level Bands, then the sort and the street over the band's maps. */
+/* Where to train: the Level Bands, then the street over the band's maps. */
 .lb-train {
   padding-top: 40px;
 }
@@ -1849,7 +1849,6 @@ button.icon-button:active {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
-  justify-content: space-between;
   gap: 12px 24px;
   max-width: 60em;
   margin-top: 20px;
@@ -1857,43 +1856,11 @@ button.icon-button:active {
 .lb-train-tools[hidden] {
   display: none;
 }
-/* The two sorts, as the Level Bands are: light steel, the one shown selected. */
-.lb-sort {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.lb-sort-name,
 .lb-street-filter {
   font-size: 14px;
   font-weight: 700;
   line-height: 22px;
   color: var(--ink-2);
-}
-.lb-sort-name {
-  margin-right: 4px;
-}
-.lb-sort-choice {
-  padding: 4px 12px 5px;
-  border: 1px solid var(--select-edge);
-  border-radius: 4px;
-  background: var(--button-light);
-  box-shadow: inset 0 1px 0 #fff;
-  color: var(--ink-2);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-  text-decoration: none;
-}
-.lb-sort-choice:hover {
-  background: var(--button-light-hover);
-  color: var(--ink);
-}
-.lb-sort-choice[aria-current] {
-  background: var(--select);
-  box-shadow: inset 0 0 0 1px var(--select-edge);
-  color: var(--ink);
 }
 .lb-street-filter {
   display: flex;
@@ -1912,14 +1879,11 @@ button.icon-button:active {
   margin-top: 16px;
 }
 .lb-train-table .lb-train-mobs,
-.lb-train-table .lb-train-ceiling,
 .lb-train-table .lb-train-best,
-.lb-train-table .lb-train-share,
 .lb-train-table .lb-train-entries {
   text-align: right;
 }
 .lb-train-table td.lb-train-mobs,
-.lb-train-table td.lb-train-ceiling,
 .lb-train-table td.lb-train-entries,
 .lb-train-table td.lb-train-none {
   color: var(--ink-2);
@@ -1951,14 +1915,6 @@ button.icon-button:active {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-2);
-}
-/* A #1 above the map's solo ceiling: a party, an EXP event or a buff, as its FAQ says. */
-.lb-over {
-  display: block;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ink-2);
-  white-space: nowrap;
 }
 /* The date a #1 was set on never breaks across lines ("22 / Oct"). */
 .lb-train-date {
@@ -2562,15 +2518,13 @@ button.button {
     padding: 8px 12px;
     border-top: 1px solid var(--rule);
   }
-  /* A map's card: its name and street beside the #1, over its mobs and share of the
-     ceiling, over the ceiling and its entries, each figure said by its name. */
+  /* A map's card: its name and street beside the #1, over its mobs and its entries. */
   .lb-train-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "map best"
-      "mobs share"
-      "ceiling entries";
+      "mobs entries";
     column-gap: 12px;
     padding: 8px 12px;
   }
@@ -2588,37 +2542,19 @@ button.button {
   .lb-train-table .lb-train-best {
     grid-area: best;
   }
-  .lb-train-table .lb-train-mobs,
-  .lb-train-table .lb-train-ceiling {
-    text-align: left;
-  }
   .lb-train-table .lb-train-mobs {
     grid-area: mobs;
-  }
-  .lb-train-table .lb-train-share {
-    grid-area: share;
-  }
-  .lb-train-table .lb-train-ceiling {
-    grid-area: ceiling;
+    text-align: left;
   }
   .lb-train-table .lb-train-entries {
     grid-area: entries;
   }
   .lb-train-table td.lb-train-mobs,
-  .lb-train-table td.lb-train-ceiling,
-  .lb-train-table td.lb-train-share,
   .lb-train-table td.lb-train-entries {
     font-size: 13px;
     line-height: 20px;
   }
-  .lb-train-table td.lb-train-ceiling::before {
-    content: "Solo ";
-  }
-  .lb-train-table td.lb-train-share::before {
-    content: "Of solo ";
-    color: var(--ink-2);
-  }
-  /* A card says only what the map has: no dashes for a #1 or a share it hasn't got. */
+  /* A card says only what the map has: no dash for a #1 it hasn't got. */
   .lb-train-table td.lb-train-none {
     display: none;
   }

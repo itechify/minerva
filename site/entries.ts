@@ -54,9 +54,8 @@ export interface BandsAnswer {
 /** A map as Where to train lists it for a Level Band. */
 export interface TrainingMap {
   map: string;
-  /** Its solo EXP/h ceiling and the levels of the middle half of its spawns, from the
-   *  ceilings table; `null` for a map with an entry there that the table doesn't hold. */
-  ceiling: number | null;
+  /** The levels of the middle half of its spawns, from the ceilings table; `null` for a
+   *  map with an entry there that the table doesn't hold. */
   mobs: [number, number] | null;
   /** How many entries it has in the band, and the band's #1 there (`null` with none). */
   entries: number;

@@ -1,4 +1,4 @@
-// Where to train (ADR 0024): the maps for each Level Band, each with its solo ceiling and the
+// Where to train (ADR 0024): the maps for each Level Band, each with its mob levels and the
 // band's #1 there. A map is for a band when the middle half of its spawns is at the band's
 // levels (the ceilings table), or when it has an entry in the band.
 import type { Best, TrainingMap } from "../entries";
@@ -64,7 +64,7 @@ export async function readTraining(env: Env, first: string): Promise<Answer> {
     const top = tops.get(map);
     const best: Best | null =
       top === undefined ? null : { name: top.name, job: top.job, level: top.level, expPerHour: top.exp_per_hour, setAt: top.set_at };
-    return { map, ceiling: table[map]?.ceiling ?? null, mobs: table[map]?.mobs ?? null, entries: top?.entries ?? 0, best };
+    return { map, mobs: table[map]?.mobs ?? null, entries: top?.entries ?? 0, best };
   });
   return { status: 200, body: { band, levels: levelsOf(band), maps } };
 }
