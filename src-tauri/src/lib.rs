@@ -724,6 +724,10 @@ fn core_loop(
         match commands.recv_timeout(due.saturating_duration_since(Instant::now())) {
             Ok(Command::Act(action)) => {
                 minerva.act(action);
+                // Opened again while it has the keyboard: from setup, which is in front.
+                if action == Action::OpenSettings {
+                    panels.settings.take_focus_again();
+                }
             }
             Ok(Command::Hotkey(pressed)) => {
                 let request = minerva.on_hotkey(&pressed);
@@ -1035,8 +1039,17 @@ fn core_loop(
             }
             emitted = Some(state.clone());
         }
-        window.show(state);
-        panels.sync(state);
+        // The window that takes the keyboard takes it before the other gives it back: given
+        // back first, Windows would hand it to the game in between, and might then refuse it
+        // to ours. The search view takes it from the Settings window, and the Settings window
+        // from the search view.
+        if state.settings_window.as_ref().is_some_and(|settings| settings.takes_keyboard) {
+            panels.sync(state);
+            window.show(state);
+        } else {
+            window.show(state);
+            panels.sync(state);
+        }
 
         // Save once the settings settle, not on every move of a drag.
         let current = minerva.settings();

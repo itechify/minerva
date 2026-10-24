@@ -1,7 +1,7 @@
 @import "./lane.css";
 
 /* The Personal Bests window: the panel's window, opened wide over the game to compare
-   maps. The shell lays it out 920 CSS px wide (WIDTH in src-tauri/src/bests_window.rs),
+   maps. The shell lays it out 920 CSS px wide (its SPEC in src-tauri/src/bests_window.rs),
    narrower over a narrower game, and as tall as the page reports it up to 600 px; past
    that the table scrolls under its header while the rest keeps its place. Like the
    panel it stands on the Quest Helper's see-through glass, the table set into it on the

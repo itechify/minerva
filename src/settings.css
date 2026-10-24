@@ -1,5 +1,5 @@
 /* The Settings window: the panel's window, opened beside it over the game. The shell lays
-   it out 420 CSS px wide (WIDTH in src-tauri/src/settings_window.rs), narrower over a
+   it out 420 CSS px wide (its SPEC in src-tauri/src/settings_window.rs), narrower over a
    narrower game, and as tall as the page reports it up to 600 px; past that the settings
    scroll under the window bar. Like the panel it stands on the Quest Helper's see-through
    glass, the settings in inset boxes of the near-opaque lavender. It has no corner grips, so

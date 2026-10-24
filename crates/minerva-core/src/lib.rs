@@ -386,6 +386,11 @@ impl PanelState {
     pub(crate) fn panel_showing(&self) -> Option<ScreenRect> {
         self.placement.filter(|_| self.layer != Layer::Hidden)
     }
+
+    /// Where the Settings window shows on screen: its placement, while it is open and shows.
+    pub(crate) fn settings_showing(&self) -> Option<ScreenRect> {
+        self.settings_window.as_ref().and_then(|window| window.placement)
+    }
 }
 
 /// What a hotkey asks the shell to do at once, beyond rendering the panel state.
@@ -556,7 +561,7 @@ pub struct Minerva {
     /// The Settings window, and the hotkey being rebound in it.
     hotkey_settings: HotkeySettings,
     /// Where the Settings window goes.
-    settings_window: SettingsPlace,
+    settings_place: SettingsPlace,
     /// Reads captures fed to [`Minerva::on_item_capture`]; loaded on the first one.
     item_reader: Option<ItemTooltipReader>,
     /// The latest Item Lookup.
@@ -635,7 +640,7 @@ impl Minerva {
             pictures: Pictures::default(),
             search: Search::default(),
             hotkey_settings: HotkeySettings::default(),
-            settings_window: SettingsPlace::default(),
+            settings_place: SettingsPlace::default(),
             item_reader: None,
             item_lookups: ItemLookups::default(),
             items: Loader::default(),
@@ -973,7 +978,7 @@ impl Minerva {
     /// lays it out.
     pub fn set_settings_size(&mut self, size: Size) -> &PanelState {
         self.record(Event::SettingsSize { size });
-        self.settings_window.size = size;
+        self.settings_place.size = size;
         self.sync_panel()
     }
 
@@ -1127,7 +1132,7 @@ impl Minerva {
             Action::SettingsMoved { x, y } => {
                 if let (Some(game), Some(panel)) = (&self.panel.game, self.panel.placement()) {
                     let others = self.settings_window_others();
-                    self.settings_window.moved_to(x, y, game, panel, &self.panel.avoid, &others);
+                    self.settings_place.moved_to(x, y, game, panel, &self.panel.avoid, &others);
                 }
             }
             Action::CheckForUpdates => self.updater.ask(),
@@ -1178,7 +1183,7 @@ impl Minerva {
 
     /// The player pressed a key on the Settings window: while a hotkey waits for its new
     /// combination, that may be it, or Backspace or Delete to turn it off (see
-    /// [`SettingsView`]). Saved with the settings, and registered in place of the old one
+    /// [`SettingsWindow`]). Saved with the settings, and registered in place of the old one
     /// once the hotkeys are live again.
     pub fn rebind_key(&mut self, press: KeyPress) -> &PanelState {
         self.record(Event::RebindKey { press: press.clone() });
@@ -1569,7 +1574,7 @@ impl Minerva {
             self.state.panel_showing().map(|at| (OurWindow::Panel, at)),
             self.state.grind_tracker.placement.map(|at| (OurWindow::GrindTracker, at)),
             self.state.personal_bests.placement.map(|at| (OurWindow::PersonalBests, at)),
-            self.state.settings_window.as_ref().and_then(|w| w.placement).map(|at| (OurWindow::Settings, at)),
+            self.state.settings_showing().map(|at| (OurWindow::Settings, at)),
             self.state.item_lookup_placement.map(|at| (OurWindow::Alert, at)),
         ]
         .into_iter()
@@ -1934,7 +1939,7 @@ impl Minerva {
         self.grind_tracker.open = settings.grind_tracker_open;
         self.grind_tracker.at = settings.grind_tracker_at;
         self.bests_window.at = settings.personal_bests_at;
-        self.settings_window.at = settings.settings_at;
+        self.settings_place.at = settings.settings_at;
         self.leaderboards.restore(settings.map_leaderboards.clone(), settings.map_leaderboards_met.clone());
         self.settings = settings;
         // The travel toggles change Distances.
@@ -1962,7 +1967,7 @@ impl Minerva {
             grind_tracker_open: self.grind_tracker.open,
             grind_tracker_at: self.grind_tracker.at,
             personal_bests_at: self.bests_window.at,
-            settings_at: self.settings_window.at,
+            settings_at: self.settings_place.at,
             map_leaderboards: self.leaderboards.saved(),
             map_leaderboards_met: self.leaderboards.met(),
             ..self.settings.clone()
@@ -2185,7 +2190,7 @@ impl Minerva {
             self.state.panel_showing(),
             self.state.grind_tracker.placement,
             self.state.personal_bests.placement,
-            self.state.settings_window.as_ref().and_then(|w| w.placement),
+            self.state.settings_showing(),
             self.state.item_lookup_placement,
             self.state.item_card_placement,
             self.state.deal_badges.as_ref().map(|badges| badges.placement),
@@ -2257,7 +2262,7 @@ impl Minerva {
         self.state.item_card_placement = match &self.panel.game {
             Some(game) if shows => {
                 // Beside the panel, a card from Search keeps off our other windows there.
-                let settings = self.state.settings_window.as_ref().and_then(|w| w.placement);
+                let settings = self.state.settings_showing();
                 let others: Vec<ScreenRect> =
                     [self.state.grind_tracker.placement, self.state.personal_bests.placement, settings]
                         .into_iter()
@@ -2435,7 +2440,7 @@ impl Minerva {
         let shows = self.hotkey_settings.is_open() && self.panel.layer() != Layer::Hidden;
         let placement = match (&self.panel.game, self.panel.placement()) {
             (Some(game), Some(panel)) if shows => {
-                Some(self.settings_window.placement(game, panel, &self.panel.avoid, &self.settings_window_others()))
+                Some(self.settings_place.placement(game, panel, &self.panel.avoid, &self.settings_window_others()))
             }
             _ => None,
         };

@@ -72,6 +72,9 @@ function changed(part: string, ...inputs: unknown[]): boolean {
 let shown: SettingsPage | null = null;
 /** The window, as last rendered: null while it is closed. */
 let settings: SettingsWindow | null = null;
+/** The player clicked the Deal Margin field while the game had the keyboard: once the window
+ *  takes it, the keys go there. */
+let marginClicked = false;
 
 /** A combination as read aloud or in a sentence: "Ctrl+Shift+F", or "off". */
 const spokenKeys = (binding: string) => (binding === "" ? "off" : keyLabel(binding));
@@ -223,6 +226,18 @@ function focusOn(target: string) {
   settingsEl.querySelector<HTMLElement>(`[data-focus="${target}"]`)?.focus({ preventScroll: true });
 }
 
+/** The window took the keyboard: the keys go to the Deal Margin field if the player clicked
+ *  it, or else where they go as it opens. */
+function takeKeys(view: SettingsWindow) {
+  if (marginClicked) {
+    marginClicked = false;
+    dealMargin.focus({ preventScroll: true });
+    dealMargin.select();
+  } else {
+    focusOn(keyboardTarget(view));
+  }
+}
+
 /**
  * The Settings window: each hotkey with what it does, its keys and a Change button.
  * Changing one, its row waits for the new keys, which the keys pressed now are (see the
@@ -238,6 +253,9 @@ function render(page: SettingsPage) {
   const was = settings;
   settings = view;
   if (view === null) return;
+  // The keyboard went back to the game: a margin typed in the field is saved, or put back,
+  // as leaving the field does.
+  if (was?.takesKeyboard && !view.takesKeyboard && document.activeElement === dealMargin) dealMargin.blur();
   const focused = (document.activeElement as HTMLElement | null)?.dataset?.focus;
   const { hotkeys, unavailableHotkeys, invalidHotkeys } = page;
   const redrawn = changed("hotkey-rows", hotkeys, unavailableHotkeys, invalidHotkeys, view.rebinding, view.problem);
@@ -256,10 +274,16 @@ function render(page: SettingsPage) {
   hotkeysReset.disabled = view.atDefaults || view.rebinding !== null;
   const announcement = settingsAnnouncement(view, hotkeys);
   if (changed("settings-announce", announcement)) settingsAnnounce.textContent = announcement;
-  // Opened: the first Change. Waiting: its row, so no key presses a button. Done: that
-  // row's Change. Restored: Undo, and undone: Restore defaults. Otherwise where it was.
+  // Opened, or opened again: the first Change. Waiting: its row, so no key presses a button.
+  // Done: that row's Change. Restored: Undo, and undone: Restore defaults. Taking the
+  // keyboard back: the Deal Margin field, if that was clicked. Otherwise where it was.
+  if (was !== null && !was.takesKeyboard && view.takesKeyboard && !view.rebinding && was.opened === view.opened) {
+    takeKeys(view);
+    reportHeight();
+    return;
+  }
   const target =
-    was === null
+    was === null || was.opened !== view.opened
       ? keyboardTarget(view)
       : view.rebinding && view.rebinding !== was.rebinding
         ? `row:${view.rebinding}`
@@ -290,14 +314,17 @@ dragByHandles();
 // the first Change; unless the player's click put them in the window already (the Deal
 // Margin field, say).
 window.addEventListener("focus", () => {
-  if (settings && !settingsEl.contains(document.activeElement)) focusOn(keyboardTarget(settings));
+  if (settings && (marginClicked || !settingsEl.contains(document.activeElement))) takeKeys(settings);
 });
 
 settingsClose.addEventListener("click", () => invoke("act", { action: "closeSettings" }));
 // A click on the Deal Margin field while the game has the keyboard: the window takes it, so
 // the player can type the margin there.
 dealMargin.addEventListener("pointerdown", () => {
-  if (settings && !settings.takesKeyboard) invoke("act", { action: "focusSettings" });
+  if (settings && !settings.takesKeyboard) {
+    marginClicked = true;
+    invoke("act", { action: "focusSettings" });
+  }
 });
 // The Deal Margin is saved once the player is done with it (Enter, or leaving the field): a
 // whole percent from 0 to 99. What isn't one goes back to the margin saved.
@@ -309,8 +336,17 @@ dealMargin.addEventListener("change", () => {
     dealMargin.value = String(shown.marginPercent);
   }
 });
+// Enter keeps the margin typed; Esc puts the saved one back, and a second Esc closes the
+// window.
 dealMargin.addEventListener("keydown", (e) => {
   if (e.key === "Enter") dealMargin.blur();
+  if (e.key === "Escape" && shown) {
+    e.preventDefault();
+    e.stopPropagation();
+    dealMargin.value = String(shown.marginPercent);
+    dealMargin.blur();
+    settingsEl.focus({ preventScroll: true });
+  }
 });
 grindTrackerOn.addEventListener("change", () => invoke("act", { action: { setGrindTracker: { on: grindTrackerOn.checked } } }));
 checkForUpdatesOn.addEventListener("change", () =>

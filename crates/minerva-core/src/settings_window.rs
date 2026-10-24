@@ -32,6 +32,9 @@ pub struct SettingsWindow {
     /// It has the keyboard: it opened, or the player clicked a Change or the Deal Margin
     /// field, and hasn't clicked back into the game since.
     pub takes_keyboard: bool,
+    /// Counts the player's openings of it, the gear's and setup's Change hotkeys', so its page
+    /// can tell it was opened again while open: it puts the keys on its first Change.
+    pub opened: u32,
     /// The hotkey waiting for the player to press its new combination; `None` while none is.
     pub rebinding: Option<Hotkey>,
     /// Why the last combination pressed for it wasn't taken.

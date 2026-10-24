@@ -11,20 +11,11 @@
 
 mod common;
 
-use common::{FakeSource, GAME};
+use common::{FakeSource, GAME, game, rect};
 use minerva_core::{
-    Action, ClientOffset, Foreground, GameWindow, Hotkey, KeyPress, Minerva, PanelControl, PanelSizes, PanelState, ScreenRect, Settings,
+    Action, ClientOffset, Foreground, Hotkey, KeyPress, Minerva, PanelControl, PanelSizes, PanelState, ScreenRect, Settings,
     SettingsNotice, Size,
 };
-
-fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
-    ScreenRect { x, y, width, height }
-}
-
-/// The game window with this client area, framed as measured, on `SCREEN`.
-fn game(client: ScreenRect) -> Option<GameWindow> {
-    Some(common::window_on_wide_screen(client))
-}
 
 const WINDOW: Size = Size { width: 420, height: 500 };
 
@@ -124,11 +115,13 @@ fn opening_it_again_from_setup_keeps_what_it_shows_and_takes_the_keyboard() {
     minerva.act(Action::BeginRebind(Hotkey::Search));
     minerva.rebind_key(KeyPress { code: "KeyQ".into(), ctrl: true, alt: false, shift: false, win: false });
     minerva.act(Action::LeaveSettings);
+    let before = minerva.panel_state().settings_window.clone().expect("open");
 
     let state = minerva.act(Action::OpenSettings);
 
     let window = state.settings_window.as_ref().expect("still open");
     assert!(window.takes_keyboard);
+    assert_ne!(window.opened, before.opened, "opened again, its page puts the keys on its first Change");
     assert_eq!(window.notice, Some(SettingsNotice::Saved { hotkey: Hotkey::Search, swapped_with: None }));
 }
 

@@ -63,6 +63,8 @@ pub(crate) struct HotkeySettings {
     view: Option<OpenView>,
     /// The open window has the keyboard (see [`SettingsWindow::takes_keyboard`]).
     keyboard: bool,
+    /// How many times the player opened the window (see [`SettingsWindow::opened`]).
+    opened: u32,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -80,6 +82,7 @@ impl HotkeySettings {
     pub fn open(&mut self) {
         self.view.get_or_insert_with(OpenView::default);
         self.keyboard = true;
+        self.opened = self.opened.wrapping_add(1);
     }
 
     /// Close the window; a rebinding under way is cancelled.
@@ -131,6 +134,7 @@ impl HotkeySettings {
         self.view.as_ref().map(|view| SettingsWindow {
             placement,
             takes_keyboard: self.keyboard && placement.is_some(),
+            opened: self.opened,
             rebinding: view.rebinding,
             problem: view.problem.clone(),
             notice: view.notice,

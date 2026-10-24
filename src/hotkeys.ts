@@ -56,6 +56,8 @@ export type SettingsWindow = {
   placement: { x: number; y: number; width: number; height: number } | null;
   /** It has the keyboard: it opened, or the player clicked a Change or the Deal Margin field. */
   takesKeyboard: boolean;
+  /** Counts the player's openings of it: opened again while open, the keys go to its first Change. */
+  opened: number;
   rebinding: Hotkey | null;
   problem: RebindProblem | null;
   notice: SettingsNotice | null;

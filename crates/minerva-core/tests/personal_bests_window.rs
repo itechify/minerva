@@ -16,9 +16,9 @@
 mod common;
 
 use common::player::Player;
-use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, osms, sharing_a_title, tracking, tracking_with, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, KERNING_SAMPLE, S, MIN, GAME};
+use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, osms, sharing_a_title, tracking, tracking_with, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, KERNING_SAMPLE, S, MIN, GAME, game, rect};
 use minerva_core::{
-    Action, BESTS_VERSION, CharacterBests, ClientOffset, Minerva, Foreground, GameWindow, LevelRange, MapBests,
+    Action, BESTS_VERSION, CharacterBests, ClientOffset, Minerva, Foreground, LevelRange, MapBests,
     PanelControl, PanelSizes, PanelState, PersonalBestsMap, PersonalBestsVisit,
     PersonalBestsWindow, Request, SavedBests, ScreenRect, Settings, Size, VisitBest, meowdb,
 };
@@ -600,15 +600,6 @@ fn removing_the_last_visit_anywhere_closes_the_window_and_the_button_goes() {
 // Where it goes.
 
 const WINDOW: Size = Size { width: 920, height: 600 };
-
-fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
-    ScreenRect { x, y, width, height }
-}
-
-/// The game window with this client area, framed as measured, on `SCREEN`.
-fn game(client: ScreenRect) -> Option<GameWindow> {
-    Some(common::window_on_wide_screen(client))
-}
 
 /// A core restored from `settings` with a best on Sunset Sky, the game window found and
 /// the windows' sizes known.
