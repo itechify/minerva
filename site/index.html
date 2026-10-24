@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- The Minerva site's home page, one of the game's windows opened wide: what Minerva does,
-     a feature at a time, each with its most-asked questions, then how it stays safe, how to
-     start and its hotkeys. Every detail is in the FAQ (faq/index.html), whose questions this
+     a feature at a time in three parts, each with the question a player asks first about it,
+     then how it stays safe, its hotkeys and how to start, so it ends on the Download. Every
+     detail is in the FAQ (faq/index.html), whose questions this
      page names and the build copies in. The text describes the release whose tag the site is
      built from (docs/releasing.md); a change a player notices updates it in the same PR. -->
 <html lang="en">
@@ -47,8 +48,9 @@
       @WINDOW_HEAD@
 
       <main class="window-body" id="main">
-        <!-- What it does: the hero, then a feature at a time. -->
-        <div class="part" data-street="What it does">
+        <!-- What it does: the hero, then a feature at a time in three parts, where you are, where
+             to hunt and what it's worth, each feature with the question a player asks first. -->
+        <div class="part" data-street="Where you are">
           <div class="hero stop" id="top" data-mini="Minerva">
             <div class="hero-text">
               <img class="logo" src="../assets/logo.png" alt="Minerva" width="300" height="200" />
@@ -99,7 +101,7 @@
             </figure>
           </div>
 
-          <section class="feature stop" id="map" data-mini="Hidden Portals" aria-labelledby="map-title">
+          <section class="feature lead stop" id="map" data-mini="Hidden Portals" aria-labelledby="map-title">
             <figure class="shot stage">
               <img
                 src="./screenshots/map.png"
@@ -114,7 +116,7 @@
                 The <strong>Map Preview</strong> shows the whole map with its portals circled, including the
                 <strong>Hidden Portals</strong> the game doesn't show you, and where each one goes.
               </p>
-              <div class="qa-list" data-qa="hidden-portals ring-colours zoom" data-group="panel"></div>
+              <div class="qa-list" data-qa="hidden-portals" data-group="panel"></div>
             </div>
           </section>
 
@@ -133,10 +135,13 @@
                 The <strong>Map Summary</strong> estimates how much EXP an hour a map can give, solo or in a party, and
                 lists its mobs by level. Point at a mob to see its <strong>spawn points</strong>.
               </p>
-              <div class="qa-list" data-qa="map-summary mob-card shared-titles" data-group="panel"></div>
+              <div class="qa-list" data-qa="map-summary" data-group="panel"></div>
             </div>
           </section>
 
+        </div>
+
+        <div class="part" data-street="Where to hunt">
           <section class="feature stop" id="navigation" data-mini="Search and Navigation" aria-labelledby="navigation-title">
             <figure class="shot stage">
               <img
@@ -152,15 +157,15 @@
                 Search for a mob and Minerva lists the maps it spawns on, best first. Pick one as your
                 <strong>Hunting Target</strong>, or pick any map, and the panel shows the way there, portal by portal.
               </p>
-              <div class="qa-list" data-qa="search figures target-or-destination" data-group="hunting"></div>
+              <div class="qa-list" data-qa="target-or-destination" data-group="hunting"></div>
             </div>
           </section>
 
           <section class="feature stop" id="grind-tracker" data-mini="Grind Tracker" aria-labelledby="grind-tracker-title">
             <figure class="shot stage">
               <img
-                src="./screenshots/wip.png"
-                alt="Minerva's owl in a hard hat beside a sign: WIP, screenshot coming soon. A new shot of the Grind Tracker is on its way."
+                src="./screenshots/grind-tracker.png"
+                alt="The Grind Tracker: 5h 30m to level, 24,100 EXP an hour over the last 5 minutes and 20,600 over the Session, the map's Best at 60,000, and the Pace Trace under them; 1.5% of the map's solo EXP/h, 1,903,929, with a help icon beside it; and the EXP bar at 31.94%, beside the character playing, Egbert · Lv. 36, with its forecast an hour, two and three ahead."
                 loading="lazy"
                 decoding="async"
               />
@@ -174,7 +179,7 @@
                 also keeps each character's <strong>Personal Best</strong> on every map, and shows when you're close to
                 beating it.
               </p>
-              <div class="qa-list" data-qa="tracker-on pace-trace remove-best" data-group="grinding"></div>
+              <div class="qa-list" data-qa="tracker-on" data-group="grinding"></div>
             </div>
           </section>
 
@@ -191,17 +196,18 @@
                 under their name in your Personal Bests to keep them off.
               </p>
               <p class="feature-action"><a class="button secondary" href="/leaderboards/">Open the Map Leaderboards</a></p>
-              <div class="qa-list" data-qa="map-leaderboards where-to-train leaderboard-appear leaderboard-public" data-group="leaderboards"></div>
+              <div class="qa-list" data-qa="leaderboard-public" data-group="leaderboards"></div>
             </div>
           </section>
 
+        </div>
+
+        <div class="part" data-street="What it's worth">
           <section class="feature stop" id="item-card" data-mini="Item Card" aria-labelledby="item-card-title">
-            <!-- While the shot is the WIP sign, it stands on a stage as the Grind Tracker's does; the
-                 retaken scene is its own stage again: class "shot stage scene". -->
-            <figure class="shot stage">
+            <figure class="shot stage scene">
               <img
-                src="./screenshots/wip.png"
-                alt="Minerva's owl in a hard hat beside a sign: WIP, screenshot coming soon. A new shot of the Item Card is on its way."
+                src="./screenshots/item-card.png"
+                alt="A One-Handed Blunt Weapon Attack Scroll: Greater's tooltip, and under it the Item Card at the pointer: the scroll's picture beside its name, Shop pays: Not known, and under Market its one line, Price, at 7,500 mesos, its ring filled as the Deal Line, with the buttons to add a line and open MesoWatch, and the credit's info icon at its foot."
                 loading="lazy"
                 decoding="async"
               />
@@ -212,7 +218,7 @@
                 Hover an item and press <kbd>Ctrl+Shift+I</kbd>. Its <strong>Item Card</strong> shows what an NPC shop pays
                 for it, next to the market prices you've noted down.
               </p>
-              <div class="qa-list" data-qa="market-prices set-price market-lines" data-group="items"></div>
+              <div class="qa-list" data-qa="market-prices" data-group="items"></div>
             </div>
           </section>
 
@@ -231,13 +237,18 @@
                 Hover an item and press <kbd>Ctrl+Shift+U</kbd>. <strong>Item Lookup</strong> opens its MeowDB page, with
                 what drops it and which quests use it.
               </p>
-              <div class="qa-list" data-qa="item-lookup lookup-alert lookup-pick" data-group="items"></div>
+              <div class="qa-list" data-qa="item-lookup" data-group="items"></div>
             </div>
           </section>
 
           <section class="feature stop" id="deal-finder" data-mini="Deal Finder" aria-labelledby="deal-finder-title">
-            <figure class="shot stage deal-owl">
-              <img src="../assets/deal-finder-owl.png" width="168" height="168" alt="Minerva's owl, peering through a magnifying glass." loading="lazy" decoding="async" />
+            <figure class="shot stage scene">
+              <img
+                src="./screenshots/deal-finder.png"
+                alt="A Player Shop's listings with the Deal Finder's badge to the left of each: Cape LUK Scroll at 0% and Claw Attack Scroll: Greater at +3%, pale, not deals; Gloves Crit. Rate Scroll at −1% under its Deal Line of 99,999, blue, a deal; and Cape Magic Def. Scroll at −25% under 6,632, purple, a great one."
+                loading="lazy"
+                decoding="async"
+              />
             </figure>
             <div class="feature-text">
               <h2 id="deal-finder-title">The deals in any Player Shop</h2>
@@ -245,12 +256,13 @@
                 Open a Player Shop and press <kbd>Ctrl+Shift+D</kbd>. The <strong>Deal Finder</strong> badges every listing
                 priced under your market price, and says how far under.
               </p>
-              <div class="qa-list" data-qa="deal-finder deal-line deal-badges" data-group="items"></div>
+              <div class="qa-list" data-qa="deal-badges" data-group="items"></div>
             </div>
           </section>
         </div>
 
-        <!-- Get started: how it stays safe, the three steps, and the hotkeys. -->
+        <!-- Get started: how it stays safe, the hotkeys, and the steps, so the page ends on the
+             Download. -->
         <div class="part" data-street="Get started">
           <!-- The setup warning, word for word (setup.html). -->
           <section class="safety stop" id="safe" data-mini="How it stays safe" aria-labelledby="safe-title">
@@ -274,6 +286,23 @@
               </ul>
             </div>
             <div class="qa-list" data-qa="reads-game data kept" data-group="safety"></div>
+          </section>
+
+          <section class="keys stop" id="hotkeys" data-mini="Hotkeys" aria-labelledby="hotkeys-title">
+            <div>
+              <h2 id="hotkeys-title">Hotkeys</h2>
+              <p>
+                They work while the game or Minerva is in front, and the game never sees them. Change them in Settings,
+                the gear at the top of the panel.
+              </p>
+              <div class="qa-list" data-qa="settings" data-group="setup"></div>
+            </div>
+            <table class="hotkeys">
+              <caption>The hotkeys a new install starts with</caption>
+              <tbody>
+@HOTKEY_ROWS@
+              </tbody>
+            </table>
           </section>
 
           <section class="start stop" id="get-started" data-mini="Download and play" aria-labelledby="start-title">
@@ -301,7 +330,7 @@
                   <strong>Update</strong>.
                 </li>
               </ol>
-              <div class="qa-list" data-qa="which-file update self-update" data-group="install"></div>
+              <div class="qa-list" data-qa="which-file" data-group="install"></div>
             </div>
             <figure class="shot">
               <img
@@ -313,23 +342,6 @@
               />
               <figcaption>The panel inside the game window, dragged under the minimap.</figcaption>
             </figure>
-          </section>
-
-          <section class="keys stop" id="hotkeys" data-mini="Hotkeys" aria-labelledby="hotkeys-title">
-            <div>
-              <h2 id="hotkeys-title">Hotkeys</h2>
-              <p>
-                They work while the game or Minerva is in front, and the game never sees them. Change them in Settings,
-                the gear at the top of the panel.
-              </p>
-              <div class="qa-list" data-qa="settings hotkey-nothing" data-group="setup"></div>
-            </div>
-            <table class="hotkeys">
-              <caption>The hotkeys a new install starts with</caption>
-              <tbody>
-@HOTKEY_ROWS@
-              </tbody>
-            </table>
           </section>
         </div>
       </main>

@@ -62,7 +62,7 @@ describe("map search", () => {
   });
 
   it("puts a name holding the query inside a word last", () => {
-    expect(found("unnel", 20).maps.slice(0, 1)).toEqual(["Ant Tunnel For Bowman (080001000)"]);
+    expect(found("unnel", 20).maps.slice(0, 1)).toEqual(["Ant Tunnel I (010005060)"]);
     expect(found("tunnel I", 20).maps).toEqual([
       "Ant Tunnel I (010005060)",
       "Ant Tunnel II (010005061)",
@@ -71,6 +71,18 @@ describe("map search", () => {
       "Deep Ant Tunnel I (010005066)",
       "Deep Ant Tunnel II (010005067)",
     ]);
+  });
+
+  it("puts the islands' maps before those off them, so Enter opens Ant Tunnel I for “ant”, not a job advancement test", () => {
+    expect(found("ant", 6).maps).toEqual([
+      "Ant Tunnel I (010005060)",
+      "Ant Tunnel II (010005061)",
+      "Ant Tunnel III (010005062)",
+      "Ant Tunnel IV (010005063)",
+      "Ant Tunnel Park (010005070)",
+      "Ant Tunnel For Bowman (080001000)",
+    ]);
+    expect(searchSaid("ant", searchMaps(names, "ant"))).toMatch(/Enter opens Ant Tunnel I\.$/);
   });
 
   it("shows a few and counts the rest", () => {
@@ -109,7 +121,7 @@ describe("map search", () => {
       "3 maps. Enter opens Henesys Hunting Ground I.",
     );
     expect(searchSaid("ant tunnel", searchMaps(names, "ant tunnel", { shown: 2 }))).toBe(
-      "2 maps, and 6 more: type more of the name. Enter opens Ant Tunnel For Bowman.",
+      "2 maps, and 6 more: type more of the name. Enter opens Ant Tunnel I.",
     );
   });
 
@@ -161,7 +173,7 @@ describe("map search", () => {
   it("counts a map's entries among all it finds, not only the ones it shows", () => {
     const counts = entryCounts({ maps: [{ map: "010005063", characters: 3, entries: 3 }] });
 
-    expect(found("ant tunnel", 2).maps).toEqual(["Ant Tunnel For Bowman (080001000)", "Ant Tunnel I (010005060)"]);
-    expect(searchMaps(names, "ant tunnel", { shown: 2, counts }).maps.map((m) => m.name)).toEqual(["Ant Tunnel IV", "Ant Tunnel For Bowman"]);
+    expect(found("ant tunnel", 2).maps).toEqual(["Ant Tunnel I (010005060)", "Ant Tunnel II (010005061)"]);
+    expect(searchMaps(names, "ant tunnel", { shown: 2, counts }).maps.map((m) => m.name)).toEqual(["Ant Tunnel IV", "Ant Tunnel I"]);
   });
 });

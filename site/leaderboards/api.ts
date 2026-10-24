@@ -61,8 +61,9 @@ export function byId<T extends HTMLElement>(id: string): T {
   return document.getElementById(id) as T;
 }
 
-/** A map in a list of maps: its Map Mark (if it has one) and name in bold over its street, a
- *  link to its page, and what's beside it (how many Characters have entries there). */
+/** A map in a list of maps: its Map Mark (or the mark's room, without one) and name in bold
+ *  over its street, a link to its page, and what's beside it (how many Characters have
+ *  entries there). */
 export function mapItem(
   map: { name: string; street: string; href: string; aside?: string | null; mark?: { name: string; picture: string } | null },
   enter = false,
@@ -73,8 +74,7 @@ export function mapItem(
   link.href = map.href;
   const words = make("span", "lb-map-words");
   const title = make("span", "lb-map-title");
-  if (map.mark != null) title.append(markImage(map.mark, true));
-  title.append(make("span", "lb-map-name", map.name));
+  title.append(markSlot(map.mark ?? null), make("span", "lb-map-name", map.name));
   words.append(title, make("span", "lb-map-street", map.street));
   link.append(words);
   if (map.aside != null) link.append(make("span", "lb-map-aside", map.aside));
@@ -94,6 +94,16 @@ export function markImage(mark: { name: string; picture: string }, named = false
   img.decoding = "async";
   img.referrerPolicy = "no-referrer";
   return img;
+}
+
+/** A map's Map Mark before its name in a list of maps, named; a map without one keeps the
+ *  mark's room, empty and hidden from assistive tech, so the names line up down the list,
+ *  as the panel keeps it. */
+export function markSlot(mark: { name: string; picture: string } | null): HTMLElement {
+  if (mark !== null) return markImage(mark, true);
+  const slot = make("span", "lb-mark");
+  slot.setAttribute("aria-hidden", "true");
+  return slot;
 }
 
 /** Put what a page says in `line`: its words, and the link after them, if any. */

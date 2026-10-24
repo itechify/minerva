@@ -85,11 +85,12 @@ body {
   top: 12px;
 }
 
-/* Links: ink at rest with a quiet underline, Portal Blue under the pointer as a mob's name
+/* Links: ink at rest over an Ink Steel underline, the one mark of a link in a line of ink,
+   so it shows on the lavender (3:1 against it); Portal Blue under the pointer as a mob's name
    in the panel, Frame Navy pressed. */
 a {
   color: inherit;
-  text-decoration: underline 1px var(--select-edge);
+  text-decoration: underline 1px var(--ink-3);
   text-underline-offset: 3px;
 }
 a:hover {
@@ -650,25 +651,35 @@ figcaption {
   right: 0;
 }
 
-/* Each step's caption under the frame, one at a time, the last the shot's own. */
+/* Each step's words, one at a time, on a band of the window's lavender along the foot of
+   what's in view of the frame (reel.ts), at the size of the words beside it. Over the
+   shot as the panel's notices sit in it: edged in Window Edge, the frame's own corners. */
 .reel-captions {
   position: absolute;
   left: 0;
   top: 0;
   display: grid;
   width: var(--reel-w);
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--ink-2);
-  text-wrap: pretty;
+  pointer-events: none;
 }
 .reel-captions > span {
   grid-area: 1 / 1;
+  align-self: end;
+  box-sizing: border-box;
+  min-height: 72px;
+  padding: 11px 16px 12px;
+  border: 1px solid var(--window-edge);
+  border-radius: 0 0 4px 4px;
+  background: var(--body);
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 24px;
+  text-wrap: pretty;
 }
 /* ---- The page's parts ---- */
 
-/* The home page's two parts (what it does, getting started) and the FAQ's three, parted by
-   a Window Rule. */
+/* The home page's four parts (where you are, where to hunt, what it's worth, getting started)
+   and the FAQ's three, parted by a Window Rule. */
 .part + .part {
   margin-top: 72px;
   border-top: 1px solid var(--rule);
@@ -765,10 +776,20 @@ strong {
   font-size: 17px;
   line-height: 28px;
 }
+/* The first feature, the Hidden Portals the game doesn't show, the thing Minerva is for:
+   its title and words a size up, a step towards the hero's. */
+.feature.lead h2 {
+  font-size: 36px;
+  line-height: 42px;
+}
+.feature.lead .feature-lede {
+  font-size: 19px;
+  line-height: 31px;
+}
 
 /* The stage a crop of the panel stands on, the band's lavender, the same size for every
    crop so the features keep one rhythm. A scene from the game (the Item Card's, Item
-   Lookup's) is its own stage. */
+   Lookup's, the Deal Finder's) is its own stage. */
 .stage {
   box-sizing: border-box;
   display: grid;
@@ -785,15 +806,6 @@ strong {
   min-height: 0;
   padding: 0;
   background: none;
-}
-/* The Deal Finder's owl, its 42-pixel drawing at four times its size, pixel for pixel, on
-   the stage the panel's crops stand on. */
-.stage.deal-owl img {
-  width: 168px;
-  height: 168px;
-  border: none;
-  background: none;
-  image-rendering: pixelated;
 }
 /* The Map Leaderboards' stage: the Grind Tracker's gold tally board, the mark of a best,
    at three quarters of its size, pixel for pixel. */
@@ -1019,13 +1031,14 @@ strong {
   margin-top: 50px;
 }
 
-/* Three steps beside the owl, and the whole game window with the panel in it. */
+/* The steps beside the owl, and the whole game window with the panel in it: the page's
+   last part, so its Download is the last thing on it. */
 .start {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 608px);
   gap: 56px;
   align-items: start;
-  padding-top: 64px;
+  padding: 64px 0 40px;
 }
 .start .npc {
   margin-bottom: 28px;
@@ -1045,7 +1058,7 @@ strong {
   grid-template-columns: minmax(0, 26em) minmax(0, 32em);
   gap: 64px;
   align-items: start;
-  padding: 64px 0 40px;
+  padding-top: 64px;
 }
 
 /* ---- The FAQ ---- */
@@ -1055,6 +1068,19 @@ strong {
 }
 .faq-head .npc {
   max-width: 50em;
+}
+/* The search (filter.ts) under the owl's choices, as an NPC's window asks you to type an
+   answer: its field as the Map Leaderboards' is, at the choices' measure. */
+.faq-filter {
+  max-width: 26em;
+  margin: 18px 0 0;
+}
+/* How many questions are left, as the Map Leaderboards' search says what it found. */
+.npc-words .faq-said {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--ink-2);
 }
 /* A group: its heading and what it covers held at the left as its questions go by, the
    questions at a reading measure beside them. */
@@ -1110,10 +1136,10 @@ strong {
 /* The topics under a group's heading (topics.ts), held in sight with it, so the way to
    another is never back at the top: the nine as quiet rows past a Window Rule, the group
    you're in the selected one, as the panel marks the shown map's row (Selection Periwinkle,
-   its inset ring and bold Ink). Shown between 961px and 1440px, where the minimap isn't
-   and the column has the room; on a screen too short to hold them with the heading, or
-   narrower, each group ends on its way back to the owl's list instead. A printed page has
-   no use for either. */
+   its inset ring and bold Ink). Shown from 961px, where the column has the room, beside the
+   minimap from 1440px (its portals name the topics only under the pointer); on a screen too
+   short to hold them with the heading, or narrower, each group ends on its way back to the
+   owl's list instead. A printed page has no use for either. */
 .faq-topics {
   display: none;
   margin-top: 18px;
@@ -1163,12 +1189,12 @@ strong {
   display: inline-block;
   padding: 11px 0;
 }
-@media screen and (min-width: 961px) and (max-width: 1439px) and (min-height: 600px) {
+@media screen and (min-width: 961px) and (min-height: 600px) {
   .faq-topics {
     display: block;
   }
 }
-@media screen and (max-width: 960px), screen and (max-width: 1439px) and (max-height: 599px) {
+@media screen and (max-width: 960px), screen and (max-height: 599px) {
   .faq-topics-back {
     display: block;
   }
@@ -1846,7 +1872,8 @@ button.icon-button:active {
   font-size: 23px;
   line-height: 30px;
 }
-.lb-search label {
+.lb-search label,
+.faq-filter label {
   display: block;
   margin-bottom: 6px;
   font-size: 14px;
@@ -1856,6 +1883,7 @@ button.icon-button:active {
 }
 /* The search field, as the panel's: the one surface set into the body. */
 .lb-search input,
+.faq-filter input,
 .lb-dialog textarea {
   box-sizing: border-box;
   width: 100%;
@@ -2393,6 +2421,11 @@ html.lb-band .lb-train,
   font-weight: 400;
   color: var(--ink-2);
 }
+/* A band no one has a best in, with a Character linked: the line about them comes under the
+   one that says so, a paragraph's distance down, as the pages' lines are parted. */
+.lb-board .lb-said:not([hidden]) ~ .lb-note {
+  margin-top: 10px;
+}
 /* A band's entries: the hotkey table's inset box, rows parted by Window Rules, figures
    right-aligned, the linked character's row selected. As wide as the page's measure. */
 .lb-table,
@@ -2822,8 +2855,8 @@ button.button {
   .window-head {
     display: contents;
   }
-  /* The pages side by side, each a thumb's height. As in the game, the others sit dimmer
-     and the open one is the bright, framed one. */
+  /* The pages side by side, each a thumb's height: the others in light steel, as the
+     game's tabs, and the open one the lavender, framed. */
   .tabs {
     position: sticky;
     top: 0;
@@ -2838,7 +2871,7 @@ button.button {
     padding: 11px 4px;
     border-color: var(--select-edge);
     border-radius: 4px;
-    background: color-mix(in srgb, var(--body-solid) 70%, var(--select-edge));
+    background: var(--button-light);
     box-shadow: none;
     font-size: 13px;
     text-align: center;
@@ -2858,6 +2891,30 @@ button.button {
     flex: 1 1 100%;
     text-align: center;
   }
+  /* On a phone, where the Download is no use (the note above says so), See what it does
+     leads, as the steel button, and the Download follows as the light one. */
+  .actions .button.secondary {
+    order: -1;
+    border-color: var(--button-edge);
+    background: var(--button);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    color: #fff;
+    text-shadow: 0 1px 0 var(--button-edge);
+  }
+  .actions .button.secondary:hover,
+  .actions .button.secondary:active {
+    background: var(--button-hover);
+  }
+  .actions .button:not(.secondary) {
+    border-color: var(--frame);
+    background: var(--button-light);
+    box-shadow: inset 0 1px 0 #fff;
+    color: var(--ink);
+    text-shadow: none;
+  }
+  .actions .button:not(.secondary):hover {
+    background: var(--button-light-hover);
+  }
   .window-body {
     padding: 0 18px 8px;
   }
@@ -2870,8 +2927,20 @@ button.button {
     line-height: 32px;
   }
   .faq-group h2 {
-    font-size: 20px;
-    line-height: 26px;
+    font-size: 22px;
+    line-height: 28px;
+  }
+  .feature.lead h2 {
+    font-size: 30px;
+    line-height: 36px;
+  }
+  .feature.lead .feature-lede {
+    font-size: 17px;
+    line-height: 28px;
+  }
+  /* The hotkeys across the column, as the questions above them are. */
+  .hotkeys {
+    width: 100%;
   }
   .lede,
   .feature-lede,
@@ -2911,6 +2980,10 @@ button.button {
   }
   .npc-choices {
     columns: 1;
+  }
+  /* Each topic a thumb's height. */
+  .npc-choices a {
+    padding: 10px 0;
   }
   .npc-words .npc-buttons {
     text-align: left;

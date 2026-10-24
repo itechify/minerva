@@ -42,6 +42,7 @@
     <link rel="stylesheet" href="../site.css" />
     <script type="module" src="../site.ts"></script>
     <script type="module" src="../topics.ts"></script>
+    <script type="module" src="../filter.ts"></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to the questions</a>
@@ -60,7 +61,7 @@
               <p class="npc-name">Minerva</p>
             </div>
             <div class="npc-words">
-              <p>What would you like to know? Pick a topic, then click a question to see its answer.</p>
+              <p>What would you like to know? Pick a topic, or tell me a word and I'll find its questions.</p>
               <nav aria-label="Topics">
                 <ul class="npc-choices">
                   <li><a href="#safety">Safety &amp; your account</a></li>
@@ -178,18 +179,6 @@
                     name, job, level, EXP per hour and dates, with your Leaderboard Key, which the site keeps only as a
                     hash. Turn <strong>Share</strong> off under a character's name in your Personal Bests and nothing of
                     theirs is sent.
-                  </p>
-                </details>
-                <details class="qa" id="refresh">
-                  <summary>Search doesn't find a new map, mob or item. What do I do?</summary>
-                  <p>
-                    Minerva gets the game's data once a day, so a patch can take a day to show. To get it now, open
-                    Settings, the gear at the top of the panel, and press <strong>Refresh</strong> under Game Data.
-                    A new version of Minerva gets it afresh the first time it starts.
-                  </p>
-                  <p>
-                    If Refresh says to update Minerva, OSMS Data Explorer's data changed in a way this version can't read:
-                    <a href="#update">install the latest release</a>. Until then, Minerva keeps the data it has.
                   </p>
                 </details>
                 <details class="qa" id="kept">
@@ -343,8 +332,8 @@
                   <p>Finish starts the overlay. Closing setup on its first run quits.</p>
                   <figure class="shot">
                     <img
-                      src="../screenshots/wip.png"
-                      alt="Minerva's owl in a hard hat beside a sign: WIP, screenshot coming soon. A new shot of Setup finding your map is on its way."
+                      src="../screenshots/setup.png"
+                      alt="Setup opened again, at its step Finding your map (step 3 of 4): there's nothing to mark, and it shows the map Minerva found in the minimap's title, Victoria Road, Kerning City, beside its Map Mark, tagged Found, with the hotkeys to use while you play."
                       loading="lazy"
                       decoding="async"
                     />
@@ -1334,6 +1323,18 @@
                     there: Minerva sends nothing of theirs, and a note in your Personal Bests says so, since what's left
                     on your PC would replace them. Click <strong>Send what's here</strong> on it, and again to confirm,
                     to send what's there now instead.
+                  </p>
+                </details>
+                <details class="qa" id="refresh">
+                  <summary>Search doesn't find a new map, mob or item. What do I do?</summary>
+                  <p>
+                    Minerva gets the game's data once a day, so a patch can take a day to show. To get it now, open
+                    Settings, the gear at the top of the panel, and press <strong>Refresh</strong> under Game Data.
+                    A new version of Minerva gets it afresh the first time it starts.
+                  </p>
+                  <p>
+                    If Refresh says to update Minerva, OSMS Data Explorer's data changed in a way this version can't read:
+                    <a href="#update">install the latest release</a>. Until then, Minerva keeps the data it has.
                   </p>
                 </details>
               </div>

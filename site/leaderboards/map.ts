@@ -16,6 +16,7 @@ import {
   mapPage,
   mapPicture,
   morphNames,
+  NO_MAP,
   placeOf,
   readLink,
   reportOutcome,
@@ -56,24 +57,43 @@ function down() {
 }
 
 const place = link.map === null ? null : placeOf(names, link.map);
+/** Whether the page is titled with the map yet. */
+let titled = false;
 
 /** The page as its address opens it: the map, then its bands and band together, scrolled
  *  to the linked Character's entry. What's drawn as it comes is drawn into room kept for it
  *  (the street's line, the picture's height, a screen's room for the board), so arriving
- *  never moves anything in view. */
+ *  never moves anything in view. A map the map list doesn't name is titled only once the
+ *  API says it has bests (a map newer than the list), and otherwise is no map: the page
+ *  keeps only its title, as for a link naming none, so neither keeps room for a map. */
 async function open() {
-  if (place === null) {
+  if (place === null) return noMap(NO_MAP);
+  if (place.known) drawHead(place);
+  else {
     byId("map-street").hidden = true;
     byId("map-picture").hidden = true;
-    say({ text: "This link doesn't name a map.", link: { text: "Find a map on the Map Leaderboards.", href: "/leaderboards/" } });
-    return;
   }
+  openBoard(place);
+}
+
+/** The map's name under its street, as the panel titles a map, and its picture. */
+function drawHead(place: MapPlace) {
+  titled = true;
   byId("map-name").textContent = place.name;
-  byId("map-street").textContent = place.region ? `${place.street} · ${place.region}` : place.street;
+  const street = byId("map-street");
+  street.textContent = place.region ? `${place.street} · ${place.region}` : place.street;
+  street.hidden = false;
+  byId("map-picture").hidden = false;
   document.title = `${place.name} · Map Leaderboard · Minerva`;
   // Pictures load independently: a missing picture never holds up the rankings.
   showPicture(place);
-  openBoard(place);
+}
+
+/** There's no map to show: the page's title alone, and why, with the way to find one. */
+function noMap(why: Said) {
+  byId("map-street").hidden = true;
+  byId("map-picture").hidden = true;
+  say(why);
 }
 
 /** The map's bands, then the band the link opens at, drawn together. */
@@ -81,6 +101,8 @@ async function openBoard(place: MapPlace) {
   mapAnswer = await read<MapAnswer>(`/api/maps/${place.id}`);
   if (mapAnswer === null) return down();
   const page = mapPage(link, names, mapAnswer);
+  if (!page.found) return noMap(page.empty!);
+  if (!titled) drawHead(place);
   if (page.open === null) {
     drawBands(page.bands);
     return say(page.empty!);

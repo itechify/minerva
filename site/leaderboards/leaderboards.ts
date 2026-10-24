@@ -111,12 +111,19 @@ export function mapMarks(table: {
   return marks;
 }
 
-/** The maps whose Map Name holds `query`, whatever the case, as the panel's search finds
+/** The region OSMS puts the maps off the islands' roads in: mostly the job advancement
+ *  tests, the party quest and the Free Market, maps a player is sent to rather than goes to
+ *  train on, and a few hidden maps beside them. */
+const OFF_THE_ISLANDS = "Other";
+
+/** The maps whose Map Name holds `query`, whatever the case, much as the panel's search finds
  *  them (`search.rs`): those that start with it, then those with a word that starts with it,
- *  then the rest, each by name; Event and Dev maps aside. A map named the query itself,
- *  whatever the case, comes first of all. Then, with `counts`, the maps with entries come
- *  first, so the first map, the one Enter opens, isn't an empty one when another isn't. The
- *  first `shown`, each with its Map Mark from `marks`, and how many more. */
+ *  then the rest; Event and Dev maps aside. Within each, the islands' maps come before those
+ *  off them, so "ant" opens Ant Tunnel I, not the Bowman's job advancement test, Ant Tunnel
+ *  For Bowman (the panel's search doesn't do this yet); then each by name. A map named the
+ *  query itself, whatever the case, comes first of all. Then, with `counts`, the maps with
+ *  entries come first, so the first map, the one Enter opens, isn't an empty one when another
+ *  isn't. The first `shown`, each with its Map Mark from `marks`, and how many more. */
 export function searchMaps(
   names: MapNames,
   query: string,
@@ -124,17 +131,19 @@ export function searchMaps(
 ): { maps: FoundMap[]; more: number } {
   const lower = query.trim().toLowerCase();
   if (lower === "") return { maps: [], more: 0 };
-  const found: { exact: boolean; fit: number; empty: boolean; map: MapPlace }[] = [];
+  const found: { exact: boolean; fit: number; empty: boolean; off: boolean; map: MapPlace }[] = [];
   for (const map of names.values()) {
     if (LEFT_OUT_REGIONS.includes(map.region)) continue;
     const f = fit(map.name, lower);
-    if (f !== null) found.push({ exact: map.name.toLowerCase() === lower, fit: f, empty: !counts?.get(map.id), map });
+    if (f === null) continue;
+    found.push({ exact: map.name.toLowerCase() === lower, fit: f, empty: !counts?.get(map.id), off: map.region === OFF_THE_ISLANDS, map });
   }
   found.sort(
     (a, b) =>
       Number(b.exact) - Number(a.exact) ||
       Number(a.empty) - Number(b.empty) ||
       a.fit - b.fit ||
+      Number(a.off) - Number(b.off) ||
       byText(a.map.name, b.map.name) ||
       byText(a.map.street, b.map.street) ||
       byText(a.map.id, b.map.id),
@@ -208,18 +217,34 @@ export interface BandChoice {
 }
 
 /** A map's page: the map, its Level Bands, and the one it opens at (`null` with none to
- *  show), or why it has none. */
+ *  show), or why it has none. Not `found`, there's no such map: the page says so under its
+ *  title alone, with no street, picture or board. */
 export interface MapPage {
   place: MapPlace;
   bands: BandChoice[];
   open: number | null;
   empty: Said | null;
+  found: boolean;
 }
+
+/** Where a link to no map, or to one there isn't, sends the player: finding one. */
+const FIND_A_MAP = { text: "Find a map on the Map Leaderboards.", href: "/leaderboards/" };
+
+/** What a map's page says for a link that names no map. */
+export const NO_MAP: Said = { text: "This link doesn't name a map.", link: FIND_A_MAP };
 
 /** A map's page as `link` opens it, from its bands as the API gives them. It opens at the
  *  link's band, even with no entries there (Minerva links a Character's own band, and the
- *  page says they have no entry there), or else at the lowest band with entries. */
+ *  page says they have no entry there), or else at the lowest band with entries. A map the
+ *  map names fixture doesn't name and no one has a best on isn't one: the page says there's
+ *  no such map. One with bests is a map newer than the fixture (Minerva's map list is
+ *  OSMS's live one), named by its ID, as the Personal Bests window names it. */
 export function mapPage(link: Link, names: MapNames, answer: MapAnswer): MapPage {
+  const place = placeOf(names, answer.map);
+  if (!place.known && answer.bands.length === 0) {
+    const empty = { text: `There's no map ${answer.map} in the map list.`, link: FIND_A_MAP };
+    return { place, bands: [], open: null, empty, found: false };
+  }
   const open = link.band ?? answer.bands[0]?.band ?? null;
   const counts = new Map(answer.bands.map((b) => [b.band, b.entries]));
   if (open !== null && !counts.has(open)) counts.set(open, 0);
@@ -233,10 +258,11 @@ export function mapPage(link: Link, names: MapNames, answer: MapAnswer): MapPage
       open: band === open,
     }));
   return {
-    place: placeOf(names, answer.map),
+    place,
     bands,
     open,
     empty: open === null ? { text: "No one has a best on this Map Leaderboard yet.", link: PUT_YOURS } : null,
+    found: true,
   };
 }
 
@@ -445,9 +471,11 @@ export interface TrainingRow {
    *  ceilings table doesn't hold. */
   mobs: string | null;
   /** The band's #1 there: its EXP/h, who set it ("Bea · Magician Lv 25") and when; `null`
-   *  with no entries. */
+   *  with no entries, its cell left empty, as its entries say there are none. */
   best: { expPerHour: string; who: string; date: string } | null;
-  entries: string;
+  /** "3 entries", or "No entries yet"; `null` when none of the maps shown has any, which
+   *  the table says once, over them, its cell left empty. */
+  entries: string | null;
 }
 
 /** An area Where to train offers to show the maps of: its Map Mark, and a link to it. */
@@ -458,8 +486,9 @@ export interface TrainingArea extends MapMark {
 }
 
 /** Where to train's table for a band: its rows, the areas their Map Marks name (for the
- *  choice), the area it shows (`null`, all of them), what it says of itself, and why there
- *  are no rows when there are none. */
+ *  choice), the area it shows (`null`, all of them), what it says of itself, what it says
+ *  over its rows when none of them has an entry, and why there are no rows when there are
+ *  none. */
 export interface TrainingTable {
   rows: TrainingRow[];
   areas: TrainingArea[];
@@ -468,6 +497,9 @@ export interface TrainingTable {
   /** The button under a long table's first rows, that shows the rest: "Show all 69 maps";
    *  `null` when every row is shown. */
   more: string | null;
+  /** Said once over the rows when none of the maps shown has an entry: that no one has put a
+   *  best on them yet, and how to put yours there. */
+  none: Said | null;
   empty: Said | null;
 }
 
@@ -482,7 +514,9 @@ const TRAINING_ALL_UP_TO = 20;
  *  band has no maps in shows every area; the areas are offered by name, and a map without
  *  a Map Mark shows only among every area's. The maps with entries come first, highest #1
  *  first, then the rest by their mob levels, lowest first. Ties by name. A band with more
- *  than 20 maps shows its first 15, and a button to show them `all`. */
+ *  than 20 maps shows its first 15, and a button to show them `all`. When none of the maps
+ *  shown has an entry, the table says so once, over them, and their rows leave their bests
+ *  and entries empty rather than each say it again. */
 export function trainingTable(
   answer: TrainingAnswer,
   names: MapNames,
@@ -513,6 +547,7 @@ export function trainingTable(
       byText(a.map, b.map),
   );
   const cut = !all && shown.length > TRAINING_ALL_UP_TO;
+  const none = shown.length > 0 && shown.every((m) => m.entries === 0);
   const rows = (cut ? shown.slice(0, TRAINING_SHOWN) : shown).map((m): TrainingRow => {
     const set = m.best === null ? null : new Date(m.best.setAt);
     return {
@@ -529,7 +564,7 @@ export function trainingTable(
               who: `${m.best.name} · ${m.best.job} Lv ${m.best.level}`,
               date: dayText(set, set.getFullYear() !== now.getFullYear()),
             },
-      entries: m.entries === 0 ? "No entries yet" : entriesCounted(m.entries),
+      entries: none ? null : m.entries === 0 ? "No entries yet" : entriesCounted(m.entries),
     };
   });
   const at = bandLevels(answer.band);
@@ -543,6 +578,11 @@ export function trainingTable(
     area,
     caption,
     more: cut ? `Show all ${counted(shown.length, "map")}` : null,
+    none: !none
+      ? null
+      : shown.length === 1
+        ? { text: `No one at ${at} has put a best on this map yet. Its mobs are at your level.`, link: PUT_YOURS }
+        : { text: `No one at ${at} has put a best on these maps yet. They're the maps whose mobs are at your level.`, link: PUT_YOURS },
     empty: rows.length === 0 ? { text: `No map's mobs are at ${at}, and no one has put a best there yet.`, link: PUT_YOURS } : null,
   };
 }
