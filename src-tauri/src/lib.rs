@@ -141,7 +141,7 @@ pub(crate) enum Command {
     /// The player said not now to the Personal Bests window's prompt to link Discord.
     DismissLinkPrompt,
     /// The core's request `id` about linking came to `answer`; a link started, with the link
-    /// page to open first, its one-time token in it.
+    /// page to open first, its link token in it.
     DiscordLinkAnswer { id: u64, answer: DiscordLinkAnswer, open: Option<String> },
     /// The core's check `id` for a newer version came to this.
     UpdateAnswer { id: u64, answer: UpdateAnswer },
@@ -780,8 +780,9 @@ fn core_loop(
                 minerva.dismiss_link_prompt();
             }
             Ok(Command::DiscordLinkAnswer { id, answer, open }) => {
+                // The error isn't kept, nor logged: it may quote the address, with its link token.
                 let answer = match open.map(|url| app.opener().open_url(url, None::<&str>)) {
-                    Some(Err(e)) => DiscordLinkAnswer::Failed { why: format!("couldn't open the link page: {e}") },
+                    Some(Err(_)) => DiscordLinkAnswer::Failed { why: "the browser didn't open".to_string() },
                     _ => answer,
                 };
                 minerva.on_discord_link_answer(id, answer);

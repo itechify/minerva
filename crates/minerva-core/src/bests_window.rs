@@ -29,6 +29,7 @@
 //!   region (it shows in screen captures, ours included), but over the panel and the
 //!   Grind Tracker if that's where it goes.
 
+use crate::discord_link::DiscordLinkView;
 use crate::grind_tracker::ClientOffset;
 use crate::leaderboards::{self, LeaderboardToggle};
 use crate::map_data::MapData;
@@ -36,7 +37,6 @@ use crate::map_index::MapEntry;
 use crate::panel::{GameWindow, ScreenRect, Size, in_view};
 use crate::personal_best::{LevelBand, MapBests, SavedBests};
 use crate::shown_map::LevelRange;
-use crate::discord_link::DiscordLinkView;
 use crate::meowdb;
 use serde::Serialize;
 

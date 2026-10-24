@@ -3,7 +3,7 @@
 //! core the answer. What to upload, when, and what an answer means are the core's. So with
 //! linking this install to an Account (#152, ADR 0023): each request about it
 //! (`PanelState::discord_link_requests`) is made once, with the key, and starting a link opens
-//! the link page here, so its one-time token never reaches the core.
+//! the link page here, so its link token never reaches the core.
 //!
 //! The Leaderboard Key, which ties a Character's name to this install, is kept here and never
 //! handed to the core: everything the core takes in goes into a Bug Report, and those go into
@@ -14,8 +14,8 @@
 use crate::errors::error;
 use crate::{Command, http};
 use minerva_core::{
-    DiscordLinkAnswer, DiscordLinkRequest, LeaderboardAnswer, LeaderboardUpload, SITE_URL, read_leaderboard_answer, read_link_state,
-    read_link_token,
+    DiscordLinkAnswer, DiscordLinkRequest, LeaderboardAnswer, LeaderboardUpload, SITE_URL, link_page, read_leaderboard_answer,
+    read_link_state, read_link_token,
 };
 use std::fs;
 use std::io::ErrorKind;
@@ -110,14 +110,14 @@ pub struct Uploader {
     /// The id of the last upload made: the core's ids only grow.
     made: u64,
     /// The id of the last request about linking made.
-    linked: u64,
+    link_request_made: u64,
     /// Where the answers go, for the core loop.
     commands: Sender<Command>,
 }
 
 impl Uploader {
     pub fn new(key: KeyFile, client: reqwest::Client, commands: Sender<Command>) -> Self {
-        Self { key, client, made: 0, linked: 0, commands }
+        Self { key, client, made: 0, link_request_made: 0, commands }
     }
 
     /// Make each of `uploads` (the core's under way) not made yet, in the background; each
@@ -155,9 +155,9 @@ impl Uploader {
     /// answer comes back to the core loop as [`Command::DiscordLinkAnswer`], a link started with
     /// the link page to open.
     pub fn sync_discord(&mut self, requests: &[DiscordLinkRequest]) {
-        let made = self.linked;
+        let made = self.link_request_made;
         for request in requests.iter().filter(|request| request.id > made) {
-            self.linked = self.linked.max(request.id);
+            self.link_request_made = self.link_request_made.max(request.id);
             let id = request.id;
             let key = if request.posts() { self.key.key().map(Some) } else { self.key.existing() };
             let key = match key {
@@ -184,7 +184,7 @@ impl Uploader {
                     Err(why) => (DiscordLinkAnswer::Failed { why }, None),
                     Ok(reply) if posts => match read_link_token(reply.status, &reply.body) {
                         // The page on the site asked, never one the answer names.
-                        Ok(token) => (DiscordLinkAnswer::Opened {}, Some(format!("{site}account/link/?t={token}"))),
+                        Ok(token) => (DiscordLinkAnswer::Opened {}, Some(format!("{site}{}", link_page(&token)))),
                         Err(why) => (DiscordLinkAnswer::Failed { why }, None),
                     },
                     Ok(reply) => (read_link_state(reply.status, &reply.body), None),

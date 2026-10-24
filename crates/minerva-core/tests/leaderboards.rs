@@ -7,15 +7,12 @@
 mod common;
 
 use common::player::Player;
-use common::{CONSTRUCTION_SITE_ID, NORTHERN_TOP_ID, SUNSET_SKY_ID, tracking, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, S, DAY, MIN};
+use common::{CONSTRUCTION_SITE_ID, NORTHERN_TOP_ID, SUNSET_SKY_ID, tracking, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, S, DAY, MIN, WALL};
 use minerva_core::{
     BESTS_VERSION, CharacterBests, LeaderboardAnswer, LeaderboardCharacter, LeaderboardEntry, LeaderboardStatus,
     LeaderboardToggle, LeaderboardUpload, MapBests, Minerva, PanelControl, PanelState, RejectedEntry, RejectedListing, RejectedReason, Request, SavedBests, ScreenRect,
     Settings, StatusBar, StatusBarReading, VisitBest,
 };
-
-/// The wall clock at capture time 0: 9 Oct 2026, 12:00 UTC.
-const WALL: u64 = 1_791_547_200_000;
 
 /// A Visit's best: `exp` EXP/h, set `days_ago` before [`WALL`] (`None`: before Minerva knew the
 /// date) by a Magician of `level`.

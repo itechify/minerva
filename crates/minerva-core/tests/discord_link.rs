@@ -5,14 +5,11 @@
 
 mod common;
 
-use common::{CONSTRUCTION_SITE_ID, DAY, MIN, S, tracking};
+use common::{CONSTRUCTION_SITE_ID, DAY, MIN, S, WALL, tracking};
 use minerva_core::{
     BESTS_VERSION, CharacterBests, DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest, DiscordLinkView, LeaderboardAnswer,
     LeaderboardStatus, MapBests, Minerva, PanelControl, PanelState, SavedBests, Settings, VisitBest, read_link_state, read_link_token,
 };
-
-/// The wall clock at capture time 0: 9 Oct 2026, 12:00 UTC.
-const WALL: u64 = 1_791_547_200_000;
 
 /// Egbert's one best, on the Construction Site, dated: something to upload.
 fn bests() -> SavedBests {
@@ -23,7 +20,7 @@ fn bests() -> SavedBests {
 
 /// A core at launch with Egbert's bests and the wall clock told, Egbert met at an earlier
 /// launch and shown on the Map Leaderboards (`shown`) or not. The Personal Bests window closed.
-fn launched(shown: bool) -> Minerva {
+fn egbert_at_launch(shown: bool) -> Minerva {
     let mut minerva = tracking();
     let settings = Settings { map_leaderboards_met: Some(vec!["Egbert".to_string()]), ..minerva.settings() };
     minerva.restore(settings);
@@ -68,7 +65,7 @@ const NOT_LINKED: DiscordLinkView = DiscordLinkView { linked_as: None, offered: 
 
 #[test]
 fn opening_personal_bests_reads_the_link_state_and_offers_link_discord_when_not_linked() {
-    let mut minerva = launched(false);
+    let mut minerva = egbert_at_launch(false);
     assert_eq!(minerva.panel_state().discord_link_requests, []);
     assert_eq!(discord(minerva.panel_state()), DiscordLinkView { offered: false, ..NOT_LINKED });
 
@@ -84,7 +81,7 @@ fn opening_personal_bests_reads_the_link_state_and_offers_link_discord_when_not_
 
 #[test]
 fn a_linked_install_shows_whose_discord_it_is_linked_to() {
-    let mut minerva = launched(true);
+    let mut minerva = egbert_at_launch(true);
     open_bests(&mut minerva, 10);
 
     let state = answer(&mut minerva, DiscordLinkAnswer::Linked { username: "egberticus".to_string() }, 20);
@@ -94,7 +91,7 @@ fn a_linked_install_shows_whose_discord_it_is_linked_to() {
 
 #[test]
 fn the_link_state_is_read_again_at_an_opening_a_minute_after_the_last_read() {
-    let mut minerva = launched(false);
+    let mut minerva = egbert_at_launch(false);
     open_bests(&mut minerva, 10);
     answer(&mut minerva, DiscordLinkAnswer::NotLinked {}, 20);
     minerva.press(PanelControl::ClosePersonalBests);
@@ -108,7 +105,7 @@ fn the_link_state_is_read_again_at_an_opening_a_minute_after_the_last_read() {
 
 #[test]
 fn a_failed_read_offers_nothing_and_is_tried_at_the_next_opening() {
-    let mut minerva = launched(false);
+    let mut minerva = egbert_at_launch(false);
     open_bests(&mut minerva, 10);
 
     let state = answer(&mut minerva, DiscordLinkAnswer::Failed { why: "offline".to_string() }, 20);
@@ -122,7 +119,7 @@ fn a_failed_read_offers_nothing_and_is_tried_at_the_next_opening() {
 
 #[test]
 fn link_discord_opens_the_link_page_then_reads_the_state_every_5_seconds_until_linked() {
-    let mut minerva = launched(true);
+    let mut minerva = egbert_at_launch(true);
     open_bests(&mut minerva, 10);
     answer(&mut minerva, DiscordLinkAnswer::NotLinked {}, 20);
 
@@ -149,7 +146,7 @@ fn link_discord_opens_the_link_page_then_reads_the_state_every_5_seconds_until_l
 
 #[test]
 fn reading_stops_2_minutes_after_the_link_page_opened_and_link_discord_is_offered_again() {
-    let mut minerva = launched(false);
+    let mut minerva = egbert_at_launch(false);
     open_bests(&mut minerva, 10);
     answer(&mut minerva, DiscordLinkAnswer::NotLinked {}, 20);
     minerva.link_discord();
@@ -171,7 +168,7 @@ fn reading_stops_2_minutes_after_the_link_page_opened_and_link_discord_is_offere
 
 #[test]
 fn a_link_page_that_couldnt_be_opened_says_why_and_link_discord_tries_again() {
-    let mut minerva = launched(false);
+    let mut minerva = egbert_at_launch(false);
     open_bests(&mut minerva, 10);
     answer(&mut minerva, DiscordLinkAnswer::NotLinked {}, 20);
     minerva.link_discord();
@@ -189,7 +186,7 @@ fn a_link_page_that_couldnt_be_opened_says_why_and_link_discord_tries_again() {
 
 #[test]
 fn the_prompt_asks_once_a_player_with_a_character_on_the_map_leaderboards_who_hasnt_linked() {
-    let mut minerva = launched(true);
+    let mut minerva = egbert_at_launch(true);
     open_bests(&mut minerva, 10);
     let state = answer(&mut minerva, DiscordLinkAnswer::NotLinked {}, 20);
     assert_eq!(discord(&state), DiscordLinkView { prompt: true, ..NOT_LINKED });
@@ -211,7 +208,7 @@ fn the_prompt_asks_once_a_player_with_a_character_on_the_map_leaderboards_who_ha
 
 #[test]
 fn no_prompt_without_a_character_on_the_map_leaderboards_nor_while_linking() {
-    let mut minerva = launched(false);
+    let mut minerva = egbert_at_launch(false);
     open_bests(&mut minerva, 10);
     assert!(!discord(&answer(&mut minerva, DiscordLinkAnswer::NotLinked {}, 20)).prompt);
 
@@ -223,7 +220,7 @@ fn no_prompt_without_a_character_on_the_map_leaderboards_nor_while_linking() {
 
 #[test]
 fn linking_sends_a_character_whose_name_was_claimed_again_at_once() {
-    let mut minerva = launched(true);
+    let mut minerva = egbert_at_launch(true);
     let upload = minerva.panel_state().leaderboard_uploads[0].id;
     minerva.on_leaderboard_answer(upload, LeaderboardAnswer::Claimed {});
     let state = open_bests(&mut minerva, 10);
@@ -244,7 +241,7 @@ fn linking_sends_a_character_whose_name_was_claimed_again_at_once() {
 
 #[test]
 fn an_answer_to_a_request_no_longer_under_way_changes_nothing() {
-    let mut minerva = launched(false);
+    let mut minerva = egbert_at_launch(false);
     open_bests(&mut minerva, 10);
     let id = request(minerva.panel_state()).id;
     minerva.on_discord_link_answer(id, DiscordLinkAnswer::NotLinked {});

@@ -6,7 +6,7 @@
 //! - **The link state** (linked, as whom, or not) is read when the Personal Bests window opens,
 //!   at most once a minute, and every [`POLL_MS`] for [`LINKING_MS`] after the link page opened.
 //!   Until a read answers, nothing is offered: a linked player never sees Link Discord flash by.
-//! - **Link Discord** asks the shell to start a link: it asks the site for a one-time token
+//! - **Link Discord** asks the shell to start a link: it asks the site for a link token
 //!   with the key and opens the link page itself, so the token is never the core's and never
 //!   in a Bug Report. The player confirms on the site; the core reads the state until it says
 //!   linked, or the time is up.
@@ -29,7 +29,7 @@ const REREAD_MS: u64 = 60_000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DiscordLinkAsk {
-    /// Start a link: ask for a one-time token (`POST`) and open the link page with it,
+    /// Start a link: ask for a link token (`POST`) and open the link page with it,
     /// answering [`DiscordLinkAnswer::Opened`] or [`DiscordLinkAnswer::Failed`].
     Start,
     /// Read the link state (`GET`): [`DiscordLinkAnswer::Linked`], `NotLinked` or `Failed`.
@@ -233,7 +233,7 @@ pub fn read_link_state(status: u16, body: &str) -> DiscordLinkAnswer {
     }
 }
 
-/// The one-time token in the site's answer to starting a link, or why there is none. The
+/// The link token in the site's answer to starting a link, or why there is none. The
 /// shell opens the link page on the site it asked, with the token, never an address the
 /// answer names.
 pub fn read_link_token(status: u16, body: &str) -> Result<String, String> {
@@ -247,6 +247,12 @@ pub fn read_link_token(status: u16, body: &str) -> Result<String, String> {
     let token = serde_json::from_str::<Token>(body).map(|t| t.token).map_err(|_| unread(status))?;
     let fits = (20..=256).contains(&token.len()) && token.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
     if fits { Ok(token) } else { Err(unread(status)) }
+}
+
+/// The link page on the site for link token `token`, from [`crate::SITE_URL`] (or the site a
+/// debug build asks instead): the page the shell opens, never one an answer names.
+pub fn link_page(token: &str) -> String {
+    format!("account/link/?t={token}")
 }
 
 /// A refusal in words: "HTTP 429: rate-limited".

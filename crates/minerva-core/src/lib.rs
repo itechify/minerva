@@ -7,6 +7,7 @@
 mod bests_window;
 pub mod bug_report;
 mod deal_finder;
+mod discord_link;
 mod exp_bar;
 mod game_data;
 mod grind_tracker;
@@ -16,7 +17,6 @@ mod item_data;
 mod item_lookup;
 mod ink;
 mod item_tooltip;
-mod discord_link;
 mod leaderboards;
 mod loader;
 mod map_data;
@@ -64,7 +64,7 @@ pub use item_card::{
 pub use market_prices::{MARKET_PRICES_VERSION, MarketImport, MarketPrice, SavedMarketLine, SavedMarketPrices};
 pub use item_lookup::{ItemChoice, ItemHit, ItemLookup, ItemLookupLine, OurWindow};
 pub use item_tooltip::{ItemCapture, ItemTooltip, ItemTooltipReader, ItemTooltipReading};
-pub use discord_link::{DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest, DiscordLinkView, read_link_state, read_link_token};
+pub use discord_link::{DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest, DiscordLinkView, link_page, read_link_state, read_link_token};
 pub use leaderboards::{
     LeaderboardAnswer, LeaderboardCharacter, LeaderboardEntry, LeaderboardStatus, LeaderboardToggle, LeaderboardUpload,
     RejectedEntry, RejectedListing, RejectedReason, read_leaderboard_answer,
@@ -1424,7 +1424,7 @@ impl Minerva {
     }
 
     /// The player pressed Link Discord in the Personal Bests window: at the next tick the
-    /// shell asks the site for a one-time token with the Leaderboard Key and opens the link
+    /// shell asks the site for a link token with the Leaderboard Key and opens the link
     /// page, where the player confirms; the link state is read until it says linked.
     pub fn link_discord(&mut self) -> &PanelState {
         self.record(Event::LinkDiscord {});
