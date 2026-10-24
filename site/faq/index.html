@@ -91,10 +91,11 @@
                 <details class="qa" id="reads-game">
                   <summary>Does Minerva read or change the game?</summary>
                   <p>
-                    No. It captures only what it needs, the way a screenshot does: the minimap title, the EXP bar if you
-                    mark it, the tooltip by the pointer when you press an item hotkey, and the game window a few times a
-                    second while the Deal Finder is on, to find a Player Shop in it. It never reads or changes the game's
-                    memory or files, never injects anything into it, and never presses keys or clicks for you.
+                    No. Like a screenshot, it captures only what it needs: the minimap title, the bar at the bottom of the
+                    game (your EXP, level and name), the tooltip by the pointer when you press an item hotkey, and, while
+                    the Deal Finder is on, the game window a few times a second to find a Player Shop. It never reads or
+                    changes the game's memory or files, never injects anything into it, and never presses keys or clicks
+                    for you.
                   </p>
                 </details>
                 <details class="qa" id="hotkeys-hook">
@@ -157,11 +158,11 @@
                   </dl>
                   <p>Item Lookup also asks MeowDB's search for an item's name: <a href="#meowdb">see below</a>.</p>
                   <p>
-                    It sends nothing but the version you have, with each request, and a character's bests on the
-                    <a href="#leaderboard-appear">Map Leaderboards</a>, which a new character shares by default: their
-                    bests go to this site, with their name, job, level and dates, and your Leaderboard Key, which the
-                    site keeps only as a hash. Turn <strong>Share</strong> off under a character's name in your
-                    Personal Bests, and nothing of theirs is sent.
+                    It sends only the version you have with each request, plus the bests of each character you share on
+                    the <a href="#leaderboard-appear">Map Leaderboards</a> (new characters are shared by default): their
+                    name, job, level, EXP per hour and dates, with your Leaderboard Key, which the site keeps only as a
+                    hash. Turn <strong>Share</strong> off under a character's name in your Personal Bests and nothing of
+                    theirs is sent.
                   </p>
                 </details>
                 <details class="qa" id="refresh">
@@ -196,8 +197,8 @@
                   <summary>What does Minerva keep on my PC?</summary>
                   <ul>
                     <li>
-                      Your settings (placement, folded sections, the marked title, a hand-picked game window and the
-                      hotkeys) in <code class="path">%APPDATA%\<wbr />com.<wbr />itechify.<wbr />minerva\<wbr />settings.json</code>.
+                      Your settings (placement, folded sections, hotkeys, a hand-picked game window and the rest of
+                      Settings) in <code class="path">%APPDATA%\<wbr />com.<wbr />itechify.<wbr />minerva\<wbr />settings.json</code>.
                     </li>
                     <li>
                       Beside them: your Personal Bests, each character's best visits on each map, in
@@ -291,31 +292,26 @@
                 <details class="qa" id="self-update">
                   <summary>Does Minerva update itself?</summary>
                   <p>
-                    Never without you. Minerva asks GitHub, where its releases are, whether a new version is out: when it
-                    starts, every 6 hours while it runs, and when you press <strong>Check for updates</strong> in Help &amp;
-                    Setup's About &amp; Credits. The request sends only the version you have, nothing about you or your
-                    game. A new version shows in the owl's menu and tooltip, in the notification area, and in Help &amp;
-                    Setup, with a <strong>What's new</strong> link to its release. Never on the panels over the game, and
-                    nothing is downloaded until you choose to update. There's no skipping a version:
-                    <strong>Later</strong> leaves the notice where it is, quietly.
+                    Not without asking you. Minerva checks GitHub for a new version when it starts, every 6 hours while it
+                    runs, and when you press <strong>Check for updates</strong> in Help &amp; Setup's About &amp; Credits.
+                    The check sends only the version you have. When one is out, the owl in the notification area and Help
+                    &amp; Setup say so, with a <strong>What's new</strong> link. Nothing pops up over the game, and nothing
+                    downloads until you choose to update. <strong>Later</strong> just leaves the notice where it is.
                   </p>
                   <p>
-                    When you choose to update, Minerva downloads the new version, checks it's signed as Minerva's own,
-                    and installs it with a small progress window, then starts again. If you installed with the
-                    <code>.msi</code>, Windows asks for admin rights first, as the MSI installs for all users. If the
-                    download fails, or isn't signed as Minerva's own, Help &amp; Setup says so and nothing is installed:
-                    try again, or download it from the release's page. If the installer fails, it says why, and the
-                    version you have stays. Minerva only installs the version it told you about, and never one as old as
-                    yours: if the release changes before the download (taken down, say), it says so, installs nothing,
-                    and checks again.
+                    When you update, Minerva downloads the new version, checks it's signed as Minerva's own, installs it
+                    with a small progress window and starts again. If you installed the <code>.msi</code>, Windows asks
+                    for admin rights first. If the download fails or isn't signed as Minerva's own, Help &amp; Setup says
+                    so and nothing is installed: try again, or download it from the release's page. If the installer
+                    fails, it says why, and you keep the version you have. Minerva only ever installs the version it told
+                    you about, and never an older one.
                   </p>
                   <p>
-                    Updating restarts Minerva, so while you're grinding it asks first: "Updating restarts Minerva and
-                    ends this Session." Choose <strong>Update now</strong>, or <strong>Update when I quit</strong>, and it
-                    installs when you next choose <strong>Quit Minerva</strong>, without starting again. If it's still
-                    downloading then, Minerva's windows close and its owl says it's finishing the update before quitting;
-                    choose <strong>Quit now, without updating</strong> there to quit at once instead. Your Personal
-                    Bests are saved as you set them either way.
+                    Updating restarts Minerva, so if you're grinding it asks first: "Updating restarts Minerva and ends
+                    this Session." Choose <strong>Update now</strong>, or <strong>Update when I quit</strong> to install
+                    it the next time you choose <strong>Quit Minerva</strong>, without restarting. If it's still
+                    downloading when you quit, the owl says it's finishing first; <strong>Quit now, without
+                    updating</strong> skips it. Your Personal Bests are saved either way.
                   </p>
                   <p>
                     The portable <code>.exe</code> never installs anything: it says the new version is out, with a link
@@ -389,9 +385,9 @@
                   <summary>Where is Minerva while it runs, and how do I quit it?</summary>
                   <p>
                     Its owl sits in the notification area, the system tray by the clock. Click it for
-                    <strong>Help &amp; Setup</strong>, <a href="#bug-reports">Bug Report</a> or <strong>Quit Minerva</strong>,
-                    the one way to quit, whether or not the game is open. Only one Minerva runs at a time: starting it again
-                    shows the one that's running.
+                    <strong>Help &amp; Setup</strong>, <a href="#bug-reports">Bug Report</a> or <strong>Quit Minerva</strong>.
+                    That's the only way to quit, whether or not the game is open. Only one Minerva runs at a time: starting
+                    it again brings up the one that's running.
                   </p>
                 </details>
               </div>
@@ -461,10 +457,9 @@
                 <details class="qa" id="map-marks">
                   <summary>What's the emblem beside the map's name?</summary>
                   <p>
-                    Its <strong>Map Mark</strong>: the emblem the minimap shows beside its title for the area the map is
-                    in, like Henesys's shield, Kerning City's stone or Sleepywood's skull. A smaller one stands before every
-                    other map the panel names, such as a portal's destination or a stop on your route, so you can tell at
-                    a glance where each map is.
+                    Its <strong>Map Mark</strong>, the emblem the minimap shows beside its title for the area the map is
+                    in, like Henesys's shield, Kerning City's stone or Sleepywood's skull. Every other map the panel names,
+                    such as a portal's destination or a stop on your route, has a smaller one, so you can tell where it is.
                   </p>
                 </details>
                 <details class="qa" id="buttons">
@@ -512,8 +507,8 @@
                   <summary>How do I move or resize the panel?</summary>
                   <p>
                     Drag it by its header to move it, or by a side or a bottom corner to make it wider or narrower. Its
-                    height follows what it shows, and a long list scrolls instead. Dragged onto the minimap title, which
-                    Minerva reads, it moves just clear of it when you let go.
+                    height follows what it shows, and a long list scrolls instead. Drop it on the minimap title and it
+                    moves just clear, so Minerva can still read the title.
                   </p>
                 </details>
                 <details class="qa" id="placement">
@@ -842,10 +837,10 @@
                 <details class="qa" id="pace-trace">
                   <summary>What's the line under my rates?</summary>
                   <p>
-                    Your last 5 minutes raced against the 5 minutes before them, to show how your pace is going. The
-                    flat line is your earlier pace. Your line drops while that pace keeps earning and you don't, and
-                    steps up with each kill: level is steady, sinking means you've slowed, and a cliff is a death. The
-                    number by your dot says how many EXP ahead or behind you are. It shows once you've played 6 minutes.
+                    Your last 5 minutes raced against the 5 minutes before them. The flat line is your earlier pace. Your
+                    line sinks between kills and steps up with each one: level means you're keeping pace, sinking means
+                    you've slowed, and a cliff is a death. The number by your dot is how much EXP you're ahead or behind.
+                    It appears once you've played 6 minutes.
                   </p>
                   <p>
                     On a map where you have a Personal Best, once you come within 10% of its pace, it joins as a gold
@@ -863,31 +858,29 @@
                   </p>
                   <p>
                     Bests from before Minerva knew your characters, or set while it couldn't read the name, are
-                    <strong>Unassigned</strong>. The Grind Tracker races those while no name is read. In your Personal
-                    Bests, pick Unassigned, then <strong>Assign all to…</strong> and a character to give them every one,
-                    or a visit's <strong>Move</strong> and a character for just that visit, and click again to confirm.
-                    Any character's visit has a Move too, for one set while Minerva misread the name.
+                    <strong>Unassigned</strong>, and the Grind Tracker races those while no name is read. To hand them
+                    out, pick Unassigned in your Personal Bests, then <strong>Assign all to…</strong> and a character, or
+                    a visit's <strong>Move</strong> to move just that one, and click again to confirm. Every visit has a
+                    Move, in case Minerva misread the name when it was set.
                   </p>
                   <p>
-                    Renamed a character? The new name shows as a new character: pick it, click <strong>Manage</strong>,
-                    choose <strong>Merge into…</strong> and the old name, and click again to confirm. Its bests move
-                    across. To remove a character with all their bests, pick them, click <strong>Manage</strong>, then
-                    <strong>Remove</strong> twice. Neither can be undone, and both take the character off the
-                    <a href="#map-leaderboards">Map Leaderboards</a> if they're there. A double-click never confirms:
-                    the second click has to come a moment later. A best on a map that has left the map list stays,
-                    marked "Not in the map list".
+                    Renamed a character? The new name shows up as a new character. Pick it, click
+                    <strong>Manage</strong>, choose <strong>Merge into…</strong> and the old name, and click again to
+                    confirm: its bests move across. To remove a character and all their bests, pick them, click
+                    <strong>Manage</strong>, then <strong>Remove</strong> twice. Neither can be undone, and both take the
+                    character off the <a href="#map-leaderboards">Map Leaderboards</a>. A best on a map that's no longer
+                    in the map list stays, marked "Not in the map list".
                   </p>
                 </details>
                 <details class="qa" id="every-best">
                   <summary>Where can I see my best on every map?</summary>
                   <p>
-                    The star on the Grind Tracker's bar opens your Personal Bests over the game: every map's best for the
-                    character you're playing, highest first, with its mob levels, how close it came to the map's solo EXP/h
-                    ceiling (the <strong>?</strong> explains how it's computed), and when you set it. The top names whose they are; pick another of your characters, or
-                    Unassigned, there.
-                    Each best is a bar on one scale, so your best map's is the longest. A notch in a bar is another of your
-                    visits there, and the dot is the visit you're on, moving as you play. Click a column to sort by it, or a
-                    map to open it on MeowDB.
+                    Click the star on the Grind Tracker's bar to open your Personal Bests. It lists your best on every map
+                    for the character you're playing, highest first, with the map's mob levels, how close you came to its
+                    solo EXP/h ceiling (the <strong>?</strong> explains it) and when you set it. Switch to another
+                    character, or to Unassigned, at the top. Each best is a bar on the same scale; a notch is another of
+                    your visits there, and the dot is the visit you're on, moving as you play. Click a column to sort by
+                    it, or a map to open it on MeowDB.
                   </p>
                 </details>
                 <details class="qa" id="visits">
@@ -935,13 +928,11 @@
                 <details class="qa" id="map-leaderboards">
                   <summary>What are the Map Leaderboards?</summary>
                   <p>
-                    Pages on this site, one for each map, where players' Personal Bests from Minerva stand side by side,
-                    so you can see what EXP per hour others at your level get there. Each map's page shows its picture
-                    from OSMS Data Explorer when one is available. Each
-                    <a href="#level-bands">Level Band</a> is ranked on its own and shows its top 50: each character's
-                    name, job, exact level, EXP per hour and the date they set it, with a bar drawn as the game's EXP
-                    bar, from 0 to #1's EXP per hour, so you see how far each is behind. Find a map on the
-                    <a href="/leaderboards/">Map Leaderboards</a> page, by its name or among the most uploaded.
+                    A page on this site for each map, ranking players' Personal Bests from Minerva, so you can see what
+                    EXP per hour others at your level get there. Each <a href="#level-bands">Level Band</a> is ranked
+                    separately and shows its top 50, with each character's name, job, level, EXP per hour and date, and
+                    a bar showing how far behind #1 they are. Find a map on the
+                    <a href="/leaderboards/">Map Leaderboards</a> page by its name, or among the most uploaded.
                   </p>
                 </details>
                 <details class="qa" id="level-bands">
@@ -965,19 +956,18 @@
                 <details class="qa" id="leaderboard-appear">
                   <summary>How do I put my character on the Map Leaderboards?</summary>
                   <p>
-                    A new character is on them already: <strong>Share</strong>, the switch under their name in your
-                    <a href="#every-best">Personal Bests</a>, starts on for each character Minerva meets for the first
-                    time, once they have a best that can go up. A character Minerva knew before it shared by default
-                    starts off: pick them, and click <strong>Share</strong> to turn it on. Minerva uploads the
-                    character's best visit on each map in each <a href="#level-bands">Level Band</a>, then each new best
-                    when its visit ends. Removing a visit, moving one to or from the character, or merging another into
-                    them updates the site too.
+                    A new character is on them already. <strong>Share</strong>, the switch under their name in your
+                    <a href="#every-best">Personal Bests</a>, starts on for every character Minerva meets for the first
+                    time. A character Minerva knew before sharing was on by default starts off: pick them and click
+                    <strong>Share</strong> to turn it on. Minerva uploads the character's best visit on each map in each
+                    <a href="#level-bands">Level Band</a>, then each new best when its visit ends. Removing, moving or
+                    merging visits updates the site too.
                   </p>
                   <p>
-                    It's for one character at a time. Unassigned bests are never uploaded, and nor is a best set before
-                    Minerva knew the date or a character's level and job: a character with only those has no switch
-                    yet. Beside the switch, Minerva says when the last upload went through. If one didn't (offline, say), a note above your bests says so and Minerva tries again by
-                    itself; <strong>Send again</strong> tries at once.
+                    Unassigned bests are never uploaded, and nor are bests set before Minerva recorded the date, level
+                    and job; a character with only those has no switch yet. Beside the switch, Minerva says when the last
+                    upload went through. If one fails, because you're offline for instance, a note above your bests says
+                    so and Minerva retries by itself; <strong>Send again</strong> retries straight away.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-public">
@@ -1189,11 +1179,10 @@
                 <details class="qa" id="deal-finder">
                   <summary>How do I find the deals in a Player Shop?</summary>
                   <p>
-                    Press <kbd>Ctrl+Shift+D</kbd>, or click the price tag at the top of the panel, and open a shop: a badge
-                    shows beside each listing, left of the shop's window, and follows as you scroll. It stays on until
-                    you press the key or click the tag again, or Turn off in the panel, where its owl says what it
-                    compares with. It's off each time Minerva starts, and while it's on,
-                    the collapsed icon's owl holds its magnifying glass.
+                    Press <kbd>Ctrl+Shift+D</kbd>, or click the price tag at the top of the panel, and open a shop. A
+                    badge shows to the left of each listing and follows as you scroll. It stays on until you press the
+                    key or click the tag again, or press <strong>Turn off</strong> in the panel. It starts off each time
+                    you open Minerva, and while it's on, the folded panel's owl holds a magnifying glass.
                   </p>
                 </details>
                 <details class="qa" id="deal-line">
@@ -1210,19 +1199,20 @@
                 <details class="qa" id="deal-badges">
                   <summary>What do the Deal Finder's badges mean?</summary>
                   <p>
-                    A coloured badge is a deal: how far below the Deal Line it is, and the line's price, such as −32% ·
-                    1,470. Its colour grades it as the game grades items: blue for a good deal, purple for a great one (20%
-                    or more below the line), gold for a steal (40% or more). A pale one isn't a deal, and says how far off
-                    it is, such as +12%. Along each badge's bottom edge, a
-                    bar shows the price against the Deal Line, the notch in its middle the line itself, so a glance down
-                    the column shows which deals are biggest. <b>no price</b> means the Deal Line has no
-                    price for the item: click it to set one on the item's card. Click any badge for the item's card.
-                    <b>?</b> means it couldn't read the listing for sure, as when a name the shop cut short could be
-                    several items: it never guesses. For such a name, as a scroll's often is, hover the listing until the
-                    game shows its tooltip: the badge then judges the item the tooltip names, until the list changes.
-                    While the pointer or the item's tooltip covers a listing, its badge keeps what it read before, faded,
-                    with an orange dot before it, until the list changes. Equipment is judged by its name alone, as the
-                    shop doesn't show its stats.
+                    A coloured badge is a deal. It says how far under the Deal Line the listing is, and the line's price,
+                    such as −32% · 1,470. The colour grades it the way the game grades items: blue for a good deal, purple
+                    for a great one (20% or more under), gold for a steal (40% or more). A pale badge isn't a deal, and
+                    says how far over it is, such as +12%. The bar along each badge's bottom edge shows the price against
+                    the Deal Line, the notch in the middle, so you can spot the biggest deals down the column. Click any
+                    badge to open the item's card.
+                  </p>
+                  <p>
+                    <b>no price</b> means the Deal Line has no price for the item: click it to set one. <b>?</b> means
+                    Minerva couldn't read the listing for sure, such as a name the shop cut short that could be several
+                    items, and it won't guess. Hover the listing until the game shows its tooltip, and the badge judges the
+                    item the tooltip names until the list changes. While the pointer or a tooltip covers a listing, its
+                    badge fades and keeps its last reading, with an orange dot, until the list changes. Equipment is
+                    judged by its name alone, as the shop doesn't show its stats.
                   </p>
                 </details>
                 <details class="qa" id="deal-whole-shop">
@@ -1351,10 +1341,11 @@
                   <p>What Minerva read and made of it since you started it, up to a day back:</p>
                   <ul>
                     <li>
-                      Each reading of the minimap title, the EXP bar and the game's bar at the bottom of the window, with
-                      pictures of the title box you marked, the EXP figures, and the level, job and name on that bar; and the
-                      name of each item you looked up or opened a card for, with a picture of the game around the pointer
-                      (your inventory, say, and whatever is beside it). Nothing else on your screen.
+                      Each reading of the minimap title and the game's bar at the bottom of the window, with pictures of
+                      the title, the EXP figures, and the level, job and name on that bar; each item you looked up or
+                      opened a card for, with a picture of the game around the pointer (your inventory, and whatever is
+                      beside it); and, while the Deal Finder was on, pictures of the Player Shop's list. Nothing else on
+                      your screen.
                     </li>
                     <li>
                       The map it showed, the Grind Tracker's figures, and why they changed: a level-up, a death, a misread

@@ -11,7 +11,7 @@
     <title>Minerva: your guide for MapleStory Classic World</title>
     <meta
       name="description"
-      content="A free helper overlay for MapleStory Classic World. It reads the minimap title by ordinary screen capture and shows the map you're on: every portal, the hidden ones too, its mobs, the way to the mob you want to hunt, and your EXP pace."
+      content="A free overlay for MapleStory Classic World. It shows every portal on the map you're on, hidden ones included, finds you a place to hunt and the way there, tracks your EXP per hour, and helps you price items. It only reads the screen."
     />
     <link rel="canonical" href="@SITE_URL@" />
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/icon-32.png" />
@@ -21,7 +21,7 @@
     <meta property="og:title" content="Minerva: your guide for MapleStory Classic World" />
     <meta
       property="og:description"
-      content="See the map you're on at a glance: every portal ringed, the Hidden Portals the game doesn't show, its mobs, and the way to the mob you want to hunt."
+      content="A free overlay for MapleStory Classic World: hidden portals, where to hunt and how to get there, your EXP per hour, and what your items are worth."
     />
     <meta property="og:url" content="@SITE_URL@" />
     <meta property="og:image" content="@CARD_IMAGE@" />
@@ -45,13 +45,14 @@
       <main class="window-body" id="main">
         <!-- What it does: the hero, then a feature at a time. -->
         <div class="part" data-street="What it does">
-          <div class="hero stop" id="top" data-mini="At a glance">
+          <div class="hero stop" id="top" data-mini="Minerva">
             <div class="hero-text">
               <img class="logo" src="../assets/logo.png" alt="Minerva" width="300" height="200" />
-              <h1 id="title">The map you're&nbsp;on, at a glance</h1>
+              <h1 id="title">Your guide for MapleStory Classic&nbsp;World</h1>
               <p class="lede">
-                A free overlay for MapleStory Classic World that shows the map you're on: every portal, even the hidden
-                ones, its mobs, and the way to the mob you want to hunt.
+                A free overlay that sits beside the game. It shows every portal on the map, hidden ones included, finds
+                you a good place to hunt and the way there, tracks your EXP per hour, and helps you price items and spot
+                deals in Player Shops.
               </p>
               <p class="lede-safe">
                 <strong>It only looks at the screen</strong>, the way a screenshot does: it never reads the game's memory
@@ -106,8 +107,8 @@
             <div class="feature-text">
               <h2 id="map-title"><span class="mark ring" aria-hidden="true"></span>Every portal, even the hidden ones</h2>
               <p class="feature-lede">
-                The <strong>Map Preview</strong> shows the whole map you're on with every portal ringed, and lists the
-                <strong>Hidden Portals</strong> the game doesn't show, with where each one leads.
+                The <strong>Map Preview</strong> shows the whole map with its portals circled, including the
+                <strong>Hidden Portals</strong> the game doesn't show you, and where each one goes.
               </p>
               <div class="qa-list" data-qa="hidden-portals ring-colours zoom" data-group="panel"></div>
             </div>
@@ -125,8 +126,8 @@
             <div class="feature-text">
               <h2 id="mobs-title"><span class="mark mob" aria-hidden="true"></span>What a map is worth</h2>
               <p class="feature-lede">
-                The <strong>Map Summary</strong> gives the EXP and mobs per hour you can expect there, solo or in a party,
-                then lists every mob by level. Point at one to light its <strong>spawn points</strong> on the map.
+                The <strong>Map Summary</strong> estimates how much EXP an hour a map can give, solo or in a party, and
+                lists its mobs by level. Point at a mob to see its <strong>spawn points</strong>.
               </p>
               <div class="qa-list" data-qa="map-summary mob-card shared-titles" data-group="panel"></div>
             </div>
@@ -144,8 +145,8 @@
             <div class="feature-text">
               <h2 id="navigation-title"><span class="mark route" aria-hidden="true"></span>The way to any mob or map</h2>
               <p class="feature-lede">
-                Search a mob and Minerva lists the maps it spawns on, best first. Pick one as your
-                <strong>Hunting Target</strong> and it shows the way there, portal by portal.
+                Search for a mob and Minerva lists the maps it spawns on, best first. Pick one as your
+                <strong>Hunting Target</strong>, or pick any map, and the panel shows the way there, portal by portal.
               </p>
               <div class="qa-list" data-qa="search figures target-or-destination" data-group="hunting"></div>
             </div>
@@ -165,9 +166,9 @@
                 <span class="star" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="@STAR@" /></svg></span>Your pace, and your best on every map
               </h2>
               <p class="feature-lede">
-                Minerva reads your EXP bar by itself, and the <strong>Grind Tracker</strong> shows your EXP per hour and time to level, races
-                your last 5 minutes against the ones before, and keeps each character's <strong>Personal Best</strong> on
-                every map.
+                The <strong>Grind Tracker</strong> reads your EXP bar and shows your EXP per hour and time to level. It
+                also keeps each character's <strong>Personal Best</strong> on every map, and shows when you're close to
+                beating it.
               </p>
               <div class="qa-list" data-qa="tracker-on pace-trace remove-best" data-group="grinding"></div>
             </div>
@@ -180,10 +181,10 @@
             <div class="feature-text">
               <h2 id="map-leaderboards-title">What others get on every map</h2>
               <p class="feature-lede">
-                The <strong>Map Leaderboards</strong> put players' Personal Bests from Minerva side by side on each map,
-                every <strong>Level Band</strong> ranked by EXP per hour, so you can see what players at your level get
-                there. A new character's bests join them as you play, shared by default: <strong>Share</strong>, under
-                their name in your Personal Bests, turns it off.
+                The <strong>Map Leaderboards</strong> rank Minerva players' Personal Bests on each map by
+                <strong>Level Band</strong>, so you can see what people at your level really get there. New characters
+                are shared by default: turn off <strong>Share</strong> under their name in your Personal Bests to keep
+                them off.
               </p>
               <p class="feature-action"><a class="button secondary" href="/leaderboards/">Open the Map Leaderboards</a></p>
               <div class="qa-list" data-qa="map-leaderboards leaderboard-appear leaderboard-public" data-group="leaderboards"></div>
@@ -202,8 +203,8 @@
             <div class="feature-text">
               <h2 id="item-card-title">What an item is worth</h2>
               <p class="feature-lede">
-                Point at an item and press <kbd>Ctrl+Shift+I</kbd>. Its <strong>Item Card</strong> shows what a shop pays
-                for it, beside the market prices you keep.
+                Hover an item and press <kbd>Ctrl+Shift+I</kbd>. Its <strong>Item Card</strong> shows what an NPC shop pays
+                for it, next to the market prices you've noted down.
               </p>
               <div class="qa-list" data-qa="market-prices set-price market-lines" data-group="items"></div>
             </div>
@@ -221,8 +222,8 @@
             <div class="feature-text">
               <h2 id="item-lookup-title">Any item's page in one key</h2>
               <p class="feature-lede">
-                Point at an item and press <kbd>Ctrl+Shift+U</kbd>. <strong>Item Lookup</strong> opens its MeowDB page:
-                where it drops, and the quests that give or need it.
+                Hover an item and press <kbd>Ctrl+Shift+U</kbd>. <strong>Item Lookup</strong> opens its MeowDB page, with
+                what drops it and which quests use it.
               </p>
               <div class="qa-list" data-qa="item-lookup lookup-alert lookup-pick" data-group="items"></div>
             </div>
@@ -235,8 +236,8 @@
             <div class="feature-text">
               <h2 id="deal-finder-title">The deals in any Player Shop</h2>
               <p class="feature-lede">
-                Open a Player Shop and press <kbd>Ctrl+Shift+D</kbd>. The <strong>Deal Finder</strong> marks each listing
-                priced below the market price you keep for it, until you press it again.
+                Open a Player Shop and press <kbd>Ctrl+Shift+D</kbd>. The <strong>Deal Finder</strong> badges every listing
+                priced under your market price, and says how far under.
               </p>
               <div class="qa-list" data-qa="deal-finder deal-line deal-badges" data-group="items"></div>
             </div>
@@ -276,7 +277,7 @@
                   <p class="npc-name">Minerva</p>
                 </div>
                 <div class="npc-words">
-                  <p>Hello! Keep your minimap showing, and I'll find its title and know which map you're on, wherever you put it.</p>
+                  <p>Hello! Keep your minimap showing, and I'll always know which map you're on.</p>
                   <p class="npc-buttons"><a class="button" href="@SETUP_URL@">Download for Windows</a></p>
                 </div>
               </div>
@@ -285,10 +286,10 @@
                   <b>Download and run Minerva.</b> If Windows says it protected your PC, choose
                   <strong>More info</strong>, then <strong>Run anyway</strong>.
                 </li>
-                <li><b>Keep the minimap showing.</b> Open or collapsed, anywhere in the game window: Minerva finds its title by itself. On a map without a minimap, it reads the bar the game shows instead.</li>
-                <li><b>Play.</b> The panel shows beside the game, and follows you from map to map.</li>
+                <li><b>Keep the minimap showing.</b> Open or collapsed, anywhere in the game window. Minerva finds it by itself.</li>
+                <li><b>Play.</b> The panel sits beside the game and keeps up as you change maps.</li>
                 <li>
-                  <b>Update when you like.</b> Minerva says when a new version is out, and installs it when you choose
+                  <b>Update when you like.</b> Minerva tells you when a new version is out, and installs it when you choose
                   <strong>Update</strong>.
                 </li>
               </ol>
@@ -310,8 +311,8 @@
             <div>
               <h2 id="hotkeys-title">Hotkeys</h2>
               <p>
-                They work while the game or one of Minerva's windows is in front, and the game never sees them. Change
-                any of them in Settings, the gear at the top of the panel.
+                They work while the game or Minerva is in front, and the game never sees them. Change them in Settings,
+                the gear at the top of the panel.
               </p>
               <div class="qa-list" data-qa="settings hotkey-nothing" data-group="setup"></div>
             </div>
