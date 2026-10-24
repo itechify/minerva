@@ -86,31 +86,53 @@ export function entryCounts(answer: MapsAnswer): EntryCounts {
 }
 
 /** A map a search found, with how many entries it has ("12 entries", "No entries yet"), or
- *  `null` before the API has said (or when it can't be reached). */
+ *  `null` before the API has said (or when it can't be reached), and its Map Mark, `null`
+ *  for a map without one. */
 export interface FoundMap extends MapPlace {
   entries: string | null;
+  mark: { name: string; picture: string } | null;
+}
+
+/** Each map's Map Mark, by its 9-digit ID: its area's name and picture. */
+export type MapMarks = Map<string, { name: string; picture: string }>;
+
+/** Each map's Map Mark from the ceilings table (site/worker/osms-ceilings.json), which
+ *  `probe ceilings` writes and Where to train takes its marks from: a map it doesn't hold,
+ *  or holds without a mark, has none. */
+export function mapMarks(table: {
+  maps: Record<string, { mobs: number[]; mark?: string }>;
+  marks: Record<string, { name: string; picture: string }>;
+}): MapMarks {
+  const marks: MapMarks = new Map();
+  for (const [map, row] of Object.entries(table.maps)) {
+    const mark = row.mark === undefined ? undefined : table.marks[row.mark];
+    if (mark !== undefined) marks.set(map, { name: mark.name, picture: mark.picture });
+  }
+  return marks;
 }
 
 /** The maps whose Map Name holds `query`, whatever the case, as the panel's search finds
  *  them (`search.rs`): those that start with it, then those with a word that starts with it,
- *  then the rest, each by name; Event and Dev maps aside. With `counts`, the maps with
- *  entries come first, so the first map, the one Enter opens, isn't an empty one when
- *  another isn't. The first `shown`, and how many more. */
+ *  then the rest, each by name; Event and Dev maps aside. A map named the query itself,
+ *  whatever the case, comes first of all. Then, with `counts`, the maps with entries come
+ *  first, so the first map, the one Enter opens, isn't an empty one when another isn't. The
+ *  first `shown`, each with its Map Mark from `marks`, and how many more. */
 export function searchMaps(
   names: MapNames,
   query: string,
-  { shown = 10, counts = null }: { shown?: number; counts?: EntryCounts | null } = {},
+  { shown = 10, counts = null, marks = new Map() }: { shown?: number; counts?: EntryCounts | null; marks?: MapMarks } = {},
 ): { maps: FoundMap[]; more: number } {
   const lower = query.trim().toLowerCase();
   if (lower === "") return { maps: [], more: 0 };
-  const found: { fit: number; empty: boolean; map: MapPlace }[] = [];
+  const found: { exact: boolean; fit: number; empty: boolean; map: MapPlace }[] = [];
   for (const map of names.values()) {
     if (LEFT_OUT_REGIONS.includes(map.region)) continue;
     const f = fit(map.name, lower);
-    if (f !== null) found.push({ fit: f, empty: !counts?.get(map.id), map });
+    if (f !== null) found.push({ exact: map.name.toLowerCase() === lower, fit: f, empty: !counts?.get(map.id), map });
   }
   found.sort(
     (a, b) =>
+      Number(b.exact) - Number(a.exact) ||
       Number(a.empty) - Number(b.empty) ||
       a.fit - b.fit ||
       byText(a.map.name, b.map.name) ||
@@ -123,7 +145,7 @@ export function searchMaps(
     return count === 0 ? "No entries yet" : entriesCounted(count);
   };
   return {
-    maps: found.slice(0, shown).map(({ map }) => ({ ...map, entries: entries(map.id) })),
+    maps: found.slice(0, shown).map(({ map }) => ({ ...map, entries: entries(map.id), mark: marks.get(map.id) ?? null })),
     more: Math.max(0, found.length - shown),
   };
 }
@@ -132,7 +154,7 @@ export function searchMaps(
  *  the one Enter opens (the list marks it, and this says it in words). */
 export function searchSaid(query: string, found: { maps: MapPlace[]; more: number }): string {
   if (query.trim() === "") return "Type part of a map's name as the game writes it, like Ant Tunnel.";
-  if (found.maps.length === 0) return `No map's name holds “${query.trim()}”.`;
+  if (found.maps.length === 0) return `No map's name has “${query.trim()}” in it. Check the spelling, as the game writes it.`;
   const shown = counted(found.maps.length, "map");
   const all = found.more === 0 ? shown : `${shown}, and ${whole(found.more)} more: type more of the name`;
   return `${all}. Enter opens ${found.maps[0].name}.`;
@@ -196,7 +218,7 @@ export interface MapPage {
 
 /** A map's page as `link` opens it, from its bands as the API gives them. It opens at the
  *  link's band, even with no entries there (Minerva links a Character's own band, and the
- *  page says their entry has gone), or else at the lowest band with entries. */
+ *  page says they have no entry there), or else at the lowest band with entries. */
 export function mapPage(link: Link, names: MapNames, answer: MapAnswer): MapPage {
   const open = link.band ?? answer.bands[0]?.band ?? null;
   const counts = new Map(answer.bands.map((b) => [b.band, b.entries]));
@@ -297,7 +319,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
   const total = whole(answer.total);
   let note: string | null = null;
   if (yours !== null) note = `${yours.name} is #${yours.rank} of ${total} at ${at}.`;
-  else if (name !== null) note = `${name} has no entry here at ${at} any more.`;
+  else if (name !== null) note = `${name} has no entry here at ${at}.`;
   const below = yours !== null && !rows.some((r) => r.you);
   const between = below ? yours.rank - rows.length - 1 : 0;
   const caption =
@@ -443,16 +465,31 @@ export interface TrainingTable {
   areas: TrainingArea[];
   area: string | null;
   caption: string | null;
+  /** The button under a long table's first rows, that shows the rest: "Show all 69 maps";
+   *  `null` when every row is shown. */
+  more: string | null;
   empty: Said | null;
 }
+
+/** How many of a band's maps Where to train shows before "Show all": the first 15, of a band
+ *  with more than 20, so the button never hides only a few. */
+const TRAINING_SHOWN = 15;
+const TRAINING_ALL_UP_TO = 20;
 
 /** Where to train's table for the band GET /api/bands/<band> answered, in the area `link`
  *  names, with dates written as of `now`. A map the player can't normally enter (an Event
  *  or Dev map) is left out unless it has entries, as search leaves it out. An area the
  *  band has no maps in shows every area; the areas are offered by name, and a map without
  *  a Map Mark shows only among every area's. The maps with entries come first, highest #1
- *  first, then the rest by their mob levels, lowest first. Ties by name. */
-export function trainingTable(answer: TrainingAnswer, names: MapNames, link: TrainingLink, now: Date): TrainingTable {
+ *  first, then the rest by their mob levels, lowest first. Ties by name. A band with more
+ *  than 20 maps shows its first 15, and a button to show them `all`. */
+export function trainingTable(
+  answer: TrainingAnswer,
+  names: MapNames,
+  link: TrainingLink,
+  now: Date,
+  { all = false }: { all?: boolean } = {},
+): TrainingTable {
   const maps = answer.maps
     .map((m) => ({ ...m, place: placeOf(names, m.map) }))
     .filter((m) => m.best !== null || !LEFT_OUT_REGIONS.includes(m.place.region));
@@ -475,7 +512,8 @@ export function trainingTable(answer: TrainingAnswer, names: MapNames, link: Tra
       byText(a.place.name, b.place.name) ||
       byText(a.map, b.map),
   );
-  const rows = shown.map((m): TrainingRow => {
+  const cut = !all && shown.length > TRAINING_ALL_UP_TO;
+  const rows = (cut ? shown.slice(0, TRAINING_SHOWN) : shown).map((m): TrainingRow => {
     const set = m.best === null ? null : new Date(m.best.setAt);
     return {
       name: m.place.name,
@@ -497,12 +535,14 @@ export function trainingTable(answer: TrainingAnswer, names: MapNames, link: Tra
   const at = bandLevels(answer.band);
   let caption: string | null = null;
   const areaName = area === null ? null : marks.get(area)!.name;
-  if (rows.length > 0) caption = areaName === null ? `${counted(rows.length, "map")} for ${at}` : `${whole(rows.length)} ${areaName} ${rows.length === 1 ? "map" : "maps"} for ${at}`;
+  const listed = areaName === null ? counted(shown.length, "map") : `${whole(shown.length)} ${areaName} ${shown.length === 1 ? "map" : "maps"}`;
+  if (rows.length > 0) caption = cut ? `${rows.length} of ${listed} for ${at}` : `${listed} for ${at}`;
   return {
     rows,
     areas,
     area,
     caption,
+    more: cut ? `Show all ${counted(shown.length, "map")}` : null,
     empty: rows.length === 0 ? { text: `No map's mobs are at ${at}, and no one has put a best there yet.`, link: PUT_YOURS } : null,
   };
 }
@@ -515,14 +555,16 @@ export interface LatestLine {
   name: string;
   /** "Magician Lv 23". */
   who: string;
-  /** "153,000 EXP/h". */
+  /** "153,000", its EXP/h. */
   expPerHour: string;
   map: string;
+  /** The map's Map Mark, shown before its name; `null` for a map without one. */
+  mark: { name: string; picture: string } | null;
   levels: string;
   date: string;
   /** The map's page at the band, with the entry marked. */
   href: string;
-  /** "took #1, past Egbert's 80,000", or "took #1, past a best of 80,000" once that
+  /** "Took #1, past Egbert's 80,000", or "Took #1, past a best of 80,000" once that
    *  Character has left the Map Leaderboards; `null` for an entry that took no top spot. */
   took: string | null;
 }
@@ -534,13 +576,14 @@ export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): {
     let took: string | null = null;
     if (e.took !== null) {
       const past = rate(e.took.fromExpPerHour);
-      took = e.took.from === null ? `took #1, past a best of ${past}` : `took #1, past ${e.took.from}'s ${past}`;
+      took = e.took.from === null ? `Took #1, past a best of ${past}` : `Took #1, past ${e.took.from}'s ${past}`;
     }
     return {
       name: e.name,
       who: `${e.job} Lv ${e.level}`,
-      expPerHour: `${rate(e.expPerHour)} EXP/h`,
+      expPerHour: rate(e.expPerHour),
       map: placeOf(names, e.map).name,
+      mark: e.mark === null ? null : { name: e.mark.name, picture: e.mark.picture },
       levels: bandLevels(e.band),
       date: dayText(set, set.getFullYear() !== now.getFullYear()),
       href: linkTo({ map: e.map, band: e.band, name: e.name }),

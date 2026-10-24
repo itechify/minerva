@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,6 +50,13 @@ function fillPlaceholders(): Plugin {
     "@SITE_URL@": SITE_URL,
     "@HOTKEY_ROWS@": hotkeyRows(),
     "@STAR@": STAR,
+    // The picture a link to the site shows: site/public/card.png, drawn from
+    // site/screenshots/card.html (site/screenshots/README.md). Its address names its
+    // content, so a redrawn card isn't hidden behind the old one Discord or Reddit keeps.
+    "@CARD_IMAGE@": `${SITE_URL}card.png?v=${createHash("sha256")
+      .update(readFileSync(fileURLToPath(new URL("./public/card.png", import.meta.url))))
+      .digest("hex")
+      .slice(0, 10)}`,
   };
   // The window's head opens every page and the credits close it, each written once.
   const windowHead = fileURLToPath(new URL("./window-head.html", import.meta.url));
@@ -103,8 +111,7 @@ function questions(): Plugin {
 /**
  * The screenshots are taken by hand in the game (site/screenshots/README.md), so the build
  * fails while one is missing rather than publish the page without it. Vite leaves the
- * address of a picture it couldn't find as written. Open Graph and Twitter cards then get
- * the hero shot's absolute address, known only once the build has named the file.
+ * address of a picture it couldn't find as written.
  */
 function screenshots(): Plugin {
   return {
@@ -120,13 +127,7 @@ function screenshots(): Plugin {
         if (isHome(ctx.filename) && !/<img[^>]*\bid="hero-shot"/.test(html)) {
           throw new Error("site: the hero shot (img#hero-shot) is missing from the home page");
         }
-        // The hero shot is every page's card. Its address as Vite writes it from the site's
-        // root (it names the file last), after the site's origin.
-        const hero = Object.values(ctx.bundle ?? {}).find(
-          (file) => file.type === "asset" && file.originalFileNames.some((name) => name.endsWith("screenshots/hero.png")),
-        );
-        if (!hero) throw new Error("site: the hero shot (site/screenshots/hero.png) isn't in the build");
-        return html.replace(/@CARD_IMAGE@/g, `${new URL(SITE_URL).origin}/${hero.fileName}`);
+        return html;
       },
     },
   };
@@ -175,7 +176,7 @@ function webpScreenshots(): Plugin {
     name: "minerva-site:webp-screenshots",
     transformIndexHtml: {
       order: "pre",
-      async handler(html) {
+      async handler(html, ctx) {
         for (const [tag, up, name] of html.matchAll(/<img\b[^>]*\bsrc="((?:\.\.?\/)+)screenshots\/([\w-]+)\.png"[^>]*>/g)) {
           const png = fileURLToPath(new URL(`./screenshots/${name}.png`, import.meta.url));
           if (!existsSync(png)) continue;
@@ -189,6 +190,14 @@ function webpScreenshots(): Plugin {
             srcset = `${up}screenshots/webp/${name}-${half}.webp ${half}w, ${srcset} ${width}w`;
           }
           const source = `<source type="image/webp" srcset="${srcset}"${sizes ? ` sizes="${sizes}"` : ""} />`;
+          html = html.replace(tag, `<picture>${source}${tag}</picture>`);
+        }
+        // The logo heads the home page's first screen, so it gets a WebP copy too: a quarter
+        // of the PNG's weight, at the PNG's size for a sharp high-DPI screen.
+        for (const [tag] of html.matchAll(/<img\b[^>]*\bsrc="(?:\.\.\/)+assets\/logo\.png"[^>]*>/g)) {
+          await webp(fileURLToPath(new URL("../assets/logo.png", import.meta.url)), "logo.webp");
+          const root = upTo(ctx.filename, dirname(HOME));
+          const source = `<source type="image/webp" srcset="${root ? `${root}/` : "./"}screenshots/webp/logo.webp" />`;
           html = html.replace(tag, `<picture>${source}${tag}</picture>`);
         }
         return html;
@@ -239,7 +248,7 @@ export default defineConfig({
     rolldownOptions: {
       input: { home: HOME, faq: FAQ, leaderboards: LEADERBOARDS, map: MAP_LEADERBOARD, account: ACCOUNT, link: LINK, admin: ADMIN },
     },
-    // A screenshot keeps a file of its own, however small, so the cards can address it.
+    // A screenshot keeps a file of its own, however small.
     assetsInlineLimit: (file) => (file.includes("/screenshots/") ? false : undefined),
   },
 });

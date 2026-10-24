@@ -46,8 +46,14 @@ const BAND_20: TrainingAnswer = {
 
 const LINK: TrainingLink = { band: 20, area: null };
 
-function table(link: Partial<TrainingLink> = {}, answer = BAND_20) {
-  return trainingTable(answer, names, { ...LINK, ...link }, NOW);
+function table(link: Partial<TrainingLink> = {}, answer = BAND_20, all = false) {
+  return trainingTable(answer, names, { ...LINK, ...link }, NOW, { all });
+}
+
+/** Band 20 with `count` made-up maps, each with an entry, the first the best. */
+function many(count: number): TrainingAnswer {
+  const maps = Array.from({ length: count }, (_, i) => map(String(100_000_100 + i), [22, 27], CITY, 900_000 - i * 1_000));
+  return { band: 20, levels: [20, 29], maps };
 }
 
 describe("where to train's address", () => {
@@ -148,10 +154,30 @@ describe("where to train's table", () => {
       areas: [],
       area: null,
       caption: null,
+      more: null,
       empty: {
         text: "No map's mobs are at Lv 150–159, and no one has put a best there yet.",
         link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
       },
     });
+  });
+
+  it("shows a band of more than 20 maps by its first 15, and a button for all of them", () => {
+    const shown = table({}, many(22));
+
+    expect(shown.rows.map((r) => r.name)).toEqual(many(22).maps.slice(0, 15).map((m) => `Map ${m.map}`));
+    expect(shown.more).toBe("Show all 22 maps");
+    expect(shown.caption).toBe("15 of 22 maps for Lv 20–29");
+  });
+
+  it("shows every map once asked for all, and every map of a band of 20", () => {
+    expect(table({}, many(22), true)).toMatchObject({ more: null, caption: "22 maps for Lv 20–29" });
+    expect(table({}, many(22), true).rows).toHaveLength(22);
+    expect(table({}, many(20))).toMatchObject({ more: null, caption: "20 maps for Lv 20–29" });
+    expect(table({}, many(20)).rows).toHaveLength(20);
+  });
+
+  it("counts an area's maps when it cuts one area's table short", () => {
+    expect(table({ area: "KerningCity" }, many(21))).toMatchObject({ more: "Show all 21 maps", caption: "15 of 21 Kerning City maps for Lv 20–29" });
   });
 });

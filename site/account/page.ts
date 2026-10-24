@@ -62,6 +62,7 @@ async function load() {
     return;
   }
   const account = read.body!;
+  byId("account-title").textContent = "Signed in";
   said.textContent = `Signed in with Discord as ${account.username}.`;
   byId("admin-link").hidden = !account.maintainer;
   drawPcs(account);

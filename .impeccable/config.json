@@ -19,6 +19,15 @@
         ],
         "createdAt": "2026-10-22T01:35:06.133Z",
         "reason": "Claude, checked site/site.css: the flagged .qa-list is a bordered list of flush rows by design; each row's text is inset 16px (.qa > summary padding 10px 12px 10px 16px, .qa-answer padding 0 16px 14px)"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "site/vite.config.ts"
+        ],
+        "createdAt": "2026-10-24T04:19:19.455Z",
+        "reason": "agent: matches are regex literals and HTML strings in the Vite build plugins, not rendered markup"
       }
     ]
   }

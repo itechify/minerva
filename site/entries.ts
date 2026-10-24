@@ -81,10 +81,12 @@ export interface TrainingAnswer {
   maps: TrainingMap[];
 }
 
-/** An entry as Latest lists it: where, and whether it took the top spot from another
- *  Character, from whom (`null` once they've left the Map Leaderboards) and what they had. */
+/** An entry as Latest lists it: where (with the map's Map Mark, `null` for a map without
+ *  one), and whether it took the top spot from another Character, from whom (`null` once
+ *  they've left the Map Leaderboards) and what they had. */
 export interface LatestEntry extends Best {
   map: string;
+  mark: MapMark | null;
   band: number;
   took: { from: string | null; fromExpPerHour: number } | null;
 }

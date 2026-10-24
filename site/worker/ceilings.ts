@@ -3,6 +3,7 @@
 // to (ADR 0015), the levels of the middle half of its spawns, which Where to train matches
 // maps to a Level Band by, and its Map Mark, which Where to train picks an area by
 // (ADR 0024); and each Map Mark's area and picture.
+import type { MapMark } from "../entries";
 import table from "./osms-ceilings.json";
 
 /** A map's row in the ceilings table. */
@@ -38,7 +39,10 @@ export function ceilingsOf(env: Env): Record<string, Ceiling> {
   return tableOf(env).maps;
 }
 
-/** Each Map Mark, by OSMS's name for it. */
-export function marksOf(env: Env): Record<string, MarkRow> {
-  return tableOf(env).marks;
+/** A map's Map Mark as Where to train and Latest give it: OSMS's name for it, its area and
+ *  its picture; `null` for a map without one, or one the table doesn't hold. */
+export function markOf(env: Env, map: string): MapMark | null {
+  const { maps, marks } = tableOf(env);
+  const id = maps[map]?.mark;
+  return id === undefined || marks[id] === undefined ? null : { id, ...marks[id] };
 }

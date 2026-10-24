@@ -1,10 +1,10 @@
 // Where to train, on the Map Leaderboards page (leaderboards/index.html): the Level Bands,
 // and the open band's maps, each with its Map Mark, mob levels and the band's #1 there, in
-// every area or one, by its Map Mark (ADR 0024). A click on a band or an area switches the
-// table in place and the address with it, so the link still shares and Back comes back.
-// What it shows is worked out in leaderboards.ts.
+// every area or one, by its Map Mark (ADR 0024), a long band's first 15 until Show all. A
+// click on a band or an area switches the table in place and the address with it, so the
+// link still shares and Back comes back. What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
-import { byId, names, read, said as saidWith, UNREACHABLE } from "./api.ts";
+import { byId, markImage, names, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandsAnswer,
   PICK_A_BAND,
@@ -29,12 +29,43 @@ const table = byId("train-table");
 const rows = byId<HTMLTableSectionElement>("train-rows");
 /** The Level Bands, once read. */
 let bands: BandsAnswer | null = null;
+/** Whether the open band shows all its maps: Show all was pressed. Another band or area
+ *  starts at the first 15 again. */
+let all = false;
+
+/** Keep the room of a band's table while its maps come, so what's under it doesn't jump when
+ *  they do: the page's own script (index.html) keeps it from the first paint for a link
+ *  naming a band, and this from then on. */
+function wait() {
+  section.classList.add("lb-waiting");
+  document.documentElement.classList.remove("lb-band");
+}
+
+function done() {
+  section.classList.remove("lb-waiting");
+  document.documentElement.classList.remove("lb-band");
+}
 
 /** What the section says in place of the table: why there isn't one, or what's loading. */
 function say(text: Said | string) {
+  done();
   saidWith(said, typeof text === "string" ? { text } : text);
   said.hidden = false;
   table.hidden = true;
+}
+
+/** The API can't be reached: the page says so once, and Try again starts over. */
+function down() {
+  done();
+  table.hidden = true;
+  bandsNav.hidden = bands === null;
+  areasNav.hidden = true;
+  unreachable(said, () => {
+    say("Loading the Level Bands…");
+    bandsNav.hidden = false;
+    if (bands === null) start();
+    else show();
+  });
 }
 
 /** The bands read so far, so Back, Forward and an area don't wait on the API. */
@@ -58,12 +89,22 @@ async function show() {
     areasNav.hidden = true;
     return say(PICK_A_BAND);
   }
+  if (!bandsRead.has(link.band)) {
+    wait();
+    // A table already shown stays until the new one comes.
+    if (table.hidden) saidWith(said, { text: "Loading the band's maps…" });
+  }
   section.setAttribute("aria-busy", "true");
   const answer = await readBand(link.band);
   if (turn !== draws) return;
   section.removeAttribute("aria-busy");
-  if (answer === null) return say(UNREACHABLE);
-  const shown = trainingTable(answer, names, link, new Date());
+  if (answer === null) return down();
+  drawTable(answer);
+}
+
+/** The open band's table, from its answer: its first 15 maps, or all of them. */
+function drawTable(answer: TrainingAnswer) {
+  const shown = trainingTable(answer, names, link, new Date(), { all });
   // An area the band has no maps in shows every area, and the address says so.
   if (shown.area !== link.area) {
     link = { ...link, area: shown.area };
@@ -75,7 +116,30 @@ async function show() {
   said.hidden = true;
   byId("train-caption").textContent = shown.caption ?? "";
   rows.replaceChildren(...shown.rows.map(drawRow));
+  if (shown.more !== null) rows.append(moreRow(shown.more, answer));
   table.hidden = false;
+  done();
+}
+
+/** The row under a long band's first 15: Show all, which shows the rest in place and
+ *  takes the focus to the first of them. The address stays the band's. */
+function moreRow(text: string, answer: TrainingAnswer): HTMLTableRowElement {
+  const tr = make("tr", "lb-more");
+  tr.setAttribute("role", "row");
+  const cell = make("td");
+  cell.setAttribute("role", "cell");
+  cell.colSpan = 4;
+  const button = make("button", "lb-more-button", text);
+  button.type = "button";
+  button.addEventListener("click", () => {
+    const at = rows.querySelectorAll("tr").length - 1;
+    all = true;
+    drawTable(answer);
+    rows.querySelectorAll<HTMLElement>(".lb-map-name")[at]?.focus();
+  });
+  cell.append(button);
+  tr.append(cell);
+  return tr;
 }
 
 /** The band choices, each a link to its band, the open one marked. */
@@ -116,18 +180,6 @@ function drawAreas(areas: TrainingArea[], shown: string | null) {
   if (focused !== undefined) areasNav.querySelector<HTMLElement>(`[data-area="${focused}"]`)?.focus();
 }
 
-/** A Map Mark's picture, the game's own emblem for an area, named for it. */
-function markImage(mark: { name: string; picture: string }): HTMLImageElement {
-  const img = make("img", "lb-mark");
-  img.src = mark.picture;
-  img.alt = "";
-  img.width = 19;
-  img.height = 19;
-  img.decoding = "async";
-  img.referrerPolicy = "no-referrer";
-  return img;
-}
-
 /** A map's row: its name (its Map Leaderboard at the band) over its street, its mob levels,
  *  the band's #1 there, and its entries. */
 function drawRow(row: TrainingRow): HTMLTableRowElement {
@@ -143,15 +195,10 @@ function drawRow(row: TrainingRow): HTMLTableRowElement {
   const name = make("a", "lb-map-name", row.name);
   name.href = row.href;
   const title = make("span", "lb-train-title");
-  if (row.mark !== null) {
-    const mark = markImage(row.mark);
-    mark.alt = row.mark.name;
-    mark.title = row.mark.name;
-    title.append(mark);
-  }
+  if (row.mark !== null) title.append(markImage(row.mark, true));
   title.append(name);
   cell("lb-train-map", title, make("span", "lb-map-street", row.street));
-  cell("lb-train-mobs", row.mobs ?? "—");
+  cell(row.mobs === null ? "lb-train-mobs lb-train-none" : "lb-train-mobs", row.mobs ?? "—");
   if (row.best === null) cell("lb-train-best lb-train-none", "—");
   else {
     const who = make("span", "lb-train-who", `${row.best.who} · `);
@@ -165,6 +212,7 @@ function drawRow(row: TrainingRow): HTMLTableRowElement {
 /** Switch to `to` in place, pushing it to the history. */
 function go(to: TrainingLink) {
   link = to;
+  all = false;
   history.pushState(null, "", trainingLinkTo(link));
   show();
 }
@@ -182,11 +230,17 @@ bandsNav.addEventListener("click", (event) => switchOnClick(event, "a.lb-band"))
 areasNav.addEventListener("click", (event) => switchOnClick(event, "a.lb-area"));
 addEventListener("popstate", () => {
   link = readTrainingLink(location.search);
+  all = false;
   show();
 });
 
-read<BandsAnswer>("/api/bands").then((answer) => {
-  if (answer === null) return say(UNREACHABLE);
-  bands = answer;
-  show();
-});
+/** Read the Level Bands, then draw what the address names. */
+function start() {
+  if (link.band !== null) wait();
+  read<BandsAnswer>("/api/bands").then((answer) => {
+    if (answer === null) return down();
+    bands = answer;
+    show();
+  });
+}
+start();

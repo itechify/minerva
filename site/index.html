@@ -16,6 +16,8 @@
     <link rel="canonical" href="@SITE_URL@" />
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../assets/icon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ececec" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Minerva" />
     <meta property="og:title" content="Minerva: your guide for MapleStory Classic World" />
@@ -25,9 +27,11 @@
     />
     <meta property="og:url" content="@SITE_URL@" />
     <meta property="og:image" content="@CARD_IMAGE@" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="MapleStory's minimap and, under it, the Minerva panel showing the same map: its picture with every portal ringed, and the way to a mob to hunt."
+      content="Minerva's owl over its name in Minerva's window, beside the words Your guide for MapleStory Classic World, and MapleStory's minimap with the Minerva panel under it showing the same map, every portal ringed."
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="@CARD_IMAGE@" />
@@ -176,7 +180,7 @@
 
           <section class="feature stop" id="map-leaderboards" data-mini="Map Leaderboards" aria-labelledby="map-leaderboards-title">
             <figure class="shot stage tally-board">
-              <img src="../assets/grind-tracker.png" width="192" height="192" alt="The Grind Tracker's gold tally board." />
+              <img src="../assets/grind-tracker.png" width="192" height="192" alt="The Grind Tracker's gold tally board." loading="lazy" decoding="async" />
             </figure>
             <div class="feature-text">
               <h2 id="map-leaderboards-title">What others get on every map</h2>
@@ -192,7 +196,9 @@
           </section>
 
           <section class="feature stop" id="item-card" data-mini="Item Card" aria-labelledby="item-card-title">
-            <figure class="shot stage scene">
+            <!-- While the shot is the WIP sign, it stands on a stage as the Grind Tracker's does; the
+                 retaken scene is its own stage again: class "shot stage scene". -->
+            <figure class="shot stage">
               <img
                 src="./screenshots/wip.png"
                 alt="Minerva's owl in a hard hat beside a sign: WIP, screenshot coming soon. A new shot of the Item Card is on its way."
@@ -231,7 +237,7 @@
 
           <section class="feature stop" id="deal-finder" data-mini="Deal Finder" aria-labelledby="deal-finder-title">
             <figure class="shot stage deal-owl">
-              <img src="../assets/deal-finder-owl.png" width="168" height="168" alt="Minerva's owl, peering through a magnifying glass." />
+              <img src="../assets/deal-finder-owl.png" width="168" height="168" alt="Minerva's owl, peering through a magnifying glass." loading="lazy" decoding="async" />
             </figure>
             <div class="feature-text">
               <h2 id="deal-finder-title">The deals in any Player Shop</h2>
@@ -268,7 +274,7 @@
             <div class="qa-list" data-qa="reads-game data kept" data-group="safety"></div>
           </section>
 
-          <section class="start stop" id="get-started" aria-labelledby="start-title">
+          <section class="start stop" id="get-started" data-mini="Download and play" aria-labelledby="start-title">
             <div>
               <h2 id="start-title">Get started</h2>
               <div class="npc">

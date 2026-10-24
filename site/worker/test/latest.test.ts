@@ -11,6 +11,8 @@ const TAKEN = "100000071";
 const DELETED = "100000072";
 const LEFT = "100000073";
 const BEATEN = "100000074";
+/** A map the test config's ceilings table gives a Map Mark. */
+const MARKED = "100000060";
 
 /** A day in ms, to date each test's Visits after the last's: Latest lists the newest first. */
 const DAY = 86_400_000;
@@ -46,20 +48,21 @@ describe("latest", () => {
       expPerHour: 2_000,
       setAt: START + 1,
       map: LISTED,
+      mark: null,
       band: 10,
       took: null,
     });
   });
 
-  it("lists no more than 20", async () => {
+  it("lists no more than 10", async () => {
     const maps = Array.from({ length: 25 }, (_, i) => entry(String(100_000_200 + i), 50, 5_000, START + DAY + i));
     await upload("Cleo", key("cleo"), maps);
 
     const entries = await latest();
 
-    expect(entries).toHaveLength(20);
+    expect(entries).toHaveLength(10);
     expect(entries[0].setAt).toBe(START + DAY + 24);
-    expect(entries[19].setAt).toBe(START + DAY + 5);
+    expect(entries[9].setAt).toBe(START + DAY + 15);
   });
 
   it("marks an entry that took a top spot from another Character, with whose it was", async () => {
@@ -115,5 +118,15 @@ describe("latest", () => {
     await upload("Pia", key("pia"), [entry(LEFT, 54, 90_000, START + 5 * DAY + 1)]);
 
     expect(await latestOf("Pia", LEFT)).toMatchObject({ expPerHour: 90_000, took: null });
+  });
+
+  it("gives each entry its map's Map Mark, as Where to train does", async () => {
+    await upload("Sana", key("sana"), [entry(MARKED, 23, 10_000, START + 6 * DAY)]);
+
+    expect((await latestOf("Sana", MARKED))?.mark).toEqual({
+      id: "MadeUpTown",
+      name: "Made-up Town",
+      picture: "https://osms.invalid/images/map_marks/MadeUpTown.png",
+    });
   });
 });
