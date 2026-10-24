@@ -81,6 +81,9 @@ pub struct Settings {
     /// "Check for updates" (Settings' switch): Minerva checks for a newer version by itself,
     /// at launch and every 6 hours (ADR 0019). Files from before it have it on.
     pub check_for_updates: bool,
+    /// The player said not now to the Personal Bests window's prompt to link Discord (#152):
+    /// it doesn't ask again.
+    pub link_prompt_dismissed: bool,
 }
 
 impl Default for Settings {
@@ -105,6 +108,7 @@ impl Default for Settings {
             map_leaderboards: Vec::new(),
             map_leaderboards_met: Some(Vec::new()),
             check_for_updates: true,
+            link_prompt_dismissed: false,
         }
     }
 }

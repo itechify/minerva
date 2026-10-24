@@ -6,7 +6,7 @@
 use crate::Command;
 use crate::grind_tracker::GRIND_TRACKER;
 use crate::panel_window::{Heights, PanelWindow, Shows, WindowSpec};
-use minerva_core::{Action, MapMark, Minerva, PanelState, PersonalBestsCharacter, VisitBest};
+use minerva_core::{Action, DiscordLinkView, MapMark, Minerva, PanelState, PersonalBestsCharacter, VisitBest};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::sync::mpsc::Sender;
@@ -39,13 +39,15 @@ struct BestsView<'a> {
     characters: &'a [PersonalBestsCharacter],
     /// Every Map Mark, which each map names its own by.
     map_marks: &'a BTreeMap<String, MapMark>,
+    /// Linking this install to the player's Account on the site with Discord.
+    discord: &'a DiscordLinkView,
 }
 
 /// Show the window where the core says, or nothing; and send its page the rows.
 pub fn sync(window: &mut PanelWindow, state: &PanelState) {
     let bests = &state.personal_bests;
     let placement = bests.placement;
-    let view = BestsView { shown: placement.is_some(), characters: &bests.characters, map_marks: &state.map_marks };
+    let view = BestsView { shown: placement.is_some(), characters: &bests.characters, map_marks: &state.map_marks, discord: &bests.discord };
     window.sync(&view, Shows { placement, clickable: placement.is_some(), takes_keyboard: false });
 }
 
@@ -111,6 +113,18 @@ pub fn personal_bests_merge_characters(from: String, into: String, commands: Sta
 #[tauri::command]
 pub fn personal_bests_show_on_leaderboards(name: String, on: bool, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::ShowOnLeaderboards { name, on });
+}
+
+/// The player pressed Link Discord: the core starts a link, and the link page opens.
+#[tauri::command]
+pub fn personal_bests_link_discord(commands: State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::LinkDiscord);
+}
+
+/// The player said not now to the prompt to link Discord.
+#[tauri::command]
+pub fn personal_bests_dismiss_link_prompt(commands: State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::DismissLinkPrompt);
 }
 
 /// A click on a map's Map Leaderboard link (its ID), among the bests of the Character named

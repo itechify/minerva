@@ -1,6 +1,9 @@
 //! Uploading to the Map Leaderboards (#110, ADR 0015): the shell makes each upload the core
 //! has under way (`PanelState::leaderboard_uploads`) once, on the async runtime, and tells the
-//! core the answer. What to upload, when, and what an answer means are the core's.
+//! core the answer. What to upload, when, and what an answer means are the core's. So with
+//! linking this install to an Account (#152, ADR 0023): each request about it
+//! (`PanelState::discord_link_requests`) is made once, with the key, and starting a link opens
+//! the link page here, so its one-time token never reaches the core.
 //!
 //! The Leaderboard Key, which ties a Character's name to this install, is kept here and never
 //! handed to the core: everything the core takes in goes into a Bug Report, and those go into
@@ -10,7 +13,10 @@
 
 use crate::errors::error;
 use crate::{Command, http};
-use minerva_core::{LeaderboardAnswer, LeaderboardUpload, SITE_URL, read_leaderboard_answer};
+use minerva_core::{
+    DiscordLinkAnswer, DiscordLinkRequest, LeaderboardAnswer, LeaderboardUpload, SITE_URL, read_leaderboard_answer, read_link_state,
+    read_link_token,
+};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -63,6 +69,23 @@ impl KeyFile {
         self.key = Some(key.clone());
         Ok(key)
     }
+
+    /// The key if this install has made one, never making it: an install that hasn't is
+    /// linked to no Account. `Err` if the file is there but can't be read.
+    pub fn existing(&mut self) -> Result<Option<String>, String> {
+        if let Some(key) = &self.key {
+            return Ok(Some(key.clone()));
+        }
+        match fs::read_to_string(&self.path) {
+            Ok(text) if is_key(text.trim()) => {
+                self.key = Some(text.trim().to_string());
+                Ok(self.key.clone())
+            }
+            Ok(_) => Ok(None),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(format!("reading the Leaderboard Key: {e}")),
+        }
+    }
 }
 
 /// Whether `text` can be a Leaderboard Key: 32 to 256 letters, digits, `-` or `_`.
@@ -79,20 +102,22 @@ fn make(path: &Path) -> Result<String, String> {
     Ok(key)
 }
 
-/// Makes the core's uploads.
+/// Makes the core's uploads, and its requests about linking to Discord.
 pub struct Uploader {
     key: KeyFile,
     /// The data source's: one HTTP client for all that Minerva fetches and sends.
     client: reqwest::Client,
     /// The id of the last upload made: the core's ids only grow.
     made: u64,
+    /// The id of the last request about linking made.
+    linked: u64,
     /// Where the answers go, for the core loop.
     commands: Sender<Command>,
 }
 
 impl Uploader {
     pub fn new(key: KeyFile, client: reqwest::Client, commands: Sender<Command>) -> Self {
-        Self { key, client, made: 0, commands }
+        Self { key, client, made: 0, linked: 0, commands }
     }
 
     /// Make each of `uploads` (the core's under way) not made yet, in the background; each
@@ -125,6 +150,49 @@ impl Uploader {
             });
         }
     }
+
+    /// Make each of `requests` (the core's about linking) not made yet, in the background; each
+    /// answer comes back to the core loop as [`Command::DiscordLinkAnswer`], a link started with
+    /// the link page to open.
+    pub fn sync_discord(&mut self, requests: &[DiscordLinkRequest]) {
+        let made = self.linked;
+        for request in requests.iter().filter(|request| request.id > made) {
+            self.linked = self.linked.max(request.id);
+            let id = request.id;
+            let key = if request.posts() { self.key.key().map(Some) } else { self.key.existing() };
+            let key = match key {
+                Ok(Some(key)) => key,
+                // No key made: linked to no Account.
+                Ok(None) => {
+                    let _ = self.commands.send(Command::DiscordLinkAnswer { id, answer: DiscordLinkAnswer::NotLinked {}, open: None });
+                    continue;
+                }
+                Err(why) => {
+                    error!("Link Discord: {why}");
+                    let _ = self.commands.send(Command::DiscordLinkAnswer { id, answer: DiscordLinkAnswer::Failed { why }, open: None });
+                    continue;
+                }
+            };
+            let site = site();
+            let url = format!("{site}{}", request.path());
+            let posts = request.posts();
+            let client = self.client.clone();
+            http::answer_in_background(self.commands.clone(), async move {
+                let method = if posts { reqwest::Method::POST } else { reqwest::Method::GET };
+                let reply = http::send(&client, method, &url, &key, None).await;
+                let (answer, open) = match reply {
+                    Err(why) => (DiscordLinkAnswer::Failed { why }, None),
+                    Ok(reply) if posts => match read_link_token(reply.status, &reply.body) {
+                        // The page on the site asked, never one the answer names.
+                        Ok(token) => (DiscordLinkAnswer::Opened {}, Some(format!("{site}account/link/?t={token}"))),
+                        Err(why) => (DiscordLinkAnswer::Failed { why }, None),
+                    },
+                    Ok(reply) => (read_link_state(reply.status, &reply.body), None),
+                };
+                Command::DiscordLinkAnswer { id, answer, open }
+            });
+        }
+    }
 }
 
 #[cfg(test)]
@@ -149,6 +217,15 @@ mod tests {
         assert_eq!(KeyFile::new(path.clone()).key().unwrap(), key);
         // Another install makes another.
         assert_ne!(KeyFile::new(file("another")).key().unwrap(), key);
+    }
+
+    #[test]
+    fn reading_the_link_state_never_makes_a_key() {
+        let path = file("existing");
+        assert_eq!(KeyFile::new(path.clone()).existing(), Ok(None));
+        assert!(!path.exists());
+        let key = KeyFile::new(path.clone()).key().unwrap();
+        assert_eq!(KeyFile::new(path).existing(), Ok(Some(key)));
     }
 
     #[test]

@@ -16,6 +16,7 @@ mod item_data;
 mod item_lookup;
 mod ink;
 mod item_tooltip;
+mod discord_link;
 mod leaderboards;
 mod loader;
 mod map_data;
@@ -63,6 +64,7 @@ pub use item_card::{
 pub use market_prices::{MARKET_PRICES_VERSION, MarketImport, MarketPrice, SavedMarketLine, SavedMarketPrices};
 pub use item_lookup::{ItemChoice, ItemHit, ItemLookup, ItemLookupLine, OurWindow};
 pub use item_tooltip::{ItemCapture, ItemTooltip, ItemTooltipReader, ItemTooltipReading};
+pub use discord_link::{DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest, DiscordLinkView, read_link_state, read_link_token};
 pub use leaderboards::{
     LeaderboardAnswer, LeaderboardCharacter, LeaderboardEntry, LeaderboardStatus, LeaderboardToggle, LeaderboardUpload,
     RejectedEntry, RejectedListing, RejectedReason, read_leaderboard_answer,
@@ -108,6 +110,7 @@ use item_card::{Editing, ItemCards, MESOWATCH_URL, Pressed};
 use loader::{Held, Load, Loaded, Loader};
 use market_prices::MarketPrices;
 use item_lookup::ItemLookups;
+use discord_link::DiscordLink;
 use leaderboards::Leaderboards;
 use search::{Search, Searched};
 use shown_map::ShownMap;
@@ -303,6 +306,12 @@ pub struct PanelState {
     /// Not sent to the overlay.
     #[serde(skip_serializing)]
     pub leaderboard_uploads: Vec<LeaderboardUpload>,
+    /// The request about linking to Discord under way (#152), for the shell to make with the
+    /// Leaderboard Key: starting a link, or reading the link state. The shell makes each once,
+    /// by its id, and tells the answer to [`Minerva::on_discord_link_answer`]. Not sent to the
+    /// overlay.
+    #[serde(skip_serializing)]
+    pub discord_link_requests: Vec<DiscordLinkRequest>,
     /// The title of the game window to look for: "MapleStory", or one the player
     /// picked by hand.
     pub game_window_title: String,
@@ -577,6 +586,8 @@ pub struct Minerva {
     title_unread_since: Option<u64>,
     /// The Characters shown on the Map Leaderboards, and the uploads for them.
     leaderboards: Leaderboards,
+    /// Linking this install's Leaderboard Key to the player's Account on the site.
+    discord: DiscordLink,
     /// The checks for a newer version, and its download and install when the player chooses.
     updater: Updater,
     /// What the shell must do that came of time passing (a page MeowDB's answer settled),
@@ -634,6 +645,7 @@ impl Minerva {
             title_missing_since: None,
             title_unread_since: None,
             leaderboards: Leaderboards::default(),
+            discord: DiscordLink::default(),
             updater: Updater::default(),
             requests: VecDeque::new(),
             panel: Panel::default(),
@@ -1411,6 +1423,34 @@ impl Minerva {
         self.sync_panel()
     }
 
+    /// The player pressed Link Discord in the Personal Bests window: at the next tick the
+    /// shell asks the site for a one-time token with the Leaderboard Key and opens the link
+    /// page, where the player confirms; the link state is read until it says linked.
+    pub fn link_discord(&mut self) -> &PanelState {
+        self.record(Event::LinkDiscord {});
+        self.discord.start();
+        self.sync_panel()
+    }
+
+    /// The player said not now to the Personal Bests window's prompt to link Discord: it
+    /// doesn't ask again, at this launch or any after.
+    pub fn dismiss_link_prompt(&mut self) -> &PanelState {
+        self.record(Event::DismissLinkPrompt {});
+        self.settings.link_prompt_dismissed = true;
+        self.sync_panel()
+    }
+
+    /// The shell made request `id` of [`PanelState::discord_link_requests`], and it came to
+    /// `answer`. Linked just now, a Character whose name another key held goes up again at
+    /// once. An answer to a request no longer under way changes nothing.
+    pub fn on_discord_link_answer(&mut self, id: u64, answer: DiscordLinkAnswer) -> &PanelState {
+        self.record(Event::DiscordLinkAnswer { id, answer: answer.clone() });
+        if self.discord.answer(id, answer) {
+            self.leaderboards.retry_claimed();
+        }
+        self.sync_panel()
+    }
+
     /// The shell ran check `id` of [`Updates::check`], and it came to `answer`. An answer to a
     /// check no longer under way changes nothing.
     pub fn on_update_answer(&mut self, id: u64, answer: UpdateAnswer) -> &PanelState {
@@ -1951,6 +1991,7 @@ impl Minerva {
         self.session.tick(at_ms);
         // Uploads only on a tick: at launch the bests are back by the first.
         self.leaderboards.tick(at_ms, self.session.bests().history(), self.wall_clock);
+        self.discord.tick(at_ms, self.bests_window.open);
         self.updater.tick(at_ms, self.settings.check_for_updates);
         self.load_osms(at_ms);
         if self.maps.held().is_some() {
@@ -2106,6 +2147,7 @@ impl Minerva {
         self.sync_grind_tracker();
         self.sync_personal_bests();
         self.state.leaderboard_uploads = self.leaderboards.uploads();
+        self.state.discord_link_requests = self.discord.requests();
         self.sync_item_lookup();
         self.sync_item_card();
         self.sync_deal_finder();
@@ -2347,7 +2389,8 @@ impl Minerva {
         } else {
             Vec::new()
         };
-        self.state.personal_bests = PersonalBestsWindow { open: window.open, placement, characters };
+        let discord = self.discord.view(self.leaderboards.any_shown(), self.settings.link_prompt_dismissed);
+        self.state.personal_bests = PersonalBestsWindow { open: window.open, placement, characters, discord };
     }
 
     /// Whether EXP tracking is on: the Grind Tracker is (the settings view's switch), and

@@ -32,6 +32,7 @@ use crate::hotkey_settings::KeyPress;
 use crate::item_lookup::ItemHit;
 use crate::item_lookup::ItemLookup;
 use crate::item_tooltip::{ItemCapture, ItemTooltip, ItemTooltipReading};
+use crate::discord_link::{DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest};
 use crate::leaderboards::{LeaderboardAnswer, RejectedReason};
 use crate::map_data::MapSummary;
 use crate::map_index::{Fetched, MapDataSource, SourceError};
@@ -258,6 +259,13 @@ pub enum Event {
     /// The Map Leaderboards answered upload `id`, for the Character named `name` (empty for an
     /// upload no longer under way), with `answer`.
     LeaderboardAnswer { id: u64, name: String, answer: LeaderboardAnswer },
+    /// The player pressed Link Discord in the Personal Bests window.
+    LinkDiscord {},
+    /// The player said not now to the prompt to link Discord.
+    DismissLinkPrompt {},
+    /// Request `id` about linking to Discord came to `answer`. A link page opened says so,
+    /// never with its token.
+    DiscordLinkAnswer { id: u64, answer: DiscordLinkAnswer },
     /// Check `id` for a newer version came to `answer`.
     UpdateAnswer { id: u64, answer: UpdateAnswer },
     /// What this build can do with a newer version: install it, or only say it is out.
@@ -385,6 +393,9 @@ pub struct Line {
     /// The uploads to the Map Leaderboards the core asked the shell for after.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub uploads: Vec<AskedUpload>,
+    /// The request about linking to Discord the core asked the shell for after.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discord_link: Option<DiscordLinkRequest>,
     /// The check for a newer version the core asked the shell for after, by its id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub update_check: Option<u64>,
@@ -412,6 +423,7 @@ impl Line {
             grind_tracker: None,
             map: None,
             uploads,
+            discord_link: None,
             update_check: None,
             update_job: None,
             crop: None,
@@ -685,6 +697,8 @@ struct Last {
     exp_bar_rgba: Vec<u8>,
     /// The id of the last upload to the Map Leaderboards written down as asked for.
     upload_id: u64,
+    /// The id of the last request about linking to Discord written down as asked for.
+    discord_link_id: u64,
     /// The id of the last check for a newer version written down as asked for.
     update_check: u64,
     /// The last step of updating written down as asked for.
@@ -839,6 +853,10 @@ impl Recorder {
                 let entries = upload.entries.as_ref().map(Vec::len);
                 line.uploads.push(AskedUpload { id: upload.id, name: upload.name.clone(), entries });
                 self.last.upload_id = self.last.upload_id.max(upload.id);
+            }
+            if let Some(request) = outcome.state.discord_link_requests.iter().find(|r| r.id > self.last.discord_link_id) {
+                line.discord_link = Some(request.clone());
+                self.last.discord_link_id = request.id;
             }
             if let Some(id) = outcome.state.updates.check.filter(|&id| id > self.last.update_check) {
                 line.update_check = Some(id);
@@ -1585,6 +1603,15 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::LeaderboardAnswer { id, answer, .. } => {
                 minerva.on_leaderboard_answer(id, answer);
             }
+            Event::LinkDiscord {} => {
+                minerva.link_discord();
+            }
+            Event::DismissLinkPrompt {} => {
+                minerva.dismiss_link_prompt();
+            }
+            Event::DiscordLinkAnswer { id, answer } => {
+                minerva.on_discord_link_answer(id, answer);
+            }
             Event::UpdateAnswer { id, answer } => {
                 minerva.on_update_answer(id, answer);
             }
@@ -1674,6 +1701,9 @@ impl Recording {
                     | Event::ShowOnLeaderboards { .. }
                     | Event::SendToLeaderboardsAgain { .. }
                     | Event::LeaderboardAnswer { .. }
+                    | Event::LinkDiscord {}
+                    | Event::DismissLinkPrompt {}
+                    | Event::DiscordLinkAnswer { .. }
                     | Event::UpdateAnswer { .. }
                     | Event::Build { .. }
                     | Event::UpdateDownload { .. }
@@ -1685,6 +1715,7 @@ impl Recording {
                 || !line.notes.is_empty()
                 || line.map.is_some()
                 || !line.uploads.is_empty()
+                || line.discord_link.is_some()
                 || line.update_check.is_some()
                 || line.update_job.is_some()
                 || line.answers.iter().any(Answer::is_set);
@@ -1731,6 +1762,10 @@ impl Line {
         out.extend(self.uploads.iter().map(|upload| match upload.entries {
             Some(entries) => format!("Map Leaderboards upload {} asked: {:?}'s {entries} entries", upload.id, upload.name),
             None => format!("Map Leaderboards upload {} asked: deleting {:?}'s entries", upload.id, upload.name),
+        }));
+        out.extend(self.discord_link.as_ref().map(|request| match request.ask {
+            DiscordLinkAsk::Start => format!("Discord link request {} asked: open the link page", request.id),
+            DiscordLinkAsk::State => format!("Discord link request {} asked: read the link state", request.id),
         }));
         out.extend(self.update_check.map(|id| format!("update check {id} asked")));
         out.extend(self.update_job.map(|job| match job.step {
@@ -1974,6 +2009,17 @@ impl Event {
                     LeaderboardAnswer::Failed { why } => format!("failed: {why}"),
                 };
                 format!("Map Leaderboards upload {id} for {name:?}: {said}")
+            }
+            Event::LinkDiscord {} => "Link Discord pressed".to_string(),
+            Event::DismissLinkPrompt {} => "the prompt to link Discord dismissed".to_string(),
+            Event::DiscordLinkAnswer { id, answer } => {
+                let said = match answer {
+                    DiscordLinkAnswer::Opened {} => "the link page opened".to_string(),
+                    DiscordLinkAnswer::Linked { username } => format!("linked to {username:?}"),
+                    DiscordLinkAnswer::NotLinked {} => "not linked".to_string(),
+                    DiscordLinkAnswer::Failed { why } => format!("failed: {why}"),
+                };
+                format!("Discord link request {id}: {said}")
             }
             Event::UpdateAnswer { id, answer: UpdateAnswer::Latest { version } } => {
                 format!("update check {id}: the latest version is {version}")

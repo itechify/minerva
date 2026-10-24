@@ -180,6 +180,30 @@
   margin: -2px -4px -2px 0;
 }
 
+/* The prompt to link Discord: a quiet note in an inset box, as the window's notes are, its
+   buttons at the end. Not a problem, so no dot and no amber. */
+.panel .problems .note.link-prompt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 8px 5px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Link Discord inside a note's words, and beside the Share: a text button in the line. */
+.problem-words .text-button,
+.discord-offer .text-button {
+  margin: 0;
+  vertical-align: baseline;
+}
+
+.discord-offer {
+  margin-left: 4px;
+}
+
 .problems .text-button.armed {
   border-color: var(--problem-ink);
 }

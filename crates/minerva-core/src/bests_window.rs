@@ -36,6 +36,7 @@ use crate::map_index::MapEntry;
 use crate::panel::{GameWindow, ScreenRect, Size, in_view};
 use crate::personal_best::{LevelBand, MapBests, SavedBests};
 use crate::shown_map::LevelRange;
+use crate::discord_link::DiscordLinkView;
 use crate::meowdb;
 use serde::Serialize;
 
@@ -53,6 +54,9 @@ pub struct PersonalBestsWindow {
     /// playing, by name; then the Unassigned bests, if there are any or no Character is
     /// named. None while it is closed.
     pub characters: Vec<PersonalBestsCharacter>,
+    /// Linking this install to the player's Account on the site with Discord (#152): whose
+    /// it is linked to, or Link Discord offered, and its prompt.
+    pub discord: DiscordLinkView,
 }
 
 /// One Character's bests in the Personal Bests window, or the Unassigned ones: the choices

@@ -400,6 +400,23 @@ impl Leaderboards {
         standing.claimed = false;
     }
 
+    /// Linked to an Account just now: each Character whose name another key held goes up again
+    /// at the next tick, since the name may be theirs through the Account. Uploads held stay
+    /// held.
+    pub fn retry_claimed(&mut self) {
+        for standing in self.standings.iter_mut().filter(|standing| standing.claimed && standing.in_flight.is_none()) {
+            standing.claimed = false;
+            standing.confirmed = None;
+            standing.wait = None;
+            standing.failures = 0;
+        }
+    }
+
+    /// Whether any Character is shown on the Map Leaderboards.
+    pub fn any_shown(&self) -> bool {
+        self.standings.iter().any(|standing| standing.saved.shown)
+    }
+
     /// The Personal Bests saved at earlier launches couldn't be read at this one: hold the
     /// uploads of every Character shown. Who was met can't be told from them either.
     pub fn bests_lost(&mut self) {
