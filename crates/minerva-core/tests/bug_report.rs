@@ -8,9 +8,9 @@ mod common;
 use common::items::{ItemWorld, equip, etc, item_world, scroll};
 use common::osms;
 use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame, HOUR, S, MIN, percent};
-use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES};
+use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES, MAX_TEXT_AND_CROPS_BYTES};
 use minerva_core::{
-    ListedPrice, ShopCapture, ShopHover, ShopList, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
+    ListedPrice, ShopCapture, ShopHover, ShopList, ShopNearMiss, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarNearMiss, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, DiscordLinkAnswer, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, STATUS_BAR_STRIP, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
@@ -663,10 +663,9 @@ fn the_exp_figures_read_in_a_status_bar_capture_are_written_with_where_they_were
     assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
 }
 
-#[test]
-fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
-    let mut shell = Shell::new(FakeSource::osms());
-    // The level learned, then 20 crops of noise a minute apart, the first a misread.
+/// 20 crops of the EXP figures, of noise, a minute apart, the first a misread, after the level
+/// is learned: over 5 MB of them, more than a report keeps.
+fn read_noise(shell: &mut Shell) {
     let first = ExpBar { exp: 1000, percent_hundredths: 500 };
     shell.minerva.on_exp_bar_reading(ExpBarReading { bar: Some(first), at_ms: 30 * S, place: None });
     for n in 0..20 {
@@ -679,13 +678,19 @@ fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
         // As much of the Status Bar as is captured: a crop of the figures as big as they come.
         let figures = noise_frame(n, shell.at);
         let strip = status_bar_strip();
-        read_figures_at(&mut shell, figures, bar, ScreenPoint { x: strip.x, y: strip.y });
+        read_figures_at(shell, figures, bar, ScreenPoint { x: strip.x, y: strip.y });
         shell.step();
     }
+}
+
+#[test]
+fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
+    let mut shell = Shell::new(FakeSource::osms());
+    read_noise(&mut shell);
 
     let (report, recording) = shell.report();
 
-    assert!(report.zip.len() <= MAX_REPORT_BYTES, "{} bytes", report.zip.len());
+    assert!(report.zip.len() <= MAX_TEXT_AND_CROPS_BYTES, "{} bytes", report.zip.len());
     assert!(recording.report.crops_left_out > 0);
     assert_eq!(recording.report.crops + recording.report.crops_left_out, 12, "the last 10 minutes and the kept one");
     assert!(recording.crops.contains(&format!("crops/exp-bar-{:010}.png", MIN)), "the kept one stays");
@@ -1018,7 +1023,7 @@ fn shop_reading(names: &[Option<&str>], at_ms: u64) -> ShopReading {
             covered: false,
         })
         .collect();
-    ShopReading { shop: Some(ShopList { area: ScreenRect { x: 561, y: 513, width: 311, height: 366 }, rows }), hover: None, at_ms }
+    ShopReading { shop: Some(ShopList { area: ScreenRect { x: 561, y: 513, width: 311, height: 366 }, rows }), hover: None, at_ms, near_miss: None }
 }
 
 /// The game's client area as the shell captures it for the Deal Finder.
@@ -1044,7 +1049,7 @@ fn run_with_the_deal_finder() -> Shell {
     shell.minerva.act(Action::SetDealMargin { percent: 5 });
     shell.minerva.act(Action::OpenDealItem { row: 0 });
     shell.play(20 * S, CONSTRUCTION_SITE, grind);
-    shell.minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 20 * S });
+    shell.minerva.on_player_shop_reading(ShopReading { shop: None, hover: None, at_ms: 20 * S, near_miss: None });
     shell.minerva.act(Action::ToggleDealFinder);
     shell.play(30 * S, CONSTRUCTION_SITE, grind);
     shell
@@ -1149,7 +1154,7 @@ fn a_shops_list_is_cut_down_to_its_covered_listings_past_the_bands_found() {
     };
     let list = ShopList { area: ScreenRect { x: 561, y: 513, width: 311, height: 70 }, rows: vec![row(0, Some("Bronze Ore")), row(1, None), row(2, None)] };
     assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
-    shell.minerva.on_player_shop_read(shop_capture(31 * S), ShopReading { shop: Some(list), hover: None, at_ms: 31 * S });
+    shell.minerva.on_player_shop_read(shop_capture(31 * S), ShopReading { shop: Some(list), hover: None, at_ms: 31 * S, near_miss: None });
 
     let (report, _) = shell.report();
 
@@ -1172,7 +1177,7 @@ fn a_shops_list_at_another_ui_size_is_cut_as_much_smaller() {
     };
     let list = ShopList { area: ScreenRect { x: 561, y: 513, width: 199, height: 235 }, rows: vec![row(0, Some("Bronze Ore")), row(1, None)] };
     assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
-    shell.minerva.on_player_shop_read(shop_capture(31 * S), ShopReading { shop: Some(list), hover: None, at_ms: 31 * S });
+    shell.minerva.on_player_shop_read(shop_capture(31 * S), ShopReading { shop: Some(list), hover: None, at_ms: 31 * S, near_miss: None });
 
     let (report, _) = shell.report();
 
@@ -1197,6 +1202,7 @@ fn status_bar_reading(name: Option<&str>, at_ms: u64) -> StatusBarReading {
     StatusBarReading {
         bar: Some(StatusBar { area, level: Some(13), job: Some("Magician".into()), name: name.map(String::from), exp_figures: None }),
         at_ms,
+        near_miss: None,
     }
 }
 
@@ -1211,7 +1217,7 @@ fn run_with_characters() -> Shell {
     }
     for second in 11..=15 {
         shell.play(second * S, CONSTRUCTION_SITE, |_| None);
-        shell.minerva.on_status_bar_reading(StatusBarReading { bar: None, at_ms: second * S });
+        shell.minerva.on_status_bar_reading(StatusBarReading { bar: None, at_ms: second * S, near_miss: None });
     }
     shell.minerva.on_status_bar_read(status_bar_capture(16 * S), status_bar_reading(Some("Bob"), 16 * S), None);
     shell.play(30 * S, CONSTRUCTION_SITE, grind);
@@ -1279,4 +1285,205 @@ fn readings_for_a_region_no_longer_captured_are_left_and_say_so_and_replay() {
         "{timeline:#?}"
     );
     assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
+}
+
+/// The game's client area as the Deal Finder captures it, its blue telling `at_ms` apart, so
+/// the capture a report keeps can be told by its pixels.
+fn deal_finder_capture(at_ms: u64) -> ShopCapture {
+    let shade = (at_ms / 400 % 251) as u8;
+    let img = image::RgbaImage::from_fn(1920, 1200, |x, y| image::Rgba([(x % 256) as u8, (y % 256) as u8, shade, 255]));
+    ShopCapture { frame: frame(&img, at_ms), origin: ScreenPoint { x: 0, y: 0 }, pointer: None }
+}
+
+/// A Deal Finder capture with no Player Shop found; with a `near` miss, a stack of bands too
+/// wide for any UI Size.
+fn no_shop(at_ms: u64, near: bool) -> ShopReading {
+    let area = ScreenRect { x: 700, y: 400, width: 520, height: 300 };
+    let near_miss = near.then_some(ShopNearMiss { area, rows: 60, brightness_hundredths: 94 });
+    ShopReading { shop: None, hover: None, at_ms, near_miss }
+}
+
+/// The Deal Finder turned on, 10 s in, and its captures read as `readings` say, each taken
+/// when its reading says.
+fn deal_finder_reads(readings: impl IntoIterator<Item = ShopReading>) -> Shell {
+    let mut shell = Shell::new(FakeSource::osms().with_items(items()));
+    shell.play(10 * S, CONSTRUCTION_SITE, grind);
+    assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
+    for reading in readings {
+        shell.minerva.on_player_shop_read(deal_finder_capture(reading.at_ms), reading);
+    }
+    shell.play(20 * S, CONSTRUCTION_SITE, grind);
+    shell
+}
+
+/// The whole captures of `kind` (`client-area`, `status-bar-strip`) in a report.
+fn whole_captures<'a>(recording: &'a Recording, kind: &str) -> Vec<&'a str> {
+    let prefix = format!("crops/{kind}-");
+    recording.crops.iter().map(String::as_str).filter(|name| name.starts_with(&prefix)).collect()
+}
+
+/// No shop open, then a shop the reader came near but couldn't find, twice, then no shop again
+/// and a shop found: the report keeps the latest capture with the near miss, whole, and the
+/// timeline says what the reader came near.
+#[test]
+fn a_deal_finder_capture_with_no_shop_found_is_kept_whole_the_latest_with_a_near_miss() {
+    let mut readings: Vec<ShopReading> =
+        [(10_400, false), (10_800, true), (11_200, true), (11_600, false)].into_iter().map(|(at, near)| no_shop(at, near)).collect();
+    readings.push(shop_reading(&[Some("Bronze Ore")], 12_000));
+    let mut shell = deal_finder_reads(readings);
+
+    let (report, recording) = shell.report();
+
+    let name = format!("crops/client-area-{:010}.png", 11_200);
+    assert_eq!(whole_captures(&recording, "client-area"), [name.as_str()]);
+    let png = image::load_from_memory(&zip_bytes(&report.zip, &name)).expect("a PNG").to_rgba8();
+    assert_eq!(png.dimensions(), (1920, 1200));
+    assert!(png.as_raw() == &deal_finder_capture(11_200).frame.rgba, "the capture, pixel for pixel");
+    let shops: Vec<&Event> = recording.lines.iter().map(|line| &line.event).filter(|e| matches!(e, Event::PlayerShop { .. })).collect();
+    assert!(matches!(shops[1], Event::PlayerShop { near_miss: Some(_), same: false, .. }), "a near miss isn't the same as no shop");
+    assert!(matches!(shops[2], Event::PlayerShop { near_miss: None, same: true, .. }), "the same near miss again");
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains("no Player Shop; nearest, 60 band rows 520 px wide at (700, 400), 520x300, at 94% brightness"), "{timeline}");
+    assert!(timeline.contains(&format!("Player Shop read as before  [{name}]")), "{timeline}");
+    let with = ReplayData { osms: Some(osms::game().files()), items: Some(items().files()) };
+    assert_eq!(bug_report::replay_with(&recording, with).divergence, None);
+}
+
+#[test]
+fn a_deal_finder_capture_with_no_shop_found_and_none_near_is_kept_whole_the_latest() {
+    let readings = [no_shop(10_400, false), no_shop(10_800, false), shop_reading(&[Some("Bronze Ore")], 11_200)];
+    let mut shell = deal_finder_reads(readings);
+
+    let (report, recording) = shell.report();
+
+    let name = format!("crops/client-area-{:010}.png", 10_800);
+    assert_eq!(whole_captures(&recording, "client-area"), [name.as_str()]);
+    let png = image::load_from_memory(&zip_bytes(&report.zip, &name)).expect("a PNG").to_rgba8();
+    assert!(png.as_raw() == &deal_finder_capture(10_800).frame.rgba, "the capture, pixel for pixel");
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains(&format!("Player Shop read as before  [{name}]")), "{timeline}");
+}
+
+#[test]
+fn deal_finder_captures_with_a_shop_found_or_none_found_over_10_minutes_ago_leave_no_whole_capture() {
+    let (_, recording) = deal_finder_reads([shop_reading(&[Some("Bronze Ore")], 10_400)]).report();
+    assert_eq!(whole_captures(&recording, "client-area"), Vec::<&str>::new(), "a shop found");
+
+    let mut shell = deal_finder_reads([no_shop(10_400, true), no_shop(10_800, false)]);
+    shell.play(10_800 + 10 * MIN + S, CONSTRUCTION_SITE, grind);
+    let (_, recording) = shell.report();
+    assert_eq!(whole_captures(&recording, "client-area"), Vec::<&str>::new(), "none found over 10 minutes ago");
+}
+
+/// The bottom of the client area as the Status Bar is captured, its blue telling `at_ms` apart.
+fn strip_capture(at_ms: u64) -> StatusBarCapture {
+    let strip = status_bar_strip();
+    let shade = (at_ms / S % 251) as u8;
+    let img = image::RgbaImage::from_fn(strip.width, strip.height, |x, y| image::Rgba([(x % 256) as u8, (y % 256) as u8, shade, 255]));
+    StatusBarCapture { frame: frame(&img, at_ms), origin: ScreenPoint { x: strip.x, y: strip.y } }
+}
+
+/// A Status Bar capture with no bar found; with a `near` miss, two level tiles with no LV box.
+fn no_bar(at_ms: u64, near: bool) -> StatusBarReading {
+    let area = ScreenRect { x: 334, y: 1150, width: 35, height: 20 };
+    StatusBarReading { bar: None, at_ms, near_miss: near.then_some(StatusBarNearMiss { area, tiles: 2, box_height: None }) }
+}
+
+/// No Status Bar found, the reader near one, then not, then Egbert's found: the report keeps
+/// the latest strip with none found, whole, near miss or not.
+#[test]
+fn a_status_bar_capture_with_no_bar_found_is_kept_whole_the_latest() {
+    let mut shell = Shell::new(FakeSource::osms());
+    for (second, near) in [(1, true), (2, false)] {
+        shell.play(second * S, CONSTRUCTION_SITE, grind);
+        shell.minerva.on_status_bar_read(strip_capture(second * S), no_bar(second * S, near), None);
+    }
+    shell.play(3 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.on_status_bar_read(status_bar_capture(3 * S), status_bar_reading(Some("Egbert"), 3 * S), None);
+    shell.play(10 * S, CONSTRUCTION_SITE, grind);
+
+    let (report, recording) = shell.report();
+
+    let name = format!("crops/status-bar-strip-{:010}.png", 2 * S);
+    assert_eq!(whole_captures(&recording, "status-bar-strip"), [name.as_str()]);
+    let png = image::load_from_memory(&zip_bytes(&report.zip, &name)).expect("a PNG").to_rgba8();
+    assert_eq!(png.dimensions(), (1920, STATUS_BAR_STRIP));
+    assert!(png.as_raw() == &strip_capture(2 * S).frame.rgba, "the strip, pixel for pixel");
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains("no Status Bar; nearest, 2 level tiles at (334, 1150), 35x20, no LV box round them"), "{timeline}");
+    assert!(timeline.contains(&format!("no Status Bar  [{name}]")), "{timeline}");
+    assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
+}
+
+#[test]
+fn status_bar_captures_with_a_bar_found_or_none_found_over_10_minutes_ago_leave_no_whole_capture() {
+    let (_, recording) = run_with_characters().report();
+    assert_eq!(whole_captures(&recording, "status-bar-strip"), Vec::<&str>::new(), "bars found");
+
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(S, CONSTRUCTION_SITE, grind);
+    shell.minerva.on_status_bar_read(strip_capture(S), no_bar(S, true), None);
+    shell.play(S + 10 * MIN + S, CONSTRUCTION_SITE, grind);
+    let (_, recording) = shell.report();
+    assert_eq!(whole_captures(&recording, "status-bar-strip"), Vec::<&str>::new(), "none found over 10 minutes ago");
+}
+
+/// A Deal Finder capture, its top `noisy` rows noise, which no PNG compresses (4 bytes a
+/// pixel), and the rest one colour.
+fn noisy_deal_finder_capture(noisy: u32, at_ms: u64) -> ShopCapture {
+    let mut state: u64 = 1;
+    let img = image::RgbaImage::from_fn(1920, 1200, |_, y| {
+        if y >= noisy {
+            return image::Rgba([96, 150, 210, 255]);
+        }
+        state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+        let [r, g, b, ..] = state.to_be_bytes();
+        image::Rgba([r, g, b, 255])
+    });
+    ShopCapture { frame: frame(&img, at_ms), origin: ScreenPoint { x: 0, y: 0 }, pointer: None }
+}
+
+/// Over 5 MB of crops, then the Deal Finder turned on and a capture read with no shop found.
+fn crops_then_no_shop(noisy: u32) -> Shell {
+    let mut shell = Shell::new(FakeSource::osms().with_items(items()));
+    read_noise(&mut shell);
+    assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
+    shell.at += 400;
+    let at = shell.at;
+    shell.minerva.on_player_shop_read(noisy_deal_finder_capture(noisy, at), no_shop(at, true));
+    shell.step();
+    shell
+}
+
+#[test]
+fn a_capture_with_no_shop_found_comes_on_top_of_5_mb_of_crops_and_the_report_stays_under_10_mb() {
+    // About 2.3 MB as a PNG.
+    let mut shell = crops_then_no_shop(300);
+    let at = shell.at;
+
+    let (report, recording) = shell.report();
+
+    assert!(report.zip.len() > MAX_TEXT_AND_CROPS_BYTES, "{} bytes", report.zip.len());
+    assert!(report.zip.len() <= MAX_REPORT_BYTES, "{} bytes", report.zip.len());
+    assert!(recording.report.crops_left_out > 0, "the ordinary crops still kept to 5 MB");
+    assert_eq!(whole_captures(&recording, "client-area"), [format!("crops/client-area-{at:010}.png").as_str()]);
+    assert!(recording.report.captures_left_out.is_empty());
+}
+
+#[test]
+fn a_capture_with_no_shop_found_that_wont_fit_is_left_out_and_the_summary_says_so() {
+    // About 9.2 MB as a PNG.
+    let mut shell = crops_then_no_shop(1200);
+    let at = shell.at;
+
+    let (report, recording) = shell.report();
+
+    let name = format!("crops/client-area-{at:010}.png");
+    assert!(report.zip.len() <= MAX_TEXT_AND_CROPS_BYTES, "{} bytes", report.zip.len());
+    assert_eq!(whole_captures(&recording, "client-area"), Vec::<&str>::new());
+    let left_out: Vec<&str> = recording.report.captures_left_out.iter().map(|left| left.name.as_str()).collect();
+    assert_eq!(left_out, [name.as_str()]);
+    let summary = text_in(&report.zip, "summary.txt");
+    let says = format!("Left out: {name}, a whole capture where nothing was found, 9.2 MB as a PNG: too big for the report");
+    assert!(summary.contains(&says), "{summary}");
 }

@@ -21,8 +21,14 @@
 //!   name changed. For the whole run, those behind a reading the core found unusual
 //!   ([`Note::is_unusual`]), that changed the map shown, or that found a part but couldn't
 //!   read it (it may have been misread).
-//! - A report is at most [`MAX_REPORT_BYTES`]: crops are left out to keep it so, the
-//!   oldest ordinary ones first, then the oldest kept for the run. The text never is.
+//! - Where a reader that looks for its place in a capture found nothing, one such capture from
+//!   the last [`RECENT_CROPS_MS`], whole (#133): the Deal Finder's client area, the latest whose
+//!   reader saw a near miss, else the latest; and the Status Bar's strip, the latest. It is held
+//!   as captured, and made a PNG only when a report is saved.
+//! - The text and the ordinary crops are at most [`MAX_TEXT_AND_CROPS_BYTES`]: crops are left
+//!   out to keep it so, the oldest ordinary ones first, then the oldest kept for the run. The
+//!   text never is. The whole captures come on top, while the report stays under
+//!   [`MAX_REPORT_BYTES`]; one that won't fit is left out, and `summary.txt` says so.
 //! - OSMS's file set isn't in a report (ADR 0008), only its fingerprint: a replay is given
 //!   the set to replay with, and a set that has changed since replays differently. The
 //!   same goes for the Item Card's OSMS item files (ADR 0010).
@@ -41,11 +47,11 @@ use crate::osms::{OsmsFiles, SavedFiles};
 use crate::osms_items::{ItemFiles, SavedItemFiles};
 use crate::panel::{Action, Foreground, GameWindow, PanelSizes, ScreenPoint, ScreenRect, Size};
 use crate::personal_best::{SavedBests, VisitBest};
-use crate::player_shop::{ShopCapture, ShopHover, ShopList, ShopReading};
+use crate::player_shop::{ShopCapture, ShopHover, ShopList, ShopNearMiss, ShopReading};
 use crate::recogniser::{TitleCapture, TitleLines, TitleReading};
 use crate::session::{ExpTracking, TrackingState};
 use crate::settings::Settings;
-use crate::status_bar::{StatusBar, StatusBarCapture, StatusBarReading};
+use crate::status_bar::{StatusBar, StatusBarCapture, StatusBarNearMiss, StatusBarReading};
 use crate::updates::{Build, DownloadAnswer, UpdateAnswer, UpdateJob, UpdateStep};
 use crate::{MINERVA_VERSION, Minerva, Frame, PanelControl, PanelState};
 use serde::{Deserialize, Serialize};
@@ -60,9 +66,12 @@ const TRACE_MS: u64 = 24 * 60 * 60 * 1000;
 pub const RECENT_CROPS_MS: u64 = 10 * 60_000;
 /// The most the crops kept for the run take; beyond it the oldest go.
 const KEPT_CROPS_BYTES: usize = 8 * 1024 * 1024;
-/// The biggest a Bug Report gets.
-pub const MAX_REPORT_BYTES: usize = 5 * 1024 * 1024;
-/// Room left under [`MAX_REPORT_BYTES`] for what the crops left out change in the text.
+/// The most a Bug Report's text and its ordinary crops take...
+pub const MAX_TEXT_AND_CROPS_BYTES: usize = 5 * 1024 * 1024;
+/// ...and the biggest it gets, with the captures where a reader found nothing: under 10 MB, in
+/// MB of a million bytes, for a Discord DM from a free account.
+pub const MAX_REPORT_BYTES: usize = 10_000_000;
+/// Room left under each for what the crops left out change in the text.
 const MARGIN_BYTES: usize = 4096;
 /// The trace's text is compressed in chunks of about this much.
 const CHUNK_BYTES: usize = 256 * 1024;
@@ -172,13 +181,16 @@ pub enum Event {
     Hotkey { pressed: String },
     Press { control: PanelControl },
     ItemTooltip { reading: Option<ItemTooltipReading> },
-    /// A Deal Finder capture taken at `at_ms` read as `shop` (`None`: no Player Shop), or
-    /// the `same` as the reading before; with the pointer on the list and the Item Tooltip
-    /// by it, if it was on the list.
+    /// A Deal Finder capture taken at `at_ms` read as `shop` (`None`: no Player Shop, with
+    /// the `near_miss` the reader came closest with, if any), or the `same` as the reading
+    /// before, its near miss too; with the pointer on the list and the Item Tooltip by it, if
+    /// it was on the list.
     PlayerShop {
         at_ms: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         shop: Option<ShopList>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        near_miss: Option<ShopNearMiss>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         same: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -188,12 +200,15 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         stale_region: Option<ScreenRect>,
     },
-    /// A Status Bar capture taken at `at_ms` read as `bar` (`None`: no Status Bar), or the
-    /// `same` as the reading before.
+    /// A Status Bar capture taken at `at_ms` read as `bar` (`None`: no Status Bar, with the
+    /// `near_miss` the reader came closest with, if any), or the `same` as the reading
+    /// before, its near miss too.
     StatusBar {
         at_ms: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         bar: Option<StatusBar>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        near_miss: Option<StatusBarNearMiss>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         same: bool,
         /// The region the capture was of, when it was no longer captured by the time it was
@@ -497,6 +512,18 @@ pub struct ReportFile {
     /// The crops in the report, and those left out to keep it small.
     pub crops: usize,
     pub crops_left_out: usize,
+    /// The captures where a reader found nothing (#133) left out, too big for the report: their
+    /// names, and their size as PNGs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub captures_left_out: Vec<LeftOut>,
+}
+
+/// A capture where a reader found nothing, left out of a report.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LeftOut {
+    pub name: String,
+    pub bytes: usize,
 }
 
 /// A Bug Report, ready to save.
@@ -540,6 +567,27 @@ pub(crate) enum Region {
     PlayerShop,
     /// The Status Bar's level, job and name, at a Status Bar capture.
     StatusBar,
+    /// The game's whole client area, at a Deal Finder capture with no shop found (#133):
+    /// `near_miss`, its reader saw one.
+    ClientArea { near_miss: bool },
+    /// The whole strip, at a Status Bar capture with no bar found (#133).
+    StatusBarStrip,
+}
+
+impl Region {
+    /// What its crop of a frame captured at `at_ms` is named in a report.
+    fn crop_name(self, at_ms: u64) -> String {
+        match self {
+            Region::Title => format!("crops/minimap-title-{at_ms:010}.png"),
+            Region::ExpBar => format!("crops/exp-bar-{at_ms:010}.png"),
+            // Named as `samples/item-tooltip` names its frames: the pointer's spot in it.
+            Region::ItemTooltip { pointer: (x, y) } => format!("crops/item-tooltip-{at_ms:010}@{x},{y}.png"),
+            Region::PlayerShop => format!("crops/player-shop-{at_ms:010}.png"),
+            Region::StatusBar => format!("crops/status-bar-{at_ms:010}.png"),
+            Region::ClientArea { .. } => format!("crops/client-area-{at_ms:010}.png"),
+            Region::StatusBarStrip => format!("crops/status-bar-strip-{at_ms:010}.png"),
+        }
+    }
 }
 
 /// How far the crop of an Item Card or Item Lookup capture reaches from the pointer (px,
@@ -610,9 +658,12 @@ const PLAYER_SHOP_MARGIN: f32 = 10.0;
 const PLAYER_SHOP_WIDTH: f32 = 352.0;
 
 /// The Player Shop's item list in a Deal Finder capture, for a Bug Report: the listings the
-/// reader read, or should have, as `samples/player-shop` keeps them. `None` with no shop.
-pub(crate) fn player_shop_crop(capture: &ShopCapture, shop: Option<&ShopList>) -> Option<(Region, Frame)> {
-    let shop = shop?;
+/// reader read, or should have, as `samples/player-shop` keeps them. With no shop, the whole
+/// capture, as it was captured (#133).
+pub(crate) fn player_shop_crop(capture: ShopCapture, reading: &ShopReading) -> Option<(Region, Frame)> {
+    let Some(shop) = &reading.shop else {
+        return Some((Region::ClientArea { near_miss: reading.near_miss.is_some() }, capture.frame));
+    };
     // Down to every listing, the covered ones past the bands found included.
     let (list, size) = (shop.span(), shop.ui_size());
     let (margin, width) = ((PLAYER_SHOP_MARGIN * size).round() as i32, (PLAYER_SHOP_WIDTH * size).round() as i32);
@@ -633,10 +684,11 @@ pub(crate) fn title_crop(capture: &TitleCapture, found: Option<ScreenRect>) -> O
 const STATUS_BAR_MARGIN: u32 = 10;
 
 /// The Status Bar's level, job and name in a Status Bar capture, for a Bug Report, as
-/// `samples/status-bar` keeps them: none of the rest of the bar, nor the game above it.
-/// `None` with no Status Bar.
-pub(crate) fn status_bar_crop(capture: &StatusBarCapture, bar: Option<&StatusBar>) -> Option<(Region, Frame)> {
-    Some((Region::StatusBar, rect_crop(&capture.frame, capture.origin, bar?.area, STATUS_BAR_MARGIN)?))
+/// `samples/status-bar` keeps them: none of the rest of the bar, nor the game above it. With
+/// no Status Bar, the whole strip, as it was captured (#133).
+pub(crate) fn status_bar_crop(capture: StatusBarCapture, bar: Option<&StatusBar>) -> Option<(Region, Frame)> {
+    let Some(bar) = bar else { return Some((Region::StatusBarStrip, capture.frame)) };
+    Some((Region::StatusBar, rect_crop(&capture.frame, capture.origin, bar.area, STATUS_BAR_MARGIN)?))
 }
 
 /// A crop of a captured region, as a PNG.
@@ -649,6 +701,43 @@ struct Crop {
     /// the map shown.
     kept: bool,
     png: Vec<u8>,
+}
+
+/// The latest capture a reader found nothing in (#133), held as captured until a report is
+/// saved, when it is made a PNG: the capture loop costs no more for it.
+#[derive(Default)]
+struct Unfound {
+    latest: Option<Frame>,
+    /// The latest whose reader saw a near miss, when it isn't the latest.
+    near_miss: Option<Frame>,
+}
+
+impl Unfound {
+    /// Hold `frame`, the latest; with a `near_miss`, over the one held for one before.
+    fn hold(&mut self, frame: Frame, near_miss: bool) {
+        if near_miss {
+            self.near_miss = Some(frame);
+            self.latest = None;
+        } else {
+            self.latest = Some(frame);
+        }
+    }
+
+    /// Let go of any captured before `since`.
+    fn expire(&mut self, since: u64) {
+        for held in [&mut self.latest, &mut self.near_miss] {
+            if held.as_ref().is_some_and(|frame| frame.at_ms < since) {
+                *held = None;
+            }
+        }
+    }
+
+    /// The one a report keeps, of those captured since `since`: the latest with a near miss,
+    /// else the latest.
+    fn kept<'a>(&'a self, since: u64) -> Option<&'a Frame> {
+        let recent = |held: Option<&'a Frame>| held.filter(|frame| frame.at_ms >= since);
+        recent(self.near_miss.as_ref()).or(recent(self.latest.as_ref()))
+    }
 }
 
 /// The trace's text for a stretch of it, compressed.
@@ -691,11 +780,13 @@ struct Last {
     unavailable_hotkeys: Option<(Vec<String>, Vec<String>)>,
     /// What the last title capture read as, and where the title was found.
     title: Option<(Option<TitleLines>, Option<ScreenRect>)>,
-    shop: Option<Option<ShopList>>,
+    /// What the last Deal Finder capture read as, and the near miss with no shop.
+    shop: Option<(Option<ShopList>, Option<ShopNearMiss>)>,
     /// What the Item Tooltip by the pointer on the shop's list said in the last Deal Finder
     /// capture with one: its name as read (`None`: unreadable).
     shop_tooltip: Option<Option<String>>,
-    status_bar: Option<Option<StatusBar>>,
+    /// What the last Status Bar capture read as, and the near miss with no bar.
+    status_bar: Option<(Option<StatusBar>, Option<StatusBarNearMiss>)>,
     exp_bar_rgba: Vec<u8>,
     /// The id of the last upload to the Map Leaderboards written down as asked for.
     upload_id: u64,
@@ -726,6 +817,9 @@ pub(crate) struct Recorder {
     wall_clock: Option<(u64, u64)>,
     last: Last,
     crops: VecDeque<Crop>,
+    /// The latest Deal Finder capture with no shop found, and Status Bar capture with no bar.
+    client_area: Unfound,
+    status_bar_strip: Unfound,
     /// Every map shown over the run, by ID.
     maps: BTreeSet<String>,
     /// The fingerprints of the OSMS sets taken, in order.
@@ -789,20 +883,24 @@ impl Recorder {
                 *found = None;
             }
         }
-        if let Event::PlayerShop { shop, same, hover, stale_region: None, .. } = &mut event {
+        // A near miss is part of what was read: a shop opened that isn't found is no longer
+        // the same as no shop open.
+        if let Event::PlayerShop { shop, near_miss, same, hover, stale_region: None, .. } = &mut event {
             // Off the list, no tooltip: the next one by it is new.
             if hover.is_none() {
                 self.last.shop_tooltip = None;
             }
-            *same = !changes(&mut self.last.shop, shop);
+            *same = !changes(&mut self.last.shop, &(shop.clone(), *near_miss));
             if *same {
                 *shop = None;
+                *near_miss = None;
             }
         }
-        if let Event::StatusBar { bar, same, stale_region: None, .. } = &mut event {
-            *same = !changes(&mut self.last.status_bar, bar);
+        if let Event::StatusBar { bar, near_miss, same, stale_region: None, .. } = &mut event {
+            *same = !changes(&mut self.last.status_bar, &(bar.clone(), *near_miss));
             if *same {
                 *bar = None;
+                *near_miss = None;
             }
         }
         let line = match (&event, at_ms) {
@@ -897,7 +995,20 @@ impl Recorder {
     /// Keep the crop of `frame`, read for `line`: one that changed, or that the core made
     /// something of (`state` after it).
     fn keep_crop(&mut self, line: &mut Line, region: Region, frame: Frame, state: &PanelState) {
+        let since = self.now.saturating_sub(RECENT_CROPS_MS);
         let (changed, kept) = match region {
+            // Held whole, apart from the crops (#133).
+            Region::ClientArea { near_miss } => {
+                self.client_area.hold(frame, near_miss);
+                self.client_area.expire(since);
+                return;
+            }
+            // The latest, near miss or not: a bar not found while playing is the bug itself.
+            Region::StatusBarStrip => {
+                self.status_bar_strip.hold(frame, false);
+                self.status_bar_strip.expire(since);
+                return;
+            }
             Region::ExpBar => {
                 let changed = frame.rgba != self.last.exp_bar_rgba;
                 (changed, line.notes.iter().any(Note::is_unusual))
@@ -958,14 +1069,7 @@ impl Recorder {
             }
         };
         if changed || kept {
-            let name = match region {
-                Region::Title => format!("crops/minimap-title-{:010}.png", frame.at_ms),
-                Region::ExpBar => format!("crops/exp-bar-{:010}.png", frame.at_ms),
-                // Named as `samples/item-tooltip` names its frames: the pointer's spot in it.
-                Region::ItemTooltip { pointer: (x, y) } => format!("crops/item-tooltip-{:010}@{x},{y}.png", frame.at_ms),
-                Region::PlayerShop => format!("crops/player-shop-{:010}.png", frame.at_ms),
-                Region::StatusBar => format!("crops/status-bar-{:010}.png", frame.at_ms),
-            };
+            let name = region.crop_name(frame.at_ms);
             if let Some(png) = png(&frame) {
                 let shop_tooltip = matches!(region, Region::ItemTooltip { .. }) && matches!(line.event, Event::PlayerShop { .. });
                 *(if shop_tooltip { &mut line.tooltip_crop } else { &mut line.crop }) = Some(name.clone());
@@ -975,7 +1079,8 @@ impl Recorder {
         if region == Region::ExpBar {
             self.last.exp_bar_rgba = frame.rgba;
         }
-        let since = self.now.saturating_sub(RECENT_CROPS_MS);
+        self.client_area.expire(since);
+        self.status_bar_strip.expire(since);
         self.crops.retain(|crop| crop.kept || crop.at_ms >= since);
         let mut kept_bytes: usize = self.crops.iter().filter(|crop| crop.kept).map(|crop| crop.png.len()).sum();
         while kept_bytes > KEPT_CROPS_BYTES {
@@ -1054,8 +1159,9 @@ impl Recorder {
         trace
     }
 
-    /// The Bug Report: the trace so far, with `summary.txt`, `report.json` and the crops,
-    /// in a `.zip` of at most [`MAX_REPORT_BYTES`].
+    /// The Bug Report: the trace so far, with `summary.txt`, `report.json` and the crops, in a
+    /// `.zip` whose text and ordinary crops take at most [`MAX_TEXT_AND_CROPS_BYTES`], and
+    /// which is at most [`MAX_REPORT_BYTES`] with the captures where a reader found nothing.
     pub fn report(&self, about: &ReportAbout, press: Press<'_>) -> BugReport {
         let trace = self.trace();
         let trace_from_ms = match (self.truncated, self.chunks.front()) {
@@ -1065,7 +1171,7 @@ impl Recorder {
             }
             _ => 0,
         };
-        let file = |crops: usize, crops_left_out: usize| ReportFile {
+        let file = |crops: usize, crops_left_out: usize, captures_left_out: Vec<LeftOut>| ReportFile {
             version: about.version.clone(),
             os: about.os.clone(),
             display_scale: about.display_scale,
@@ -1080,6 +1186,7 @@ impl Recorder {
             maps: press.maps.clone(),
             crops,
             crops_left_out,
+            captures_left_out,
         };
         let texts = |file: &ReportFile| {
             let report = serde_json::to_string_pretty(file).unwrap_or_default();
@@ -1095,19 +1202,33 @@ impl Recorder {
         let mut crops: Vec<&Crop> = self.crops.iter().filter(|crop| crop.kept || crop.at_ms >= since).collect();
         // The text alone, then as many crops as fit beside it: the oldest ordinary ones
         // go first, then the oldest kept for the run.
-        let text_bytes = zip(&texts(&file(crops.len(), 0)), &[]).len();
-        let size = |crop: &Crop| crop.png.len() + 2 * crop.name.len() + 100;
+        let text_bytes = zip(&texts(&file(crops.len(), 0, Vec::new())), &[]).len();
+        let size = |name: &str, png: &[u8]| png.len() + 2 * name.len() + 100;
         crops.sort_by_key(|crop| crop.at_ms);
-        let mut crop_bytes: usize = crops.iter().map(|crop| size(crop)).sum();
-        let budget = MAX_REPORT_BYTES - MARGIN_BYTES;
+        let mut crop_bytes: usize = crops.iter().map(|crop| size(&crop.name, &crop.png)).sum();
         let mut left_out = 0;
-        while text_bytes + crop_bytes > budget && !crops.is_empty() {
+        while text_bytes + crop_bytes > MAX_TEXT_AND_CROPS_BYTES - MARGIN_BYTES && !crops.is_empty() {
             let oldest = crops.iter().position(|crop| !crop.kept).unwrap_or(0);
-            crop_bytes -= size(crops.remove(oldest));
+            let crop = crops.remove(oldest);
+            crop_bytes -= size(&crop.name, &crop.png);
             left_out += 1;
         }
-        let pictures: Vec<(String, Vec<u8>)> = crops.iter().map(|crop| (crop.name.clone(), crop.png.clone())).collect();
-        let zip = zip(&texts(&file(crops.len(), left_out)), &pictures);
+        let mut pictures: Vec<(String, Vec<u8>)> = crops.iter().map(|crop| (crop.name.clone(), crop.png.clone())).collect();
+        // On top, the captures where a reader found nothing, made PNGs now: the strip first, as
+        // it is small, then the client area, each if it fits.
+        let unfound = [(&self.status_bar_strip, Region::StatusBarStrip), (&self.client_area, Region::ClientArea { near_miss: false })];
+        let mut captures_left_out = Vec::new();
+        for (frame, region) in unfound.into_iter().filter_map(|(unfound, region)| Some((unfound.kept(since)?, region))) {
+            let (name, Some(png)) = (region.crop_name(frame.at_ms), png(frame)) else { continue };
+            let bytes = size(&name, &png);
+            if text_bytes + crop_bytes + bytes > MAX_REPORT_BYTES - MARGIN_BYTES {
+                captures_left_out.push(LeftOut { name, bytes: png.len() });
+                continue;
+            }
+            crop_bytes += bytes;
+            pictures.push((name, png));
+        }
+        let zip = zip(&texts(&file(pictures.len(), left_out, captures_left_out)), &pictures);
         let stamp: String = about.local_time.chars().filter(|c| c.is_ascii_digit()).collect();
         let stamp = match (stamp.get(..4), stamp.get(4..6), stamp.get(6..8), stamp.get(8..14)) {
             (Some(year), Some(month), Some(day), Some(time)) => format!("{year}-{month}-{day}-{time}"),
@@ -1134,6 +1255,13 @@ impl Recorder {
         if file.crops_left_out > 0 {
             out += &format!("Crops: {} kept, {} left out to keep the report small\n", file.crops, file.crops_left_out);
         }
+        for left_out in &file.captures_left_out {
+            out += &format!(
+                "Left out: {}, a whole capture where nothing was found, {:.1} MB as a PNG: too big for the report\n",
+                left_out.name,
+                left_out.bytes as f64 / 1e6
+            );
+        }
         out += "\nAt the press\n";
         out += &format!(
             "  Map: {}\n",
@@ -1158,7 +1286,9 @@ impl Recorder {
         out += "  trace.jsonl  every input the core took in, a JSON object a line (t: ms since launch),\n";
         out += "               with what came of it: answers, notes, what the Grind Tracker and map showed\n";
         out += "  crops/       the EXP figures', the Minimap Title's, the Status Bar's, the Item Tooltip's and the Player Shop's crops,\n";
-        out += "               named by capture time (ms since launch)\n";
+        out += "               named by capture time (ms since launch); and, where nothing was found, a whole capture:\n";
+        out += "               client-area-<ms>.png, the Deal Finder's with no shop found (chat and names included),\n";
+        out += "               and status-bar-strip-<ms>.png, the bottom of the game window with no Status Bar found\n";
         out
     }
 }
@@ -1450,8 +1580,8 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
     let mut wall_clock: Option<(u64, u64)> = None;
     // The last readings, which a line the same as the one before stands for.
     let mut title: (Option<TitleLines>, Option<ScreenRect>) = (None, None);
-    let mut shop: Option<ShopList> = None;
-    let mut status_bar: Option<StatusBar> = None;
+    let mut shop: (Option<ShopList>, Option<ShopNearMiss>) = (None, None);
+    let mut status_bar: (Option<StatusBar>, Option<StatusBarNearMiss>) = (None, None);
     for line in &recording.lines {
         if let Some((unix_ms, at)) = wall_clock {
             minerva.wall_clock = Some(unix_ms + line.t.saturating_sub(at));
@@ -1519,13 +1649,15 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::ItemTooltip { reading } => {
                 minerva.on_item_tooltip_reading(reading);
             }
-            Event::PlayerShop { at_ms, shop: read, same, hover, stale_region } => {
-                let shop = if stale_region.is_some() { read } else { as_before(&mut shop, read, same) };
-                minerva.player_shop_reading_for(ShopReading { shop, hover, at_ms }, stale_region);
+            Event::PlayerShop { at_ms, shop: read, near_miss, same, hover, stale_region } => {
+                let read = (read, near_miss);
+                let (shop, near_miss) = if stale_region.is_some() { read } else { as_before(&mut shop, read, same) };
+                minerva.player_shop_reading_for(ShopReading { shop, hover, at_ms, near_miss }, stale_region);
             }
-            Event::StatusBar { at_ms, bar, same, stale_region } => {
-                let bar = if stale_region.is_some() { bar } else { as_before(&mut status_bar, bar, same) };
-                minerva.status_bar_reading_for(StatusBarReading { bar, at_ms }, stale_region);
+            Event::StatusBar { at_ms, bar, near_miss, same, stale_region } => {
+                let read = (bar, near_miss);
+                let (bar, near_miss) = if stale_region.is_some() { read } else { as_before(&mut status_bar, read, same) };
+                minerva.status_bar_reading_for(StatusBarReading { bar, at_ms, near_miss }, stale_region);
             }
             Event::ChooseDealLine { line } => {
                 minerva.choose_deal_line(&line);
@@ -1648,7 +1780,16 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Answer::Items { answer: Ok(_) } => Answer::Items { answer: Ok(String::new()) },
             other => other,
         });
-        let line = Line { crop: None, tooltip_crop: None, answers: answers.collect(), ..line.clone() };
+        // What came of a reading, not what its reader came closest with: a near miss is
+        // never what a replay diverges over.
+        let mut event = line.event.clone();
+        if let Event::PlayerShop { near_miss, .. } = &mut event {
+            *near_miss = None;
+        }
+        if let Event::StatusBar { near_miss, .. } = &mut event {
+            *near_miss = None;
+        }
+        let line = Line { event, crop: None, tooltip_crop: None, answers: answers.collect(), ..line.clone() };
         serde_json::to_string(&line).unwrap_or_default()
     };
     let length = recording.lines.len().max(replayed.len());
@@ -1681,6 +1822,13 @@ impl Recording {
                 title = lines.as_ref();
             }
             let consequences = line.consequences();
+            // The whole capture kept where a reader found nothing, if it is this line's.
+            let whole = match line.event {
+                Event::PlayerShop { at_ms, stale_region: None, .. } => Some(Region::ClientArea { near_miss: false }.crop_name(at_ms)),
+                Event::StatusBar { at_ms, stale_region: None, .. } => Some(Region::StatusBarStrip.crop_name(at_ms)),
+                _ => None,
+            }
+            .filter(|name| self.crops.contains(name));
             let acted = matches!(
                 line.event,
                 Event::Act { .. }
@@ -1718,6 +1866,7 @@ impl Recording {
                     | Event::BugReport {}
             );
             let notable = acted
+                || whole.is_some()
                 || !line.notes.is_empty()
                 || line.map.is_some()
                 || !line.uploads.is_empty()
@@ -1738,7 +1887,7 @@ impl Recording {
                 if !consequences.is_empty() {
                     text += &format!("  →  {}", consequences.join("; "));
                 }
-                for crop in line.crop.iter().chain(&line.tooltip_crop) {
+                for crop in line.crop.iter().chain(&line.tooltip_crop).chain(&whole) {
                     text += &format!("  [{crop}]");
                 }
                 out.push(text);
@@ -1850,11 +1999,11 @@ impl Event {
             Event::Title { at_ms, lines, found, same, stale_region: Some(region) } => {
                 Some((Event::Title { at_ms, lines, found, same, stale_region: None }, region))
             }
-            Event::PlayerShop { at_ms, shop, same, hover, stale_region: Some(region) } => {
-                Some((Event::PlayerShop { at_ms, shop, same, hover, stale_region: None }, region))
+            Event::PlayerShop { at_ms, shop, near_miss, same, hover, stale_region: Some(region) } => {
+                Some((Event::PlayerShop { at_ms, shop, near_miss, same, hover, stale_region: None }, region))
             }
-            Event::StatusBar { at_ms, bar, same, stale_region: Some(region) } => {
-                Some((Event::StatusBar { at_ms, bar, same, stale_region: None }, region))
+            Event::StatusBar { at_ms, bar, near_miss, same, stale_region: Some(region) } => {
+                Some((Event::StatusBar { at_ms, bar, near_miss, same, stale_region: None }, region))
             }
             _ => None,
         }
@@ -1940,9 +2089,16 @@ impl Event {
             Event::Hotkey { pressed } => format!("hotkey {pressed}"),
             Event::SearchQuery { query } => format!("search typed {query:?}"),
             Event::ItemTooltip { reading } => format!("Item Tooltip read {}", json(reading)),
-            Event::PlayerShop { hover: Some(hover), same, shop, at_ms, .. } => {
-                let read = Event::PlayerShop { at_ms: *at_ms, shop: shop.clone(), same: *same, hover: None, stale_region: None }
-                    .describe(title);
+            Event::PlayerShop { hover: Some(hover), same, shop, near_miss, at_ms, .. } => {
+                let read = Event::PlayerShop {
+                    at_ms: *at_ms,
+                    shop: shop.clone(),
+                    near_miss: *near_miss,
+                    same: *same,
+                    hover: None,
+                    stale_region: None,
+                }
+                .describe(title);
                 let tooltip = match &hover.tooltip {
                     ItemTooltip::Found { name: Some(name), .. } => format!("its tooltip {name:?}"),
                     ItemTooltip::Found { name: None, .. } => "its tooltip unreadable".to_string(),
@@ -1951,7 +2107,14 @@ impl Event {
                 format!("{read}; the pointer on it at {}, {}, {tooltip}", hover.pointer.x, hover.pointer.y)
             }
             Event::PlayerShop { same: true, .. } => "Player Shop read as before".to_string(),
-            Event::PlayerShop { shop: None, .. } => "no Player Shop".to_string(),
+            Event::PlayerShop { shop: None, near_miss: None, .. } => "no Player Shop".to_string(),
+            Event::PlayerShop { shop: None, near_miss: Some(near), .. } => {
+                let ScreenRect { x, y, width, height } = near.area;
+                format!(
+                    "no Player Shop; nearest, {} band rows {width} px wide at ({x}, {y}), {width}x{height}, at {}% brightness",
+                    near.rows, near.brightness_hundredths
+                )
+            }
             Event::PlayerShop { shop: Some(shop), .. } => {
                 let rows: Vec<String> = shop
                     .rows
@@ -1968,7 +2131,12 @@ impl Event {
                 format!("Player Shop read: {}", if rows.is_empty() { "no listings".into() } else { rows.join(", ") })
             }
             Event::StatusBar { same: true, .. } => "Status Bar read as before".to_string(),
-            Event::StatusBar { bar: None, .. } => "no Status Bar".to_string(),
+            Event::StatusBar { bar: None, near_miss: None, .. } => "no Status Bar".to_string(),
+            Event::StatusBar { bar: None, near_miss: Some(near), .. } => {
+                let ScreenRect { x, y, width, height } = near.area;
+                let boxed = near.box_height.map_or("no LV box round them".to_string(), |h| format!("in an LV box {h} px tall"));
+                format!("no Status Bar; nearest, {} level tiles at ({x}, {y}), {width}x{height}, {boxed}", near.tiles)
+            }
             Event::StatusBar { bar: Some(bar), .. } => {
                 let or_unread = |part: Option<String>| part.unwrap_or_else(|| "?".to_string());
                 let level = or_unread(bar.level.map(|level| level.to_string()));

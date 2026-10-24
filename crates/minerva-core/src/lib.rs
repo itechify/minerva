@@ -85,7 +85,7 @@ pub use panel::{
     ScreenRect, Section, Size,
 };
 pub use personal_best::{BESTS_VERSION, CharacterBests, MapBests, SavedBests, VisitBest};
-pub use player_shop::{ListedPrice, PlayerShopReader, ShopCapture, ShopHover, ShopList, ShopReading, ShopRow};
+pub use player_shop::{ListedPrice, PlayerShopReader, ShopCapture, ShopHover, ShopList, ShopNearMiss, ShopReading, ShopRow};
 pub use search::{
     DensityTier, Destination, HuntingTarget, ItemMatch, ItemsMissing, MapMatch, Matches, MobChoice, MobMatch, RouteStop,
     SearchResult, SearchState, SearchView, Trip,
@@ -95,7 +95,7 @@ pub use settings::{Hotkey, Hotkeys, Settings};
 pub use settings_window::SettingsWindow;
 pub use setup::{SetupReason, SetupState};
 pub use shown_map::{Candidate, Candidates, LevelRange, Outline};
-pub use status_bar::{STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarReader, StatusBarReading};
+pub use status_bar::{STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarNearMiss, StatusBarReader, StatusBarReading};
 pub use updates::{
     Build, DownloadAnswer, QuitItem, UpdateAnswer, UpdateJob, UpdateNotice, UpdateOffer, UpdateStage, UpdateStatus, UpdateStep,
     Updates,
@@ -1616,14 +1616,14 @@ impl Minerva {
     }
 
     fn take_player_shop_capture(&mut self, capture: ShopCapture, reading: ShopReading) -> &PanelState {
-        // The list alone, and the Item Tooltip by the pointer, as their samples keep them.
-        let crops = [
-            bug_report::player_shop_crop(&capture, reading.shop.as_ref()),
-            bug_report::shop_tooltip_crop(&capture, reading.hover.as_ref()),
-        ];
+        // The list alone, and the Item Tooltip by the pointer, as their samples keep them; with
+        // no shop, the whole capture.
+        let tooltip = bug_report::shop_tooltip_crop(&capture, reading.hover.as_ref());
+        let crops = [bug_report::player_shop_crop(capture, &reading), tooltip];
         let event = Event::PlayerShop {
             at_ms: reading.at_ms,
             shop: reading.shop.clone(),
+            near_miss: reading.near_miss,
             same: false,
             hover: reading.hover.clone(),
             stale_region: None,
@@ -1647,6 +1647,7 @@ impl Minerva {
         let event = Event::PlayerShop {
             at_ms: reading.at_ms,
             shop: reading.shop.clone(),
+            near_miss: reading.near_miss,
             same: false,
             hover: reading.hover.clone(),
             stale_region,
@@ -1692,12 +1693,21 @@ impl Minerva {
     }
 
     fn take_status_bar_capture(&mut self, capture: StatusBarCapture, reading: StatusBarReading, exp: Option<ExpBarReading>) -> &PanelState {
-        let crop = bug_report::status_bar_crop(&capture, reading.bar.as_ref());
-        let event = Event::StatusBar { at_ms: reading.at_ms, bar: reading.bar.clone(), same: false, stale_region: None };
+        // The EXP figures' crop first: they are read where they were last found even with no bar,
+        // whose whole strip is handed over then.
+        let figures = exp.as_ref().and_then(|exp| exp_bar::figures_frame(&capture, exp.place?)).map(|frame| (Region::ExpBar, frame));
+        let crop = bug_report::status_bar_crop(capture, reading.bar.as_ref());
+        let event = Event::StatusBar {
+            at_ms: reading.at_ms,
+            bar: reading.bar.clone(),
+            near_miss: reading.near_miss,
+            same: false,
+            stale_region: None,
+        };
         self.record_input(event, Some(reading.at_ms), crop);
         self.take_status_bar_reading(reading);
         let Some(exp) = exp else { return self.sync_panel() };
-        let crop = exp.place.and_then(|place| exp_bar::figures_frame(&capture, place)).map(|frame| (Region::ExpBar, frame));
+        let crop = figures;
         let event = Event::ExpBar { at_ms: exp.at_ms, bar: exp.bar, place: exp.place };
         self.record_input(event, Some(exp.at_ms), crop);
         self.take_exp_bar_reading(exp)
@@ -1715,7 +1725,7 @@ impl Minerva {
     /// it. A Bug Report's replay decides so again.
     pub(crate) fn status_bar_reading_for(&mut self, reading: StatusBarReading, stale_region: Option<ScreenRect>) -> &PanelState {
         let stale_region = stale_region.filter(|&region| self.state.status_bar_capture != Some(region));
-        let event = Event::StatusBar { at_ms: reading.at_ms, bar: reading.bar.clone(), same: false, stale_region };
+        let event = Event::StatusBar { at_ms: reading.at_ms, bar: reading.bar.clone(), near_miss: reading.near_miss, same: false, stale_region };
         self.record_input(event, Some(reading.at_ms), None);
         if stale_region.is_some() {
             return &self.state;

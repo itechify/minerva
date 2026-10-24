@@ -264,7 +264,7 @@ _Avoid_: settings view (the panel's, before the window), settings page, preferen
 ### Reporting bugs
 
 **Bug Report**:
-The `.zip` Minerva saves when the player chooses Bug Report in the tray menu, to go with a bug's issue: everything it read and made of it since launch (up to a day), with crops of the regions it captured. Fed back to the core, it goes through the same states again (ADR 0009).
+The `.zip` Minerva saves when the player chooses Bug Report in the tray menu, to go with a bug's issue: everything it read and made of it since launch (up to a day), with crops of the regions it captured, and, where a reader found nothing, the latest such capture whole. Fed back to the core, it goes through the same states again (ADR 0009).
 _Avoid_: log, diagnostics, dump, trace (to the player; "trace" is its record of inputs, in the code)
 
 ### Updating

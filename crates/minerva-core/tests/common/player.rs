@@ -90,7 +90,7 @@ impl Player {
             let bar = StatusBar { area, level: Some(*level), job: Some("Magician".to_string()), name: name.clone(), exp_figures: None };
             // Captured just before the EXP bar, so the refresh at a half minute takes in both.
             let at_ms = self.at.saturating_sub(500);
-            self.minerva.on_status_bar_reading(StatusBarReading { bar: Some(bar), at_ms });
+            self.minerva.on_status_bar_reading(StatusBarReading { bar: Some(bar), at_ms, near_miss: None });
         }
         let bar = Some(ExpBar { exp: self.exp, percent_hundredths: percent(self.exp) });
         self.minerva.on_exp_bar_reading(ExpBarReading { bar, at_ms: self.at, place: None });

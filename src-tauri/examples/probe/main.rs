@@ -300,6 +300,9 @@ fn replay(args: &[String]) -> Result<(), String> {
     let report = &recording.report;
     println!("Minerva {} on {}, display scale {}", report.version, report.os, report.display_scale);
     println!("Saved {} ({} ms after launch); {} lines, {} crops", report.saved_at, report.saved_at_ms, recording.lines.len(), recording.crops.len());
+    for left_out in &report.captures_left_out {
+        println!("Left out, too big for the report: {}, a whole capture where nothing was found ({} bytes as a PNG)", left_out.name, left_out.bytes);
+    }
     if report.truncated {
         println!("The run outlasted a day: the trace starts at {} ms, after the lines that set the run up", report.trace_from_ms);
     }

@@ -53,6 +53,26 @@ pub struct StatusBarReading {
     pub bar: Option<StatusBar>,
     /// When the frame was captured, as in [`Frame::at_ms`].
     pub at_ms: u64,
+    /// With no Status Bar found, what the reader came closest with (#133); `None` with a bar,
+    /// or with nothing near.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub near_miss: Option<StatusBarNearMiss>,
+}
+
+/// What a Status Bar capture with no bar found came closest to one with: the level tiles, a
+/// row of orange of a tile's shape at their pitch, the most of them, and the LV box round them
+/// if it was found there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusBarNearMiss {
+    /// Where the tiles are on screen.
+    pub area: ScreenRect,
+    /// How many there are in the row.
+    pub tiles: u32,
+    /// The LV box's height (px), if it was found round them: the bar's UI Size was measured
+    /// by it, but the bar wasn't found at the samples' size.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub box_height: Option<u32>,
 }
 
 /// The Status Bar's Character part, as read.
@@ -205,22 +225,34 @@ impl StatusBarReader {
     }
 
     pub fn read(&mut self, capture: &StatusBarCapture) -> StatusBarReading {
-        let bar = frame_to_rgb(&capture.frame).and_then(|img| self.read_rgb(&img, capture.origin));
-        StatusBarReading { bar, at_ms: capture.frame.at_ms }
+        let (bar, near_miss) = match frame_to_rgb(&capture.frame).map(|img| self.read_rgb(&img, capture.origin)) {
+            Some(Ok(bar)) => (Some(bar), None),
+            Some(Err(near_miss)) => (None, near_miss),
+            None => (None, None),
+        };
+        StatusBarReading { bar, at_ms: capture.frame.at_ms, near_miss }
     }
 
     /// Read the bar at the samples' size (ADR 0020): measure its UI Size, scale the capture to
     /// the samples' size if it isn't at it, read that, and put what was found back on screen.
-    fn read_rgb(&mut self, img: &RgbImage, origin: ScreenPoint) -> Option<StatusBar> {
-        let at = AtSamplesSize::new(img, measure(img)?);
-        let bar = self.read_at_samples_size(&at)?;
+    /// With no bar, what came closest to one.
+    fn read_rgb(&mut self, img: &RgbImage, origin: ScreenPoint) -> Result<StatusBar, Option<StatusBarNearMiss>> {
+        let (size, nearest) = measure(img);
+        let near_miss = nearest.map(|near| StatusBarNearMiss {
+            area: near.tiles.on_screen(origin),
+            tiles: near.count,
+            box_height: size.map(|_| near.box_height),
+        });
+        let Some(size) = size else { return Err(near_miss) };
+        let at = AtSamplesSize::new(img, size);
+        let Some(bar) = self.read_at_samples_size(&at) else { return Err(near_miss) };
         let back = |r: ScreenRect| {
             let (x0, y0) = at.back(r.x as f32, r.y as f32);
             let (x1, y1) = at.back((r.x + r.width as i32) as f32, (r.y + r.height as i32) as f32);
             let (x0, y0, x1, y1) = (x0.round() as u32, y0.round() as u32, x1.round() as u32, y1.round() as u32);
             Rect { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }.on_screen(origin)
         };
-        Some(StatusBar { area: back(bar.area), exp_figures: bar.exp_figures.map(back), ..bar })
+        Ok(StatusBar { area: back(bar.area), exp_figures: bar.exp_figures.map(back), ..bar })
     }
 
     /// Read a capture at the samples' UI Size; where the bar is found, from its top-left pixel.
@@ -313,10 +345,21 @@ fn oranges(img: &RgbImage) -> Vec<Component> {
     components(img, 0..w, 0..h, orange)
 }
 
+/// The nearest [`measure`] came to the LV box: a row of tiles, `count` of them in `tiles` (capture
+/// px), and the box's height round them where it was found.
+#[derive(Debug, Clone, Copy)]
+struct Nearest {
+    tiles: Rect,
+    count: u32,
+    box_height: u32,
+}
+
 /// The bar's UI Size (ADR 0020): its LV box's height next to the samples' [`BOX_H`]. The box
 /// is found as [`find`] finds it, but at any size: a row of tiles of one height at their
-/// pitch, with the box's grey all round them.
-fn measure(img: &RgbImage) -> Option<f32> {
+/// pitch, with the box's grey all round them. With it, the box's tiles; without, the row of
+/// tiles with the most in it, the first of those (#133).
+fn measure(img: &RgbImage) -> (Option<f32>, Option<Nearest>) {
+    let mut nearest: Option<Nearest> = None;
     let mut blobs: Vec<Component> = oranges(img)
         .into_iter()
         .filter(|b| ANY_TILE_H.contains(&b.h()) && TILE_ASPECT.contains(&(b.w() as f32 / b.h() as f32)))
@@ -340,10 +383,18 @@ fn measure(img: &RgbImage) -> Option<f32> {
                 break;
             }
         }
+        if group.len() > MAX_TILES {
+            continue;
+        }
         let (x0, x1) = (first.x0, group[group.len() - 1].x1);
-        let (top, bottom) = (group.iter().map(|b| b.y0).min()?, group.iter().map(|b| b.y1).max()?);
+        let top = group.iter().map(|b| b.y0).fold(first.y0, u32::min);
+        let bottom = group.iter().map(|b| b.y1).fold(first.y1, u32::max);
+        let found = Nearest { tiles: Rect { x: x0, y: top, w: x1 - x0, h: bottom - top }, count: group.len() as u32, box_height: 0 };
+        if nearest.is_none_or(|nearest| found.count > nearest.count) {
+            nearest = Some(found);
+        }
         let margin = ((BOX_MARGIN as f32 * size).round() as u32).max(1);
-        if group.len() > MAX_TILES || x0 < margin || top < margin || bottom + margin >= h || x1 + margin > w {
+        if x0 < margin || top < margin || bottom + margin >= h || x1 + margin > w {
             continue;
         }
         let boxed = (x0..x1).all(|x| grey(x, top - margin) && grey(x, bottom - 1 + margin))
@@ -362,9 +413,10 @@ fn measure(img: &RgbImage) -> Option<f32> {
         if left.abs_diff(right) as f32 > size.max(1.0) {
             continue;
         }
-        return Some((left + right) as f32 / 2.0 / BOX_H);
+        let box_height = (left + right) as f32 / 2.0;
+        return (Some(box_height / BOX_H), Some(Nearest { box_height: box_height.round() as u32, ..found }));
     }
-    None
+    (None, nearest)
 }
 
 /// The level's tiles in the LV box: tiles in a row at their pitch, with the box's grey all
