@@ -2591,6 +2591,11 @@ button.button {
 .account-reason {
   font-style: italic;
 }
+.account-subhead {
+  margin: 32px 0 0;
+  font-size: 18px;
+  line-height: 24px;
+}
 .account-lines {
   margin: 12px 0 0;
   padding-left: 18px;

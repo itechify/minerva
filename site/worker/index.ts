@@ -5,7 +5,7 @@ import { callback, start } from "./discord";
 import { type Answer, badRequest, json } from "./http";
 import { isMaintainerToken } from "./keys";
 import { optOut, readBand, readMap, readMaps, upload } from "./leaderboards";
-import { deleteEntry, dismissReport, findAccounts, readCharacter, readReports, reassign, report } from "./moderation";
+import { deleteEntry, dismissReport, findAccounts, readCharacter, readRemoved, readReports, reassign, report, restoreEntry } from "./moderation";
 import { endSession, isMaintainerAccount, sameOrigin, sessionAccount } from "./sessions";
 
 export default {
@@ -132,6 +132,10 @@ async function routeAdmin(request: Request, url: URL, path: string[], env: Env):
       return dismissReport(env, path[1]);
     case path.length === 4 && path[0] === "entries" && method === "DELETE":
       return deleteEntry(env, path[1], path[2], path[3]);
+    case path.length === 1 && path[0] === "removed" && method === "GET":
+      return readRemoved(env);
+    case path.length === 5 && path[0] === "removed" && method === "DELETE":
+      return restoreEntry(env, path[1], path[2], path[3], path[4]);
     case path.length === 2 && path[0] === "characters" && method === "GET":
       return readCharacter(env, path[1]);
     case path.length === 3 && path[0] === "characters" && path[2] === "reassign" && method === "POST":

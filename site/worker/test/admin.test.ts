@@ -120,3 +120,37 @@ describe("the maintainer, signed in", () => {
     expect((await upload("Hedy", key("hedy-claimant-other"), [entry(FIELD, 106, 320_000)])).status).toBe(409);
   });
 });
+
+describe("entries taken down", () => {
+  it("are listed for the maintainer, and restored: the same Visit then goes up again", async () => {
+    const mine = key("ines");
+    await upload("Ines", mine, [entry(FIELD, 107, 300_000)]);
+    await admin(`/entries/Ines/${FIELD}/100`, { method: "DELETE" });
+    const listed = (await (await admin("/removed")).json()) as { removed: { name: string; map: string; band: number; expPerHour: number }[] };
+    expect(listed.removed).toContainEqual({ name: "Ines", map: FIELD, band: 100, expPerHour: 300_000 });
+
+    const response = await admin(`/removed/Ines/${FIELD}/100/300000`, { method: "DELETE" });
+    const again = await upload("Ines", mine, [entry(FIELD, 107, 300_000)]);
+
+    expect(response.status).toBe(204);
+    expect(await again.json()).toEqual({ accepted: 1, rejected: [] });
+    expect(await names(FIELD, 100)).toContain("Ines");
+    const after = (await (await admin("/removed")).json()) as { removed: { name: string }[] };
+    expect(after.removed.map((r) => r.name)).not.toContain("Ines");
+  });
+
+  it("can't restore what wasn't taken down", async () => {
+    const response = await admin(`/removed/Nobody/${FIELD}/100/1`, { method: "DELETE" });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "no-removed" });
+  });
+
+  it("are the maintainer's alone to list or restore", async () => {
+    const player = await signIn("400000000000000007", "jo");
+
+    const tries = [await asSignedIn(player, "/api/admin/removed"), await admin(`/removed/Ines/${FIELD}/100/1`, { method: "DELETE" }, "not-the-token")];
+
+    expect(tries.map((r) => r.status)).toEqual([401, 401]);
+  });
+});

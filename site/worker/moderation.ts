@@ -1,5 +1,6 @@
 // Reports against entries, and the maintainer's routes: reading and dismissing the reports,
-// deleting an entry, looking a name up, and reassigning it to the key its player has now.
+// taking an entry down and restoring it, looking a name up, and reassigning it to the key its
+// player has now.
 import { type Answer, badRequest, body } from "./http";
 import { hash } from "./keys";
 import { REPORTS, limit } from "./rate-limits";
@@ -50,6 +51,27 @@ export async function deleteEntry(env: Env, name: string, map: string, band: str
     env.DB.prepare("DELETE FROM reports WHERE name_key = ?1 AND map_id = ?2 AND band = ?3").bind(...at),
   ]);
   if (removed.meta.changes === 0) return { status: 404, body: { error: "no-entry" } };
+  return { status: 204 };
+}
+
+/** Every entry the maintainer took down, by its Character's name as it is now: the Visits
+ *  kept off the Map Leaderboards until restored. */
+export async function readRemoved(env: Env): Promise<Answer> {
+  const rows = await env.DB.prepare(
+    `SELECT COALESCE(c.name, r.name_key) AS name, r.map_id AS map, r.band, r.exp_per_hour AS expPerHour
+     FROM removed_entries r LEFT JOIN characters c USING (name_key) ORDER BY name, map, band`,
+  ).all<{ name: string; map: string; band: number; expPerHour: number }>();
+  return { status: 200, body: { removed: rows.results } };
+}
+
+/** Restore the entry taken down for `name` on `map` in the Level Band starting at `band`, the
+ *  Visit with `expPerHour`: the next upload of that Visit goes up again. */
+export async function restoreEntry(env: Env, name: string, map: string, band: string, expPerHour: string): Promise<Answer> {
+  if (!/^\d+$/.test(band) || !/^\d+$/.test(expPerHour)) return badRequest("a band and an EXP/h are numbers");
+  const restored = await env.DB.prepare("DELETE FROM removed_entries WHERE name_key = ? AND map_id = ? AND band = ? AND exp_per_hour = ?")
+    .bind(name.toLowerCase(), map, Number(band), Number(expPerHour))
+    .run();
+  if (restored.meta.changes === 0) return { status: 404, body: { error: "no-removed" } };
   return { status: 204 };
 }
 

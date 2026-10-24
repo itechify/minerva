@@ -77,4 +77,4 @@ From then on, **never publish the site from a ref older than the API**: an older
   ```
 
   It moves the name to the last key refused for it and says when that was. Check the time with the player before telling them it's done.
-- **Reports**: at `/admin/`, under **Reports**, each with **Delete entry** and **Dismiss**. Without Discord, `curl -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/reports`, and to delete an entry, `curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/entries/<name>/<map>/<band>`.
+- **Reports**: at `/admin/`, under **Reports**, each with **Dismiss** (the report goes) and **Take entry down** (the entry goes too, and stays off). An entry taken down by mistake comes back with **Restore** under **Taken down**. Without Discord, `curl -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/reports`, and to delete an entry, `curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/entries/<name>/<map>/<band>`.
