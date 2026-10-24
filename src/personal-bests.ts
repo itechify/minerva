@@ -682,12 +682,12 @@ function standing(t: Toggle): string {
   }
 }
 
-/** Link Discord, in words a player can act on: a button to link, or whose Discord this
- *  Minerva is linked to. */
-function linkButton(words = "Link Discord") {
+/** Link Discord: a text button, or inside a note's sentence a text link, as the note's
+ *  "ask on Minerva's Discord" is. */
+function linkButton(words = "Link Discord", inSentence = false) {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "text-button";
+  button.className = inSentence ? "text-link" : "text-button";
   button.dataset.linkDiscord = "";
   button.textContent = words;
   button.title = "Link this PC to your Discord on owlofminerva.app, so your characters' names on the Map Leaderboards follow you to a new PC";
@@ -695,16 +695,13 @@ function linkButton(words = "Link Discord") {
 }
 
 /** Beside the Share: whose Discord this Minerva is linked to, that linking is under way, or
- *  Link Discord. Nothing while the site hasn't said. */
-function discordLine(): HTMLElement | null {
-  if (discord.linkedAs !== null) return span("leaderboard-status discord-linked", `Linked to Discord as ${discord.linkedAs}`);
-  if (discord.linking) return span("leaderboard-status", "Link Discord: finish in your browser…");
-  if (discord.offered) {
-    const line = span("discord-offer", "");
-    line.append(linkButton());
-    return line;
-  }
-  return null;
+ *  Link Discord, unless a note below offers it already (the prompt, a page that didn't open,
+ *  a name another key holds, bests that didn't read). Nothing while the site hasn't said. */
+function discordLine(t: Toggle): HTMLElement | null {
+  if (discord.linkedAs !== null) return span("leaderboard-status", `Linked to Discord as ${discord.linkedAs}.`);
+  if (discord.linking) return span("leaderboard-status", "Linking Discord: finish in your browser.");
+  const noted = discord.prompt || discord.failed !== null || t.status === "claimed" || t.status === "held";
+  return discord.offered && !noted ? linkButton() : null;
 }
 
 /** A line of the Manage panel. */
@@ -723,7 +720,7 @@ function renderShare() {
   shareEl.replaceChildren();
   if (c?.name && t?.offered) {
     shareEl.append(leaderboardSwitch(c.name, t), span("leaderboard-status", standing(t)));
-    const link = discordLine();
+    const link = discordLine(t);
     if (link) shareEl.append(link);
   } else if (c?.name && t && c.maps.length > 0) {
     shareEl.append(
@@ -873,7 +870,7 @@ function renderProblems() {
           [
             `Minerva couldn't read your bests file at a launch, so the site may hold more of ${name}'s bests than are here. `,
             "Nothing of theirs is sent until you send what's here, which replaces what the site holds.",
-            ...(discord.offered ? [" To keep your characters' names yours if this PC's files are ever lost, ", linkButton(), "."] : []),
+            ...(discord.offered ? [" To keep your characters' names yours if this PC's files are ever lost, ", linkButton("link Discord", true), "."] : []),
           ],
           send,
         ),
@@ -887,7 +884,7 @@ function renderProblems() {
       link.textContent = "ask on Minerva's Discord";
       const words: (string | HTMLElement)[] = [`Not on the Map Leaderboards: another Minerva holds the name ${name} there. If it's yours (a new PC, say), `];
       // Linked already, the name would have gone through if the old PC was: only Discord can help.
-      if (discord.offered) words.push("and your old PC was linked to Discord, ", linkButton("link this one"), "; otherwise ");
+      if (discord.offered) words.push("and your old PC was linked to Discord, ", linkButton("link this one", true), "; otherwise ");
       words.push(link, ", then send again.");
       problemsEl.append(problemNote(words, again));
     } else if (t.status === "retrying") {
@@ -902,7 +899,7 @@ function renderProblems() {
     }
   }
   if (discord.failed !== null) {
-    problemsEl.append(problemNote([`Couldn't open the page to link Discord: ${discord.failed}.`], linkButton("Try again")));
+    problemsEl.append(problemNote(["Couldn't open the page to link Discord. Check you're online, then try again."], linkButton("Try again")));
   }
   if (discord.prompt) problemsEl.append(linkPrompt());
   problemsEl.hidden = problemsEl.childElementCount === 0;

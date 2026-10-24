@@ -193,17 +193,6 @@
   line-height: 16px;
 }
 
-/* Link Discord inside a note's words, and beside the Share: a text button in the line. */
-.problem-words .text-button,
-.discord-offer .text-button {
-  margin: 0;
-  vertical-align: baseline;
-}
-
-.discord-offer {
-  margin-left: 4px;
-}
-
 .problems .text-button.armed {
   border-color: var(--problem-ink);
 }
@@ -445,7 +434,8 @@ tbody tr.board-row td {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  /* Across, the room the status had as a margin; a line that wraps starts flush. */
+  gap: 4px 8px;
 }
 
 .share[hidden] {
@@ -509,7 +499,6 @@ tbody tr.board-row td {
 }
 
 .leaderboard-status {
-  margin-left: 4px;
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-2);
