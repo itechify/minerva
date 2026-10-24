@@ -33,6 +33,11 @@
   /* The doubt chip's gradient, the game's small orange button (DESIGN.md: Doubt Gold to
      Doubt Amber). */
   --doubt: linear-gradient(180deg, #ffd25a 0%, #f0a715 100%);
+  /* The page minimap's ground, grass over moss over earth, which the window's foot stands
+     on too. */
+  --mm-grass: #a5d544;
+  --mm-moss: #4e7a2a;
+  --mm-earth: #6a4626;
   /* The tab strip's band: the lavender a step into the frame's navy. */
   --tab-band: color-mix(in srgb, var(--body-solid) 88%, var(--frame));
   /* How tall the window's head is while it sticks, kept by site.ts, so a jump to a heading
@@ -98,6 +103,39 @@ a:active {
   outline: 2px solid var(--edit);
   outline-offset: 2px;
   border-radius: 2px;
+}
+
+/* The game's own pointer (site/cursors/NOTICE.md): the white glove at rest, the glove over a
+   mouse on anything that takes a click, its button lit red while held. Each hotspot is the
+   drawing's origin in the game's files; the 2x copies keep the pixels crisp on a high-DPI
+   screen. Text fields keep the caret, and a disabled control the glove at rest. */
+:root {
+  --cursor: url("./cursors/normal.png") 0 3, default;
+  --cursor-link: url("./cursors/hover.png") 3 6, pointer;
+  --cursor-press: url("./cursors/press.png") 4 4, pointer;
+}
+@supports (cursor: image-set("x.png" 1x) 0 0, auto) {
+  :root {
+    --cursor: image-set(url("./cursors/normal.png") 1x, url("./cursors/normal@2x.png") 2x) 0 3, default;
+    --cursor-link: image-set(url("./cursors/hover.png") 1x, url("./cursors/hover@2x.png") 2x) 3 6, pointer;
+    --cursor-press: image-set(url("./cursors/press.png") 1x, url("./cursors/press@2x.png") 2x) 4 4, pointer;
+  }
+}
+html {
+  cursor: var(--cursor);
+}
+:is(a[href], button, summary, select, label:has(input[type="checkbox"], input[type="radio"]), [role="button"], [role="option"]) {
+  cursor: var(--cursor-link);
+}
+:is(a[href], button:enabled, summary, select, label:has(input[type="checkbox"], input[type="radio"]), [role="button"], [role="option"]):active,
+:is(a[href], button:enabled, summary, label:has(input[type="checkbox"], input[type="radio"]), [role="button"], [role="option"]):active * {
+  cursor: var(--cursor-press);
+}
+button:disabled {
+  cursor: var(--cursor);
+}
+:is(input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"]), textarea) {
+  cursor: text;
 }
 
 /* ---- The window ---- */
@@ -289,6 +327,23 @@ a:active {
   height: auto;
   margin: 0 0 20px;
 }
+/* On a laptop's shorter screen the logo gives up some height, so the Download is in view
+   on the first screen and the words come nearer fitting beside the film. */
+@media (min-width: 961px) and (max-height: 1000px) {
+  .hero {
+    padding-top: 32px;
+  }
+  .logo {
+    width: 240px;
+    margin-bottom: 16px;
+  }
+}
+@media (min-width: 961px) and (max-height: 820px) {
+  .logo {
+    width: 200px;
+    margin-bottom: 12px;
+  }
+}
 h1 {
   margin: 0 0 18px;
   font-size: 42px;
@@ -440,7 +495,7 @@ figcaption {
 }
 .hero.reel-side .hero-text {
   position: sticky;
-  top: var(--reel-top);
+  top: var(--reel-text-top, var(--reel-top));
 }
 /* The shot's own caption stays for screen readers; the film's say each step on screen. */
 .hero.reeling .hero-shot > figcaption {
@@ -567,6 +622,15 @@ figcaption {
   pointer-events: none;
 }
 
+/* Beside the words, a frame narrower than its column (a laptop's shorter screen fits it
+   to the height) keeps to the window's right edge, as the full-size frame does, so the
+   space falls between the words and the film rather than past it. */
+.hero.reel-side .reel-frame,
+.hero.reel-side .reel-captions {
+  left: auto;
+  right: 0;
+}
+
 /* Each step's caption under the frame, one at a time, the last the shot's own. */
 .reel-captions {
   position: absolute;
@@ -657,16 +721,19 @@ strong {
    first, on a window too narrow for both. */
 .feature {
   display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(24em, 30em);
-  justify-content: center;
+  grid-template-columns: minmax(0, 1fr) minmax(24em, 30em);
   align-items: start;
-  gap: 64px;
+  gap: 56px;
   padding-top: 88px;
 }
-/* Every other feature turns, its shot on the right, so the page zigzags down as the
-   minimap's way does. */
+/* Every feature keeps the same two columns, so the words line up from row to row however
+   wide the shot is: the shot stands centred in its own. Every other feature turns, its shot
+   on the right, so the page zigzags down as the minimap's way does. */
+.feature > .stage {
+  justify-self: center;
+}
 .feature:nth-of-type(even) {
-  grid-template-columns: minmax(24em, 30em) minmax(0, max-content);
+  grid-template-columns: minmax(24em, 30em) minmax(0, 1fr);
 }
 .feature:nth-of-type(even) > .stage {
   order: 2;
@@ -748,7 +815,7 @@ strong {
   font-weight: 700;
   line-height: 22px;
   list-style: none;
-  cursor: pointer;
+  cursor: var(--cursor-link);
 }
 .qa > summary::-webkit-details-marker {
   display: none;
@@ -975,7 +1042,7 @@ strong {
 .faq-group {
   display: grid;
   grid-template-columns: minmax(0, 16em) minmax(0, 44em);
-  gap: 56px;
+  gap: 16px 56px;
   align-items: start;
   padding-top: 64px;
 }
@@ -997,6 +1064,72 @@ strong {
 }
 .faq-group-body > h3:first-child {
   margin-top: 2px;
+}
+/* The topics under a group's heading (topics.ts), held in sight with it, so the way to
+   another is never back at the top: the nine as quiet rows past a Window Rule, the group
+   you're in the selected one, as the panel marks the shown map's row (Selection Periwinkle,
+   its inset ring and bold Ink). Shown between 961px and 1440px, where the minimap isn't
+   and the column has the room; on a screen too short to hold them with the heading, or
+   narrower, each group ends on its way back to the owl's list instead. A printed page has
+   no use for either. */
+.faq-topics {
+  display: none;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+.faq-topics ul {
+  margin: 0 -10px;
+  padding: 0;
+  list-style: none;
+}
+.faq-topics li {
+  margin: 0;
+}
+.faq-topics a {
+  display: block;
+  padding: 4px 10px;
+  border-radius: 3px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 20px;
+  text-decoration: none;
+}
+.faq-topics a:hover {
+  background: color-mix(in srgb, var(--edit) 8%, transparent);
+  color: var(--ink);
+}
+.faq-topics a:focus-visible {
+  outline-offset: -2px;
+}
+.faq-topics a[aria-current] {
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--select-edge);
+  color: var(--ink);
+  font-weight: 700;
+}
+/* Under the questions, as a feature's questions end on the rest of their group. */
+.faq-topics-back {
+  display: none;
+  grid-column: -2;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 22px;
+}
+.faq-topics-back a {
+  display: inline-block;
+  padding: 11px 0;
+}
+@media screen and (min-width: 961px) and (max-width: 1439px) and (min-height: 600px) {
+  .faq-topics {
+    display: block;
+  }
+}
+@media screen and (max-width: 960px), screen and (max-width: 1439px) and (max-height: 599px) {
+  .faq-topics-back {
+    display: block;
+  }
 }
 
 /* ---- Inline pieces, as the panel draws them ---- */
@@ -1259,10 +1392,21 @@ code.path {
 /* ---- The window's foot: the credits ---- */
 
 .window-foot {
-  padding: 28px 40px 32px;
+  position: relative;
+  padding: 28px 40px 46px;
   border-top: 1px solid var(--window-edge);
   border-radius: 0 0 3px 3px;
   background: var(--tab-band);
+}
+/* The window's foot stands on the page minimap's ground, grass over moss over earth, where
+   its dot ends its walk at the credits: the page and its map end on the same ground. */
+.window-foot::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 14px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(180deg, var(--mm-grass) 0 2px, var(--mm-moss) 2px 4px, var(--mm-earth) 4px);
 }
 .window-foot h2 {
   margin: 0 0 14px;
@@ -1307,9 +1451,6 @@ code.path {
    the map's art, not the windows'. */
 .minimap {
   --mm-night: linear-gradient(180deg, #1f2e4f 0%, #2a4170 100%);
-  --mm-grass: #a5d544;
-  --mm-moss: #4e7a2a;
-  --mm-earth: #6a4626;
   --mm-rope: #d8c48c;
   display: none;
   border: 1px solid var(--window-edge);
@@ -1367,7 +1508,7 @@ button.icon-button {
   margin: 0;
   padding: 0;
   font: inherit;
-  cursor: pointer;
+  cursor: var(--cursor-link);
 }
 button.icon-button svg {
   width: 12px;
@@ -1623,13 +1764,37 @@ button.icon-button:active {
 .lb-head h1 {
   margin-bottom: 14px;
 }
-/* Finding a map beside the newest bests. */
+/* One measure for every part of the Map Leaderboards' pages, the band tables' 60em, so they
+   share one right edge; what's set in two columns shares one split (56px apart). */
+.lb-train,
+.lb-columns,
+.lb-questions,
+.lb-board {
+  max-width: 60em;
+}
+/* Finding a map, then the questions under it, beside the newest bests, so the left column
+   isn't left empty beside Latest's ten. */
 .lb-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 56px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "find newest"
+    "questions newest";
+  gap: 0 56px;
   align-items: start;
   padding-top: 48px;
+}
+.lb-find {
+  grid-area: find;
+}
+.lb-newest {
+  grid-area: newest;
+}
+.lb-columns > .lb-questions {
+  grid-area: questions;
+  display: block;
+  padding-top: 56px;
 }
 .lb-section h2,
 .lb-train h2,
@@ -1731,10 +1896,97 @@ button.icon-button:active {
   flex: none;
   text-align: right;
 }
-/* The pages' questions, beside a heading, as a FAQ group sets them. */
+/* Latest: each entry two lines beside two right-aligned figures, so the EXP/h read down the
+   list as a column: the Character (bold) and their job and level beside what they got, over
+   the map, its Map Mark before it, and band beside the day. An entry that took a map's top
+   spot says so under them. */
+.lb-map.lb-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 14px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 18px;
+}
+.lb-entry-job,
+.lb-entry-unit,
+.lb-entry-where,
+.lb-entry-date {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+.lb-entry-unit {
+  font-weight: 400;
+}
+.lb-entry-exp {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.lb-entry-where {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.lb-entry-place {
+  min-width: 0;
+}
+.lb-entry-band {
+  white-space: nowrap;
+}
+.lb-entry-map {
+  min-width: 0;
+  color: var(--ink);
+}
+.lb-entry-date {
+  text-align: right;
+  white-space: nowrap;
+}
+.lb-entry .lb-took {
+  grid-column: 1 / -1;
+  line-height: 18px;
+}
+/* While the entries come, the list keeps the room of ten, saying so in its first row. */
+.lb-latest.lb-waiting {
+  min-height: 611px;
+  box-sizing: border-box;
+}
+.lb-wait {
+  padding: 9px 14px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+/* Try again, where a page says the API can't be reached: a link's words, as a button. */
+.lb-retry {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline 1px var(--select-edge);
+  text-underline-offset: 3px;
+  cursor: var(--cursor-link);
+}
+.lb-retry:hover {
+  color: var(--portal);
+  text-decoration-color: currentColor;
+}
+.lb-retry:active {
+  color: var(--frame);
+}
+/* A map's page's questions, beside their heading on the two columns' split, as a FAQ
+   group sets them. */
 .lb-questions {
   display: grid;
-  grid-template-columns: minmax(0, 16em) minmax(0, 44em);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 56px;
   align-items: start;
   padding-top: 64px;
@@ -1756,7 +2008,10 @@ button.icon-button:active {
   font-weight: 700;
   line-height: 22px;
 }
+/* The street keeps its line from the first paint, so the name under it doesn't drop when
+   the script writes it. */
 .lb-street {
+  min-height: 22px;
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 700;
@@ -1766,18 +2021,27 @@ button.icon-button:active {
 .lb-head .lb-bands {
   margin-top: 24px;
 }
-/* The whole map on the panel's minimap paper, kept within one shallow inset so both
-   wide fields and tall towers fit without cropping or pushing the bands as it loads. */
+/* The whole map on the panel's minimap paper, in a shallow inset as wide as the picture, so
+   both wide fields and tall towers fit without cropping, and never wider than the page's
+   measure. Its height is kept from the first paint, so nothing under it moves as it loads;
+   once the picture is in, the box narrows to it (--wide, set from the picture's own shape,
+   never past its own size). With no picture, the box goes and a line says so. */
 .lb-picture {
+  --high: clamp(160px, 24vw, 240px);
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: clamp(160px, 24vw, 240px);
+  height: var(--high);
+  max-width: calc(min(100%, 60em) - 26px);
   margin: 20px 0 0;
   padding: 12px;
   border: 1px solid var(--inset-edge);
   border-radius: 4px;
   background: var(--minimap-paper);
+}
+.lb-picture.lb-in {
+  width: min(calc(var(--high) * var(--ratio)), var(--wide));
 }
 .lb-picture[hidden],
 .lb-picture [hidden] {
@@ -1791,11 +2055,23 @@ button.icon-button:active {
   max-height: 100%;
   object-fit: contain;
 }
+.lb-picture:not(.lb-in) img {
+  position: absolute;
+  opacity: 0;
+}
 .lb-picture p {
   margin: 0;
   color: var(--ink-2);
   font-size: 14px;
   line-height: 21px;
+}
+.lb-picture.lb-none {
+  display: block;
+  height: auto;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
 }
 /* The Level Bands, light steel buttons each with its levels over its count; the band shown
    is the selected one, in Selection Periwinkle. */
@@ -1845,13 +2121,24 @@ button.icon-button:active {
 .lb-train {
   padding-top: 40px;
 }
+/* The Level Bands' row keeps its room from the first paint, as the API's answer fills it. */
+.lb-train > .lb-bands {
+  min-height: 51px;
+}
+/* While a band's maps come, Where to train keeps the room to reach the fold from under the
+   page's title, so what's under it starts below the fold and little in view moves when they
+   come, whether the band has many maps or few. A link naming a band keeps it from the first
+   paint (the page's own script marks <html>). */
+html.lb-band .lb-train,
+.lb-train.lb-waiting {
+  min-height: calc(100vh - 300px);
+}
 /* The areas, as the Level Bands are: light steel, each the game's Map Mark before its name,
    the one shown selected. */
 .lb-areas {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-width: 60em;
   margin-top: 14px;
 }
 .lb-areas[hidden] {
@@ -1892,7 +2179,8 @@ button.icon-button:active {
   width: 19px;
   height: 19px;
 }
-.lb-train-title {
+.lb-train-title,
+.lb-map-title {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1945,15 +2233,105 @@ button.icon-button:active {
 .lb-train-date {
   white-space: nowrap;
 }
-/* Latest: an entry that took a map's top spot says so after its EXP/h. */
+/* Latest: an entry that took a map's top spot says so under it. */
 .lb-took {
   font-size: 13px;
   font-weight: 400;
   color: var(--ink-2);
 }
+/* Under a long band's first 15 maps, Show all: a row across the table, as a map's page says
+   how many entries are between, its words a link's, the whole row to press. */
+.lb-train-table tr.lb-more > td {
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+.lb-more-button {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 700 14px/22px var(--font);
+  text-align: center;
+  text-decoration: underline 1px var(--select-edge);
+  text-underline-offset: 3px;
+  cursor: var(--cursor-link);
+}
+.lb-more-button:hover {
+  background: color-mix(in srgb, var(--edit) 8%, transparent);
+  color: var(--portal);
+  text-decoration-color: currentColor;
+}
+.lb-more-button:active {
+  color: var(--frame);
+}
+.lb-more-button:focus-visible {
+  outline-offset: -2px;
+}
+/* The columns are set by their headers, not by the rows shown, so they never move when Show
+   all, a band or an area changes the rows: the map takes what the figures leave. */
+@media (min-width: 641px) {
+  .lb-train-table {
+    table-layout: fixed;
+  }
+  .lb-train-table th.lb-train-mobs {
+    width: 96px;
+  }
+  .lb-train-table th.lb-train-best {
+    width: 232px;
+  }
+  .lb-train-table th.lb-train-entries {
+    width: 112px;
+  }
+  .lb-train-table td {
+    overflow-wrap: anywhere;
+  }
+}
+/* Too narrow for those, the figures' columns give the map room; "No entries yet" takes two
+   lines. */
+@media (min-width: 641px) and (max-width: 899px) {
+  .lb-train-table th.lb-train-mobs {
+    width: 72px;
+  }
+  .lb-train-table th.lb-train-best {
+    width: 216px;
+  }
+  .lb-train-table th.lb-train-entries {
+    width: 80px;
+  }
+}
+/* The headers stay under the window's head as a long table goes by, on the box's tint over
+   the window's lavender, a Window Rule under them. */
+@media (min-width: 641px) {
+  .lb-train-table thead th {
+    position: sticky;
+    top: var(--head);
+    z-index: 1;
+    background: color-mix(in srgb, #fff 55%, var(--body-solid));
+    box-shadow: inset 0 -1px 0 var(--rule);
+  }
+  .lb-train-table thead th:first-child {
+    border-top-left-radius: 3px;
+  }
+  .lb-train-table thead th:last-child {
+    border-top-right-radius: 3px;
+  }
+  .lb-train-table tbody tr:first-child > * {
+    border-top: 0;
+  }
+}
 
 .lb-board {
   padding-top: 40px;
+}
+/* While the map's bands and its band come, the board keeps the room of a short band's
+   table, enough that the questions under it start below the fold, so nothing in view moves
+   much when they come, whether the band is long or short. */
+.lb-board.lb-waiting {
+  min-height: 420px;
 }
 .lb-board .lb-said {
   margin: 0;
@@ -1974,11 +2352,10 @@ button.icon-button:active {
   color: var(--ink-2);
 }
 /* A band's entries: the hotkey table's inset box, rows parted by Window Rules, figures
-   right-aligned, the linked character's row selected. */
+   right-aligned, the linked character's row selected. As wide as the page's measure. */
 .lb-table,
 .lb-train-table {
   width: 100%;
-  max-width: 60em;
   border: 1px solid var(--inset-edge);
   border-radius: 4px;
   border-spacing: 0;
@@ -2187,7 +2564,7 @@ html.lb-morph::view-transition-group(lb-head) {
   font: 13px/18px var(--font);
   text-decoration: underline 1px transparent;
   text-underline-offset: 3px;
-  cursor: pointer;
+  cursor: var(--cursor-link);
 }
 .lb-table tbody tr:hover .lb-report-button {
   text-decoration-color: var(--select-edge);
@@ -2217,6 +2594,30 @@ html.lb-morph::view-transition-group(lb-head) {
     content: "";
     position: absolute;
     inset: -13px -8px;
+  }
+}
+/* The areas take a thumb's tap too, 44px tall with their Map Mark, and Try again a tap past
+   its edge. */
+@media (hover: none) and (pointer: coarse) {
+  .lb-area {
+    padding-block: 11px 12px;
+  }
+  .lb-retry::after {
+    content: "";
+    position: absolute;
+    inset: -13px -8px;
+  }
+}
+/* Without script, nothing keeps the room of what the script would draw. */
+@media (scripting: none) {
+  .lb-train > .lb-bands,
+  .lb-latest,
+  .lb-street,
+  .lb-picture {
+    display: none;
+  }
+  .lb-board.lb-waiting {
+    min-height: 0;
   }
 }
 
@@ -2274,7 +2675,7 @@ html.lb-morph::view-transition-group(lb-head) {
 }
 button.button {
   font-family: var(--font);
-  cursor: pointer;
+  cursor: var(--cursor-link);
 }
 
 /* ---- Narrower ---- */
@@ -2323,6 +2724,7 @@ button.button {
   .feature > .stage,
   .feature:nth-of-type(even) > .stage {
     order: 3;
+    justify-self: stretch;
     margin-top: 24px;
   }
   .feature .qa-block {
@@ -2489,7 +2891,10 @@ button.button {
     columns: 1;
   }
   .window-foot {
-    padding: 24px 18px 28px;
+    padding: 24px 18px 42px;
+    border-radius: 0;
+  }
+  .window-foot::after {
     border-radius: 0;
   }
 }
@@ -2503,7 +2908,15 @@ button.button {
     gap: 24px;
   }
   .lb-columns {
+    grid-template-rows: none;
+    grid-template-areas:
+      "find"
+      "newest"
+      "questions";
     gap: 48px;
+  }
+  .lb-columns > .lb-questions {
+    padding-top: 16px;
   }
   .feature-action {
     order: 2;
@@ -2526,6 +2939,10 @@ button.button {
   }
   .lb-head {
     padding-top: 28px;
+  }
+  /* The Level Bands wrap to two rows here. */
+  .lb-train > .lb-bands {
+    min-height: 108px;
   }
   /* The rows as cards, the table's roles kept in the markup; the caption still under them. */
   .lb-table,
@@ -2579,9 +2996,30 @@ button.button {
     font-size: 13px;
     line-height: 20px;
   }
-  /* A card says only what the map has: no dash for a #1 it hasn't got. */
+  /* With no header over them, a card's mob levels say what they are. */
+  .lb-train-table td.lb-train-mobs::before {
+    content: "Mobs at ";
+  }
+  /* A card says only what the map has: no dash for a #1 or mob levels it hasn't got. */
   .lb-train-table td.lb-train-none {
     display: none;
+  }
+  /* The whole card is its map's link, for a thumb. */
+  .lb-train-table tbody tr {
+    position: relative;
+  }
+  .lb-train-table .lb-map-name::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .lb-train-table tr.lb-more {
+    display: block;
+    padding: 0;
+  }
+  .lb-train-table tr.lb-more > td {
+    display: block;
+    border-top: 0;
   }
   .lb-train-table thead,
   .lb-table thead {
@@ -2690,6 +3128,13 @@ button.button {
   }
 }
 
+/* The Level Bands wrap to three rows on a phone. */
+@media (max-width: 502px) {
+  .lb-train > .lb-bands {
+    min-height: 165px;
+  }
+}
+
 /* ---- Accounts: the account, link and moderation pages (site/account, site/admin) ---- */
 
 .part[data-street="Account"] .lb-section,
@@ -2786,7 +3231,7 @@ button.button {
   font: inherit;
   text-decoration: underline 1px;
   text-underline-offset: 2px;
-  cursor: pointer;
+  cursor: var(--cursor-link);
 }
 @media (max-width: 720px) {
   .window-signed-in {

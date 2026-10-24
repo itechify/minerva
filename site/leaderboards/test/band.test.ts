@@ -82,7 +82,7 @@ describe("a Level Band", () => {
 
     expect(table.rows.map((r) => r.you)).toEqual([false]);
     expect(table.yours).toBe(null);
-    expect(table.note).toBe("Egbert has no entry here at Lv 20–29 any more.");
+    expect(table.note).toBe("Egbert has no entry here at Lv 20–29.");
   });
 
   it("says when no one has a best in the band, and how to put yours there from Minerva", () => {
@@ -98,6 +98,6 @@ describe("a Level Band", () => {
       },
       ruler: [],
     });
-    expect(bandTable(answer([]), "Egbert", NOW).note).toBe("Egbert has no entry here at Lv 20–29 any more.");
+    expect(bandTable(answer([]), "Egbert", NOW).note).toBe("Egbert has no entry here at Lv 20–29.");
   });
 });

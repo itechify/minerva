@@ -1,6 +1,6 @@
 // The Map Leaderboards page's search (leaderboards/index.html): find a map by its name, each
-// with how many entries it has. What it shows is worked out in leaderboards.ts.
-import { byId, mapItem, names, read } from "./api.ts";
+// with its Map Mark and how many entries it has. What it shows is worked out in leaderboards.ts.
+import { byId, mapItem, marks, names, read } from "./api.ts";
 import { type EntryCounts, entryCounts, linkTo, type MapsAnswer, searchMaps, searchSaid } from "./leaderboards.ts";
 
 const query = byId<HTMLInputElement>("map-query");
@@ -11,11 +11,14 @@ let counts: EntryCounts | null = null;
 
 /** The maps the query finds, under the field, the one Enter opens first and marked. */
 function search() {
-  const result = searchMaps(names, query.value, { counts });
+  const result = searchMaps(names, query.value, { counts, marks });
   said.textContent = searchSaid(query.value, result);
   found.replaceChildren(
     ...result.maps.map((map, i) =>
-      mapItem({ name: map.name, street: map.street, href: linkTo({ map: map.id, band: null, name: null }), aside: map.entries }, i === 0),
+      mapItem(
+        { name: map.name, street: map.street, href: linkTo({ map: map.id, band: null, name: null }), aside: map.entries, mark: map.mark },
+        i === 0,
+      ),
     ),
   );
   found.hidden = result.maps.length === 0;

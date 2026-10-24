@@ -1,10 +1,12 @@
 // Latest (ADR 0024): the newest entries on every map, by when their Visit set them, each
-// marked when it took a top spot from another Character (ADR 0022).
+// with its map's Map Mark, and marked when it took a top spot from another Character
+// (ADR 0022).
 import type { LatestEntry } from "../entries";
+import { markOf } from "./ceilings";
 import type { Answer } from "./http";
 
 /** How many entries Latest lists. */
-const LATEST = 20;
+const LATEST = 10;
 
 export async function readLatest(env: Env): Promise<Answer> {
   const rows = await env.DB.prepare(
@@ -36,6 +38,7 @@ export async function readLatest(env: Env): Promise<Answer> {
     expPerHour: r.exp_per_hour,
     setAt: r.set_at,
     map: r.map_id,
+    mark: markOf(env, r.map_id),
     band: r.band,
     took: r.took ? { from: r.from_name, fromExpPerHour: r.from_exp_per_hour! } : null,
   }));

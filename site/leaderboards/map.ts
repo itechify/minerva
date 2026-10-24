@@ -5,7 +5,7 @@
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import { STAR } from "../star.ts";
-import { byId, names, read, said as saidWith, UNREACHABLE } from "./api.ts";
+import { byId, names, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
@@ -39,64 +39,86 @@ let wanted: number | null = null;
 
 /** What the page says in place of the leaderboard: why there isn't one, or what's loading. */
 function say(text: Said | string) {
+  byId("board").classList.remove("lb-waiting");
   saidWith(said, typeof text === "string" ? { text } : text);
   said.hidden = false;
 }
 
+/** The API can't be reached: the page says so, and Try again reads the map's bands and
+ *  band again, in the room kept for them. */
+function down() {
+  byId("board").classList.remove("lb-waiting");
+  unreachable(said, () => {
+    say("Loading the Map Leaderboard…");
+    byId("board").classList.add("lb-waiting");
+    openBoard(place!);
+  });
+}
+
 const place = link.map === null ? null : placeOf(names, link.map);
 
-/** The page as its address opens it: the map, then its band, at once, scrolled to the
- *  linked Character's entry. Arriving never moves anything. */
+/** The page as its address opens it: the map, then its bands and band together, scrolled
+ *  to the linked Character's entry. What's drawn as it comes is drawn into room kept for it
+ *  (the street's line, the picture's height, a screen's room for the board), so arriving
+ *  never moves anything in view. */
 async function open() {
   if (place === null) {
+    byId("map-street").hidden = true;
+    byId("map-picture").hidden = true;
     say({ text: "This link doesn't name a map.", link: { text: "Find a map on the Map Leaderboards.", href: "/leaderboards/" } });
     return;
   }
   byId("map-name").textContent = place.name;
-  const street = byId("map-street");
-  street.textContent = place.region ? `${place.street} · ${place.region}` : place.street;
-  street.hidden = false;
+  byId("map-street").textContent = place.region ? `${place.street} · ${place.region}` : place.street;
   document.title = `${place.name} · Map Leaderboard · Minerva`;
   // Pictures load independently: a missing picture never holds up the rankings.
   showPicture(place);
+  openBoard(place);
+}
 
+/** The map's bands, then the band the link opens at, drawn together. */
+async function openBoard(place: MapPlace) {
   mapAnswer = await read<MapAnswer>(`/api/maps/${place.id}`);
-  if (mapAnswer === null) return say(UNREACHABLE);
+  if (mapAnswer === null) return down();
   const page = mapPage(link, names, mapAnswer);
-  drawBands(page.bands);
-  if (page.open === null) return say(page.empty!);
+  if (page.open === null) {
+    drawBands(page.bands);
+    return say(page.empty!);
+  }
   wanted = page.open;
 
   const band = await readBand(page.open, link.name);
-  if (band === null) return say(UNREACHABLE);
+  if (band === null) return down();
+  drawBands(page.bands);
   drawBand(band, null, false);
+  byId("board").classList.remove("lb-waiting");
   // The linked Character's entry is what the player came to see.
   rows.querySelector<HTMLElement>(".lb-you")?.scrollIntoView({ block: "center" });
 }
 
-/** OSMS's live map picture, fetched at runtime rather than bundled with the site. */
+/** OSMS's live map picture, fetched at runtime rather than bundled with the site, in a box
+ *  that narrows to it once it's in; with none, a line says so in the box's place. */
 async function showPicture(place: MapPlace) {
-  byId("map-picture").hidden = false;
+  const figure = byId("map-picture");
   const image = byId<HTMLImageElement>("map-image");
   const status = byId("map-picture-status");
+  const none = (text: string) => {
+    figure.classList.add("lb-none");
+    image.hidden = true;
+    status.textContent = text;
+  };
   const manifest = await read<unknown>("https://osmsdataexplorer.com/data/current/map_manifest.json");
-  if (manifest === null) {
-    status.textContent = "Couldn't load the map picture.";
-    return;
-  }
+  if (manifest === null) return none("Couldn't load the map picture.");
   const url = mapPicture(manifest, place.id);
-  if (url === null) {
-    status.textContent = "No map picture available.";
-    return;
-  }
+  if (url === null) return none("No map picture for this map.");
   image.alt = `Map layout of ${place.name}`;
   image.onload = () => {
+    figure.style.setProperty("--ratio", String(image.naturalWidth / image.naturalHeight));
+    figure.style.setProperty("--wide", `${image.naturalWidth}px`);
+    figure.classList.add("lb-in");
     status.hidden = true;
-    image.hidden = false;
   };
-  image.onerror = () => {
-    status.textContent = "Couldn't load the map picture.";
-  };
+  image.onerror = () => none("Couldn't load the map picture.");
   image.src = url;
 }
 
@@ -166,7 +188,8 @@ function drawBands(bands: ReturnType<typeof mapPage>["bands"]) {
       return choice;
     }),
   );
-  nav.hidden = bands.length === 0;
+  // A map with one band has it named over its table: no row of one.
+  nav.hidden = bands.length < 2;
   if (focused) nav.querySelector<HTMLElement>("[aria-current]")?.focus();
 }
 

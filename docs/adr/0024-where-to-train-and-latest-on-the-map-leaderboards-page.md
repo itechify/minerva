@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended 2026-10-23 (Where to train shows a long band's first 15 maps until Show all; Latest lists 10, each with its map's Map Mark)
 ---
 
 # Where to train and Latest on the Map Leaderboards page
@@ -17,6 +17,8 @@ The Map Leaderboards page (`/leaderboards/`, ADR 0015) found a map by its name a
 - **Most uploaded goes.** Latest shows where players are active, with dates. Search still says how many entries each map it finds has, from `GET /api/maps`.
 
 The page reads top to bottom: its title, Where to train full width, then Find a map and Latest side by side, then its questions.
+
+**Amended 2026-10-23.** Every row shown with no cut-off buried the page: a band of 69 maps pushed Find a map and Latest some 4,000px down, and Latest's 20 rows left the search's column empty beside them. Where to train now shows a band of more than 20 maps by its first 15, in the order above, with a Show all button that lists the rest in place; the address stays the band's (the page works it out, `trainingTable`). Latest lists the 10 newest entries, and `GET /api/latest` gives each its map's Map Mark as `GET /api/bands/<band>` gives a map's (`"mark": { "id", "name", "picture" }`, or `null`), so Latest shows the mark beside the map's name as Where to train does.
 
 ## The API
 

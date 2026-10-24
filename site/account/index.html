@@ -11,6 +11,8 @@
     <title>Your Account · Minerva</title>
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../../assets/icon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ececec" />
     <link rel="preload" href="../fonts/Maplestory-Light.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="../fonts/Maplestory-Bold.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="../../src/theme.css" />
@@ -25,7 +27,7 @@
 
       <main class="window-body" id="main">
         <div class="part" data-street="Account">
-          <header class="lb-head stop" id="top" data-mini="Account">
+          <header class="lb-head stop" id="top" data-mini="Your Account">
             <h1>Your Account</h1>
             <p class="lede">
               An Account is optional. Link the PCs you play on to it, and your Characters' names on the
@@ -33,8 +35,8 @@
             </p>
           </header>
 
-          <section class="lb-section stop" id="account" data-mini="Signed in" aria-labelledby="account-title">
-            <h2 id="account-title">Signed in</h2>
+          <section class="lb-section stop" id="account" data-mini="Signing in" aria-labelledby="account-title">
+            <h2 id="account-title">Sign in</h2>
             <p class="lb-said" id="said" aria-live="polite">Loading…</p>
             <noscript><p class="lb-said">Your Account needs JavaScript to load.</p></noscript>
             <p id="signed-out" hidden><a class="button" id="sign-in" href="/api/auth/discord?return=%2Faccount%2F">Sign in with Discord</a></p>

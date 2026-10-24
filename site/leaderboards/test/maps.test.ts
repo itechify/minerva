@@ -2,7 +2,7 @@
 // names them, and find a map by its Map Name as the panel's search does.
 import { describe, expect, it } from "vitest";
 import fixture from "../../../crates/minerva-core/tests/fixtures/osms-map-names.json";
-import { entryCounts, mapNames, placeOf, searchMaps, searchSaid } from "../leaderboards.ts";
+import { entryCounts, mapMarks, mapNames, placeOf, searchMaps, searchSaid } from "../leaderboards.ts";
 
 const names = mapNames(fixture);
 
@@ -104,7 +104,7 @@ describe("map search", () => {
 
   it("says what it found, and the map Enter opens", () => {
     expect(searchSaid("", searchMaps(names, ""))).toBe("Type part of a map's name as the game writes it, like Ant Tunnel.");
-    expect(searchSaid("Zakum", searchMaps(names, "Zakum"))).toBe("No map's name holds “Zakum”.");
+    expect(searchSaid("Zakum", searchMaps(names, "Zakum"))).toBe("No map's name has “Zakum” in it. Check the spelling, as the game writes it.");
     expect(searchSaid("henesys hunting ground", searchMaps(names, "henesys hunting ground"))).toBe(
       "3 maps. Enter opens Henesys Hunting Ground I.",
     );
@@ -130,6 +130,32 @@ describe("map search", () => {
     expect(searchSaid("henesys hunting ground", { maps, more: 0 })).toBe("3 maps. Enter opens Henesys Hunting Ground II.");
     // Before the API has said, or when it can't be reached, nothing is said of entries.
     expect(searchMaps(names, "henesys hunting ground").maps.map((m) => m.entries)).toEqual([null, null, null]);
+  });
+
+  it("puts the map named the query itself first, whatever the case, even with no entries", () => {
+    const counts = entryCounts({ maps: [{ map: "010001010", characters: 2, entries: 2 }] });
+    const { maps } = searchMaps(names, " HENESYS ", { counts });
+
+    expect(maps.slice(0, 2).map((m) => [m.name, m.entries])).toEqual([
+      ["Henesys", "No entries yet"],
+      ["Henesys Hunting Ground I", "2 entries"],
+    ]);
+    expect(searchSaid("henesys", { maps, more: 0 })).toMatch(/Enter opens Henesys\.$/);
+  });
+
+  it("gives each map found its Map Mark from the ceilings table, and none to a map it holds without one", () => {
+    // A made-up table in the ceilings table's shape.
+    const marks = mapMarks({
+      maps: { "010001010": { mobs: [3, 8], mark: "Henesys" }, "010001011": { mobs: [5, 9] } },
+      marks: { Henesys: { name: "Henesys", picture: "https://osms.invalid/images/map_marks/Henesys.png" } },
+    });
+    const { maps } = searchMaps(names, "henesys hunting ground", { marks });
+
+    expect(maps.map((m) => [m.name, m.mark?.name ?? null])).toEqual([
+      ["Henesys Hunting Ground I", "Henesys"],
+      ["Henesys Hunting Ground II", null],
+      ["Henesys Hunting Ground III", null],
+    ]);
   });
 
   it("counts a map's entries among all it finds, not only the ones it shows", () => {

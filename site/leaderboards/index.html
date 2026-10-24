@@ -16,6 +16,8 @@
     <link rel="canonical" href="@SITE_URL@leaderboards/" />
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../../assets/icon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ececec" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Minerva" />
     <meta property="og:title" content="Map Leaderboards · Minerva" />
@@ -25,9 +27,11 @@
     />
     <meta property="og:url" content="@SITE_URL@leaderboards/" />
     <meta property="og:image" content="@CARD_IMAGE@" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="MapleStory's minimap and, under it, the Minerva panel showing the same map: its picture with every portal ringed, and the way to a mob to hunt."
+      content="Minerva's owl over its name in Minerva's window, beside the words Your guide for MapleStory Classic World, and MapleStory's minimap with the Minerva panel under it showing the same map, every portal ringed."
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="@CARD_IMAGE@" />
@@ -39,6 +43,11 @@
     <script type="module" src="./training.ts"></script>
     <script type="module" src="./search.ts"></script>
     <script type="module" src="./latest.ts"></script>
+    <!-- A link naming a Level Band opens on its maps: their room is kept from the first
+         paint, so the page doesn't jump when they come (training.ts takes over from here). -->
+    <script>
+      if (/[?&]band=\d/.test(location.search)) document.documentElement.classList.add("lb-band");
+    </script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to the page</a>
@@ -58,7 +67,7 @@
 
           <section class="lb-train stop" id="where-to-train" data-mini="Where to train" aria-labelledby="train-title">
             <h2 id="train-title">Where to train</h2>
-            <nav class="lb-bands" id="train-bands" aria-label="Level Bands" hidden></nav>
+            <nav class="lb-bands" id="train-bands" aria-label="Level Bands"></nav>
             <nav class="lb-areas" id="train-areas" aria-label="Areas, by their Map Marks" hidden></nav>
             <p class="lb-said" id="train-said" aria-live="polite">Loading the Level Bands…</p>
             <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
@@ -69,7 +78,7 @@
               <thead role="rowgroup">
                 <tr role="row">
                   <th scope="col" role="columnheader" class="lb-train-map">Map</th>
-                  <th scope="col" role="columnheader" class="lb-train-mobs">Mobs</th>
+                  <th scope="col" role="columnheader" class="lb-train-mobs">Mob levels</th>
                   <th scope="col" role="columnheader" class="lb-train-best">Players' best</th>
                   <th scope="col" role="columnheader" class="lb-train-entries">Entries</th>
                 </tr>
@@ -79,7 +88,7 @@
           </section>
 
           <div class="lb-columns">
-            <section class="lb-section stop" id="find" data-mini="Find a map" aria-labelledby="find-title">
+            <section class="lb-section lb-find stop" id="find" data-mini="Find a map" aria-labelledby="find-title">
               <h2 id="find-title">Find a map</h2>
               <form class="lb-search" role="search" action="javascript:void 0">
                 <label for="map-query">Map name</label>
@@ -89,17 +98,21 @@
               <ul class="lb-maps" id="search-maps" hidden></ul>
             </section>
 
-            <section class="lb-section stop" id="latest" data-mini="Latest" aria-labelledby="latest-title">
+            <section class="lb-section lb-newest stop" id="latest" data-mini="Latest" aria-labelledby="latest-title">
               <h2 id="latest-title">Latest</h2>
-              <p class="lb-said" id="latest-said" aria-live="polite">Loading the newest bests…</p>
-              <ol class="lb-maps" id="latest-entries" hidden></ol>
+              <p class="lb-said" id="latest-said" aria-live="polite" hidden></p>
+              <!-- Its room is kept while the entries come, so the questions don't jump. -->
+              <ol class="lb-maps lb-latest lb-waiting" id="latest-entries">
+                <li class="lb-wait">Loading the newest bests…</li>
+              </ol>
+            </section>
+
+            <!-- Under Find a map, beside Latest, on a wide page; after Latest on a narrow one. -->
+            <section class="lb-questions stop" id="questions" data-mini="Questions" aria-labelledby="questions-title">
+              <h2 id="questions-title">How they work</h2>
+              <div class="qa-list" data-qa="map-leaderboards where-to-train level-bands leaderboard-exp report-entry" data-group="leaderboards"></div>
             </section>
           </div>
-
-          <section class="lb-questions stop" id="questions" data-mini="Questions" aria-labelledby="questions-title">
-            <h2 id="questions-title">How they work</h2>
-            <div class="qa-list" data-qa="map-leaderboards where-to-train level-bands leaderboard-exp report-entry" data-group="leaderboards"></div>
-          </section>
         </div>
       </main>
 

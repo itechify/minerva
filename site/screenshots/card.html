@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- The picture a link to the site shows (Open Graph, Discord, Reddit): site/public/card.png,
+     this page as Chrome draws it at 1200×630. Redraw it when hero.png is retaken
+     (site/screenshots/README.md). -->
+<html><head><meta charset="utf-8"><style>
+@font-face{font-family:Maplestory;src:url("../fonts/Maplestory-Light.woff2");font-weight:100 500}
+@font-face{font-family:Maplestory;src:url("../fonts/Maplestory-Bold.woff2");font-weight:600 900}
+html,body{margin:0;width:1200px;height:630px;overflow:hidden}
+body{background:linear-gradient(rgba(178,194,232,.62),rgba(178,194,232,.62)),#fff;font-family:Maplestory,Arial,sans-serif;color:#1b2648}
+.window{position:absolute;left:36px;top:30px;width:1126px;height:568px;border:1px solid #6f95ba;border-radius:6px;background:#eae8f5;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);overflow:hidden}
+.bar{display:flex;align-items:center;gap:12px;height:52px;padding:0 22px;background:linear-gradient(180deg,#ececec 0%,#dfdfdf 55%,#d6d6d6 100%);border-bottom:1px solid #6f95ba;box-shadow:inset 0 1px 0 rgba(255,255,255,.9);font-weight:700;font-size:19px;color:#3d4048}
+.bar img{width:32px;height:32px;image-rendering:pixelated}
+.words{position:absolute;left:60px;top:84px;width:560px}
+.logo{display:block;width:288px;height:auto;margin:0 0 22px -5px}
+h1{margin:0 0 16px;font-size:46px;line-height:52px;font-weight:700;text-wrap:balance}
+p{margin:0;font-size:21px;line-height:31px;color:#44527a;text-wrap:pretty}
+.shot{position:absolute;right:60px;top:84px;width:420px;height:540px;border:1px solid #6f95ba;border-radius:5px;overflow:hidden;background:#d3def3}
+.shot img{display:block;width:420px;height:auto}
+</style></head><body>
+<div class="window">
+<div class="bar"><img src="../../assets/icon-32.png">Minerva</div>
+<div class="words"><img class="logo" src="../../assets/logo.png">
+<h1>Your guide for MapleStory Classic&nbsp;World</h1>
+<p>Hidden portals, where to hunt and how to get there, your EXP per hour, and what your items are worth.</p></div>
+<div class="shot"><img src="../screenshots/hero.png"></div>
+</div></body></html>

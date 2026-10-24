@@ -17,6 +17,8 @@
     <link rel="canonical" href="@SITE_URL@faq/" />
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../../assets/icon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ececec" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Minerva" />
     <meta property="og:title" content="Questions and answers · Minerva" />
@@ -26,9 +28,11 @@
     />
     <meta property="og:url" content="@SITE_URL@faq/" />
     <meta property="og:image" content="@CARD_IMAGE@" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="MapleStory's minimap and, under it, the Minerva panel showing the same map: its picture with every portal ringed, and the way to a mob to hunt."
+      content="Minerva's owl over its name in Minerva's window, beside the words Your guide for MapleStory Classic World, and MapleStory's minimap with the Minerva panel under it showing the same map, every portal ringed."
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="@CARD_IMAGE@" />
@@ -37,6 +41,7 @@
     <link rel="stylesheet" href="../../src/theme.css" />
     <link rel="stylesheet" href="../site.css" />
     <script type="module" src="../site.ts"></script>
+    <script type="module" src="../topics.ts"></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to the questions</a>
@@ -47,7 +52,7 @@
         <!-- The owl asks what you'd like to know, as an NPC offers its choices. -->
         <header class="faq-head">
           <h1>Questions and answers</h1>
-          <div class="npc">
+          <div class="npc" id="topics">
             <div class="npc-portrait">
               <img src="../../assets/icon.png" alt="" width="111" height="126" />
               <p class="npc-name">Minerva</p>
@@ -226,6 +231,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
 
           <section class="faq-group stop" id="install" data-about="installing and updating" aria-labelledby="install-title">
@@ -324,6 +330,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
 
           <section class="faq-group stop" id="setup" data-about="setup and hotkeys" aria-labelledby="setup-title">
@@ -436,6 +443,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
         </div>
 
@@ -677,6 +685,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
 
           <section class="faq-group stop" id="hunting" data-about="hunting" aria-labelledby="hunting-title">
@@ -758,6 +767,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
 
           <section class="faq-group stop" id="grinding" data-about="grinding" aria-labelledby="grinding-title">
@@ -917,6 +927,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
 
           <section class="faq-group stop" id="leaderboards" data-about="the Map Leaderboards" aria-labelledby="leaderboards-title">
@@ -948,7 +959,8 @@
                     that band. A map's mobs are the middle half of its spawns, so one stray mob far above or below the
                     rest doesn't put it in another band. Beside each map are those mobs' levels, the band's best EXP per
                     hour there and who set it, and how many entries it has. The maps with entries come first, the best
-                    first; pick an area, by the same emblem the game's minimap shows beside the map's name, to see only
+                    first, and a band with more than 20 maps shows its first 15: <strong>Show all</strong> lists the
+                    rest. Pick an area, by the same emblem the game's minimap shows beside the map's name, to see only
                     its maps.
                   </p>
                 </details>
@@ -1058,8 +1070,9 @@
                   <p>
                     In your Personal Bests, click a map's count of visits: under its visits, <strong>Map
                     Leaderboard</strong> opens the map's page at the Level Band of the character you're playing, marks
-                    your entry and says its rank, even outside the top 50. If it says your character has no entry there
-                    any more, the entry has gone: taken off the Map Leaderboards, or removed after a report. If the site
+                    your entry and says its rank, even outside the top 50. If it says your character has no entry there,
+                    they haven't put a best there yet, or the entry has gone: taken off the Map Leaderboards, or
+                    removed after a report. If the site
                     kept one of your bests off, as over 5 times the map's solo EXP/h or removed after a report, a note
                     above your bests says so.
                   </p>
@@ -1075,6 +1088,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
 
           <section class="faq-group stop" id="items" data-about="items" aria-labelledby="items-title">
@@ -1252,6 +1266,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
         </div>
 
@@ -1395,6 +1410,7 @@
                 </details>
               </div>
             </div>
+            <p class="faq-topics-back"><a href="#topics">All topics</a></p>
           </section>
         </div>
       </main>

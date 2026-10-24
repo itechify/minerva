@@ -16,6 +16,8 @@
     />
     <link rel="icon" type="image/png" sizes="32x32" href="../../../assets/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../../../assets/icon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ececec" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Minerva" />
     <meta property="og:title" content="Map Leaderboard · Minerva" />
@@ -24,9 +26,11 @@
       content="What EXP per hour do players at your level get on this map? Their Personal Bests from Minerva, each Level Band ranked."
     />
     <meta property="og:image" content="@CARD_IMAGE@" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="MapleStory's minimap and, under it, the Minerva panel showing the same map: its picture with every portal ringed, and the way to a mob to hunt."
+      content="Minerva's owl over its name in Minerva's window, beside the words Your guide for MapleStory Classic World, and MapleStory's minimap with the Minerva panel under it showing the same map, every portal ringed."
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="@CARD_IMAGE@" />
@@ -46,16 +50,16 @@
         <div class="part" data-street="Map Leaderboard">
           <header class="lb-head stop" id="top" data-mini="The map">
             <p class="lb-back"><a href="/leaderboards/">All Map Leaderboards</a></p>
-            <p class="lb-street" id="map-street" hidden></p>
+            <p class="lb-street" id="map-street"></p>
             <h1 id="map-name">Map Leaderboard</h1>
-            <figure class="lb-picture" id="map-picture" aria-label="Map picture" hidden>
-              <img id="map-image" alt="" decoding="async" referrerpolicy="no-referrer" hidden />
+            <figure class="lb-picture" id="map-picture" aria-label="Map picture">
+              <img id="map-image" alt="" loading="lazy" fetchpriority="low" decoding="async" referrerpolicy="no-referrer" />
               <p id="map-picture-status" role="status">Loading map…</p>
             </figure>
             <nav class="lb-bands" id="bands" aria-label="Level Bands" hidden></nav>
           </header>
 
-          <section class="lb-board stop" id="board" data-mini="Level Band" aria-labelledby="band-title">
+          <section class="lb-board stop lb-waiting" id="board" data-mini="Level Band" aria-labelledby="band-title">
             <h2 id="band-title" hidden></h2>
             <p class="lb-said" id="said" aria-live="polite">Loading the Map Leaderboard…</p>
             <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>

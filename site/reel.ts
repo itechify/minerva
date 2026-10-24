@@ -207,13 +207,16 @@ export function reel(head: () => number) {
     figure!.style.setProperty("--reel-w", `${w}px`);
     const tall = h + 8 + captions.offsetHeight;
     // Side by side, the words stay with the film, and leave with it: both stick for as long
-    // as the film, when the words fit under the head. Where they don't, they go on by and
-    // the film holds alone, as it does on a narrow screen.
+    // as the film. Where the words fit under the head, the film's foot lines up with theirs;
+    // where they don't, as on a laptop's shorter screen, they go on up until their foot is
+    // in view and hold there, their top under the head, so neither column is ever left
+    // empty. On a narrow screen the words go on by, above the film.
     text!.style.removeProperty("min-height");
-    const side =
-      getComputedStyle(hero!).gridTemplateColumns.trim().split(/\s+/).length > 1 && text!.offsetHeight <= bottom - top;
+    const side = getComputedStyle(hero!).gridTemplateColumns.trim().split(/\s+/).length > 1;
+    const fits = text!.offsetHeight <= bottom - top;
     hero!.classList.toggle("reel-side", side);
-    const held = side ? Math.max(tall, text!.offsetHeight) : tall;
+    hero!.style.setProperty("--reel-text-top", `${fits ? top : bottom - text!.offsetHeight}px`);
+    const held = side && fits ? Math.max(tall, text!.offsetHeight) : tall;
     frameTop = held - tall;
     const run = Math.round(high * 1.25);
     hero!.style.setProperty("--reel-top", `${top}px`);
