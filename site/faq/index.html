@@ -51,7 +51,9 @@
       <main class="window-body" id="main">
         <!-- The owl asks what you'd like to know, as an NPC offers its choices. -->
         <header class="faq-head">
-          <h1>Questions and answers</h1>
+          <h1>
+            <img class="page-title" src="../art/faq.png" alt="FAQ: questions and answers" width="440" height="241" fetchpriority="high" />
+          </h1>
           <div class="npc" id="topics">
             <div class="npc-portrait">
               <img src="../../assets/icon.png" alt="" width="111" height="126" />
@@ -79,6 +81,7 @@
         <div class="part" data-street="Before you play">
           <section class="faq-group stop" id="safety" data-about="safety and your account" aria-labelledby="safety-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-safety.png" alt="" width="114" height="120" decoding="async" />
               <h2 id="safety-title">Safety &amp; your account</h2>
               <p>The risk to your account, what Minerva looks at, and what it downloads and keeps.</p>
             </div>
@@ -87,9 +90,12 @@
                 <details class="qa" id="banned">
                   <summary>Can I get banned for using Minerva?</summary>
                   <p>
-                    It's possible. Minerva is a third-party tool, not made or approved by Nexon. Nexon's terms forbid some
-                    third-party programs, and a penalty in Classic World applies to your whole account, MapleStory
-                    included. Minerva keeps the risk low by <a href="#reads-game">only looking at the screen</a>, but
+                    It's very unlikely. Minerva <a href="#reads-game">only looks at the screen</a>, the way a screenshot
+                    does: it never touches the game's memory or files, and never presses keys or clicks for you. Other
+                    tools read the game's screen the same way, MesoWatch among them.
+                  </p>
+                  <p>
+                    Still, Minerva is a third-party tool, not made or approved by Nexon, so there's no guarantee:
                     <strong>using it is at your own risk</strong>.
                   </p>
                 </details>
@@ -161,7 +167,11 @@
                       runs, and when you ask. <a href="#self-update">See how it updates</a>.
                     </dd>
                   </dl>
-                  <p>Item Lookup also asks MeowDB's search for an item's name: <a href="#meowdb">see below</a>.</p>
+                  <p>
+                    <a href="#item-lookup">Item Lookup</a> also asks <a href="https://meowdb.com">NiaMeowDB</a>'s search
+                    for an item's name when you press its hotkey or click an Item Card's name: each name once a week at
+                    most.
+                  </p>
                   <p>
                     It sends only the version you have with each request, plus the bests of each character you share on
                     the <a href="#leaderboard-appear">Map Leaderboards</a> (new characters are shared by default): their
@@ -180,22 +190,6 @@
                   <p>
                     If Refresh says to update Minerva, OSMS Data Explorer's data changed in a way this version can't read:
                     <a href="#update">install the latest release</a>. Until then, Minerva keeps the data it has.
-                  </p>
-                </details>
-                <details class="qa" id="offline">
-                  <summary>Does Minerva work offline?</summary>
-                  <p>
-                    Yes, once it has the data: its first launch needs a connection. If OSMS Data Explorer can't be reached
-                    for over a week, the panel says it's showing a saved copy, with its date. Uploads to the
-                    <a href="#leaderboard-appear">Map Leaderboards</a> wait until you're back online.
-                  </p>
-                </details>
-                <details class="qa" id="meowdb">
-                  <summary>Does Minerva contact MeowDB?</summary>
-                  <p>
-                    Only for Item Lookup. When you press its hotkey or click an Item Card's name, it asks
-                    <a href="https://meowdb.com">NiaMeowDB</a>'s search for the item's name: each name once a week at most,
-                    2 seconds apart. Every other MeowDB link just opens its page in your browser.
                   </p>
                 </details>
                 <details class="qa" id="kept">
@@ -222,13 +216,6 @@
                     </li>
                   </ul>
                 </details>
-                <details class="qa" id="why-owl">
-                  <summary>Why an owl?</summary>
-                  <p>
-                    Minerva is the Roman goddess of wisdom, and the owl was her companion: the owl of Minerva, which gives
-                    this site its address. A wise owl that knows every map seemed the right guide.
-                  </p>
-                </details>
               </div>
             </div>
             <p class="faq-topics-back"><a href="#topics">All topics</a></p>
@@ -236,6 +223,7 @@
 
           <section class="faq-group stop" id="install" data-about="installing and updating" aria-labelledby="install-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-install.png" alt="" width="134" height="120" loading="lazy" decoding="async" />
               <h2 id="install-title">Install &amp; updates</h2>
               <p>What you need, which file to download, and how to update.</p>
             </div>
@@ -335,6 +323,7 @@
 
           <section class="faq-group stop" id="setup" data-about="setup and hotkeys" aria-labelledby="setup-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-setup.png" alt="" width="146" height="120" loading="lazy" decoding="async" />
               <h2 id="setup-title">Setup &amp; hotkeys</h2>
               <p>The first run, finding your map, and changing the hotkeys.</p>
             </div>
@@ -348,20 +337,10 @@
                     <li>The <a href="/#safe">account warning</a>.</li>
                     <li>Finding the game window, or picking it by hand.</li>
                     <li>Setting up the game: windowed or borderless, with the minimap showing, open or collapsed.</li>
-                    <li>Finding your map: Minerva <a href="#minimap-title">finds the minimap title by itself</a> and shows the map it names.</li>
+                    <li>Finding your map: Minerva finds the minimap title by itself and shows the map it names.</li>
                     <li>The <a href="/#grind-tracker">Grind Tracker</a>, which <a href="#exp-bar">needs nothing marked</a>.</li>
                   </ol>
                   <p>Finish starts the overlay. Closing setup on its first run quits.</p>
-                </details>
-                <details class="qa" id="minimap-title">
-                  <summary>Do I have to mark the minimap title?</summary>
-                  <p>
-                    No. Minerva finds the minimap's title by itself, wherever you put the minimap, open or collapsed,
-                    whatever the game window's size, and at any of the game's UI Size settings. On a map without a
-                    minimap, it reads the bar the game shows there instead, "Victoria Road : Perion Department Store". A
-                    mark you made in an earlier version isn't used any more. Setup shows the map it found, and you can
-                    finish it before it has found one.
-                  </p>
                   <figure class="shot">
                     <img
                       src="../screenshots/wip.png"
@@ -450,6 +429,7 @@
         <div class="part" data-street="While you play">
           <section class="faq-group stop" id="panel" data-about="the panel and the map" aria-labelledby="panel-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-panel.png" alt="" width="202" height="120" loading="lazy" decoding="async" />
               <h2 id="panel-title"><span class="mark ring" aria-hidden="true"></span>The panel &amp; the map</h2>
               <p>Moving and placing the panel, the Map Preview and its Hidden Portals, the mobs, and maps that share a title.</p>
             </div>
@@ -690,6 +670,7 @@
 
           <section class="faq-group stop" id="hunting" data-about="hunting" aria-labelledby="hunting-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-hunting.png" alt="" width="163" height="120" loading="lazy" decoding="async" />
               <h2 id="hunting-title"><span class="mark route" aria-hidden="true"></span>Hunting</h2>
               <p>Searching, choosing a map to hunt on, and following the way there.</p>
             </div>
@@ -772,6 +753,7 @@
 
           <section class="faq-group stop" id="grinding" data-about="grinding" aria-labelledby="grinding-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-grinding.png" alt="" width="126" height="120" loading="lazy" decoding="async" />
               <h2 id="grinding-title">
                 <span class="star" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="@STAR@" /></svg></span>Grinding
               </h2>
@@ -932,6 +914,7 @@
 
           <section class="faq-group stop" id="leaderboards" data-about="the Map Leaderboards" aria-labelledby="leaderboards-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-leaderboards.png" alt="" width="108" height="120" loading="lazy" decoding="async" />
               <h2 id="leaderboards-title">Map Leaderboards</h2>
               <p>
                 Players' Personal Bests side by side on this site: what they rank, Level Bands, putting your character
@@ -1093,6 +1076,7 @@
 
           <section class="faq-group stop" id="items" data-about="items" aria-labelledby="items-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-items.png" alt="" width="150" height="120" loading="lazy" decoding="async" />
               <h2 id="items-title">Items</h2>
               <p>The Item Card, the market prices you keep, Item Lookup and the Deal Finder.</p>
             </div>
@@ -1273,6 +1257,7 @@
         <div class="part" data-street="When something's wrong">
           <section class="faq-group stop" id="trouble" data-about="troubleshooting and Bug Reports" aria-labelledby="trouble-title">
             <div class="faq-group-head">
+              <img class="faq-art" src="../art/faq-trouble.png" alt="" width="166" height="120" loading="lazy" decoding="async" />
               <h2 id="trouble-title">Troubleshooting &amp; Bug Reports</h2>
               <p>What to do when it doesn't work, and how to report what's wrong.</p>
             </div>

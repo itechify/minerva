@@ -200,6 +200,13 @@ function webpScreenshots(): Plugin {
           const source = `<source type="image/webp" srcset="${root ? `${root}/` : "./"}screenshots/webp/logo.webp" />`;
           html = html.replace(tag, `<picture>${source}${tag}</picture>`);
         }
+        // The drawn titles (site/art) head their pages' first screens too, and get the same.
+        for (const [tag, name] of html.matchAll(/<img\b[^>]*\bsrc="(?:\.\.?\/)+art\/([\w-]+)\.png"[^>]*>/g)) {
+          await webp(fileURLToPath(new URL(`./art/${name}.png`, import.meta.url)), `art-${name}.webp`);
+          const root = upTo(ctx.filename, dirname(HOME));
+          const source = `<source type="image/webp" srcset="${root ? `${root}/` : "./"}screenshots/webp/art-${name}.webp" />`;
+          html = html.replace(tag, `<picture>${source}${tag}</picture>`);
+        }
         return html;
       },
     },

@@ -344,6 +344,25 @@ button:disabled {
     margin-bottom: 12px;
   }
 }
+/* The FAQ's and the Map Leaderboards' titles, drawn (site/art), in place of the heading's
+   words, which are their alt text. A shorter screen gives up some of their height, as the
+   logo does, so what's under them is in view on the first screen. */
+.page-title {
+  display: block;
+  width: 440px;
+  max-width: 100%;
+  height: auto;
+}
+@media (max-height: 1000px) {
+  .page-title {
+    width: 360px;
+  }
+}
+@media (max-height: 820px), (max-width: 640px) {
+  .page-title {
+    width: 300px;
+  }
+}
 h1 {
   margin: 0 0 18px;
   font-size: 42px;
@@ -1055,6 +1074,29 @@ strong {
   margin-bottom: 10px;
   font-size: 23px;
   line-height: 30px;
+}
+/* Each group's owl (site/art) stands over its heading, every one the same height whatever
+   its width. A shorter screen gives up some of it, so the heading, what it covers and the
+   topics under them still fit beside the questions; too short to hold them, it goes. */
+.faq-art {
+  display: block;
+  width: auto;
+  height: 120px;
+  max-width: 100%;
+  margin: 0 0 14px;
+  object-fit: contain;
+  object-position: left bottom;
+}
+@media (max-height: 860px) {
+  .faq-art {
+    height: 88px;
+    margin-bottom: 10px;
+  }
+}
+@media screen and (min-width: 961px) and (max-height: 700px) {
+  .faq-art {
+    display: none;
+  }
 }
 .faq-group-head p {
   margin: 0;
