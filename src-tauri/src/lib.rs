@@ -450,7 +450,7 @@ struct Panels {
 
 impl Panels {
     /// The Personal Bests window after the overlay and the Grind Tracker's, which it stays
-    /// above; the Settings window after them all, which it stays above.
+    /// above; the Settings window after those three, which it stays above.
     fn new(app: &AppHandle, commands: &Sender<Command>) -> Self {
         Self {
             grind_tracker: PanelWindow::new(app, &grind_tracker::SPEC, commands.clone()),
