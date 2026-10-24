@@ -10,6 +10,7 @@ use crate::map_preview::{PicturePoint, SpawnMark};
 use crate::mob_card::{DamageRange, Elements, HpPerExp, MobDetails};
 use crate::portal_overrides::{PORTAL_OVERRIDES, PortalOverride};
 use crate::portals::{self, Destination, Exit, MapFacts};
+use crate::shown_map::LevelRange;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
@@ -48,6 +49,14 @@ impl OsmsFiles {
 /// ([`crate::MINERVA_VERSION`]; `None` for a set saved before sets said so).
 pub type SavedFiles = Saved<OsmsFiles>;
 
+/// A map's row in the ceilings table ([`MapSet::solo_ceilings`]): its solo EXP/h ceiling,
+/// and the levels of the middle half of its spawns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SoloCeiling {
+    pub exp_per_hour: u64,
+    pub mob_levels: LevelRange,
+}
+
 /// Every map's data from OSMS's file set: the map list, each listed map's figures, and
 /// every mob's Mob Card figures.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -69,12 +78,16 @@ impl MapSet {
         self.maps.iter().map(|(entry, data)| (entry, data))
     }
 
-    /// Each map's solo EXP-per-hour ceiling from its Map Summary, by its 9-digit ID: the
-    /// table the Map Leaderboards cap entries with (ADR 0015). A map with no Map Summary,
-    /// or a ceiling of 0, isn't in it.
-    pub fn solo_ceilings(&self) -> BTreeMap<String, u64> {
-        let solo = |data: &MapData| data.summary.map(|s| s.exp_per_hour.solo).filter(|&solo| solo > 0);
-        self.maps().filter_map(|(entry, data)| Some((entry.id.clone(), solo(data)?))).collect()
+    /// Each map's solo EXP-per-hour ceiling from its Map Summary, and the levels of the
+    /// middle half of its spawns, by its 9-digit ID: the table the Map Leaderboards cap
+    /// entries with (ADR 0015) and match maps to a Level Band by (ADR 0024). A map with no
+    /// Map Summary, or a ceiling of 0, isn't in it.
+    pub fn solo_ceilings(&self) -> BTreeMap<String, SoloCeiling> {
+        let ceiling = |data: &MapData| {
+            let exp_per_hour = data.summary.map(|s| s.exp_per_hour.solo).filter(|&solo| solo > 0)?;
+            Some(SoloCeiling { exp_per_hour, mob_levels: data.middle_mob_levels()? })
+        };
+        self.maps().filter_map(|(entry, data)| Some((entry.id.clone(), ceiling(data)?))).collect()
     }
 
     /// The map list.

@@ -4,9 +4,14 @@ import { confirmLinkToken, deleteAccount, linkState, mintLinkToken, readAccount,
 import { callback, start } from "./discord";
 import { type Answer, badRequest, json } from "./http";
 import { isMaintainerToken } from "./keys";
+import { readLatest } from "./latest";
 import { optOut, readBand, readMap, readMaps, upload } from "./leaderboards";
 import { deleteEntry, dismissReport, findAccounts, readCharacter, readRemoved, readReports, reassign, report, restoreEntry } from "./moderation";
 import { endSession, isMaintainerAccount, sameOrigin, sessionAccount } from "./sessions";
+import { readBands, readTraining } from "./where-to-train";
+
+/** The Map Leaderboards' reads, which read no key or cookie. */
+const PUBLIC_READS = ["/api/maps", "/api/bands", "/api/latest"];
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -15,7 +20,7 @@ export default {
     const answer = await route(request, url, env, ctx);
     // The Map Leaderboards' reads may be cached a minute; nothing else, since everything else
     // reads a key or a cookie.
-    const isPublicRead = request.method === "GET" && url.pathname.startsWith("/api/maps");
+    const isPublicRead = request.method === "GET" && PUBLIC_READS.some((path) => url.pathname.startsWith(path));
     return json(answer, isPublicRead ? "public, max-age=60" : "no-store");
   },
 } satisfies ExportedHandler<Env>;
@@ -53,6 +58,12 @@ async function route(request: Request, url: URL, env: Env, ctx: ExecutionContext
       return readMap(env, path[1]);
     case path.length === 4 && path[0] === "maps" && path[2] === "bands" && method === "GET":
       return readBand(env, path[1], path[3], url.searchParams.get("name"));
+    case path.length === 1 && path[0] === "bands" && method === "GET":
+      return readBands(env);
+    case path.length === 2 && path[0] === "bands" && method === "GET":
+      return readTraining(env, path[1]);
+    case path.length === 1 && path[0] === "latest" && method === "GET":
+      return readLatest(env);
     case path.length === 1 && path[0] === "reports" && method === "POST":
       return report(env, request);
     default:

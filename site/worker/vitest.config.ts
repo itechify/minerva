@@ -22,8 +22,15 @@ export default defineConfig(async () => {
             DISCORD_CLIENT_ID: "made-up-client",
             DISCORD_CLIENT_SECRET: "made-up-client-secret",
             MAINTAINER_DISCORD_IDS: "900000000000000001",
-            // Made-up maps' solo ceilings, in place of osms-ceilings.json.
-            TEST_CEILINGS: { "100000000": 100_000, "100000001": 2_000_000 },
+            // A made-up ceilings table, in place of osms-ceilings.json: test/api.ts's maps, and
+            // test/where-to-train.test.ts's.
+            TEST_CEILINGS: {
+              "100000000": { ceiling: 100_000, mobs: [70, 75] },
+              "100000001": { ceiling: 2_000_000, mobs: [100, 105] },
+              "100000060": { ceiling: 300_000, mobs: [22, 27] },
+              "100000061": { ceiling: 500_000, mobs: [25, 34] },
+              "100000062": { ceiling: 50_000, mobs: [5, 8] },
+            },
           },
         },
       }),

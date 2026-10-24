@@ -1,5 +1,5 @@
 ---
-status: accepted, amended by ADR-0010 (the Item Card reads OSMS's item files, a set of their own), ADR-0015 (a table of each map's solo ceiling is committed, for the Map Leaderboards' cap), and 2026-10-21 (a set another version saved is fetched afresh at launch, and the player can Refresh it now)
+status: accepted, amended by ADR-0010 (the Item Card reads OSMS's item files, a set of their own), ADR-0015 (a table of each map's solo ceiling is committed, for the Map Leaderboards' cap), ADR-0024 (the table holds each map's mob levels too, for Where to train), and 2026-10-21 (a set another version saved is fetched afresh at launch, and the player can Refresh it now)
 ---
 
 # Map and mob data from OSMS Data Explorer's files, not MeowDB's pages

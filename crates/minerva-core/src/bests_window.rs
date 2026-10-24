@@ -268,7 +268,7 @@ fn rows<'a>(
                 // A map not in the map list has no page on the site.
                 leaderboard_url: entry.and_then(|_| link(bests)),
                 best_of_all: false,
-                mob_levels: data.and_then(mob_levels),
+                mob_levels: data.and_then(MapData::mob_levels),
                 exp_per_hour: best.exp_per_hour,
                 solo_exp_ceiling: ceiling,
                 ceiling_share_hundredths: ceiling.map(|c| share_hundredths(best.exp_per_hour, c)),
@@ -280,13 +280,6 @@ fn rows<'a>(
         .collect();
     maps.sort_by(|a, b| b.exp_per_hour.cmp(&a.exp_per_hour).then_with(|| a.id.cmp(&b.id)));
     maps
-}
-
-/// The lowest and highest of the map's mobs' levels.
-fn mob_levels(data: &MapData) -> Option<LevelRange> {
-    let lowest = data.mobs.iter().map(|m| m.level).min()?;
-    let highest = data.mobs.iter().map(|m| m.level).max()?;
-    Some(LevelRange { lowest, highest })
 }
 
 /// `exp_per_hour` as a share of `ceiling` (> 0), in hundredths of a percent, rounded, halves

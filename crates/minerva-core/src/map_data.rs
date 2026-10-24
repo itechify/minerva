@@ -1,6 +1,7 @@
 //! One map's hunting information, and how the panel shows it.
 
 use crate::map_preview::{PortalMark, SpawnMark};
+use crate::shown_map::LevelRange;
 use serde::{Deserialize, Serialize};
 
 /// One map's data, as read from OSMS's file set.
@@ -166,6 +167,36 @@ impl MapData {
             data.hidden_portals.iter().map(|p| (p.to_map_id.clone(), p.quest)).collect()
         };
         self.summary == other.summary && self.mobs == other.mobs && portals(self) == portals(other)
+    }
+
+    /// The lowest and highest of its mobs' levels, its mobs in any order; `None` with no
+    /// mobs.
+    pub(crate) fn mob_levels(&self) -> Option<LevelRange> {
+        let lowest = self.mobs.iter().map(|m| m.level).min()?;
+        let highest = self.mobs.iter().map(|m| m.level).max()?;
+        Some(LevelRange { lowest, highest })
+    }
+
+    /// The levels of the middle half of its spawns: from the level a quarter of them are at
+    /// or under to the level three quarters are, each mob counted as often as the map holds
+    /// it at once. A mob a few of its spawns are, much lower or higher than the rest, leaves
+    /// it as it is. With no spawns counted, all its mobs' levels; `None` with no mobs.
+    pub(crate) fn middle_mob_levels(&self) -> Option<LevelRange> {
+        let total: u64 = self.mobs.iter().map(|m| u64::from(m.spawn_count)).sum();
+        if total == 0 {
+            return self.mob_levels();
+        }
+        let mut by_level: Vec<&Mob> = self.mobs.iter().collect();
+        by_level.sort_by_key(|m| m.level);
+        // The level the spawns reach `quarters` quarters of the total at.
+        let at = |quarters: u64| {
+            let mut counted = 0;
+            by_level.iter().find_map(|m| {
+                counted += u64::from(m.spawn_count);
+                (counted * 4 >= total * quarters).then_some(m.level)
+            })
+        };
+        Some(LevelRange { lowest: at(1)?, highest: at(3)? })
     }
 }
 

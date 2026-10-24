@@ -38,7 +38,7 @@ pnpm site:build                                 # the site, into site/dist (fail
 pnpm site:test                                  # the site's Worker (the Map Leaderboards API, against a local D1) and what its pages show
 pnpm exec wrangler d1 migrations apply minerva-leaderboards --local --config site/wrangler.jsonc  # once: a local D1
 pnpm exec wrangler dev --config site/wrangler.jsonc  # the built site and its API, at http://localhost:8787/
-cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json  # no game: the Map Leaderboards' cap, from OSMS
+cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json  # no game: the Map Leaderboards' cap and Where to train, from OSMS
 ```
 
 The tests run on made-up worlds in OSMS's shape and a list of the game's map names; `probe osms` checks the live data, by hand when OSMS changes and before a release.

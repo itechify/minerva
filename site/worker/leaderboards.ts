@@ -1,13 +1,13 @@
 // The Map Leaderboards: each Character's entries, mirrored whole from the app, and each
 // map's Level Bands ranked from them.
 import { isMap, isName } from "../entries";
-import { bandOf, levelsOf } from "../level-bands";
-import { type Top, takenTops, tell } from "./announce";
+import { bandFrom, bandOf, levelsOf } from "../level-bands";
+import { type Taken, type Top, takenTops, tell } from "./announce";
 import { type Answer, badRequest, body } from "./http";
 import { accountOfKey, touchKey } from "./accounts";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
-import ceilings from "./osms-ceilings.json";
+import { ceilingsOf } from "./ceilings";
 
 /** How many entries a band's read lists. */
 const TOP = 50;
@@ -22,8 +22,8 @@ const ABSOLUTE_CAP = 25_000_000;
 
 /** The most EXP/h an entry on `map` may have. */
 function capOn(env: Env, map: string): number {
-  const ceiling = (env.TEST_CEILINGS ?? (ceilings as Record<string, number>))[map];
-  return ceiling === undefined ? ABSOLUTE_CAP : ceiling * CEILINGS_OVER;
+  const row = ceilingsOf(env)[map];
+  return row === undefined ? ABSOLUTE_CAP : row.ceiling * CEILINGS_OVER;
 }
 
 interface Upload {
@@ -136,6 +136,12 @@ const MAY_WRITE = "(key_hash = ?2 OR account_id IN (SELECT account_id FROM accou
 /** Each statement of a write runs only while the key may still write for the name. */
 const HELD = `EXISTS (SELECT 1 FROM characters WHERE name_key = ?1 AND ${MAY_WRITE})`;
 
+/** A taken top spot whose entry has gone: deleted, opted out, or replaced by a new best of
+ *  the same Character's. Another Character taking the spot leaves it, since the entry that
+ *  took it still stands. */
+const UNMATCHED = `NOT EXISTS (SELECT 1 FROM entries e WHERE e.name_key = taken_tops.name_key AND e.map_id = taken_tops.map_id
+                   AND e.band = taken_tops.band AND e.exp_per_hour = taken_tops.exp_per_hour)`;
+
 /** A place on the Map Leaderboards: one map's Level Band. */
 interface Place {
   map: string;
@@ -210,9 +216,13 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
          SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8 WHERE ${HELD}`,
       ).bind(nameKey, keyHash, e.map, e.band, e.level, e.job, e.expPerHour, e.setAt),
     ),
+    // A top spot taken stays marked only while the entry that took it stands.
+    env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD} AND ${UNMATCHED}`).bind(nameKey, keyHash),
   ]);
   if (improved.length > 0) {
-    const told = tell(env, takenTops(before, await topsAt(env, improved), nameKey));
+    const taken = takenTops(before, await topsAt(env, improved), nameKey);
+    await keepTaken(env, nameKey, keyHash, taken, now);
+    const told = tell(env, taken);
     // The upload is answered without waiting for Discord; with no context to hand it to
     // (a direct call), it is waited for, so nothing is left running after the answer.
     if (ctx === undefined) await told;
@@ -221,12 +231,33 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
   return { status: 200, body: { accepted: accepted.length, rejected } };
 }
 
+/** Keep the top spots `nameKey` took in this upload, for Latest to mark (ADR 0024), whether
+ *  or not Discord is told: the Map Leaderboards are the record. */
+async function keepTaken(env: Env, nameKey: string, keyHash: string, taken: Taken[], now: number): Promise<void> {
+  if (taken.length === 0) return;
+  await env.DB.batch(
+    taken.map((t) =>
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO taken_tops (name_key, map_id, band, exp_per_hour, from_name_key, from_exp_per_hour, taken_at)
+         SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8 WHERE ${HELD}`,
+        // A name in lower case is its Character's key, whatever its case (ADR 0015).
+      ).bind(nameKey, keyHash, t.map, t.band, t.expPerHour, t.from.toLowerCase(), t.fromExpPerHour, now),
+    ),
+  );
+}
+
 export async function optOut(env: Env, request: Request, name: string): Promise<Answer> {
   const claimed = await claim(env, request, name, Date.now(), "leave");
   // A name no key holds has no entries, and stays unclaimed.
   if (claimed === null) return { status: 204 };
   if (!("nameKey" in claimed)) return claimed;
-  await env.DB.prepare(`DELETE FROM entries WHERE name_key = ?1 AND ${HELD}`).bind(claimed.nameKey, claimed.keyHash).run();
+  const at = [claimed.nameKey, claimed.keyHash];
+  await env.DB.batch([
+    env.DB.prepare(`DELETE FROM entries WHERE name_key = ?1 AND ${HELD}`).bind(...at),
+    // The spots it took go with its entries, and its name from the spots taken off it.
+    env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD}`).bind(...at),
+    env.DB.prepare(`UPDATE taken_tops SET from_name_key = NULL WHERE from_name_key = ?1 AND ${HELD}`).bind(...at),
+  ]);
   return { status: 204 };
 }
 
@@ -244,9 +275,9 @@ interface Row {
 /** Map `map`'s Level Band starting at level `first`: its top 50, and `name`'s entry there
  *  with its rank, if given and it has one. */
 export async function readBand(env: Env, map: string, first: string, name: string | null): Promise<Answer> {
-  const band = Number(first);
   if (!isMap(map)) return badRequest("a map is its 9-digit ID");
-  if (!/^\d+$/.test(first) || band < 1 || bandOf(band) !== band) return badRequest("a Level Band is its first level: 1, 10, 20...");
+  const band = bandFrom(first);
+  if (band === null) return badRequest("a Level Band is its first level: 1, 10, 20...");
   const nameKey = name?.toLowerCase() ?? null;
   const rows = await env.DB.prepare(
     `WITH ranked AS (

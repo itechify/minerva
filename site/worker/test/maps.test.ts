@@ -1,4 +1,5 @@
-// The Map Leaderboards page lists the most-uploaded maps, and a map's page its Level Bands.
+// The Map Leaderboards page's search says how many entries each map has, and a map's page
+// lists its Level Bands.
 // (D1 starts empty for each test file, so only this file's uploads are here.)
 import { describe, expect, it } from "vitest";
 import { call, entry, key, upload } from "./api";
@@ -7,7 +8,7 @@ const BUSY = "100000020";
 const QUIET = "100000021";
 
 describe("maps", () => {
-  it("lists the most-uploaded maps, by how many entries they have", async () => {
+  it("lists the maps with entries, the most first", async () => {
     await upload("Ada", key("ada"), [entry(BUSY, 12, 10_000), entry(BUSY, 25, 20_000), entry(QUIET, 12, 9_000)]);
     await upload("Bea", key("bea"), [entry(BUSY, 14, 11_000)]);
 

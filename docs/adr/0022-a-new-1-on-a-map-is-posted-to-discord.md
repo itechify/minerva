@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended by ADR-0024 (a top spot taken is also kept, for Latest to mark, whether or not the webhook is set)
 ---
 
 # A new #1 on a map is posted to Discord

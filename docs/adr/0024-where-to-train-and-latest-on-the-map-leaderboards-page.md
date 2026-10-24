@@ -1,0 +1,48 @@
+---
+status: accepted
+---
+
+# Where to train and Latest on the Map Leaderboards page
+
+The Map Leaderboards page (`/leaderboards/`, ADR 0015) found a map by its name and listed the maps with the most entries. It answered "what do players get on this map?" but not the question a player brings to it: "where should I train at my level?". With few players on the boards so far, every map in the most-uploaded list had one entry. This records what the page shows instead (#157): **Where to train**, a table of the maps for a Level Band, and **Latest**, the newest bests on every map.
+
+## The decision
+
+- **Where to train lists a Level Band's maps.** The player picks a band from a row of chips, as on a map's page (`?band=30`). The table lists every map the ceilings table matches to the band, and every map with an entry in it. Each row has the map and its street, its mobs' levels, its solo EXP/h ceiling, the band's #1 there (name, job, level, EXP/h, date) with how many entries the band has, and that #1 as a share of the ceiling, as the Personal Bests window writes it. Each row links to the map's Map Leaderboard at that band. A map with no entries there says so, and still shows its ceiling, so the table is useful from the first day.
+- **It sorts by players' best by default, or by solo ceiling** (`&sort=ceiling`). By players' best: the maps with entries come first, highest #1 first, then the rest by ceiling. A **street filter** (`&street=`) offers only the streets in the band's table, so it never leads to an empty one. A street the band lacks falls back to every street. Every row is shown, with no cut-off: a band has at most about 80 maps.
+- **A #1 above the map's solo ceiling is marked**, "above solo", linking to the FAQ answer (`leaderboard-over-ceiling`): it took a party, an EXP event or a buff. It still ranks raw, as ADR 0015 ranks every entry.
+- **A map is matched to a band by the levels of the middle half of its spawns**: from the level a quarter of its spawns are at or under to the level three quarters are, each mob counted as often as the map holds it at once (`MapData::middle_mob_levels`). A map is for a band when that range overlaps the band's levels. The full range of a map's mob levels, lowest to highest, was stretched by one stray mob: Sleepy Dungeon V read as levels 6 to 58 and, with its 2.5M ceiling, would have topped a ceiling sort for levels 1–9. The middle half reads 33 to 37.
+- **The ceilings table carries the levels.** `probe ceilings` writes each map's row as `{ "ceiling": 153216, "mobs": [3, 8] }` (`MapSet::solo_ceilings`, which works both out with the core's own arithmetic), and the Worker matches maps to bands from it. The cap reads the same table as before.
+- **Latest lists the 20 newest entries on every map**, by when their Visit set them (`setAt`; no upload time is kept), each linking to its Map Leaderboard with the entry marked. An entry that took a top spot from another Character says so: "took #1, past Egbert's 150,000".
+- **A top spot taken is kept** in a `taken_tops` table, written where ADR 0022 finds one, whether or not a Discord webhook is set: the Map Leaderboards are the record. A row marks its entry only while that entry stands: it goes when the maintainer deletes the entry, when its Character opts out, or when a new best of the same Character's replaces it. Another Character taking the spot in turn leaves it, since the entry that took it still stands. A Character who opts out loses their name from the spots taken off them; the row keeps what they had, and Latest says "past a best of 150,000".
+- **Most uploaded goes.** Latest shows where players are active, with dates. Search still says how many entries each map it finds has, from `GET /api/maps`.
+
+The page reads top to bottom: its title, Where to train full width, then Find a map and Latest side by side, then its questions.
+
+## The API
+
+Beside ADR 0015's, the Map Leaderboards page reads three more routes. They are public and cached for a minute, as the other reads are.
+
+- `GET /api/bands`: every Level Band with maps, lowest first. `{ "bands": [{ "band": 20, "levels": [20, 29], "maps": 68, "entries": 7 }] }`. `maps` counts the maps the band's table lists, and `entries` the entries those maps have in the band. A band with neither isn't listed.
+- `GET /api/bands/<band>`: the band's maps, by ID. `{ "band": 20, "levels": [20, 29], "maps": [{ "map": "010001010", "ceiling": 153216, "mobs": [3, 8], "entries": 2, "best": { "name": "Egbert", "job": "Magician", "level": 23, "expPerHour": 150000, "setAt": 1760000000000 } }] }`. A map the ceilings table doesn't hold has `ceiling` and `mobs` `null`, and a map with no entries in the band has `best` `null`. A band with no maps answers `maps: []`. `band` is the band's first level, as in ADR 0015; anything else is a 400.
+- `GET /api/latest`: `{ "entries": [{ "name": "Hakuo", "job": "Bandit", "level": 26, "expPerHour": 153000, "setAt": 1760000000000, "map": "010001010", "band": 20, "took": { "from": "Egbert", "fromExpPerHour": 150000 } }] }`, newest first. `took` is `null` for an entry that took no top spot, and `from` is `null` once that Character has opted out.
+
+The page sorts, filters and names the maps itself (`site/leaderboards/leaderboards.ts`), from the map names fixture, as it names every map. An Event or Dev map is left out unless it has entries, as search leaves it out.
+
+## Considered options
+
+- **The full range of mob levels.** The simplest rule to explain, but stray mobs stretch it (above). It put 97 maps in levels 1–9 and the highest-level dungeons at the top of a low band's ceiling sort.
+- **The level of a map's median spawn, one band per map.** The tightest lists (61, 29, 40… maps a band), but a player a few levels under a map's band never sees it in theirs. The middle half's overlap lists a map in each band whose players hunt it.
+- **Fetching OSMS's set in the browser** to match maps to bands. It would commit nothing more, but means reading OSMS's shape again in TypeScript and loading its whole set for one table. The core already works the levels out; one more pair per map in a table already committed is far less.
+- **Only maps with entries.** It would keep the data rule as it was, but with one Character on the boards most bands would be empty, and nothing would say what a map can give.
+- **Ranking by the lower of the #1 and the ceiling,** so a party's entry can't outrank a solo one. That quietly reranks what ADR 0015 ranks raw; marking it is honest without second-guessing anyone.
+- **An upload time for Latest.** A first upload of an old Visit History would then show as new. But that needs a column on every entry, and Latest's date is when the best was set, which is what a player reads it as.
+- **A Character's page, crowns (#1s held), best maps for one job.** Each needs more players than the boards have yet. A Character's page is acceptable on privacy grounds (each entry is already public, by map), provided the FAQ says so in the same change.
+
+## Consequences
+
+- The ceilings table now holds a second figure per map, so it is a third piece of OSMS's data committed, after the map names fixture (ADR 0008) and the ceilings (ADR 0015). AGENTS.md's rule on committed data says so. It is written again with `probe ceilings` when OSMS's set changes, as before.
+- `site/migrations/0003_where_to_train.sql` adds `taken_tops`, and indexes on `entries` for reading a band across every map and for reading the newest. It is additive: the Worker before it keeps working until the deploy after.
+- An upload that takes a top spot writes a row more, beside ADR 0022's two reads. One that doesn't, the common case, writes one statement more: the delete of its Character's marks whose entry has gone.
+- ADR 0023's rule that only `/api/maps…` may be cached now covers `/api/bands…` and `/api/latest` too. Neither reads a key or a cookie.
+- Names a player uploads now also show in Latest, for as long as an entry is among the newest. The FAQ says so (`leaderboard-public`), and answers how Where to train picks a band's maps (`where-to-train`) and what "above solo" means (`leaderboard-over-ceiling`).

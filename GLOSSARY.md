@@ -179,8 +179,16 @@ A Character's best Visits on a map that have ended (or the Unassigned ones), hig
 _Avoid_: runs, attempts, records
 
 **Map Leaderboard**:
-A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by EXP/h, ties going to whoever set it first. An entry is one Character's best Visit on the map in the band: its name, job, exact level, EXP/h and date. The site mirrors what the player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015).
+A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by EXP/h, ties going to whoever set it first. An entry is one Character's best Visit on the map in the band: its name, job, exact level, EXP/h and date. The site mirrors what the player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015). The Map Leaderboards page leads to them through Where to train, a search by name, and Latest, the 20 newest entries on every map (ADR 0024).
 _Avoid_: leaderboard (alone), ranking, high scores, hiscores
+
+**Where to train**:
+The Map Leaderboards page's table of the maps for one Level Band: each map whose middle half of spawns is at the band's levels, and each map with an entry in it, with its mob levels, its solo ceiling, the band's #1 there, and that #1 as a share of the ceiling, sorted by players' best or by ceiling (ADR 0024). A #1 above the ceiling is marked "above solo".
+_Avoid_: best maps, recommended maps, map ranking
+
+**Top spot taken**:
+An upload that leaves its Character holding a map and Level Band's #1 that another Character held before: posted to Discord (ADR 0022), and marked "took #1" in Latest while the entry that took it stands (ADR 0024). A first entry in an empty band, or a Character beating their own best, isn't one.
+_Avoid_: record, new record, crown
 
 **Leaderboard Key**:
 The secret each install of Minerva makes on its first upload to the Map Leaderboards and keeps in a file of its own beside the settings (`leaderboard-key`), sent with every upload. The shell keeps it, never the core, so no Bug Report holds it. A Character's first upload ties its name to the key; later uploads for the name must carry it, and another key's are refused as claimed. Never shown to the player; the site keeps only its hash. A lost one is replaced by linking the new one to the name's Account, if the old one was linked, or else by the maintainer reassigning the name.

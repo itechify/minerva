@@ -33,9 +33,10 @@
 //! `cargo run -p minerva --example probe ceilings <out.json> [--osms <osms-set.json>]`
 //! Ceilings mode, for the Map Leaderboards' cap (ADR 0015): fetch OSMS Data Explorer's
 //! live file set (or read the `osms-set.json` given), read it with the core's reader, and
-//! write each map's solo EXP/h ceiling, by its 9-digit ID, to `out.json`: the table the
-//! site's Worker loads (`site/worker/osms-ceilings.json`). A map with no Map Summary, or a
-//! ceiling of 0, is left out. No game window is needed.
+//! write each map's solo EXP/h ceiling and the levels of the middle half of its spawns, by
+//! its 9-digit ID, to `out.json`: the table the site's Worker loads
+//! (`site/worker/osms-ceilings.json`), for the cap and for Where to train (ADR 0024). A map
+//! with no Map Summary, or a ceiling of 0, is left out. No game window is needed.
 //!
 //! `cargo run -p minerva --example probe replay <report.zip> [--all] [--osms <osms-set.json>] [--items <osms-items.json>]`
 //! Replay mode, for a Bug Report (ADR 0009): print what it holds and its timeline (from 10
@@ -201,8 +202,9 @@ fn osms() -> Result<(), String> {
     Ok(())
 }
 
-/// `<out.json> [--osms <osms-set.json>]`: write each map's solo EXP/h ceiling, by its
-/// 9-digit ID, one map to a line.
+/// `<out.json> [--osms <osms-set.json>]`: write each map's solo EXP/h ceiling and the levels
+/// of the middle half of its spawns, by its 9-digit ID, one map to a line:
+/// `"010001010": { "ceiling": 153216, "mobs": [2, 8] }`.
 fn ceilings(args: &[String]) -> Result<(), String> {
     let mut rest = args.iter();
     let out = rest.next().ok_or("no file to write")?;
@@ -222,7 +224,13 @@ fn ceilings(args: &[String]) -> Result<(), String> {
     };
     let set = minerva_core::osms::read(&files).map_err(|e| format!("OSMS's set doesn't read: {e}"))?;
     let ceilings = set.solo_ceilings();
-    let rows: Vec<String> = ceilings.iter().map(|(id, solo)| format!("  \"{id}\": {solo}")).collect();
+    let rows: Vec<String> = ceilings
+        .iter()
+        .map(|(id, solo)| {
+            let (lowest, highest) = (solo.mob_levels.lowest, solo.mob_levels.highest);
+            format!("  \"{id}\": {{ \"ceiling\": {}, \"mobs\": [{lowest}, {highest}] }}", solo.exp_per_hour)
+        })
+        .collect();
     std::fs::write(out, format!("{{\n{}\n}}\n", rows.join(",\n"))).map_err(|e| format!("{out}: {e}"))?;
     println!("Wrote the solo ceilings of {} maps (of {} in the map list) to {out}", ceilings.len(), set.maps().count());
     Ok(())
