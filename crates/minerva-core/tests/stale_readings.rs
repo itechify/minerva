@@ -82,6 +82,7 @@ fn read_shop(minerva: &mut Minerva, region: ScreenRect, at_ms: u64) -> PanelStat
         name: Some("Bronze Ore".into()),
         price: Some(ListedPrice { quantity: 1, mesos: 999 }),
         covered: false,
+        tier: None,
     };
     let shop = ShopList { area: ScreenRect { x: region.x + 600, y: region.y + 500, width: 300, height: 300 }, rows: vec![row] };
     let capture = ShopCapture { frame: blank(region, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, pointer: None };

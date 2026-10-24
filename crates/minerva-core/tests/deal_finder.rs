@@ -17,7 +17,7 @@ use common::{FakeSource, GAME, SCREEN};
 use common::items::{ItemWorld, equip, etc, item_world, scroll, use_item};
 use minerva_core::{
     Action, DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Edge, Foreground, GameWindow, Hotkey, Hotkeys, ItemCardView, ListedPrice,
-    MarketPrice, Minerva, PanelControl, PanelSizes, PanelState, Request, SavedMarketLine, SavedMarketPrices, ScreenRect, ShopHover, ShopList, ShopReading, ShopRow, Size, Verdict, ItemTooltip, ScreenPoint,
+    MarketPrice, Minerva, PanelControl, PanelSizes, PanelState, Request, SavedMarketLine, SavedMarketPrices, ScreenRect, ScrollTier, ShopHover, ShopList, ShopReading, ShopRow, Size, Verdict, ItemTooltip, ScreenPoint,
 };
 use std::task::Poll;
 
@@ -32,8 +32,9 @@ const BRONZE_ORE: &str = "04010000";
 const EMERALD_STAFF: &str = "01382004";
 const WOODEN_TOP: &str = "02070000";
 
-/// Made-up item data: ores and gems, a staff, two Blue Moons that don't look alike, and two
-/// Pet Equip Speed Scrolls.
+/// Made-up item data: ores and gems, a staff, two Blue Moons that don't look alike, two Pet
+/// Equip Speed Scrolls, the four tiers of One-Handed Sword Attack Scroll, and a Claw Attack
+/// Scroll beside a Claw Attack Spirit, which isn't a scroll.
 fn items() -> ItemWorld {
     item_world(vec![
         etc(4_021_000, "Garnet").sells_for(500),
@@ -43,10 +44,16 @@ fn items() -> ItemWorld {
         equip(1_041_078, "Blue Moon", "Top").sells_for(11_000),
         equip(1_032_011, "Blue Moon", "Earring").sells_for(10_500),
         use_item(2_070_000, "Wooden Top").recharged_at(1.0),
+        etc(4_000_900, "Claw Attack Spirit").sells_for(10),
     ])
     .with_scroll(scroll(2_048_000, "Pet Equip Speed Scroll: Legs for Made Up"))
     .with_scroll(scroll(2_048_001, "Pet Equip Speed Scroll: Lungs for Made Up"))
     .with_scroll(scroll(2_048_010, "Pet Equip Jump Scroll: Head for Made Up"))
+    .with_scroll(scroll(2_043_000, "One-Handed Sword Attack Scroll: Lesser"))
+    .with_scroll(scroll(2_043_001, "One-Handed Sword Attack Scroll: Intermediate").of_tier("Intermediate"))
+    .with_scroll(scroll(2_043_002, "One-Handed Sword Attack Scroll: Greater").of_tier("Greater"))
+    .with_scroll(scroll(2_043_003, "One-Handed Sword Attack Scroll: Chaos").of_tier("Chaos"))
+    .with_scroll(scroll(2_044_702, "Claw Attack Scroll: Greater").of_tier("Greater"))
 }
 
 /// The market prices: "Your price" and "Lowest ask", with a few prices on each.
@@ -99,6 +106,7 @@ fn row(slot: u32, name: Option<&str>, price: Option<(u64, u64)>) -> ShopRow {
         name: name.map(String::from),
         price: price.map(|(quantity, mesos)| ListedPrice { quantity, mesos }),
         covered: false,
+        tier: None,
     }
 }
 
@@ -751,4 +759,101 @@ fn a_deal_is_graded_good_great_or_a_steal_by_how_far_below_the_line_it_is() {
         [DealGrade::Good, DealGrade::Good, DealGrade::Great, DealGrade::Great, DealGrade::Steal],
         "−0%, −19%, −20%, −39%, −40% of 900"
     );
+}
+
+/// The name the game cuts every One-Handed Sword Attack Scroll short to, and its Greater's.
+const SWORD_SCROLL: &str = "One-Handed Sword Attac...";
+const SWORD_GREATER: &str = "One-Handed Sword Attack Scroll: Greater";
+
+/// `row`, its picture a scroll of `tier`.
+fn pictured(row: ShopRow, tier: ScrollTier) -> ShopRow {
+    ShopRow { tier: Some(tier), ..row }
+}
+
+fn sword_greater() -> Verdict {
+    Verdict::NoPrice { item: item("02043002", SWORD_GREATER), listed: listed(1, 7_500) }
+}
+
+#[test]
+fn a_scrolls_name_cut_short_is_named_by_the_tier_its_picture_shows() {
+    let mut minerva = on();
+    let sword = || row(0, Some(SWORD_SCROLL), Some((1, 7_500)));
+    let state = minerva.on_player_shop_reading(shop(vec![sword()], 400));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown), "its picture not told: any of the four");
+
+    let state = minerva.on_player_shop_reading(shop(vec![pictured(sword(), ScrollTier::Greater)], 800));
+    assert_eq!(badge(state, 0), (false, sword_greater()));
+
+    // A click on its badge shows that scroll's card.
+    let state = minerva.act(Action::OpenDealItem { row: 0 });
+    match &state.item_card.as_ref().expect("a card").view {
+        ItemCardView::Card(card) => assert_eq!(card.id, "02043002"),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn a_picture_names_nothing_but_one_scroll_of_its_tier() {
+    let mut minerva = on();
+    let state = minerva.on_player_shop_reading(shop(
+        vec![
+            // Both Pet Equip Speed Scrolls are Lesser.
+            pictured(row(0, Some(SPEED_SCROLL_L), Some((1, 12_999))), ScrollTier::Lesser),
+            // The Claw Attack Spirit isn't a scroll: its picture could look like one.
+            pictured(row(1, Some("Claw Attac..."), Some((1, 99_000))), ScrollTier::Greater),
+            // Its picture showed no tier plainly: any of the four.
+            row(2, Some(SWORD_SCROLL), Some((1, 7_500))),
+        ],
+        400,
+    ));
+    assert_eq!(verdicts(state), vec![Verdict::Unknown; 3]);
+}
+
+#[test]
+fn a_tooltip_naming_another_tier_than_the_pictures_leaves_a_question_mark() {
+    let mut minerva = on();
+    let sword = |price| pictured(row(0, Some(SWORD_SCROLL), price), ScrollTier::Greater);
+    minerva.on_player_shop_reading(shop(vec![sword(Some((1, 7_500)))], 400));
+
+    // A misread somewhere: neither is believed.
+    let chaos = hovering(0, Some("One-Handed Sword Attack Scroll: Chaos"));
+    let state = minerva.on_player_shop_reading(hovered(vec![sword(None)], chaos, 800));
+    assert_eq!(badge(state, 0), (true, Verdict::Unknown));
+
+    // The two agreeing, it is that scroll.
+    let mut minerva = on();
+    minerva.on_player_shop_reading(shop(vec![sword(Some((1, 7_500)))], 400));
+    let state = minerva.on_player_shop_reading(hovered(vec![sword(None)], hovering(0, Some(SWORD_GREATER)), 800));
+    assert_eq!(badge(state, 0), (true, sword_greater()));
+
+    // A picture that names no scroll, as no Pet Equip Speed Scroll is Greater, still says the
+    // tooltip's Lesser one isn't it.
+    let mut minerva = on();
+    let speed = |price| pictured(row(0, Some(SPEED_SCROLL_L), price), ScrollTier::Greater);
+    minerva.on_player_shop_reading(shop(vec![speed(Some((1, 12_999)))], 400));
+    let state = minerva.on_player_shop_reading(hovered(vec![speed(None)], hovering(0, Some(LEGS)), 800));
+    assert_eq!(badge(state, 0), (true, Verdict::Unknown));
+}
+
+#[test]
+fn a_tier_read_stands_while_the_pointer_covers_the_picture() {
+    let mut minerva = on();
+    let sword = || row(0, Some(SWORD_SCROLL), Some((1, 7_500)));
+    minerva.on_player_shop_reading(shop(vec![pictured(sword(), ScrollTier::Greater)], 400));
+
+    // The pointer on its picture, its name and price still read.
+    let state = minerva.on_player_shop_reading(hovered(vec![sword()], hovering(0, None), 800));
+    assert_eq!(badge(state, 0), (false, sword_greater()));
+
+    // The tooltip by it hiding its price too.
+    let state = minerva.on_player_shop_reading(hovered(vec![row(0, Some(SWORD_SCROLL), None)], hovering(0, None), 1_200));
+    assert_eq!(badge(state, 0), (true, sword_greater()));
+
+    // Covered whole.
+    let state = minerva.on_player_shop_reading(shop(vec![covered(0)], 1_600));
+    assert_eq!(badge(state, 0), (true, sword_greater()));
+
+    // Another listing where it was: what was read there before is gone.
+    let state = minerva.on_player_shop_reading(shop(vec![row(0, Some(SWORD_SCROLL), Some((1, 9_000)))], 2_000));
+    assert_eq!(badge(state, 0), (false, Verdict::Unknown));
 }

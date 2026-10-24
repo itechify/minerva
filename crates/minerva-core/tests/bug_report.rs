@@ -10,7 +10,7 @@ use common::osms;
 use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame, HOUR, S, MIN, percent};
 use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES};
 use minerva_core::{
-    ListedPrice, ShopCapture, ShopHover, ShopList, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
+    ListedPrice, ScrollTier, ShopCapture, ShopHover, ShopList, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, DiscordLinkAnswer, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, STATUS_BAR_STRIP, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
@@ -1016,6 +1016,7 @@ fn shop_reading(names: &[Option<&str>], at_ms: u64) -> ShopReading {
             name: name.map(String::from),
             price: Some(ListedPrice { quantity: 1, mesos: 999 }),
             covered: false,
+            tier: None,
         })
         .collect();
     ShopReading { shop: Some(ShopList { area: ScreenRect { x: 561, y: 513, width: 311, height: 366 }, rows }), hover: None, at_ms }
@@ -1107,6 +1108,34 @@ fn a_shop_read_with_the_pointer_on_a_listing_replays_with_its_tooltip_and_keeps_
     assert!(timeline.contains(&format!("[{crop}]")), "{timeline}");
 }
 
+/// A listing whose name the game cut short so that it could be any of the four One-Handed
+/// Sword Attack Scrolls, its picture a Greater's: the tier is written down with the reading,
+/// replays to the same badge, and reads in the timeline.
+#[test]
+fn a_listings_picture_tier_replays_and_reads_in_the_timeline() {
+    let with_swords = || {
+        ["Lesser", "Intermediate", "Greater", "Chaos"].into_iter().zip(2_043_000..).fold(items(), |items, (tier, id)| {
+            items.with_scroll(scroll(id, &format!("One-Handed Sword Attack Scroll: {tier}")).of_tier(tier))
+        })
+    };
+    let mut shell = Shell::new(FakeSource::osms().with_items(with_swords()));
+    shell.minerva.set_deal_badges_size(Size { width: 160, height: 0 });
+    shell.play(10 * S, CONSTRUCTION_SITE, grind);
+    assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
+    let mut reading = shop_reading(&[Some("One-Handed Sword Attac..."), Some("Bronze Ore")], 10_400);
+    reading.shop.as_mut().expect("a shop").rows[0].tier = Some(ScrollTier::Greater);
+    let state = shell.minerva.on_player_shop_read(shop_capture(10_400), reading);
+    let badge = &state.deal_badges.as_ref().expect("badges").badges[0];
+    assert!(matches!(&badge.verdict, Verdict::NoPrice { item, .. } if item.name == "One-Handed Sword Attack Scroll: Greater"), "{badge:?}");
+
+    let (_, recording) = shell.report();
+
+    let replay = bug_report::replay_with(&recording, ReplayData { osms: Some(osms::game().files()), items: Some(with_swords().files()) });
+    assert_eq!(replay.divergence, None);
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains(r#"Player Shop read: "One-Handed Sword Attac..." (a Greater scroll's picture) 1 for 999, "Bronze Ore" 1 for 999"#), "{timeline}");
+}
+
 #[test]
 fn a_shop_read_the_same_as_before_is_written_as_such_with_no_crop() {
     let (_, recording) = run_with_the_deal_finder().report();
@@ -1146,6 +1175,7 @@ fn a_shops_list_is_cut_down_to_its_covered_listings_past_the_bands_found() {
         name: name.map(String::from),
         price: name.map(|_| ListedPrice { quantity: 1, mesos: 999 }),
         covered: name.is_none(),
+        tier: None,
     };
     let list = ShopList { area: ScreenRect { x: 561, y: 513, width: 311, height: 70 }, rows: vec![row(0, Some("Bronze Ore")), row(1, None), row(2, None)] };
     assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
@@ -1169,6 +1199,7 @@ fn a_shops_list_at_another_ui_size_is_cut_as_much_smaller() {
         name: name.map(String::from),
         price: Some(ListedPrice { quantity: 1, mesos: 999 }),
         covered: false,
+        tier: None,
     };
     let list = ShopList { area: ScreenRect { x: 561, y: 513, width: 199, height: 235 }, rows: vec![row(0, Some("Bronze Ore")), row(1, None)] };
     assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
