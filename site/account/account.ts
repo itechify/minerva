@@ -38,6 +38,14 @@ export interface Report {
   reportedAt: number;
 }
 
+/** An entry taken down, as GET /api/admin/removed lists it. */
+export interface Removed {
+  name: string;
+  map: string;
+  band: number;
+  expPerHour: number;
+}
+
 /** GET /api/admin/characters/<name>'s answer. */
 export interface CharacterAnswer {
   name: string;
@@ -114,6 +122,12 @@ export function reportLine(report: Report, mapName: string): { what: string; whe
     what: `${report.name} on ${mapName}, levels ${first}–${last}: ${whole(report.expPerHour)} EXP/h`,
     when: `Reported ${day(report.reportedAt)}`,
   };
+}
+
+/** An entry taken down as the admin page lists it: whose, where, and the Visit kept off. */
+export function removedLine(removed: Removed, mapName: string): string {
+  const [first, last] = levelsOf(removed.band);
+  return `${removed.name} on ${mapName}, levels ${first}–${last}: ${whole(removed.expPerHour)} EXP/h`;
 }
 
 /** A name as the admin page shows it, looked up: who holds it, and when another key was

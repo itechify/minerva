@@ -1,6 +1,6 @@
 // What the account, link and admin pages say, from the API's answers.
 import { describe, expect, it } from "vitest";
-import { characterLines, foundLine, holds, linkQuestion, listed, pcDates, reportLine, signInFailed, signInHref, tokenIn } from "../account.ts";
+import { characterLines, foundLine, holds, linkQuestion, listed, pcDates, removedLine, reportLine, signInFailed, signInHref, tokenIn } from "../account.ts";
 
 const OCT_3 = new Date(2026, 9, 3, 12).getTime();
 const OCT_21 = new Date(2026, 9, 21, 12).getTime();
@@ -65,6 +65,12 @@ describe("the admin page", () => {
       what: "Egbert on Henesys Hunting Ground I, levels 20–29: 153,216 EXP/h",
       when: "Reported 21 Oct 2026",
     });
+  });
+
+  it("lists an entry taken down with the Visit kept off", () => {
+    const removed = { name: "Egbert", map: "010004042", band: 30, expPerHour: 61_536 };
+
+    expect(removedLine(removed, "Over the Wall")).toBe("Egbert on Over the Wall, levels 30–39: 61,536 EXP/h");
   });
 
   it("shows a name looked up: its entries, its Account and the last key refused", () => {

@@ -8,6 +8,8 @@ import {
   characterLines,
   type FoundAccount,
   foundLine,
+  type Removed,
+  removedLine,
   type Report,
   reportLine,
   signInFailed,
@@ -34,7 +36,8 @@ views.characters.addEventListener("click", () => show("characters"));
 
 // ---- Reports ----
 
-/** Draw every report, newest first, each with Open, Delete entry and Dismiss. */
+/** Draw every report, newest first, each with Open, Dismiss (the report goes) and Take entry
+ *  down (the entry goes too, and the same Visit stays off until restored). */
 async function loadReports() {
   const line = byId("reports-said");
   const read = await call<{ reports: Report[] }>("/api/admin/reports");
@@ -53,22 +56,55 @@ async function loadReports() {
       if (report.reason !== "") words.append(make("span", "account-reason", `“${report.reason}”`));
       const open = make("a", "button small secondary", "Open");
       open.href = linkTo({ map: report.map, band: report.band, name: report.name });
-      const remove = make("button", "button small secondary", "Delete entry");
-      remove.type = "button";
-      armed(remove, "Delete? Click again", async () => {
-        const path = `/api/admin/entries/${encodeURIComponent(report.name)}/${report.map}/${report.band}`;
-        if ((await send(path, "DELETE")).status !== 204) line.textContent = UNREACHABLE;
-        else await loadReports();
-      });
       const dismiss = make("button", "button small secondary", "Dismiss");
       dismiss.type = "button";
+      dismiss.title = "The report goes; the entry stays on the Map Leaderboard";
       dismiss.addEventListener("click", async () => {
         if ((await send(`/api/admin/reports/${report.id}`, "DELETE")).status !== 204) line.textContent = UNREACHABLE;
         else await loadReports();
       });
+      const takeDown = make("button", "button small secondary", "Take entry down");
+      takeDown.type = "button";
+      takeDown.title = "The entry and its reports go, and the same visit stays off until restored under Taken down";
+      armed(takeDown, `Take ${report.name}'s entry down? Click again`, async () => {
+        const path = `/api/admin/entries/${encodeURIComponent(report.name)}/${report.map}/${report.band}`;
+        if ((await send(path, "DELETE")).status !== 204) line.textContent = UNREACHABLE;
+        else await loadReports();
+      });
       const actions = make("div", "account-actions");
-      actions.append(open, remove, dismiss);
+      actions.append(open, dismiss, takeDown);
       item.append(words, actions);
+      return item;
+    }),
+  );
+  await loadRemoved();
+}
+
+/** Draw every entry taken down, each with Restore: the same Visit goes up again at its next
+ *  upload. */
+async function loadRemoved() {
+  const line = byId("removed-said");
+  const read = await call<{ removed: Removed[] }>("/api/admin/removed");
+  if (read.status !== 200 || read.body === null) {
+    line.textContent = UNREACHABLE;
+    return;
+  }
+  const removed = read.body.removed;
+  line.textContent =
+    removed.length === 0 ? "None. An entry taken down stays off until restored here." : "Each stays off the Map Leaderboards until restored.";
+  byId("removed-list").replaceChildren(
+    ...removed.map((entry) => {
+      const item = make("li", "account-item");
+      item.append(make("span", "account-words", removedLine(entry, placeOf(names, entry.map).name)));
+      const restore = make("button", "button small secondary", "Restore");
+      restore.type = "button";
+      restore.title = `${entry.name}'s next upload of this visit puts it back`;
+      restore.addEventListener("click", async () => {
+        const path = `/api/admin/removed/${encodeURIComponent(entry.name)}/${entry.map}/${entry.band}/${entry.expPerHour}`;
+        if ((await send(path, "DELETE")).status !== 204) line.textContent = UNREACHABLE;
+        else await loadRemoved();
+      });
+      item.append(restore);
       return item;
     }),
   );
