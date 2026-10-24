@@ -1,15 +1,17 @@
-//! The settings view: the gear at the top of the panel opens it over the panel, and there
-//! the player rebinds a hotkey by pressing its new key combination on the overlay. While
-//! they do, the hotkeys are released (`PanelState::hotkeys_live`): a registered
-//! combination reaches no window, the overlay's included. A hotkey can also be turned off
+//! The hotkeys in the Settings window ([`crate::settings_window`]): there the player rebinds
+//! a hotkey by pressing its new key combination on the window. While they do, the hotkeys
+//! are released (`PanelState::hotkeys_live`): a registered combination reaches no window,
+//! the Settings window's included. A hotkey can also be turned off
 //! (Backspace or Delete, or the waiting row's Turn off): it then has no combination, and its
 //! action stays on its button.
 
+use crate::panel::ScreenRect;
 use crate::same_hotkey;
 use crate::settings::{Hotkey, Hotkeys};
+use crate::settings_window::SettingsWindow;
 use serde::{Deserialize, Serialize};
 
-/// A key the player pressed on the settings view, as the overlay saw it.
+/// A key the player pressed on the Settings window, as its page saw it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyPress {
@@ -21,20 +23,6 @@ pub struct KeyPress {
     pub shift: bool,
     /// The Windows key.
     pub win: bool,
-}
-
-/// The settings view, while it is open.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SettingsView {
-    /// The hotkey waiting for the player to press its new combination; `None` while none is.
-    pub rebinding: Option<Hotkey>,
-    /// Why the last combination pressed for it wasn't taken.
-    pub problem: Option<RebindProblem>,
-    /// What the player's last change came to, until they start another or close the view.
-    pub notice: Option<SettingsNotice>,
-    /// Every hotkey has its default: Restore defaults would change nothing.
-    pub at_defaults: bool,
 }
 
 /// Why a combination the player pressed can't be the hotkey they are rebinding. They can
@@ -52,7 +40,7 @@ pub enum RebindProblem {
     InUse { pressed: String, by: Hotkey },
 }
 
-/// What the player's last change in the settings view came to. Every change is saved at once.
+/// What the player's last change in the Settings window came to. Every change is saved at once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum SettingsNotice {
@@ -63,7 +51,7 @@ pub enum SettingsNotice {
         swapped_with: Option<Hotkey>,
     },
     /// Every hotkey is back to its default. Undo brings back the ones from before, until the
-    /// player starts changing another or closes the view.
+    /// player starts changing another or closes the window.
     Restored,
     /// Undo brought back the hotkeys from before Restore defaults.
     RestoreUndone,
@@ -71,8 +59,10 @@ pub enum SettingsNotice {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct HotkeySettings {
-    /// `None` while the settings view is closed.
+    /// `None` while the Settings window is closed.
     view: Option<OpenView>,
+    /// The open window has the keyboard (see [`SettingsWindow::takes_keyboard`]).
+    keyboard: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -85,21 +75,41 @@ struct OpenView {
 }
 
 impl HotkeySettings {
-    /// Open the settings view, with no hotkey being rebound.
+    /// Open the Settings window, with no hotkey being rebound, or keep it as it is if it is
+    /// open; either way it takes the keyboard.
     pub fn open(&mut self) {
-        self.view = Some(OpenView::default());
+        self.view.get_or_insert_with(OpenView::default);
+        self.keyboard = true;
     }
 
-    /// Back to the normal view; a rebinding under way is cancelled.
+    /// Close the window; a rebinding under way is cancelled.
     pub fn close(&mut self) {
         self.view = None;
+        self.keyboard = false;
     }
 
-    /// Wait for the player to press `hotkey`'s new combination. The last change's notice
-    /// goes, and with it any Undo of Restore defaults.
+    pub fn is_open(&self) -> bool {
+        self.view.is_some()
+    }
+
+    /// The open window takes the keyboard (the player clicked a field that needs it).
+    pub fn take_keyboard(&mut self) {
+        self.keyboard = self.view.is_some();
+    }
+
+    /// The keyboard went elsewhere: the game, or the search view. A rebinding under way is
+    /// cancelled, as the keys pressed for it would no longer reach the window; it stays open.
+    pub fn leave(&mut self) {
+        self.keyboard = false;
+        self.cancel();
+    }
+
+    /// Wait for the player to press `hotkey`'s new combination, with the keyboard. The last
+    /// change's notice goes, and with it any Undo of Restore defaults.
     pub fn begin(&mut self, hotkey: Hotkey) {
         if let Some(view) = &mut self.view {
             *view = OpenView { rebinding: Some(hotkey), ..OpenView::default() };
+            self.keyboard = true;
         }
     }
 
@@ -115,8 +125,12 @@ impl HotkeySettings {
         self.view.as_ref().is_some_and(|view| view.rebinding.is_some())
     }
 
-    pub fn state(&self, hotkeys: &Hotkeys) -> Option<SettingsView> {
-        self.view.as_ref().map(|view| SettingsView {
+    /// The window while it is open, at `placement` (`None`: hidden). It has the keyboard
+    /// only while it shows.
+    pub fn state(&self, hotkeys: &Hotkeys, placement: Option<ScreenRect>) -> Option<SettingsWindow> {
+        self.view.as_ref().map(|view| SettingsWindow {
+            placement,
+            takes_keyboard: self.keyboard && placement.is_some(),
             rebinding: view.rebinding,
             problem: view.problem.clone(),
             notice: view.notice,
@@ -185,7 +199,7 @@ impl HotkeySettings {
     }
 
     /// Restore defaults: every hotkey back to its default, and on again. Until the player
-    /// starts changing another or closes the view, Undo brings back the ones from before.
+    /// starts changing another or closes the window, Undo brings back the ones from before.
     /// Whether `hotkeys` changed.
     pub fn restore(&mut self, hotkeys: &mut Hotkeys) -> bool {
         let before = std::mem::take(hotkeys);

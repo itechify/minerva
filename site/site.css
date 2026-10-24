@@ -724,7 +724,7 @@ strong {
 }
 
 /* ---- Questions: each folded to its question, as the panel folds a section to its
-   heading, set into the body as the settings view sets its rows ---- */
+   heading, set into the body as the Settings window sets its rows ---- */
 
 /* A section's questions on the home page, and the way to the rest of their group. */
 .qa-block {
@@ -1001,7 +1001,7 @@ strong {
 
 /* ---- Inline pieces, as the panel draws them ---- */
 
-/* A key as the game's settings view sets it: bold ink, here on an inset chip so it stands
+/* A key as Minerva's Settings window sets it: bold ink, here on an inset chip so it stands
    out of a sentence. */
 kbd {
   padding: 1px 5px;
@@ -1215,7 +1215,7 @@ code.path {
   overflow-wrap: anywhere;
 }
 
-/* The hotkeys, set into the body as an inset box, as the settings view sets its rows:
+/* The hotkeys, set into the body as an inset box, as the Settings window sets its rows:
    what each does in Ink Steel, its keys bold and right-aligned. */
 .hotkeys {
   width: min(100%, 32em);

@@ -66,6 +66,9 @@ pub struct Settings {
     /// Where the player dragged the Personal Bests window, relative to the game client;
     /// `None` for centred over the game.
     pub personal_bests_at: Option<ClientOffset>,
+    /// Where the player dragged the Settings window, relative to the game client; `None` for
+    /// beside the panel.
+    pub settings_at: Option<ClientOffset>,
     /// The Deal Margin (ADR 0014): how far below the Deal Line, in percent, a listing's
     /// price must be for the Deal Finder to call it a deal. 0: any price below it.
     pub deal_margin_percent: u32,
@@ -104,6 +107,7 @@ impl Default for Settings {
             grind_tracker_open: true,
             grind_tracker_at: None,
             personal_bests_at: None,
+            settings_at: None,
             deal_margin_percent: 0,
             map_leaderboards: Vec::new(),
             map_leaderboards_met: Some(Vec::new()),

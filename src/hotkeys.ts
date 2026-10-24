@@ -17,7 +17,7 @@ export type Hotkey = keyof Hotkeys;
 
 /**
  * What each hotkey does, named and ordered as the setup guide (setup.html) lists them, so
- * the panel and the guide never disagree.
+ * the Settings window and the guide never disagree.
  */
 export const HOTKEY_NAMES: [Hotkey, string][] = [
   ["togglePanel", "Collapse / expand"],
@@ -31,6 +31,9 @@ export const HOTKEY_NAMES: [Hotkey, string][] = [
   ["grindTracker", "Show / hide the Grind Tracker"],
   ["setup", "Help & Setup"],
 ];
+
+/** What a hotkey does, as the Settings window and the setup guide name it. */
+export const hotkeyName = (hotkey: Hotkey) => HOTKEY_NAMES.find(([h]) => h === hotkey)?.[1] ?? hotkey;
 
 /** The hotkeys whose actions have no button: turned off, they can't be used at all. */
 export const KEY_ONLY: Hotkey[] = ["itemCard", "itemLookup"];
@@ -47,8 +50,12 @@ export type SettingsNotice =
   | { kind: "restored" }
   | { kind: "restoreUndone" };
 
-/** Mirror of `minerva_core::SettingsView`. */
-export type SettingsView = {
+/** Mirror of `minerva_core::SettingsWindow`: the Settings window, while it is open. */
+export type SettingsWindow = {
+  /** Where it goes on screen; null while it is hidden (no game, or another app in front). */
+  placement: { x: number; y: number; width: number; height: number } | null;
+  /** It has the keyboard: it opened, or the player clicked a Change or the Deal Margin field. */
+  takesKeyboard: boolean;
   rebinding: Hotkey | null;
   problem: RebindProblem | null;
   notice: SettingsNotice | null;

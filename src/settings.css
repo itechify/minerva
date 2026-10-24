@@ -1,0 +1,268 @@
+/* The Settings window: the panel's window, opened beside it over the game. The shell lays
+   it out 420 CSS px wide (WIDTH in src-tauri/src/settings_window.rs), narrower over a
+   narrower game, and as tall as the page reports it up to 600 px; past that the settings
+   scroll under the window bar. Like the panel it stands on the Quest Helper's see-through
+   glass, the settings in inset boxes of the near-opaque lavender. It has no corner grips, so
+   no room is kept beside the last line. */
+.view {
+  padding-bottom: 10px;
+  overflow: hidden;
+}
+
+/* The settings, in the view's column, scrolling as one past the window's most. */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  /* Room for the inset boxes' edges and the focus rings, which scrolling would clip. */
+  padding: 2px 0;
+}
+
+/* While it has the keys, its focus moves to the row that waits, which the selection
+   frames, rather than a ring round the whole window. */
+.settings:focus,
+.hotkey-rows li:focus {
+  outline: none;
+}
+
+/* The Hotkeys heading, and under it what a hotkey costs the game: its keys. */
+.settings-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.panel .settings-intro {
+  white-space: normal;
+  text-wrap: pretty;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+/* The settings' inset boxes, of the near-opaque body like the map list: the hotkeys' (below),
+   and one each for the Deal Margin (its name and a percent field), the Grind Tracker's and
+   Check for updates' switches (a name and a checkbox) and Game Data (when it was fetched,
+   or how a Refresh is going, and Refresh), each laid out as a hotkey's row is. */
+.deal-margin,
+.grind-switch,
+.game-data,
+.hotkey-rows {
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--body);
+  text-shadow: none;
+}
+
+.deal-margin,
+.grind-switch,
+.game-data {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: -3px;
+  min-height: 23px;
+  padding: 3px 5px 3px 11px;
+}
+
+.deal-margin .action,
+.grind-switch .action {
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+.deal-margin-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-2);
+}
+
+.deal-margin input {
+  box-sizing: border-box;
+  width: 46px;
+  height: 21px;
+  padding: 0 4px;
+  border: 1px solid var(--window-edge);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--ink);
+  font: 700 13px/17px var(--font);
+  text-align: right;
+}
+
+.deal-margin input:focus-visible {
+  outline: 2px solid var(--edit);
+  outline-offset: 1px;
+}
+
+/* A switch's checkbox sits a little further in than the Deal Margin's field. */
+.grind-switch {
+  padding-right: 7px;
+  cursor: pointer;
+}
+
+.grind-switch input {
+  margin: 0;
+  accent-color: var(--edit);
+}
+
+.panel .game-data-state {
+  white-space: normal;
+  text-wrap: pretty;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+/* Each hotkey: what it does, its keys and its Change button, in an inset box of the
+   near-opaque body, like the map list. What it does wraps rather than truncates: it names
+   a control. Its keys break only after a "+", and give way to it down to 8em. Change and
+   Cancel, one in the other's place, share a 54px column, as do Turn off and Swap under
+   them. */
+.hotkey-rows {
+  margin: -3px 0 0;
+  padding: 3px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hotkey-rows li {
+  display: grid;
+  grid-template-columns: minmax(8em, 1fr) auto 54px;
+  align-items: center;
+  gap: 3px 8px;
+  min-height: 23px;
+  padding: 2px 2px 2px 8px;
+  box-sizing: border-box;
+  border-radius: 3px;
+}
+
+.hotkey-rows .action {
+  min-width: 0;
+  line-height: 16px;
+  text-wrap: pretty;
+  color: var(--ink-2);
+}
+
+.hotkey-rows .keys {
+  font: 700 13px/16px var(--font);
+  text-align: right;
+  color: var(--ink);
+}
+
+/* Off, and the wait for new keys: no keys to read, so not in the keys' bold. */
+.hotkey-rows .keys.off,
+.hotkey-rows .keys.pending {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+/* Keys pressed but refused, in the problem palette, until others are pressed. */
+.hotkey-rows .keys.refused {
+  justify-self: end;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--problem-bg);
+  box-shadow: inset 0 0 0 1px var(--problem-edge);
+  color: var(--problem-ink);
+}
+
+.hotkey-rows .text-button {
+  width: 54px;
+  padding: 0;
+}
+
+/* The row waiting for its new keys, as the selection frames the row Enter picks. */
+.hotkey-rows li.rebinding {
+  padding-bottom: 4px;
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--select-edge);
+}
+
+.hotkey-rows li.rebinding .action {
+  color: var(--ink);
+}
+
+/* A row's second line, under what it does and its keys: what to press while it waits, why
+   the keys pressed were refused (the problem note's dot and brown), or why its keys do
+   nothing, tagged as the Grind Tracker tags "paused". */
+.panel .hotkey-rows .row-note {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  white-space: normal;
+  overflow: visible;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+.hotkey-rows .row-note .words {
+  flex: 1;
+  min-width: 0;
+  text-wrap: pretty;
+}
+
+.hotkey-rows .row-note .text-button {
+  margin-top: -2px;
+}
+
+.hotkey-rows .row-note.problem {
+  position: relative;
+  padding-left: 14px;
+  color: var(--problem-ink);
+}
+
+.hotkey-rows .row-note.problem::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange-deep);
+}
+
+.hotkey-rows .tag {
+  padding: 0 5px;
+  border: 1px solid var(--problem-edge);
+  border-radius: 3px;
+  background: var(--problem-bg);
+  color: var(--problem-ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 15px;
+}
+
+/* What the last change came to, then Undo after Restore defaults, beside the button; on a
+   line of its own above them when it would be squeezed into three. */
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.panel .settings-notice {
+  flex: 1 1 14em;
+  min-width: 0;
+  white-space: normal;
+  text-wrap: pretty;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+}

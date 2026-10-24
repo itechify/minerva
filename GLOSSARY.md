@@ -36,7 +36,7 @@ One of several maps that share a Minimap Title, offered to the player when the m
 Map and mob data cached earlier and shown, with its date, because its source can't be reached right now.
 
 **Refresh**:
-The settings view's button under Game Data that has OSMS's map set and item files fetched afresh now, rather than at the next daily ask, for what a patch brought. It says what it came to: up to date, OSMS unreachable, or Minerva needing an update.
+The Settings window's button under Game Data that has OSMS's map set and item files fetched afresh now, rather than at the next daily ask, for what a patch brought. It says what it came to: up to date, OSMS unreachable, or Minerva needing an update.
 
 **UI Size**:
 How large the game draws its windows and text, which its UI Size setting (Default Ratio, sharpened or not, or Ideal Ratio, which picks a size for the resolution) and its window size decide together. Minerva reads the game at any UI Size.
@@ -254,6 +254,12 @@ _Avoid_: tag, label, highlight
 **Item Lookup**:
 The hotkey (Ctrl+Shift+U by default) that reads the Item Tooltip nearest the pointer and opens the item's MeowDB page. An alert at the top centre of the game window says what came of it, and when several items share the name, lists them for the player to pick. The same alert says what kept an Item Card from showing.
 _Avoid_: item search (Search is the search view's)
+
+### Settings
+
+**Settings window**:
+The window over the game where the player changes Minerva: its hotkeys (rebound by pressing the new keys, or turned off), the Deal Margin, the Grind Tracker's switch, Game Data's Refresh and "Check for updates". The panel's gear opens it beside the panel and closes it again, as its × does, and setup's Change hotkeys opens it; the player drags it anywhere, and it keeps that spot. It has the keyboard as it opens, and again when the player clicks a Change or the Deal Margin field; clicking back into the game gives the keyboard back, and the window stays open. Every change is saved at once. Each launch starts with it closed.
+_Avoid_: settings view (the panel's, before the window), settings page, preferences, options
 
 ### Reporting bugs
 

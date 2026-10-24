@@ -17,7 +17,6 @@ mod deal_badges;
 mod errors;
 mod files;
 mod grind_tracker;
-mod hotkey_settings;
 mod hotkeys;
 mod http;
 mod item_card;
@@ -31,6 +30,7 @@ mod panel_window;
 mod pictures;
 mod search;
 mod settings;
+mod settings_window;
 mod setup;
 mod sizemove;
 pub mod source;
@@ -97,7 +97,7 @@ pub(crate) enum Command {
     Press(PanelControl),
     /// The overlay's query box now holds this, for the core.
     SearchQuery(String),
-    /// The player pressed this key on the settings view, for the core.
+    /// The player pressed this key on the Settings window, for the core.
     RebindKey(KeyPress),
     /// The player clicked the search view's mob (in the matches) or map (in the mob's
     /// map list) with this ID.
@@ -240,7 +240,8 @@ fn act(action: Action, commands: tauri::State<'_, Sender<Command>>) {
 }
 
 /// A page reports how tall its content is, so its window fits it: the overlay's expanded
-/// panel, the Grind Tracker, the Personal Bests, the Item Lookup alert and the Item Card.
+/// panel, the Grind Tracker, the Personal Bests, the Settings, the Item Lookup alert and the
+/// Item Card.
 #[tauri::command]
 fn page_height(window: tauri::Window, height: f64, commands: tauri::State<'_, Sender<Command>>) {
     let _ = commands.send(Command::Height(window.label().to_string(), height));
@@ -341,6 +342,7 @@ pub fn run() {
                 error!("{e}");
             }
             let panels = Panels::new(app.handle(), &commands);
+            settings_window::watch_focus(app.handle(), commands.clone());
             // The page earlier versions wrote for the browser, which the Personal Bests
             // window replaces.
             let _ = std::fs::remove_file(app.path().app_config_dir()?.join("personal-bests.html"));
@@ -355,12 +357,11 @@ pub fn run() {
                     let _ = commands.send(Command::Resized(*size));
                 }
                 // Leaving the overlay for another window (the game) with the search view
-                // or the settings view open is Esc: it has the keyboard only while it's in
-                // front. Not when focus only moved within our windows, as into the
-                // overlay's own webview.
+                // open is Esc: it has the keyboard only while it's in front. Not when focus
+                // only moved within our windows, as into the overlay's own webview or the
+                // Settings window.
                 WindowEvent::Focused(false) if !gamewin::foreground_is_ours() => {
                     let _ = commands.send(Command::Act(Action::SearchEscape));
-                    let _ = commands.send(Command::Act(Action::CloseSettings));
                 }
                 _ => {}
             });
@@ -400,7 +401,7 @@ pub fn run() {
             search::search_pick,
             search::search_pick_destination,
             search::search_pick_item,
-            hotkey_settings::rebind_key,
+            settings_window::rebind_key,
             bests_window::personal_bests_open_map,
             bests_window::personal_bests_remove_visit,
             bests_window::personal_bests_move_visit,
@@ -441,6 +442,7 @@ struct Windows {
 struct Panels {
     grind_tracker: PanelWindow,
     personal_bests: PanelWindow,
+    settings: PanelWindow,
     item_lookup: PanelWindow,
     item_card: PanelWindow,
     deal_badges: PanelWindow,
@@ -448,19 +450,27 @@ struct Panels {
 
 impl Panels {
     /// The Personal Bests window after the overlay and the Grind Tracker's, which it stays
-    /// above.
+    /// above; the Settings window after them all, which it stays above.
     fn new(app: &AppHandle, commands: &Sender<Command>) -> Self {
         Self {
             grind_tracker: PanelWindow::new(app, &grind_tracker::SPEC, commands.clone()),
             personal_bests: PanelWindow::new(app, &bests_window::SPEC, commands.clone()),
+            settings: PanelWindow::new(app, &settings_window::SPEC, commands.clone()),
             item_lookup: PanelWindow::new(app, &item_lookup::SPEC, commands.clone()),
             item_card: PanelWindow::new(app, &item_card::SPEC, commands.clone()),
             deal_badges: PanelWindow::new(app, &deal_badges::SPEC, commands.clone()),
         }
     }
 
-    fn all_mut(&mut self) -> [&mut PanelWindow; 5] {
-        [&mut self.grind_tracker, &mut self.personal_bests, &mut self.item_lookup, &mut self.item_card, &mut self.deal_badges]
+    fn all_mut(&mut self) -> [&mut PanelWindow; 6] {
+        [
+            &mut self.grind_tracker,
+            &mut self.personal_bests,
+            &mut self.settings,
+            &mut self.item_lookup,
+            &mut self.item_card,
+            &mut self.deal_badges,
+        ]
     }
 
     /// The window with this label.
@@ -472,6 +482,7 @@ impl Panels {
     fn sync(&mut self, state: &PanelState) {
         grind_tracker::sync(&mut self.grind_tracker, state);
         bests_window::sync(&mut self.personal_bests, state);
+        settings_window::sync(&mut self.settings, state);
         item_lookup::sync(&mut self.item_lookup, state);
         item_card::sync(&mut self.item_card, state);
         deal_badges::sync(&mut self.deal_badges, state);
@@ -927,7 +938,7 @@ fn core_loop(
             minerva.on_foreground(gamewin::foreground(game.map(|g| g.handle)));
         }
         // After every wake-up too: the hotkeys are released as soon as the player starts
-        // rebinding one (a registered combination would never reach the overlay), and the
+        // rebinding one (a registered combination would never reach the Settings window), and the
         // new one is registered as soon as they have pressed it.
         let state = minerva.panel_state();
         if let Some((taken, invalid)) = hotkeys.sync(&app, &state.hotkeys, state.hotkeys_live) {
@@ -1112,7 +1123,7 @@ struct OverlayWindow {
     focusable: Option<bool>,
     /// Whether the overlay is listed in the taskbar (only while detached).
     in_taskbar: Option<bool>,
-    /// The search view or the settings view is open: the overlay has the keyboard.
+    /// The search view is open: the overlay has the keyboard.
     takes_keyboard: bool,
     /// Tells its watcher the core shows it, so it keeps it on top while the game or one
     /// of our windows is in front.
@@ -1188,9 +1199,8 @@ impl OverlayWindow {
             self.in_taskbar = Some(detached);
             let _ = self.overlay.set_skip_taskbar(!detached);
         }
-        // Only the open search view takes the typing, and the open settings view the
-        // combinations the player presses. Otherwise the overlay can't be activated
-        // (WS_EX_NOACTIVATE), so a click on it leaves the keyboard with the game.
+        // Only the open search view takes the typing. Otherwise the overlay can't be
+        // activated (WS_EX_NOACTIVATE), so a click on it leaves the keyboard with the game.
         let takes_keyboard = state.overlay_takes_keyboard;
         if self.focusable != Some(takes_keyboard) {
             self.focusable = Some(takes_keyboard);
@@ -1206,9 +1216,9 @@ impl OverlayWindow {
                 error!("click-through toggle failed: {e}");
             }
         }
-        // The search view or the settings view opens right after our hotkey or a click on
-        // the overlay, so Windows lets us take the foreground; when it closes, Windows
-        // gives focus back to the window below.
+        // The search view opens right after our hotkey or a click on the overlay, so
+        // Windows lets us take the foreground; when it closes, Windows gives focus back to
+        // the window below.
         match (self.takes_keyboard, takes_keyboard) {
             (false, true) => search::take_focus(&self.overlay),
             (true, false) => search::give_focus_back(&self.overlay),
@@ -1253,7 +1263,9 @@ mod tests {
             (r#""toggleTaxis""#, Action::ToggleTaxis),
             (r#""toggleTeleportScrolls""#, Action::ToggleTeleportScrolls),
             (r#"{"toggleSection":"hiddenPortals"}"#, Action::ToggleSection(Section::HiddenPortals)),
+            (r#""openSettings""#, Action::OpenSettings),
             (r#""closeSettings""#, Action::CloseSettings),
+            (r#""focusSettings""#, Action::FocusSettings),
             (r#"{"beginRebind":"itemCard"}"#, Action::BeginRebind(Hotkey::ItemCard)),
             (r#""cancelRebind""#, Action::CancelRebind),
             (r#""turnOffHotkey""#, Action::TurnOffHotkey),

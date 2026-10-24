@@ -507,12 +507,12 @@ fn card_placement(game: &GameWindow, pointer: ScreenPoint, size: Size, avoid: &[
 /// The card's side sits this far from the panel's (physical px), as the Grind Tracker's.
 const PANEL_GAP: i32 = 8;
 
-/// Where a card of `size` picked from Search goes: beside the `panel`, the tops level, on
-/// the side towards the middle of the game, or else the other side; whichever first stays
-/// inside the game's client area and off `avoid` (the captured regions and our other
-/// windows). With neither clear, towards the middle, moved inside the client area and below
+/// Where a card of `size` picked from Search goes, and the Settings window until the player
+/// drags it: beside the `panel`, the tops level, on the side towards the middle of the game,
+/// or else the other side; whichever first stays inside the game's client area and off
+/// `avoid` (the captured regions and our other windows). With neither clear, towards the middle, moved inside the client area and below
 /// (or above) what it would cover.
-fn beside_panel(game: &GameWindow, panel: ScreenRect, size: Size, avoid: &[ScreenRect]) -> ScreenRect {
+pub(crate) fn beside_panel(game: &GameWindow, panel: ScreenRect, size: Size, avoid: &[ScreenRect]) -> ScreenRect {
     let client = game.client;
     let (width, height) = (size.width.min(client.width), size.height.min(client.height));
     let left = ScreenRect { x: panel.x - PANEL_GAP - width as i32, y: panel.y, width, height };

@@ -38,7 +38,7 @@ type UpdateNotice = { version: string; releaseUrl: string; stage: UpdateStage; o
 
 /** Mirror of `minerva_core::Updates`. */
 type Updates = {
-  /** "Check for updates" is on (the panel's Settings). */
+  /** "Check for updates" is on (the Settings window's switch). */
   checksOn: boolean;
   status: UpdateStatus;
   lastCheckedUnixMs: number | null;
@@ -55,7 +55,7 @@ type SetupView = {
   };
   /** No minimap title has been found for a while: the minimap may be closed. */
   titleLost: boolean;
-  /** The Grind Tracker is on (the panel's Settings). */
+  /** The Grind Tracker is on (the Settings window's switch). */
   grindTrackerOn: boolean;
   unavailableHotkeys: string[];
   /** Those of them that don't name a key combination; the rest another app has. */
@@ -345,10 +345,10 @@ invoke<SetupView | null>("page_view").then((v) => {
 });
 
 $("guide-open").addEventListener("click", () => show("guide"));
-// The panel's settings view comes in front with the keyboard, its first Change focused.
+// The Settings window opens, or stays open, with the keyboard, its first Change focused.
 $("change-hotkeys").addEventListener("click", () => {
   $("action-error").hidden = true;
-  invoke("panel_press", { control: "settings" }).catch(actionError);
+  invoke("act", { action: "openSettings" }).catch(actionError);
 });
 $("guide-back").addEventListener("click", () => show(returnStep));
 $("about-open").addEventListener("click", () => show("about"));

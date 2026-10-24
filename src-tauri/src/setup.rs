@@ -34,7 +34,7 @@ struct SetupView<'a> {
     invalid_hotkeys: &'a [String],
     /// Every Map Mark, which the map found names its own by.
     map_marks: &'a BTreeMap<String, MapMark>,
-    /// The Grind Tracker is on (the settings view's switch): setup says how to change it.
+    /// The Grind Tracker is on (the Settings window's switch): setup says how to change it.
     grind_tracker_on: bool,
     /// Whether a newer version is out, for About & Credits.
     updates: &'a Updates,
