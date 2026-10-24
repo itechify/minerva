@@ -40,7 +40,7 @@ mod view;
 
 use minerva_core::{
     Action, DEAL_FINDER_CAPTURE_MS, Minerva, ExpBarReader, ExpBarReading, ExpFigures, GameWindow, ItemCapture, ItemTooltipReader,
-    ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
+    ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, DiscordLinkAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
     Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, StatusBarCapture, StatusBarReader, StatusBarReading,
     TITLE_READ_MS, TITLE_SEARCH_MS, TitleCapture, TitleReader, TitleReading, UpdateAnswer, VisitBest,
 };
@@ -136,6 +136,13 @@ pub(crate) enum Command {
     OpenBestsLeaderboard { character: Option<String>, id: String },
     /// The Map Leaderboards answered the core's upload `id` (or it couldn't be made).
     LeaderboardAnswer { id: u64, answer: LeaderboardAnswer },
+    /// The player pressed Link Discord in the Personal Bests window.
+    LinkDiscord,
+    /// The player said not now to the Personal Bests window's prompt to link Discord.
+    DismissLinkPrompt,
+    /// The core's request `id` about linking came to `answer`; a link started, with the link
+    /// page to open first, its link token in it.
+    DiscordLinkAnswer { id: u64, answer: DiscordLinkAnswer, open: Option<String> },
     /// The core's check `id` for a newer version came to this.
     UpdateAnswer { id: u64, answer: UpdateAnswer },
     /// The core's download `id` of a newer version came to this: its installer, checked
@@ -403,6 +410,8 @@ pub fn run() {
             bests_window::personal_bests_merge_characters,
             bests_window::personal_bests_show_on_leaderboards,
             bests_window::personal_bests_open_leaderboard,
+            bests_window::personal_bests_link_discord,
+            bests_window::personal_bests_dismiss_link_prompt,
             item_card::item_card_close,
             item_card::item_card_pick,
             item_card::item_card_open_meowdb,
@@ -764,6 +773,20 @@ fn core_loop(
             Ok(Command::LeaderboardAnswer { id, answer }) => {
                 minerva.on_leaderboard_answer(id, answer);
             }
+            Ok(Command::LinkDiscord) => {
+                minerva.link_discord();
+            }
+            Ok(Command::DismissLinkPrompt) => {
+                minerva.dismiss_link_prompt();
+            }
+            Ok(Command::DiscordLinkAnswer { id, answer, open }) => {
+                // The error isn't kept, nor logged: it may quote the address, with its link token.
+                let answer = match open.map(|url| app.opener().open_url(url, None::<&str>)) {
+                    Some(Err(_)) => DiscordLinkAnswer::Failed { why: "the browser didn't open".to_string() },
+                    _ => answer,
+                };
+                minerva.on_discord_link_answer(id, answer);
+            }
             Ok(Command::UpdateAnswer { id, answer }) => {
                 minerva.on_update_answer(id, answer);
             }
@@ -920,6 +943,7 @@ fn core_loop(
         }
         // The core asks for uploads to the Map Leaderboards on a tick: each is made once.
         uploader.sync(&minerva.panel_state().leaderboard_uploads);
+        uploader.sync_discord(&minerva.panel_state().discord_link_requests);
         // And for a check for a newer version, and its download: each is run once.
         updater.sync(&minerva.panel_state().updates);
         // Its install, on this thread: whatever Quit Minerva saves is saved first, as the

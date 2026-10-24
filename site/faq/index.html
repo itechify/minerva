@@ -117,10 +117,12 @@
                 <details class="qa" id="free">
                   <summary>Is Minerva free? Does it need an account?</summary>
                   <p>
-                    It's free, and you never sign up. There's no analytics, and its check for a new version sends only the
+                    It's free, and you never need to sign up. There's no analytics, and its check for a new version sends only the
                     version you have (<a href="#self-update">see how</a>). Putting a character on the
                     Map Leaderboards needs no account either: a secret key Minerva makes on your PC ties the name to it
-                    (<a href="#leaderboard-public">see what the site shows</a>).
+                    (<a href="#leaderboard-public">see what the site shows</a>). You can
+                    <a href="#link-discord">link your PCs to Discord</a> from Minerva, so your names follow you to a new PC,
+                    but you never have to.
                   </p>
                 </details>
                 <details class="qa" id="maker">
@@ -206,7 +208,7 @@
                     <li>
                       Once you put a character on the <a href="#leaderboard-appear">Map Leaderboards</a>, also beside them:
                       the secret Leaderboard Key that ties their name to you, in <code>leaderboard-key</code>. Copy it
-                      across when you move to a new PC, and keep it to yourself.
+                      across when you move to a new PC (or <a href="#link-discord">link Discord</a>), and keep it to yourself.
                     </li>
                     <li>
                       The map and item data, pictures and animations in
@@ -982,7 +984,7 @@
                   <summary>What does the site show of me?</summary>
                   <p>
                     For each entry: your character's name and job, the exact level they set it at, the EXP per hour, and
-                    the date, for everyone to see. Nothing else about you or your PC goes, and there's no account. Instead Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the
+                    the date, for everyone to see. Nothing else about you or your PC goes, and you need no account. Instead Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the
                     first time it uploads, which ties your character's name to it, so no one else can upload under that
                     name. The site keeps only a scrambled form (a hash) of the key, and you never need to see it.
                     Taking a map's top spot off someone else is also
@@ -1015,11 +1017,32 @@
                   <summary>It says another Minerva holds my character's name. What now?</summary>
                   <p>
                     A name belongs to the Leaderboard Key that uploaded it first. If that was you, on a PC you've since
-                    reinstalled or replaced, your old key went with it. Ask on
-                    <a href="https://discord.gg/NnbnVWkRrF">Minerva's Discord</a>, with the character's name: once Minerva
-                    has tried to upload from your new PC, the maintainer can hand the name to its key. Then click
-                    <strong>Send again</strong> on the note in your Personal Bests, and your uploads go through again. To keep your key when you move PCs, copy <code>leaderboard-key</code> across
+                    reinstalled or replaced, your old key went with it. If your old PC was
+                    <a href="#link-discord">linked to Discord</a>, click <strong>link this one</strong> on the note in your
+                    Personal Bests and link this PC to the same Discord: your uploads go through again by themselves.
+                    Otherwise, ask on <a href="https://discord.gg/NnbnVWkRrF">Minerva's Discord</a>, with the character's
+                    name: once Minerva has tried to upload from your new PC, the maintainer can hand the name to its key.
+                    Then click <strong>Send again</strong> on the note, and your uploads go through again. To keep your
+                    names when you move PCs, link Discord, or copy <code>leaderboard-key</code> across
                     (<a href="#kept">where Minerva keeps its files</a>).
+                  </p>
+                </details>
+                <details class="qa" id="link-discord">
+                  <summary>What does Link Discord do?</summary>
+                  <p>
+                    It links this PC to your Discord on owlofminerva.app, so your characters' names on the Map Leaderboards
+                    follow you to a new PC. In your Personal Bests, beside a character's <strong>Share</strong>, click
+                    <strong>Link Discord</strong>: your browser opens the site, which signs you in with Discord and asks
+                    before it links this PC. Then on a new PC, or after reinstalling Windows, link that one to the same
+                    Discord, and it can upload your characters again, with no need to ask anyone. Your Personal Bests then
+                    say <strong>Linked to Discord as</strong> your username.
+                  </p>
+                  <p>
+                    The site keeps your Discord user ID and username, and shows neither. It's optional: Minerva uploads
+                    just the same without it. At <a href="/account/">your account</a> on the site you can unlink a PC (one
+                    you sold, say) or delete the account; your characters stay on the Map Leaderboards either way. Link
+                    before you need it: a PC that was never linked can't hand its names on, and then the maintainer
+                    <a href="#leaderboard-claimed">does it by hand</a>.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-link">

@@ -398,6 +398,9 @@ pub const MIN: u64 = 60 * S;
 pub const HOUR: u64 = 60 * MIN;
 pub const DAY: u64 = 24 * HOUR;
 
+/// The wall clock at capture time 0 for the Map Leaderboards' tests: 9 Oct 2026, 12:00 UTC.
+pub const WALL: u64 = 1_791_547_200_000;
+
 /// When a saved copy was made: 2026-10-01 00:00 UTC, in ms since the Unix epoch.
 pub const SAVED_AT: u64 = 1_790_812_800_000;
 

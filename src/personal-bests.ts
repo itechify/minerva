@@ -80,9 +80,25 @@ type BestsCharacter = {
   leaderboard: Toggle | null;
 };
 
+/** Mirror of `minerva_core::DiscordLinkView`: linking this install to the player's Account
+ *  on the site, so their Characters' names follow them to a new PC. */
+type DiscordLink = {
+  /** Linked to the Account that signs in with this Discord username. */
+  linkedAs: string | null;
+  /** Link Discord is offered: the site said this install isn't linked. */
+  offered: boolean;
+  /** The link page is opening or open, and Minerva checks whether it linked. */
+  linking: boolean;
+  /** Why the link page couldn't be opened, as Link Discord last tried. */
+  failed: string | null;
+  /** The prompt shows, once, to a player sharing a Character who hasn't linked. */
+  prompt: boolean;
+};
+
 /** What the shell sends: whether the window shows at all, whose bests it can show, each
- *  with the core's rows, and every Map Mark, which each row's map names its own by. */
-type BestsView = { shown: boolean; characters: BestsCharacter[]; mapMarks: MapMarks };
+ *  with the core's rows, every Map Mark, which each row's map names its own by, and linking
+ *  to Discord. */
+type BestsView = { shown: boolean; characters: BestsCharacter[]; mapMarks: MapMarks; discord: DiscordLink };
 
 type Column = "map" | "levels" | "exp" | "share" | "set";
 type Way = "ascending" | "descending";
@@ -513,6 +529,8 @@ let characters: BestsCharacter[] = [];
 /** The shown choice's rows. */
 let maps: BestsMap[] = [];
 let marks: MapMarks = {};
+/** Linking to Discord, as the core last said it. */
+let discord: DiscordLink = { linkedAs: null, offered: false, linking: false, failed: null, prompt: false };
 let sort: { column: Column; way: Way } = { column: "exp", way: "descending" };
 let scale: Scale = { top: 1, lines: [] };
 /** The maps opened to their Visit History, by whose they are and their ID, kept as the sort
@@ -664,6 +682,28 @@ function standing(t: Toggle): string {
   }
 }
 
+/** Link Discord: a text button, or inside a note's sentence a text link, as the note's
+ *  "ask on Minerva's Discord" is. */
+function linkButton(words = "Link Discord", inSentence = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = inSentence ? "text-link" : "text-button";
+  button.dataset.linkDiscord = "";
+  button.textContent = words;
+  button.title = "Link this PC to your Discord on owlofminerva.app, so your characters' names on the Map Leaderboards follow you to a new PC";
+  return button;
+}
+
+/** Beside the Share: whose Discord this Minerva is linked to, that linking is under way, or
+ *  Link Discord, unless a note below offers it already (the prompt, a page that didn't open,
+ *  a name another key holds, bests that didn't read). Nothing while the site hasn't said. */
+function discordLine(t: Toggle): HTMLElement | null {
+  if (discord.linkedAs !== null) return span("leaderboard-status", `Linked to Discord as ${discord.linkedAs}.`);
+  if (discord.linking) return span("leaderboard-status", "Linking Discord: finish in your browser.");
+  const noted = discord.prompt || discord.failed !== null || t.status === "claimed" || t.status === "held";
+  return discord.offered && !noted ? linkButton() : null;
+}
+
 /** A line of the Manage panel. */
 function line(...parts: (string | HTMLElement)[]) {
   const div = document.createElement("div");
@@ -680,6 +720,8 @@ function renderShare() {
   shareEl.replaceChildren();
   if (c?.name && t?.offered) {
     shareEl.append(leaderboardSwitch(c.name, t), span("leaderboard-status", standing(t)));
+    const link = discordLine(t);
+    if (link) shareEl.append(link);
   } else if (c?.name && t && c.maps.length > 0) {
     shareEl.append(
       span("move-label", `Nothing of ${c.name}'s can go on the Map Leaderboards yet: a best goes up once Minerva has read the level and job that set it, and its date.`),
@@ -784,6 +826,23 @@ function problemNote(words: (string | HTMLElement)[], action?: HTMLElement) {
   return note;
 }
 
+/** The prompt to link Discord, once, quietly: not a problem, so no dot, with Link Discord
+ *  and Not now. */
+function linkPrompt() {
+  const note = document.createElement("div");
+  note.className = "note link-prompt";
+  const text = document.createElement("p");
+  text.className = "problem-words";
+  text.textContent = "Link Discord, and your characters' names on the Map Leaderboards follow you to a new PC.";
+  const later = document.createElement("button");
+  later.type = "button";
+  later.className = "text-button";
+  later.dataset.dismissLink = "";
+  later.textContent = "Not now";
+  note.append(text, linkButton(), later);
+  return note;
+}
+
 /** The shown Character's upload problems, whether Manage is open or not: held, claimed or
  *  tried again, each with its Send again, and the entries the site kept off. */
 function renderProblems() {
@@ -811,23 +870,23 @@ function renderProblems() {
           [
             `Minerva couldn't read your bests file at a launch, so the site may hold more of ${name}'s bests than are here. `,
             "Nothing of theirs is sent until you send what's here, which replaces what the site holds.",
+            ...(discord.offered ? [" To keep your characters' names yours if this PC's files are ever lost, ", linkButton("link Discord", true), "."] : []),
           ],
           send,
         ),
       );
     } else if (t.status === "claimed") {
       // To the panel's Discord link, as About & Credits' is.
-      const discord = document.createElement("button");
-      discord.type = "button";
-      discord.className = "text-link";
-      discord.dataset.control = "openDiscord";
-      discord.textContent = "ask on Minerva's Discord";
-      problemsEl.append(
-        problemNote(
-          [`Not on the Map Leaderboards: another Minerva holds the name ${name} there. If it's yours (a new PC, say), `, discord, ", then send again."],
-          again,
-        ),
-      );
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "text-link";
+      link.dataset.control = "openDiscord";
+      link.textContent = "ask on Minerva's Discord";
+      const words: (string | HTMLElement)[] = [`Not on the Map Leaderboards: another Minerva holds the name ${name} there. If it's yours (a new PC, say), `];
+      // Linked already, the name would have gone through if the old PC was: only Discord can help.
+      if (discord.offered) words.push("and your old PC was linked to Discord, ", linkButton("link this one", true), "; otherwise ");
+      words.push(link, ", then send again.");
+      problemsEl.append(problemNote(words, again));
     } else if (t.status === "retrying") {
       const last = t.uploadedAtUnixMs === null ? "" : ` Last uploaded ${when(t.uploadedAtUnixMs)}.`;
       const words = t.on
@@ -839,6 +898,10 @@ function renderProblems() {
       problemsEl.append(problemNote([`Kept off the Map Leaderboards: ${t.rejected.map(rejectedWords).join("; ")}.`]));
     }
   }
+  if (discord.failed !== null) {
+    problemsEl.append(problemNote(["Couldn't open the page to link Discord. Check you're online, then try again."], linkButton("Try again")));
+  }
+  if (discord.prompt) problemsEl.append(linkPrompt());
   problemsEl.hidden = problemsEl.childElementCount === 0;
 }
 
@@ -867,6 +930,7 @@ function render(view: BestsView) {
   document.body.classList.toggle("hidden", !view.shown);
   characters = view.characters;
   marks = view.mapMarks;
+  discord = view.discord;
   // Hidden, nothing stays armed. Closed, the window has no rows, and the maps opened stay
   // opened for when it opens again; open, a map whose row went is no longer opened, and a
   // choice that went is no longer picked.
@@ -967,6 +1031,8 @@ document.addEventListener("click", (e) => {
   if (board) invoke("personal_bests_open_leaderboard", { character: shown()?.name ?? null, id: board.dataset.id });
   const again = target?.closest<HTMLButtonElement>("button[data-send-again]");
   if (again) invoke("personal_bests_send_again", { name: again.dataset.sendAgain });
+  if (target?.closest("button[data-link-discord]")) invoke("personal_bests_link_discord");
+  if (target?.closest("button[data-dismiss-link]")) invoke("personal_bests_dismiss_link_prompt");
   const share = target?.closest<HTMLButtonElement>("button[data-share]");
   if (share) invoke("personal_bests_show_on_leaderboards", { name: share.dataset.share, on: share.getAttribute("aria-checked") !== "true" });
   const toggle = target?.closest<HTMLButtonElement>("button.visits-toggle");

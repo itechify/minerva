@@ -29,6 +29,7 @@
 //!   region (it shows in screen captures, ours included), but over the panel and the
 //!   Grind Tracker if that's where it goes.
 
+use crate::discord_link::DiscordLinkView;
 use crate::grind_tracker::ClientOffset;
 use crate::leaderboards::{self, LeaderboardToggle};
 use crate::map_data::MapData;
@@ -53,6 +54,9 @@ pub struct PersonalBestsWindow {
     /// playing, by name; then the Unassigned bests, if there are any or no Character is
     /// named. None while it is closed.
     pub characters: Vec<PersonalBestsCharacter>,
+    /// Linking this install to the player's Account on the site with Discord (#152): whose
+    /// it is linked to, or Link Discord offered, and its prompt.
+    pub discord: DiscordLinkView,
 }
 
 /// One Character's bests in the Personal Bests window, or the Unassigned ones: the choices

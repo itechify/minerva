@@ -12,7 +12,7 @@ use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData,
 use minerva_core::{
     ListedPrice, ShopCapture, ShopHover, ShopList, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
-    CharacterBests, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, STATUS_BAR_STRIP, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
+    CharacterBests, DiscordLinkAnswer, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, STATUS_BAR_STRIP, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
 };
 
@@ -364,6 +364,53 @@ fn updating_its_choices_downloads_and_installs_replay_and_read_in_the_timeline()
         "update download 3 asked",
         "action \"quit\"",
         "update download 3's install asked, not relaunching",
+    ] {
+        assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
+    }
+}
+
+/// The request about linking to Discord under way: its id.
+fn discord_link_request(shell: &Shell) -> u64 {
+    let requests = &shell.minerva.panel_state().discord_link_requests;
+    requests.first().unwrap_or_else(|| panic!("no request about linking under way")).id
+}
+
+#[test]
+fn linking_discord_its_answers_and_the_prompt_dismissed_replay_and_read_in_the_timeline() {
+    // A best, so the Personal Bests window opens.
+    let mut shell = Shell::new(FakeSource::osms());
+    let best = VisitBest { exp_per_hour: 5000, set_at_unix_ms: None, level: None, job: None };
+    let unassigned = vec![MapBests { id: CONSTRUCTION_SITE_ID.into(), visits: vec![best] }];
+    shell.minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned, characters: Vec::new() });
+    shell.minerva.press(PanelControl::TogglePersonalBests);
+    shell.play(10 * S, CONSTRUCTION_SITE, grind);
+    let id = discord_link_request(&shell);
+    shell.minerva.on_discord_link_answer(id, DiscordLinkAnswer::NotLinked {});
+    shell.minerva.dismiss_link_prompt();
+    shell.play(15 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.link_discord();
+    shell.play(20 * S, CONSTRUCTION_SITE, grind);
+    let id = discord_link_request(&shell);
+    shell.minerva.on_discord_link_answer(id, DiscordLinkAnswer::Opened {});
+    shell.play(30 * S, CONSTRUCTION_SITE, grind);
+    let id = discord_link_request(&shell);
+    shell.minerva.on_discord_link_answer(id, DiscordLinkAnswer::Linked { username: "egberticus".into() });
+    shell.play(40 * S, CONSTRUCTION_SITE, grind);
+
+    let (_, recording) = shell.report();
+    let replay = bug_report::replay(&recording, Some(osms::game().files()));
+    assert_eq!(replay.divergence, None);
+    assert_eq!(replay.lines, recording.lines.len());
+    let timeline = recording.timeline(0);
+    for said in [
+        "Discord link request 1 asked: read the link state",
+        "Discord link request 1: not linked",
+        "the prompt to link Discord dismissed",
+        "Link Discord pressed",
+        "Discord link request 2 asked: open the link page",
+        "Discord link request 2: the link page opened",
+        "Discord link request 3 asked: read the link state",
+        "Discord link request 3: linked to \"egberticus\"",
     ] {
         assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
     }
