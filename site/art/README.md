@@ -1,0 +1,28 @@
+# The site's drawings
+
+Pictures of Minerva's owl in the game's pixel-art style, drawn for the site and supplied by the owner (October 2026). They aren't screenshots, so `site/screenshots/README.md`'s rules don't apply to them. Each is the supplied drawing trimmed to what it shows, on a transparent ground, at twice the size the page shows it at. The build makes its WebP copy (`site/vite.config.ts`).
+
+## The titles
+
+They head a page in place of its title's words: the owl with a Slime and an Orange Mushroom on a wooden sign lettered with the title. The page shows each 440px wide, gives the `<img>` its size, and the heading's words as its alt text.
+
+| File | Heads | What it shows | Size |
+| --- | --- | --- | --- |
+| `map-leaderboards.png` | `site/leaderboards/index.html` | The owl, crowned, on the first place of a podium, the Slime on the second and the Orange Mushroom on the third, over "Map Leaderboards" | 880×556 |
+| `faq.png` | `site/faq/index.html` | The owl reading a book between two question marks, the Slime and the Orange Mushroom beside it, a stack of books and a notice board, over "FAQ" | 880×482 |
+
+## The FAQ's groups
+
+One over each group's heading in `site/faq/index.html`, the owl holding what the group is about. The page shows each 120px tall (`width` is its own), and as decoration (`alt=""`): the heading under it names the group.
+
+| File | Group | What it shows | Size |
+| --- | --- | --- | --- |
+| `faq-safety.png` | Safety & your account | The owl holding a gold padlock | 227×240 |
+| `faq-install.png` | Install & updates | The owl holding a download and a gear | 267×240 |
+| `faq-setup.png` | Setup & hotkeys | The owl holding a gear and the keys Ctrl and K | 292×240 |
+| `faq-panel.png` | The panel & the map | The owl reading a map with a dotted route, a signboard showing a minimap beside it, a blue portal and a signpost on its other side | 403×240 |
+| `faq-hunting.png` | Hunting | The owl with a map and a magnifying glass beside a signpost | 326×240 |
+| `faq-grinding.png` | Grinding | The owl in a headband, stars in its eyes, with an EXP board, coins, an hourglass and a trophy | 252×240 |
+| `faq-leaderboards.png` | Map Leaderboards | The owl over a board of five ranked players, the Slime, the Orange Mushroom and a pink horned mob cheering under it | 217×240 |
+| `faq-items.png` | Items | The owl in a headband carrying a shopping bag of coins and a potion | 301×240 |
+| `faq-trouble.png` | Troubleshooting & Bug Reports | The owl in a hard hat with a wrench at a laptop, a speech bubble with a warning, a wrench and a bug, the Orange Mushroom worried beside it | 331×240 |
