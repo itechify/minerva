@@ -216,6 +216,10 @@ _Avoid_: miso, gold, money
 Something the player can hold in the inventory: equipment, potions, scrolls, chairs, ores, Cash items. Each has its own MeowDB page.
 _Avoid_: drop, loot (when meaning the item itself)
 
+**Scroll Tier**:
+Which of the four scrolls that improve the same thing one is: Lesser (100%), Intermediate (60%), Greater (10%) or Chaos, the end of its name ("One-Handed Sword Attack Scroll: Greater"). Every scroll of a tier has the same picture, whatever it improves, coloured by the tier: blue-grey, red, gold or grey.
+_Avoid_: grade, rank, success rate (each tier's rate, not the tier)
+
 **Item Tooltip**:
 The box the game draws by the mouse pointer when the player hovers an item: the item's name on the line with the blue bullet (a crafted item's maker sits above it), then its picture and figures. It is the game's, not ours: the Item Card and the Mob Card are Minerva's own.
 
@@ -248,7 +252,7 @@ How far below the Deal Line, in percent, the price of one item in a listing (of 
 _Avoid_: threshold, discount
 
 **Deal Badge**:
-The mark beside a Player Shop listing while the Deal Finder is on: how far below the Deal Line its price is and the line's price ("−32% · 1,470") for a deal, coloured as the game grades items (blue for a good deal, purple for a great one, 20% or more below the line, gold for a steal, 40% or more), how far off it is ("+12%") for none, "no price" when the Deal Line has none for the item, and "?" when the listing can't be read for sure. A listing whose name the shop cut short, so it could be several items, is named by its Item Tooltip while the player hovers it, until the list changes. While the pointer or the game's tooltip covers its listing, it keeps what was read there before, marked with an orange dot. A click on it opens the item's Item Card.
+The mark beside a Player Shop listing while the Deal Finder is on: how far below the Deal Line its price is and the line's price ("−32% · 1,470") for a deal, coloured as the game grades items (blue for a good deal, purple for a great one, 20% or more below the line, gold for a steal, 40% or more), how far off it is ("+12%") for none, "no price" when the Deal Line has none for the item, and "?" when the listing can't be read for sure. A listing whose name the shop cut short, so it could be several items, is named by its picture's Scroll Tier when it is a scroll's, or by its Item Tooltip while the player hovers it, until the list changes. While the pointer or the game's tooltip covers its listing, it keeps what was read there before, marked with an orange dot. A click on it opens the item's Item Card.
 _Avoid_: tag, label, highlight
 
 **Item Lookup**:

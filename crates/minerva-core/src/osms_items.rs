@@ -47,6 +47,36 @@ pub(crate) struct ItemFacts {
     /// A throwing star or a bullet, recharged at a shop (`unitPrice`): a listing of it is one
     /// set, its number how many the set holds.
     pub rechargeable: bool,
+    /// A scroll's tier; `None` for anything else.
+    pub tier: Option<ScrollTier>,
+}
+
+/// A scroll's tier, which its picture shows by its colour alone (#140): every scroll of a tier
+/// has the same picture, whatever it improves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ScrollTier {
+    /// 100%: blue-grey.
+    Lesser,
+    /// 60%: red.
+    Intermediate,
+    /// 10%: gold.
+    Greater,
+    /// Grey.
+    Chaos,
+}
+
+impl ScrollTier {
+    /// The tier OSMS's item files write as `tier`; `None` for one they don't.
+    fn from_osms(tier: &str) -> Option<Self> {
+        match tier.trim() {
+            "Lesser" => Some(ScrollTier::Lesser),
+            "Intermediate" => Some(ScrollTier::Intermediate),
+            "Greater" => Some(ScrollTier::Greater),
+            "Chaos" => Some(ScrollTier::Chaos),
+            _ => None,
+        }
+    }
 }
 
 /// Every item in OSMS's item files: the game's items, its scrolls and the Cash Shop's.
@@ -68,6 +98,9 @@ pub struct ItemCounts {
     /// Those a shop won't buy.
     pub not_sold: usize,
     pub cash: usize,
+    pub scrolls: usize,
+    /// Scrolls whose tier isn't one the Deal Finder knows (ADR 0014): their pictures name none.
+    pub scrolls_without_tier: usize,
 }
 
 impl ItemSet {
@@ -79,6 +112,8 @@ impl ItemSet {
             shop_priced: count(|item| matches!(item.shop, ShopPrice::Sells { .. })),
             not_sold: count(|item| item.shop == ShopPrice::NotSold),
             cash: count(|item| item.shop == ShopPrice::Cash),
+            scrolls: count(|item| item.kind == "Scroll"),
+            scrolls_without_tier: count(|item| item.kind == "Scroll" && item.tier.is_none()),
         }
     }
 
@@ -102,16 +137,23 @@ impl ItemSet {
             .unwrap_or_default()
     }
 
-    /// The items with the one name that starts as `start` does (a name the game cut short),
-    /// as [`ItemSet::named`] compares them. Empty when no name does, or several do.
-    pub(crate) fn starting_with(&self, start: &str) -> Vec<&ItemFacts> {
+    /// The items of each name that starts as `start` does (a name the game cut short), name by
+    /// name, as [`ItemSet::named`] compares them. Empty when none does.
+    pub(crate) fn names_starting_with(&self, start: &str) -> Vec<Vec<&ItemFacts>> {
         let start = item_key(start);
         if start.is_empty() {
             return Vec::new();
         }
-        let mut starting = self.names.iter().filter(|(name, _)| name.starts_with(&start));
-        match (starting.next(), starting.next()) {
-            (Some((_, items)), None) => items.iter().map(|&item| &self.items[item]).collect(),
+        let starting = self.names.iter().filter(|(name, _)| name.starts_with(&start));
+        starting.map(|(_, items)| items.iter().map(|&item| &self.items[item]).collect()).collect()
+    }
+
+    /// The items with the one name that starts as `start` does (a name the game cut short),
+    /// as [`ItemSet::named`] compares them. Empty when no name does, or several do.
+    pub(crate) fn starting_with(&self, start: &str) -> Vec<&ItemFacts> {
+        let mut names = self.names_starting_with(start);
+        match names.len() {
+            1 => names.remove(0),
             _ => Vec::new(),
         }
     }
@@ -127,13 +169,14 @@ fn read_set(files: &ItemFiles) -> Result<ItemSet, String> {
     let file: ItemsFile = parse(&files.items, "items.json")?;
     let cash_shop: CashShopFile = parse(&files.cash_shop, "cash_shop.json")?;
     let mut items = Vec::new();
-    let facts = |id, name: &str, kind: String, shop| ItemFacts { id, name: name.trim().to_string(), kind, shop, rechargeable: false };
+    let facts = |id, name: &str, kind: String, shop| ItemFacts { id, name: name.trim().to_string(), kind, shop, rechargeable: false, tier: None };
     for item in &file.items {
         let rechargeable = item.stats.contains_key("unitPrice");
         items.push(ItemFacts { rechargeable, ..facts(item.id, &item.name, kind(item), shop_price(item)?) });
     }
     for scroll in &file.scrolls {
-        items.push(facts(scroll.id, &scroll.name, "Scroll".into(), ShopPrice::Unknown));
+        let tier = scroll.tier.as_deref().and_then(ScrollTier::from_osms);
+        items.push(ItemFacts { tier, ..facts(scroll.id, &scroll.name, "Scroll".into(), ShopPrice::Unknown) });
     }
     for item in cash_shop.categories.iter().flat_map(|category| &category.items) {
         items.push(facts(item.id, &item.name, "Cash".into(), ShopPrice::Cash));
@@ -218,6 +261,9 @@ struct ItemsFile {
 struct OsmsScroll {
     id: u32,
     name: String,
+    /// "Lesser", "Intermediate", "Greater" or "Chaos".
+    #[serde(default)]
+    tier: Option<String>,
 }
 
 /// `cash_shop.json`.

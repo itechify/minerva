@@ -115,15 +115,23 @@ impl Item {
     }
 }
 
-/// A scroll in `items.json`'s `scrolls`: no price, no category.
+/// A scroll in `items.json`'s `scrolls`: no price, no category; its tier ("Lesser",
+/// "Intermediate", "Greater" or "Chaos"), Lesser unless said.
 #[derive(Debug, Clone)]
 pub struct Scroll {
     pub id: u64,
     pub name: String,
+    pub tier: String,
 }
 
 pub fn scroll(id: u64, name: &str) -> Scroll {
-    Scroll { id, name: name.into() }
+    Scroll { id, name: name.into(), tier: "Lesser".into() }
+}
+
+impl Scroll {
+    pub fn of_tier(self, tier: &str) -> Self {
+        Scroll { tier: tier.into(), ..self }
+    }
 }
 
 /// A Cash Shop item in `cash_shop.json`.
@@ -179,7 +187,7 @@ impl ItemWorld {
             .iter()
             .map(|scroll| {
                 json!({"id": scroll.id, "name": scroll.name, "equip_slot": "Other", "stat_type": "Attack",
-                       "tier": "Lesser", "description": "Improves something.\nSuccess rate: 100%"})
+                       "tier": scroll.tier, "description": "Improves something.\nSuccess rate: 100%"})
             })
             .collect();
         json!({

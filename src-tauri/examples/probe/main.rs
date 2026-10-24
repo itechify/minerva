@@ -200,6 +200,7 @@ fn osms() -> Result<(), String> {
         "Items: {} ({} with a shop price, {} a shop won't buy, {} Cash items)",
         counts.items, counts.shop_priced, counts.not_sold, counts.cash
     );
+    println!("Scrolls: {} ({} without a tier the Deal Finder knows)", counts.scrolls, counts.scrolls_without_tier);
     Ok(())
 }
 

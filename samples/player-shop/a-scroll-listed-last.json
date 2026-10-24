@@ -2,5 +2,5 @@
   { "name": "Battle Axe", "quantity": 1, "mesos": 4999 },
   { "name": "Blue Shark", "quantity": 1, "mesos": 2999 },
   { "name": "Blue Woodsman Boots", "quantity": 1, "mesos": 1499 },
-  { "name": "Two-handed Blunt Weap...", "quantity": 1, "mesos": 69999, "named": "Two-handed Blunt Weapon Attack Scroll: Intermediate" }
+  { "name": "Two-handed Blunt Weap...", "quantity": 1, "mesos": 69999, "tier": "Intermediate", "named": "Two-handed Blunt Weapon Attack Scroll: Intermediate" }
 ]

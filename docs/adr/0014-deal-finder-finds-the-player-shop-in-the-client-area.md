@@ -22,7 +22,7 @@ So the Deal Finder finds the shop itself: while it is on, the shell captures the
 ## Judging a listing
 
 - The price compared is the price of one: the listing's mesos over its quantity. A throwing star or a bullet (an item OSMS gives a recharge price, `unitPrice`) is one set however many it holds: its listing's number is the set's count, so its whole price is compared, as players price a set. It is a deal when it is below the Deal Line's price for the item by at least the Deal Margin, a percentage in the settings (0 by default: any price below).
-- The name is matched against OSMS's item files as the Item Card matches a tooltip's (ADR 0010). A name the game cut short ("Pet Equip Speed Scroll: L...") is the one item whose name starts so; several, and the listing is "?". Several items sharing the name that don't look alike (their kinds or shop prices differ) are "?" too.
+- The name is matched against OSMS's item files as the Item Card matches a tooltip's (ADR 0010). A name the game cut short ("Pet Equip Speed Scroll: L...") is the one item whose name starts so; several, and the listing is "?" until its picture (a scroll's) or its tooltip names it (below). Several items sharing the name that don't look alike (their kinds or shop prices differ) are "?" too.
 - Equipment is judged by its name alone: Market Lines keep one price per item, whatever its stats, and the listing doesn't show them.
 
 ## Naming a cut-short listing from its tooltip
@@ -38,12 +38,23 @@ Scrolls are the common case of a name cut short that starts several items' names
 - The tooltip's name line can run over the shop's chat window, as light as its letters: the name ends at the tooltip's edge, light above the line where no letter reaches, not at the first gap past it.
 - Only the listings on screen are read. Minerva sends no input to the game (ADR 0001), so the player scrolls, and the badges follow within half a second.
 
+## Naming a cut-short scroll from its picture
+
+A scroll listing still waited for a hover (#140). But OSMS's item files give every scroll its Scroll Tier, every scroll of a tier has the same picture whatever it improves, and the four tiers' pictures differ in colour alone: blue-grey (Lesser), red (Intermediate), gold (Greater), grey (Chaos). The listing's picture shows beside its name. So the reader reads each listing's picture as a tier, and the core names a cut-short scroll by it, unhovered.
+
+- The reader reads the picture's colour as the mean chromaticity of its pixels (each pixel's share of red, green and blue), which a darker live capture doesn't change: those off the cell's background, neither lighter than it (the bundle count's white, the pointer's) nor much darker (outlines). It is a tier's when it lies near that tier's colour, as every sample's does, live and not; otherwise, or with too little of the picture showing, it is no tier. It reads every listing's picture as a scroll's would be: a picture that isn't a scroll's may read as a tier, and only the core knows whether the listing could be a scroll.
+- The core names a listing by its picture only when its name is cut short, every item whose name starts so is a scroll, and one name among them is of the picture's tier (or alike items of that name). An item that isn't a scroll starting so, or two scrolls of that tier (both Pet Equip Speed Scrolls are Lesser), and the badge stays "?".
+- The tier read stands for its slot as a tooltip's name does: while what was read there stands. A picture under the pointer, or under the tooltip's box by it, is read as no tier, as one partly covered may read as another tier's (the tooltip's slate edge over a Greater's gold reads as Chaos's grey), and the tier read before stands. A listing whose picture was covered from the first capture is "?" until it shows.
+- Both the picture and the tooltip may name a listing. If they name different items, or the tooltip names a scroll of another tier than the picture's, one was misread, and the badge is "?".
+- A Bug Report writes the tier read with each listing (`Event::PlayerShop`), and a replay takes it in again. A report from before has no tier, and replays as it did.
+
 ## Considered options
 
 - **A Shop Region marked at setup.** Setup would grow a step that only shop browsers use, and would be asked for again whenever the game window changes size, as the Title Region was until ADR 0021. A shop dragged elsewhere would be read wrong, or not at all, without a word. Finding the shop costs little more than reading a region: the scan of the capture is a few milliseconds, and recognition, the costly part, is the same either way.
 - **Recognising text across the whole client area.** ocrs's detection model isn't shipped (ADR 0002), and reading every line on screen would cost far more than finding the bands, with chat and names to tell apart from listings.
-- **Reading each item's Item Tooltip.** It would tell equipment's stats, but takes the player's hover over each listing, one at a time: the Item Card does that already. Tooltips are still not read for stats, nor to name every listing: only to name one whose name the game cut short so that it could be several items, which nothing else tells (#135).
+- **Reading each item's Item Tooltip.** It would tell equipment's stats, but takes the player's hover over each listing, one at a time: the Item Card does that already. Tooltips are still not read for stats, nor to name every listing: only to name one whose name the game cut short so that it could be several items, which nothing else tells but a scroll's picture (#135, #140).
 - **Naming a cut-short listing at an Item Card press.** Pressing the hotkey over the listing would name it too, but opens a card each time, and the player hovers the listing anyway.
+- **Comparing a listing's picture with each item's OSMS picture.** It would name any items whose names start alike and whose pictures differ, not scrolls alone (the two Blue Moons). But the core holds no picture's pixels: OSMS's pictures reach only the overlay, which loads them from the shell's copies (ADR 0008). It would take a new input carrying decoded pictures, written down in a Bug Report and replayed (ADR 0009), and matching them at every UI Size (ADR 0020). Scrolls are the common case, and their tiers' colours need none of it (#140). Neither the pictures nor a table of the tiers' is committed: the tier comes from OSMS's live item files.
 - **Scrolling the list for the player.** Sending input to the game is ruled out (ADR 0001).
 
 ## Consequences

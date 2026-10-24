@@ -31,9 +31,12 @@
 //!    ink is wide for ([`PRICE_DIGIT_W`]): a digit ocrs drops leaves the shape whole.
 //! 6. While the pointer is on the list, the Item Tooltip by it is read too, as the Item
 //!    Card reads it (ADR 0007): the Deal Finder names a listing the game cut short by it.
+//! 7. Each listing's picture is read as the scroll tier its colour shows, were it a scroll's
+//!    ([`picture_tier`]): the Deal Finder names a scroll the game cut short by it (#140).
 
 use crate::Frame;
 use crate::item_tooltip::{ItemTooltip, ShopTooltipReader};
+use crate::osms_items::ScrollTier;
 use crate::panel::{ScreenPoint, ScreenRect};
 use crate::prep::Rect;
 use crate::ink::{at_brightness, black_on_white, luma};
@@ -120,6 +123,10 @@ pub struct ShopRow {
     /// Something covers it, so neither was read: the pointer, or the game's tooltip by it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub covered: bool,
+    /// The scroll tier its picture's colour shows, were it a scroll; `None`: none plainly, or
+    /// the picture is covered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tier: Option<ScrollTier>,
 }
 
 impl ShopList {
@@ -204,6 +211,34 @@ const BAND_ABOVE_PRICE: u32 = 33;
 const BAND_H: u32 = 54;
 /// The item pictures' column starts this far left of the band.
 const PICTURE_LEFT: u32 = 58;
+/// A listing's picture lies between this far left of its band and this far: its column, clear
+/// of the shop window's frame on its left and of the band on its right.
+const PICTURE_FROM: u32 = PICTURE_LEFT - 4;
+const PICTURE_TO: u32 = 4;
+/// A picture's pixel is its cell's background within this much per channel, at the list's
+/// brightness; one darker than this share of the background is an outline.
+const PICTURE_BACKGROUND_TOL: f32 = 12.0;
+const PICTURE_DARKEST: f32 = 0.35;
+/// A tier is read from at least this many of a picture's pixels: about a third of a scroll's.
+const PICTURE_MIN_PX: usize = 400;
+/// Each scroll tier's picture's mean chromaticity, as red's share less green's and green's
+/// less blue's, from the samples', live and not; a picture within [`TIER_REACH`] of one is
+/// that tier's. The nearest two (Lesser's blue-grey and Chaos's grey) are 0.07 apart, and every
+/// sample's within 0.02 of its own.
+const TIER_COLOURS: [(ScrollTier, (f32, f32)); 4] = [
+    (ScrollTier::Lesser, (-0.048, 0.0)),
+    (ScrollTier::Intermediate, (0.142, 0.075)),
+    (ScrollTier::Greater, (0.074, 0.157)),
+    (ScrollTier::Chaos, (0.020, 0.005)),
+];
+const TIER_REACH: f32 = 0.025;
+/// The pointer's hand reaches this far right of and below its tip, and a little up and left.
+const POINTER_REACH: f32 = 34.0;
+const POINTER_BEHIND: f32 = 2.0;
+/// The game's Item Tooltip's box starts this far left of and above its name line, and reaches
+/// this far below it (more than the tallest's).
+const TOOLTIP_AROUND_NAME: f32 = 24.0;
+const TOOLTIP_BELOW_NAME: f32 = 400.0;
 /// The band's colour, as screenshots show it.
 const BAND_RGB: [f32; 3] = [202.0, 213.0, 223.0];
 /// The selected listing's colour, as screenshots show it, and how far into the band it
@@ -265,6 +300,10 @@ impl PlayerShopReader {
             pointer,
             tooltip: self.tooltips.read(img, capture.origin, pointer),
         });
+        let mut shop = shop;
+        if let Some((shop, hover)) = shop.as_mut().zip(hover.as_ref()) {
+            hide_covered_pictures(shop, hover);
+        }
         ShopReading { shop, hover, at_ms: capture.frame.at_ms, near_miss }
     }
 
@@ -304,7 +343,7 @@ impl PlayerShopReader {
         let texts = self.read_lines(img, &lines, list.brightness);
         let mut texts = texts.into_iter();
         let band_area = |top: u32| Rect { x: list.x0, y: top, w: BAND_W, h: BAND_H };
-        let covered_row = |top: u32| ShopRow { area: on_screen(band_area(top)), name: None, price: None, covered: true };
+        let covered_row = |top: u32| ShopRow { area: on_screen(band_area(top)), name: None, price: None, covered: true, tier: None };
         // Each listing read clean, where it is. One that isn't is covered: its lines may be
         // pieces of others', so it counts only in its slot on the grid.
         let mut rows: Vec<(u32, ShopRow)> = Vec::new();
@@ -314,7 +353,8 @@ impl PlayerShopReader {
                 let name = texts.next().flatten();
                 let price = texts.next().flatten().filter(|read| fits(read, &listing.price));
                 let price = price.as_deref().and_then(parse_price);
-                rows.push((listing.top(), ShopRow { area: on_screen(band_area(listing.top())), name, price, covered: false }));
+                let tier = picture_tier(img, &list, listing.top());
+                rows.push((listing.top(), ShopRow { area: on_screen(band_area(listing.top())), name, price, covered: false, tier }));
             } else {
                 unclean.push(listing.top());
             }
@@ -738,6 +778,71 @@ fn covered(img: &RgbImage, list: &List, top: u32) -> bool {
     dark.take(COVERED_MIN).count() == COVERED_MIN
 }
 
+/// The scroll tier the picture of the listing whose band starts at `top` shows by its colour,
+/// were it a scroll's: every scroll of a tier has the same picture, and the tiers' differ in
+/// colour alone (#140). Its colour is the mean chromaticity of the picture's pixels (each
+/// pixel's share of red, green and blue), which a darker capture doesn't change: those off the
+/// cell's background, neither lighter than it (the bundle count's white, the pointer's) nor
+/// much darker (outlines). `None` when it isn't plainly one tier's, or too little of it shows.
+fn picture_tier(img: &RgbImage, list: &List, top: u32) -> Option<ScrollTier> {
+    let (x0, x1) = (list.x0.checked_sub(PICTURE_FROM)?, list.x0.checked_sub(PICTURE_TO)?);
+    let (y0, y1) = (top, (top + BAND_H).min(img.height()));
+    let cell: Vec<[u8; 3]> = (y0..y1).flat_map(|y| (x0..x1).map(move |x| img.get_pixel(x, y).0)).collect();
+    let mut counts: HashMap<[u8; 3], usize> = HashMap::new();
+    for &p in &cell {
+        *counts.entry(p).or_default() += 1;
+    }
+    let (background, _) = counts.into_iter().max_by_key(|&(p, n)| (n, p))?;
+    let total = |p: [u8; 3]| p.iter().map(|&c| f32::from(c)).sum::<f32>();
+    let tol = PICTURE_BACKGROUND_TOL * list.brightness;
+    let (lightest, darkest) = (total(background), total(background) * PICTURE_DARKEST);
+    let mut sum = [0.0f32; 3];
+    let mut n = 0;
+    for p in cell {
+        let off_background = (0..3).any(|i| (f32::from(p[i]) - f32::from(background[i])).abs() > tol);
+        let total = total(p);
+        if !off_background || total > lightest || total < darkest {
+            continue;
+        }
+        for i in 0..3 {
+            sum[i] += f32::from(p[i]) / total;
+        }
+        n += 1;
+    }
+    if n < PICTURE_MIN_PX {
+        return None;
+    }
+    let (rg, gb) = ((sum[0] - sum[1]) / n as f32, (sum[1] - sum[2]) / n as f32);
+    let distance = |(r, g): (f32, f32)| (rg - r).hypot(gb - g);
+    let (tier, nearest) = TIER_COLOURS.iter().map(|&(tier, colour)| (tier, distance(colour))).min_by(|a, b| a.1.total_cmp(&b.1))?;
+    (nearest <= TIER_REACH).then_some(tier)
+}
+
+/// Read no tier for a listing whose picture the pointer covers, or the Item Tooltip by it: a
+/// picture partly covered may read as another tier's (the tooltip's slate edge over a Greater's
+/// gold reads grey, as Chaos's). The tier read there before stands for it in the Deal Finder.
+fn hide_covered_pictures(shop: &mut ShopList, hover: &ShopHover) {
+    let size = shop.ui_size();
+    let px = |v: f32| (v * size).round() as i32;
+    let reach = px(POINTER_REACH + POINTER_BEHIND) as u32;
+    let pointer = ScreenRect { x: hover.pointer.x - px(POINTER_BEHIND), y: hover.pointer.y - px(POINTER_BEHIND), width: reach, height: reach };
+    let tooltip = match &hover.tooltip {
+        ItemTooltip::Found { area, .. } => {
+            let (x, y) = (area.x - px(TOOLTIP_AROUND_NAME), area.y - px(TOOLTIP_AROUND_NAME));
+            let below = px(TOOLTIP_AROUND_NAME + TOOLTIP_BELOW_NAME) as u32;
+            Some(ScreenRect { x, y, width: area.width + 2 * px(TOOLTIP_AROUND_NAME) as u32, height: below })
+        }
+        ItemTooltip::None => None,
+    };
+    let (from, to) = (px(PICTURE_FROM as f32), px(PICTURE_TO as f32));
+    for row in &mut shop.rows {
+        let picture = ScreenRect { x: row.area.x - from, width: (from - to) as u32, ..row.area };
+        if picture.overlaps(pointer) || tooltip.is_some_and(|tooltip| picture.overlaps(tooltip)) {
+            row.tier = None;
+        }
+    }
+}
+
 /// `line`'s ink, black on white.
 fn line_ink(img: &RgbImage, line: &TextLine, brightness: f32) -> GrayImage {
     let (w, h) = (line.x1 - line.x0, line.y1 - line.y0);
@@ -786,6 +891,32 @@ fn grouped(text: &str) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_picture_under_the_pointer_or_its_tooltip_reads_no_tier() {
+        // Three listings at the samples' UI Size, their pictures from 54 px left of their bands.
+        let row = |y: i32| ShopRow {
+            area: ScreenRect { x: 158, y, width: 253, height: 54 },
+            name: None,
+            price: None,
+            covered: false,
+            tier: Some(ScrollTier::Greater),
+        };
+        let shop = || ShopList { area: ScreenRect { x: 100, y: 0, width: 311, height: 180 }, rows: vec![row(0), row(63), row(125)] };
+        let tiers = |shop: &ShopList| shop.rows.iter().map(|row| row.tier.is_some()).collect::<Vec<_>>();
+        let hover = |x: i32, y: i32, tooltip: ItemTooltip| ShopHover { pointer: ScreenPoint { x, y }, tooltip };
+
+        // The pointer on the middle one's picture, no tooltip by it.
+        let mut on_picture = shop();
+        hide_covered_pictures(&mut on_picture, &hover(116, 80, ItemTooltip::None));
+        assert_eq!(tiers(&on_picture), [true, false, true]);
+
+        // On its name, the tooltip by it from below it over the last one's picture.
+        let mut on_name = shop();
+        let tooltip = ItemTooltip::Found { area: ScreenRect { x: 120, y: 150, width: 300, height: 18 }, name: None };
+        hide_covered_pictures(&mut on_name, &hover(250, 80, tooltip));
+        assert_eq!(tiers(&on_name), [true, true, false]);
+    }
 
     #[test]
     fn prices_read_only_in_the_games_shape() {
