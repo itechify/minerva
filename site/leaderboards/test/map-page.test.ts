@@ -53,5 +53,26 @@ describe("a map's page", () => {
       text: "No one has a best on this Map Leaderboard yet.",
       link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
     });
+    expect(page.found).toBe(true);
+  });
+
+  it("says there's no such map for a map the map list doesn't name and no one has a best on", () => {
+    const page = mapPage(readLink("?map=999999999&band=20&name=Egbert"), names, { map: "999999999", bands: [] });
+
+    expect(page.found).toBe(false);
+    expect(page.open).toBe(null);
+    expect(page.bands).toEqual([]);
+    expect(page.empty).toEqual({
+      text: "There's no map 999999999 in the map list.",
+      link: { text: "Find a map on the Map Leaderboards.", href: "/leaderboards/" },
+    });
+  });
+
+  it("shows a map the map list doesn't name that has bests, a map newer than the list, by its ID", () => {
+    const page = mapPage(readLink("?map=999999999"), names, { map: "999999999", bands });
+
+    expect(page.found).toBe(true);
+    expect(page.place).toMatchObject({ name: "Map 999999999", street: "Not in the map list" });
+    expect(page.open).toBe(10);
   });
 });

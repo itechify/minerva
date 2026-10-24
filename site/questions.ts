@@ -64,11 +64,14 @@ export function fillFaqPage(html: string, faq: Faq): string {
 
 /**
  * A page (the home page, or the Map Leaderboards') with each list of questions filled from
- * the FAQ, followed by a link to the rest of its group. `root` is the site's folder from
- * the page: "./" for the home page.
+ * the FAQ, the last list naming a group followed by a link to the rest of it, so features
+ * side by side from one group (the Item Card, Item Lookup and the Deal Finder) share one.
+ * `root` is the site's folder from the page: "./" for the home page.
  */
 export function fillQuestionLists(html: string, faq: Faq, root = "./"): string {
-  return html.replace(LIST, (_, ids: string, groupId: string) => {
+  const last = new Map<string, number>();
+  for (const match of html.matchAll(LIST)) last.set(match[2], match.index);
+  return html.replace(LIST, (_, ids: string, groupId: string, at: number) => {
     const group = faq.groups.get(groupId);
     if (!group) throw new Error(`site: a page names a FAQ group there isn't: "${groupId}"`);
     const shown = ids.trim().split(/\s+/).map((id) => {
@@ -76,10 +79,10 @@ export function fillQuestionLists(html: string, faq: Faq, root = "./"): string {
       if (!question) throw new Error(`site: a page names a FAQ question there isn't: "${id}"`);
       return render(question, "/faq/", root);
     });
-    const count = group.ids.length;
-    return (
-      `<div class="qa-block"><div class="qa-list">${shown.join("")}</div>` +
-      `<p class="qa-more"><a href="/faq/#${group.id}">All ${count} questions about ${group.about}</a></p></div>`
-    );
+    const more =
+      at === last.get(groupId)
+        ? `<p class="qa-more"><a href="/faq/#${group.id}">All ${group.ids.length} questions about ${group.about}</a></p>`
+        : "";
+    return `<div class="qa-block"><div class="qa-list">${shown.join("")}</div>${more}</div>`;
   });
 }

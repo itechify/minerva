@@ -111,6 +111,36 @@ describe("where to train's table", () => {
 
     expect(rows.find((r) => r.name === "Boar Field")).toMatchObject({ best: null, entries: "No entries yet" });
     expect(rows.find((r) => r.name === "Map 100000009")).toMatchObject({ mark: null, mobs: null, entries: "1 entry" });
+    // A band some of whose maps have entries says nothing over them.
+    expect(table().none).toBeNull();
+  });
+
+  it("says once, over them, that no one has put a best on a band's maps when none has, their rows saying nothing of it", () => {
+    const quiet = { ...BAND_20, maps: [map("100000001", [25, 29], HARBOR, null), map("100000002", [20, 24], CITY, null)] };
+    const shown = table({}, quiet);
+
+    expect(shown.none).toEqual({
+      text: "No one at Lv 20–29 has put a best on these maps yet. They're the maps whose mobs are at your level.",
+      link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
+    });
+    expect(shown.rows.map((r) => [r.name, r.mobs, r.best, r.entries])).toEqual([
+      ["Quiet Field", "Lv 20–24", null, null],
+      ["Boar Field", "Lv 25–29", null, null],
+    ]);
+    expect(shown.caption).toBe("2 maps for Lv 20–29");
+  });
+
+  it("says so over one area's maps when none of them has an entry, though another area's have", () => {
+    const answer = { ...BAND_20, maps: [...BAND_20.maps, map("100000005", [21, 26], { id: "Ellinia", name: "Ellinia", picture: "https://osms.invalid/images/map_marks/Ellinia.png" }, null)] };
+
+    expect(table({ area: "Ellinia" }, answer).none?.text).toMatch(/^No one at Lv 20–29 has put a best on this map yet\./);
+    expect(table({}, answer).none).toBeNull();
+  });
+
+  it("says it of one map as one", () => {
+    const one = { ...BAND_20, maps: [map("100000001", [25, 29], HARBOR, null)] };
+
+    expect(table({}, one).none?.text).toBe("No one at Lv 20–29 has put a best on this map yet. Its mobs are at your level.");
   });
 
   it("offers the areas the band's maps are in, by name, each linking to it", () => {
@@ -155,6 +185,7 @@ describe("where to train's table", () => {
       area: null,
       caption: null,
       more: null,
+      none: null,
       empty: {
         text: "No map's mobs are at Lv 150–159, and no one has put a best there yet.",
         link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },

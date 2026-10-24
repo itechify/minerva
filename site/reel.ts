@@ -6,8 +6,11 @@
 // into Minerva's own lettering, which drops into the panel's title under the minimap;
 // and the camera draws back to the hero shot as it is. While it plays, the hero stays put
 // and the scroll runs the film, as the minimap's dot moves only with the scroll: never on a
-// timer. With reduced motion, without the script, in print or on a screen too short to
-// hold it, the hero is the still shot.
+// timer. The frame is as wide as the still shot, so the panel reads as well in the film as
+// out of it: where the screen is shorter than the shot, its foot waits below the fold until
+// the hero moves on, and each step's words are a band along the foot of what's in view, as
+// the game's tooltips are drawn. With reduced motion, without the script, in print or on a
+// screen too narrow to hold it, the hero is the still shot.
 
 import { make, reducedMotion } from "../src/dom.ts";
 
@@ -22,8 +25,11 @@ const HERO: Rect = { x: 0, y: 0, w: 600, h: 960 };
 const FOUND: Rect = { x: 70, y: 68, w: 248, h: 58 };
 /** The panel's title panel, under the minimap, where the read lands: beside its Map Mark. */
 const TITLE: Rect = { x: 49, y: 409, w: 290, h: 56 };
-/** Close on the minimap's title, with the panel's under it, in the hero's shape. */
-const CLOSE: Rect = { x: 0, y: 28, w: 360, h: (360 * HERO.h) / HERO.w };
+/** Close on the minimap's title, with the panel's under it, in the hero's shape: at most
+ *  this close, and drawn back as far as a shorter screen needs to keep the panel's title,
+ *  where the read lands, above the words' band (`measure`). */
+const CLOSEST = 360;
+const closeAt = (w: number): Rect => ({ x: 0, y: 28, w, h: (w * HERO.h) / HERO.w });
 /** What the minimap's title says. */
 const STREET = "Victoria Road";
 const MAP = "Henesys Hunting Ground I";
@@ -34,31 +40,33 @@ const MAP = "Henesys Hunting Ground I";
 const READ_FROM = [0xa4, 0xc8, 0xda];
 const READ_TO = [0xab, 0xcf, 0xe2];
 
-// The film's beats, as shares of its scroll: out from the hero shot to the whole window, in
-// to the title, the title found, the read, the drop into the panel, then back to the shot.
-const OUT = [0, 0.12];
-const PUSH = [0.14, 0.34];
-const FIND = [0.359, 0.472];
-const READ = [0.491, 0.623];
-const DROP = [0.642, 0.811];
-const BOX_OUT = [0.811, 0.887];
-const LANDED = [0.83, 0.887];
-const BACK = [0.849, 1];
+// The film's beats, as shares of its scroll: out from the hero shot to the whole window and
+// in to the title, quickly, then the title found, the read and the drop into the panel,
+// which take most of it, then back to the shot.
+const OUT = [0, 0.08];
+const PUSH = [0.09, 0.24];
+const FIND = [0.26, 0.4];
+const READ = [0.42, 0.58];
+const DROP = [0.6, 0.78];
+const BOX_OUT = [0.78, 0.86];
+const LANDED = [0.8, 0.86];
+const BACK = [0.82, 1];
 /**
- * Each caption and the stretch it shows for, fading in after its start and out before its
- * end, so one has gone before the next comes. The first and last are the shot's own caption.
+ * Each step's words and the stretch they show for, fading in after its start and out before
+ * its end, so one has gone before the next comes. The shot itself, at the start and the end,
+ * has none on it: its own caption is for screen readers.
  */
 const CAPTIONS: [string, number, number][] = [
-  ["", -1, 0.1],
-  ["MapleStory, windowed, with its minimap open.", 0.1, 0.331],
-  ["Minerva finds the minimap's title by itself, wherever the minimap is.", 0.331, 0.481],
-  ["It captures just the title, the way a screenshot does, and reads it.", 0.481, 0.632],
-  ["The panel names the map it read.", 0.632, 0.849],
-  ["", 0.849, 2],
+  ["MapleStory, windowed, with its minimap open.", 0.08, 0.25],
+  ["Minerva finds the minimap's title by itself, wherever the minimap is.", 0.25, 0.41],
+  ["It captures just the title, the way a screenshot does, and reads it.", 0.41, 0.59],
+  ["The panel names the map it read.", 0.59, 0.82],
 ];
 const FADE = 0.015;
 /** The share of the pinned scroll the film takes; the rest holds its last frame. */
-const PLAY = 0.85;
+const PLAY = 0.88;
+/** The pinned scroll, in screen heights. */
+const RUN = 0.8;
 
 const clamp = (t: number) => Math.min(Math.max(t, 0), 1);
 /** How far through a beat the film is. */
@@ -74,12 +82,12 @@ function between(a: Rect, b: Rect, t: number): Rect {
   return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, w, h };
 }
 
-function camera(p: number): Rect {
+function camera(p: number, close: Rect): Rect {
   if (p < OUT[1]) return between(HERO, WHOLE, ease(seg(p, OUT)));
   if (p < PUSH[0]) return WHOLE;
-  if (p < PUSH[1]) return between(WHOLE, CLOSE, ease(seg(p, PUSH)));
-  if (p < BACK[0]) return CLOSE;
-  return between(CLOSE, HERO, ease(seg(p, BACK)));
+  if (p < PUSH[1]) return between(WHOLE, close, ease(seg(p, PUSH)));
+  if (p < BACK[0]) return close;
+  return between(close, HERO, ease(seg(p, BACK)));
 }
 
 /**
@@ -113,7 +121,8 @@ export function reel(head: () => number) {
 
   // The film: a frame onto the game window, the shot's top-left corner in it at full size
   // over the whole window at half, the read's lettering, and over them in the frame's own
-  // pixels the box around the title found and the read's line. Captions under the frame.
+  // pixels the box around the title found and the read's line. Each step's words on a band
+  // along the foot of what's in view.
   const pin = make("div", "reel-pin");
   const frame = make("div", "reel-frame");
   const world = make("div", "reel-world");
@@ -130,7 +139,7 @@ export function reel(head: () => number) {
   frame.append(world, box, sweep);
   const captions = make("div", "reel-captions");
   captions.setAttribute("aria-hidden", "true");
-  const lines = CAPTIONS.map(([words]) => captions.appendChild(make("span", "", words || caption.textContent!.trim())));
+  const lines = CAPTIONS.map(([words]) => captions.appendChild(make("span", "", words)));
   pin.append(frame, captions);
 
   let broken = false;
@@ -138,6 +147,11 @@ export function reel(head: () => number) {
   let w = 0;
   let frameTop = 0;
   let start = 0;
+  /** Where the film holds under the head, and the foot of the screen. */
+  let holdAt = 0;
+  let screenFoot = 0;
+  let run = 0;
+  let close = closeAt(CLOSEST);
   /** The scroll the film takes, from where the hero holds still. */
   let span = 1;
   let last = -1;
@@ -188,7 +202,7 @@ export function reel(head: () => number) {
     measure();
   });
 
-  /** Fits the film to the screen: the frame as large as the shot or the screen allows. */
+  /** Fits the film to the screen: the frame as wide as the shot and its column allow. */
   function measure() {
     if (innerWidth !== wide || Math.abs(innerHeight - high) > 150) {
       wide = innerWidth;
@@ -196,16 +210,22 @@ export function reel(head: () => number) {
     }
     const top = head() + 16;
     const bottom = high - 16;
-    // The frame, as wide as its column and the shot allow, and short enough that it and
-    // two lines of caption fit under the window's head.
-    const fit = Math.floor(Math.min(figure!.clientWidth, HERO.w, ((bottom - top - 8 - 36) * HERO.w) / HERO.h));
+    holdAt = top;
+    screenFoot = bottom;
+    // The frame, as wide as its column and the shot allow: the still shot's size.
+    const fit = Math.floor(Math.min(figure!.clientWidth, HERO.w));
     const missing = shot!.complete && shot!.naturalWidth === 0;
     if (broken || missing || printing || reducedMotion().matches || fit < 280) return set(false);
     w = fit;
     set(true);
     const h = (w * HERO.h) / HERO.w;
     figure!.style.setProperty("--reel-w", `${w}px`);
-    const tall = h + 8 + captions.offsetHeight;
+    // Close in only as far as keeps the panel's title, where the read lands, clear of the
+    // words' band at the foot of the screen.
+    const room = bottom - top - captions.offsetHeight - 16;
+    const reach = TITLE.y + TITLE.h - closeAt(CLOSEST).y;
+    close = closeAt(Math.min(HERO.w, Math.max(CLOSEST, room > 0 ? (reach * w) / room : HERO.w)));
+    const tall = h;
     // Side by side, the words stay with the film, and leave with it: both stick for as long
     // as the film. Where the words fit under the head, the film's foot lines up with theirs;
     // where they don't, as on a laptop's shorter screen, they go on up until their foot is
@@ -218,7 +238,7 @@ export function reel(head: () => number) {
     hero!.style.setProperty("--reel-text-top", `${fits ? top : bottom - text!.offsetHeight}px`);
     const held = side && fits ? Math.max(tall, text!.offsetHeight) : tall;
     frameTop = held - tall;
-    const run = Math.round(high * 1.25);
+    run = Math.round(high * RUN);
     hero!.style.setProperty("--reel-top", `${top}px`);
     pin.style.height = `${held}px`;
     figure!.style.height = `${held + run}px`;
@@ -236,7 +256,7 @@ export function reel(head: () => number) {
     if (p === last) return;
     last = p;
 
-    const cam = camera(p);
+    const cam = camera(p, close);
     const s = w / cam.w;
     const height = cam.h * s;
     frame.style.height = `${height}px`;
@@ -244,7 +264,11 @@ export function reel(head: () => number) {
     world.classList.toggle("close", s > 1);
     // Wider than the shot, its edges are in view over the window at half size.
     world.classList.toggle("feather", cam.w > HERO.w + 0.5);
-    captions.style.transform = `translateY(${frameTop + height + 8}px)`;
+    // The words' band at the foot of what's in view of the frame: the screen's foot while the
+    // frame runs past it, the frame's own once it doesn't.
+    const pinTop = holdAt + Math.max(0, start - scroll) - Math.max(0, scroll - start - run);
+    const foot = Math.min(frameTop + height, screenFoot - pinTop);
+    captions.style.transform = `translateY(${foot - captions.offsetHeight}px)`;
     lines.forEach((line, k) => {
       const [, a, b] = CAPTIONS[k];
       line.style.opacity = String(clamp((p - a) / FADE - 1) * clamp((b - p) / FADE - 1));

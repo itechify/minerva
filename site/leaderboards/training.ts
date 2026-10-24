@@ -4,7 +4,7 @@
 // click on a band or an area switches the table in place and the address with it, so the
 // link still shares and Back comes back. What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
-import { byId, markImage, names, read, said as saidWith, unreachable } from "./api.ts";
+import { byId, markImage, markSlot, names, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandsAnswer,
   PICK_A_BAND,
@@ -113,7 +113,9 @@ function drawTable(answer: TrainingAnswer) {
   }
   drawAreas(shown.areas, shown.area);
   if (shown.empty !== null) return say(shown.empty);
-  said.hidden = true;
+  // Maps none of which has an entry: said once, over them.
+  if (shown.none !== null) saidWith(said, shown.none);
+  said.hidden = shown.none === null;
   byId("train-caption").textContent = shown.caption ?? "";
   rows.replaceChildren(...shown.rows.map(drawRow));
   if (shown.more !== null) rows.append(moreRow(shown.more, answer));
@@ -180,8 +182,10 @@ function drawAreas(areas: TrainingArea[], shown: string | null) {
   if (focused !== undefined) areasNav.querySelector<HTMLElement>(`[data-area="${focused}"]`)?.focus();
 }
 
-/** A map's row: its name (its Map Leaderboard at the band) over its street, its mob levels,
- *  the band's #1 there, and its entries. */
+/** A map's row: its Map Mark (or the mark's room, so the names line up) and name (its Map
+ *  Leaderboard at the band) over its street, its mob levels, the band's #1 there, and its
+ *  entries. A map with no entries leaves its #1's cell empty, as its entries say so; maps
+ *  none of which has any leave both empty, as the line over them says so. */
 function drawRow(row: TrainingRow): HTMLTableRowElement {
   const tr = make("tr");
   tr.setAttribute("role", "row");
@@ -195,17 +199,17 @@ function drawRow(row: TrainingRow): HTMLTableRowElement {
   const name = make("a", "lb-map-name", row.name);
   name.href = row.href;
   const title = make("span", "lb-train-title");
-  if (row.mark !== null) title.append(markImage(row.mark, true));
-  title.append(name);
+  title.append(markSlot(row.mark), name);
   cell("lb-train-map", title, make("span", "lb-map-street", row.street));
   cell(row.mobs === null ? "lb-train-mobs lb-train-none" : "lb-train-mobs", row.mobs ?? "—");
-  if (row.best === null) cell("lb-train-best lb-train-none", "—");
+  if (row.best === null) cell("lb-train-best lb-train-none");
   else {
     const who = make("span", "lb-train-who", `${row.best.who} · `);
     who.append(make("span", "lb-train-date", row.best.date));
     cell("lb-train-best", make("span", "lb-train-exp", row.best.expPerHour), who);
   }
-  cell("lb-train-entries", row.entries);
+  if (row.entries === null) cell("lb-train-entries lb-train-none");
+  else cell("lb-train-entries", row.entries);
   return tr;
 }
 
