@@ -179,14 +179,26 @@ pub enum Action {
     ToggleTeleportScrolls,
     /// A click on a section's heading: collapse the section to it, or open it again.
     ToggleSection(Section),
-    /// Open the settings view (the gear at the top of the panel). A collapsed panel
-    /// expands to show it, and an open search view closes: they take over the panel alike.
+    /// Open the Settings window (the gear at the top of the panel, or setup's Change
+    /// hotkeys), with the keyboard; one open already keeps what it shows and takes the
+    /// keyboard again. An open search view closes, the keyboard gone from it.
     OpenSettings,
-    /// Esc or the back arrow in the settings view, or focus moving to another window: back
-    /// to the normal view. A rebinding under way is cancelled.
+    /// Close the Settings window: its ×, Esc in it while no hotkey waits for its keys, or the
+    /// gear. A rebinding under way is cancelled. (Before the window, focus moving to another
+    /// window closed the settings view.)
     CloseSettings,
-    /// A hotkey's Change button in the settings view: wait for the player to press its new
-    /// combination ([`crate::Minerva::rebind_key`]). The hotkeys aren't live meanwhile.
+    /// A click on the Settings window's Deal Margin field: the window takes the keyboard, so
+    /// the player can type the margin. An open search view closes, the keyboard gone from it.
+    FocusSettings,
+    /// The keyboard left the Settings window for another app's window (the player clicked
+    /// back into the game): a rebinding under way is cancelled, and the window stays open.
+    LeaveSettings,
+    /// The player dragged the Settings window so its top-left corner is at (x, y), physical
+    /// screen px.
+    SettingsMoved { x: i32, y: i32 },
+    /// A hotkey's Change button in the Settings window: wait for the player to press its new
+    /// combination ([`crate::Minerva::rebind_key`]), with the keyboard; an open search view
+    /// closes. The hotkeys aren't live meanwhile.
     BeginRebind(crate::Hotkey),
     /// Stop waiting for a new combination, changing nothing.
     CancelRebind,
@@ -196,25 +208,25 @@ pub enum Action {
     /// Swap, after the player pressed another hotkey's combination: the hotkey being rebound
     /// takes it, and the other takes its old keys.
     SwapHotkeys,
-    /// The settings view's Restore defaults: every hotkey back to its default, and on.
+    /// The Settings window's Restore defaults: every hotkey back to its default, and on.
     ResetHotkeys,
     /// Undo, after Restore defaults: the hotkeys from before it are back.
     UndoResetHotkeys,
     /// Turn the Deal Finder on or off (its hotkey, or the panel's Deal Finder line).
     ToggleDealFinder,
-    /// The settings view's Deal Margin: how far below the Deal Line, in percent, a price must
+    /// The Settings window's Deal Margin: how far below the Deal Line, in percent, a price must
     /// be to be a deal; at most 99.
     SetDealMargin { percent: u32 },
-    /// The settings view's Grind Tracker switch: on, the EXP figures are read from the Status
+    /// The Settings window's Grind Tracker switch: on, the EXP figures are read from the Status
     /// Bar and the Session runs; off, neither, and the Grind Tracker doesn't show.
     SetGrindTracker { on: bool },
-    /// The settings view's Refresh: fetch OSMS's file set and item files afresh now, for
+    /// The Settings window's Refresh: fetch OSMS's file set and item files afresh now, for
     /// new maps, mobs and items OSMS has since they were fetched.
     RefreshGameData,
     /// Help & Setup's Check for updates: check for a newer version now, whether or not
     /// "Check for updates" is on.
     CheckForUpdates,
-    /// The settings view's "Check for updates": on, Minerva checks for a newer version at
+    /// The Settings window's "Check for updates": on, Minerva checks for a newer version at
     /// launch and every 6 hours; off, only when the player presses Check for updates.
     SetCheckForUpdates { on: bool },
     /// Help & Setup's Update now: download the newer version if it isn't yet, then install

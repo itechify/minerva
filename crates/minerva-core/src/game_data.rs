@@ -1,18 +1,18 @@
-//! The settings view's Game Data: when OSMS's data held was fetched, and the player's
+//! The Settings window's Game Data: when OSMS's data held was fetched, and the player's
 //! Refresh, which has OSMS's file set and item files fetched afresh at once, whatever
 //! their schedule.
 
 use crate::map_index::SourceError;
 use serde::Serialize;
 
-/// OSMS's data as the settings view shows it.
+/// OSMS's data as the Settings window shows it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameData {
     /// When the map set held was fetched (ms since the Unix epoch), by this launch or an
     /// earlier one; `None` while none is held, or the wall clock wasn't known then.
     pub fetched_at_unix_ms: Option<u64>,
-    /// The player's last Refresh, under way or what it came to, until the settings view
+    /// The player's last Refresh, under way or what it came to, until the Settings window
     /// closes; `None` if there is none.
     pub refresh: Option<Refresh>,
 }
@@ -88,7 +88,7 @@ impl Refreshes {
         }
     }
 
-    /// The settings view closed: what the last Refresh came to goes. One under way goes on.
+    /// The Settings window closed: what the last Refresh came to goes. One under way goes on.
     pub fn forget(&mut self) {
         self.came_to = None;
     }

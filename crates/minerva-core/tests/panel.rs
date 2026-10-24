@@ -10,7 +10,7 @@
 
 mod common;
 
-use common::{FakeSource, GAME, SCREEN, overlaps};
+use common::{FakeSource, GAME, SCREEN, game, overlaps, rect};
 use common::world::SEARCH;
 use minerva_core::{
     Action, Minerva, DEFAULT_PANEL_WIDTH, Foreground, GameWindow, Layer, MIN_PANEL_WIDTH, PanelSizes,
@@ -26,15 +26,6 @@ fn minerva() -> Minerva {
         collapsed: Size { width: 44, height: 44 },
     });
     minerva
-}
-
-fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
-    ScreenRect { x, y, width, height }
-}
-
-/// The game window with this client area, framed as measured, on `SCREEN`.
-fn game(client: ScreenRect) -> Option<GameWindow> {
-    Some(common::window_on_wide_screen(client))
 }
 
 #[test]

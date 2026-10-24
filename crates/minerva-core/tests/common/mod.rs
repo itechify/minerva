@@ -441,6 +441,16 @@ pub fn window_on_wide_screen(client: ScreenRect) -> GameWindow {
     GameWindow { client, frame: framed(client), screens: vec![SCREEN] }
 }
 
+/// The game window with this client area, framed as measured, on [`SCREEN`], as the shell
+/// reports it found.
+pub fn game(client: ScreenRect) -> Option<GameWindow> {
+    Some(window_on_wide_screen(client))
+}
+
+pub fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
+    ScreenRect { x, y, width, height }
+}
+
 /// The game window at the screen's origin, `width` by `height`, with no frame around it, on
 /// a screen of its size.
 pub fn window_at_origin(width: u32, height: u32) -> GameWindow {

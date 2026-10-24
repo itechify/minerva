@@ -1,7 +1,7 @@
-//! The settings view's Game Data: when OSMS's map set was fetched, and Refresh, which has
+//! The Settings window's Game Data: when OSMS's map set was fetched, and Refresh, which has
 //! OSMS's file set and item files fetched afresh at once, whatever their daily schedule,
 //! for the new maps, mobs and items a patch brings. It says what it came to until the
-//! settings view closes: up to date, OSMS unreachable, or Minerva needing an update for
+//! Settings window closes: up to date, OSMS unreachable, or Minerva needing an update for
 //! what OSMS serves now. The data held stays whenever a fresh one can't be had.
 
 mod common;
@@ -67,7 +67,7 @@ fn found(minerva: &mut Minerva, query: &str) -> Vec<String> {
 }
 
 #[test]
-fn the_settings_view_says_when_the_map_set_was_fetched() {
+fn the_settings_window_says_when_the_map_set_was_fetched() {
     let (minerva, _) = started(vec![fresh(osms::game())], vec![items()]);
 
     let state = minerva.panel_state();
@@ -136,7 +136,7 @@ fn refresh_says_what_kept_the_data_held() {
 }
 
 #[test]
-fn what_refresh_came_to_goes_when_the_settings_view_closes() {
+fn what_refresh_came_to_goes_when_the_settings_window_closes() {
     let (mut minerva, _) = started(vec![fresh(osms::game())], vec![items()]);
     minerva.act(Action::RefreshGameData);
     minerva.tick(1_000);

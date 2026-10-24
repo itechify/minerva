@@ -11,20 +11,11 @@
 
 mod common;
 
-use common::{FakeSource, GAME};
+use common::{FakeSource, GAME, game, rect};
 use minerva_core::{
-    Action, ClientOffset, Minerva, Foreground, GameWindow, PanelControl, PanelSizes, PanelState,
+    Action, ClientOffset, Minerva, Foreground, PanelControl, PanelSizes, PanelState,
     ScreenRect, Settings, Size,
 };
-
-fn rect(x: i32, y: i32, width: u32, height: u32) -> ScreenRect {
-    ScreenRect { x, y, width, height }
-}
-
-/// The game window with this client area, framed as measured, on `SCREEN`.
-fn game(client: ScreenRect) -> Option<GameWindow> {
-    Some(common::window_on_wide_screen(client))
-}
 
 fn sizes(expanded_height: u32) -> PanelSizes {
     PanelSizes { expanded: Size { width: 340, height: expanded_height }, collapsed: Size { width: 44, height: 44 } }

@@ -33,11 +33,11 @@ const CHECK_GIVES_UP_MS: u64 = 2 * 60 * 1000;
 /// Minerva's releases, each version's page under it.
 const RELEASES_URL: &str = "https://github.com/itechify/minerva/releases";
 
-/// Updates, as the tray, Help & Setup and the settings view show them.
+/// Updates, as the tray, Help & Setup and the Settings window show them.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Updates {
-    /// "Check for updates" is on (the settings view's switch): Minerva checks by itself.
+    /// "Check for updates" is on (the Settings window's switch): Minerva checks by itself.
     pub checks_on: bool,
     /// What the last check came to, or one under way.
     pub status: UpdateStatus,
@@ -474,7 +474,7 @@ impl Updater {
         self.newer.as_deref().map(release_url)
     }
 
-    /// As the tray, Help & Setup and the settings view show it, with "Check for updates"
+    /// As the tray, Help & Setup and the Settings window show it, with "Check for updates"
     /// `checks_on` or off.
     pub fn state(&self, checks_on: bool) -> Updates {
         Updates {

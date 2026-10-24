@@ -1,7 +1,7 @@
 //! The EXP figures found in the Status Bar (ADR 0017): the Grind Tracker needs no mark. The
 //! figures ("EXP. 160 [3.81%]") are read from the Status Bar's own capture, where it is found,
 //! or where they were last found while it can't be, until the client area changes size. The
-//! settings view's switch turns the Grind Tracker off.
+//! Settings window's switch turns the Grind Tracker off.
 //!
 //! Worked example used throughout: the Kerning City window sample's client area (1916x1197)
 //! shown at (812,110). Its Status Bar's LV box ends at client x 456, and the EXP figures are

@@ -42,6 +42,7 @@ mod recogniser;
 mod search;
 mod session;
 mod settings;
+mod settings_window;
 mod setup;
 mod shown_map;
 mod status_bar;
@@ -57,7 +58,7 @@ pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem
 pub use exp_bar::{ExpBar, ExpBarPlace, ExpBarReader, ExpBarReading, ExpFigures};
 pub use game_data::{GameData, Refresh};
 pub use grind_tracker::{ClientOffset, GrindTrackerWindow};
-pub use hotkey_settings::{KeyPress, RebindProblem, SettingsNotice, SettingsView};
+pub use hotkey_settings::{KeyPress, RebindProblem, SettingsNotice};
 pub use item_card::{
     Edge, ItemCard, ItemCardChoice, ItemCardView, MarketEdit, MarketLine, NameProblem, ShopPrice, ShownItemCard,
 };
@@ -91,6 +92,7 @@ pub use search::{
 };
 pub use session::{Character, Deaths, ExpRate, ExpTracking, Forecast, PacePoint, PaceTrace, TrackingState};
 pub use settings::{Hotkey, Hotkeys, Settings};
+pub use settings_window::SettingsWindow;
 pub use setup::{SetupReason, SetupState};
 pub use shown_map::{Candidate, Candidates, LevelRange, Outline};
 pub use status_bar::{STATUS_BAR_STRIP, StatusBar, StatusBarCapture, StatusBarReader, StatusBarReading};
@@ -106,6 +108,7 @@ use deal_finder::DealFinder;
 use game_data::Refreshes;
 use grind_tracker::GrindTracker;
 use hotkey_settings::HotkeySettings;
+use settings_window::SettingsPlace;
 use item_card::{Editing, ItemCards, MESOWATCH_URL, Pressed};
 use loader::{Held, Load, Loaded, Loader};
 use market_prices::MarketPrices;
@@ -323,14 +326,14 @@ pub struct PanelState {
     pub invalid_hotkeys: Vec<String>,
     /// The shell keeps the hotkeys registered only while this is set: while the game or
     /// one of our windows is in front. Other apps keep their own Ctrl+Shift shortcuts.
-    /// Not while the player rebinds one: the combination they press must reach the overlay.
+    /// Not while the player rebinds one: the combination they press must reach the
+    /// Settings window.
     pub hotkeys_live: bool,
-    /// The settings view, which takes over the panel while it is open; `None` while it
-    /// is closed. Like the search view, it has the keyboard while it is open.
-    pub settings_view: Option<SettingsView>,
-    /// The overlay takes the keyboard: the search view or the settings view is open, and
-    /// takes the typing or the combinations the player presses (ADR 0001). Otherwise a click
-    /// on it leaves the keyboard with the game.
+    /// The Settings window, while it is open; `None` while it is closed. The panel's gear
+    /// shows as on while it is open.
+    pub settings_window: Option<SettingsWindow>,
+    /// The overlay takes the keyboard: the search view is open, and takes the typing (ADR
+    /// 0001). Otherwise a click on it leaves the keyboard with the game.
     pub overlay_takes_keyboard: bool,
     /// The player closed first-run setup without going through its warning, so the app
     /// quits.
@@ -370,7 +373,7 @@ pub struct PanelState {
     /// The Deal Badges' window takes clicks: it shows badges, a click on one showing its
     /// item's card. Otherwise every click goes through it.
     pub deal_badges_clickable: bool,
-    /// The settings view's Game Data: when OSMS's data was fetched, and the player's Refresh.
+    /// The Settings window's Game Data: when OSMS's data was fetched, and the player's Refresh.
     pub game_data: GameData,
     /// Updates (ADR 0019): whether a newer version is out, for the tray and Help & Setup, and
     /// the check under way for the shell to run. Nothing of it shows on the panels.
@@ -382,6 +385,11 @@ impl PanelState {
     /// [`Layer`]). It shows in screen captures, ours included.
     pub(crate) fn panel_showing(&self) -> Option<ScreenRect> {
         self.placement.filter(|_| self.layer != Layer::Hidden)
+    }
+
+    /// Where the Settings window shows on screen: its placement, while it is open and shows.
+    pub(crate) fn settings_showing(&self) -> Option<ScreenRect> {
+        self.settings_window.as_ref().and_then(|window| window.placement)
     }
 }
 
@@ -439,7 +447,7 @@ pub enum PanelControl {
     ChooseCandidate,
     /// Open the search view.
     Search,
-    /// Open the settings view, to rebind the hotkeys.
+    /// The panel's gear: open the Settings window, or close it.
     Settings,
     /// Open the Grind Tracker's window, or close it.
     ToggleGrindTracker,
@@ -550,8 +558,10 @@ pub struct Minerva {
     pictures: Pictures,
     /// What the player typed, highlighted and picked in Search.
     search: Search,
-    /// The settings view, and the hotkey being rebound in it.
+    /// The Settings window, and the hotkey being rebound in it.
     hotkey_settings: HotkeySettings,
+    /// Where the Settings window goes.
+    settings_place: SettingsPlace,
     /// Reads captures fed to [`Minerva::on_item_capture`]; loaded on the first one.
     item_reader: Option<ItemTooltipReader>,
     /// The latest Item Lookup.
@@ -630,6 +640,7 @@ impl Minerva {
             pictures: Pictures::default(),
             search: Search::default(),
             hotkey_settings: HotkeySettings::default(),
+            settings_place: SettingsPlace::default(),
             item_reader: None,
             item_lookups: ItemLookups::default(),
             items: Loader::default(),
@@ -963,6 +974,14 @@ impl Minerva {
         self.sync_panel()
     }
 
+    /// The Settings window's size in physical px, for the display it is on, as its page
+    /// lays it out.
+    pub fn set_settings_size(&mut self, size: Size) -> &PanelState {
+        self.record(Event::SettingsSize { size });
+        self.settings_place.size = size;
+        self.sync_panel()
+    }
+
     /// Apply something the player did.
     pub fn act(&mut self, action: Action) -> &PanelState {
         self.record(Event::Act { action });
@@ -973,11 +992,10 @@ impl Minerva {
         match action {
             Action::ToggleExpanded => {
                 self.panel.expanded = !self.panel.expanded;
-                // The query box goes with the panel. So does the settings view.
+                // The query box goes with the panel.
                 if !self.panel.expanded {
                     self.search.close();
                     self.sync_search();
-                    self.hotkey_settings.close();
                 }
             }
             Action::PanelMoved { x, y } => self.panel.moved_to(x, y),
@@ -1053,15 +1071,16 @@ impl Minerva {
                 }
             }
             Action::OpenSearch => {
-                // The search view is on the expanded panel, in the settings view's place.
+                // The search view is on the expanded panel, and takes the keyboard from the
+                // Settings window.
                 self.panel.expanded = true;
-                self.hotkey_settings.close();
+                self.hotkey_settings.leave();
                 self.search.open();
                 self.sync_search();
             }
             Action::ReopenMapList => {
                 self.panel.expanded = true;
-                self.hotkey_settings.close();
+                self.hotkey_settings.leave();
                 self.search.reopen();
                 self.sync_search();
             }
@@ -1098,15 +1117,23 @@ impl Minerva {
                 self.settings.collapsed_sections = self.settings.collapsed_sections.toggled(section);
             }
             Action::OpenSettings => {
-                // On the expanded panel, in the search view's place.
-                self.panel.expanded = true;
-                self.search.close();
-                self.sync_search();
                 self.hotkey_settings.open();
+                self.settings_take_keyboard();
             }
             Action::CloseSettings => {
                 self.hotkey_settings.close();
                 self.refreshes.forget();
+            }
+            Action::FocusSettings => {
+                self.hotkey_settings.take_keyboard();
+                self.settings_take_keyboard();
+            }
+            Action::LeaveSettings => self.hotkey_settings.leave(),
+            Action::SettingsMoved { x, y } => {
+                if let (Some(game), Some(panel)) = (&self.panel.game, self.panel.placement()) {
+                    let others = self.settings_window_others();
+                    self.settings_place.moved_to(x, y, game, panel, &self.panel.avoid, &others);
+                }
             }
             Action::CheckForUpdates => self.updater.ask(),
             Action::SetCheckForUpdates { on } => self.settings.check_for_updates = on,
@@ -1121,7 +1148,10 @@ impl Minerva {
                     self.items.ask_now();
                 }
             }
-            Action::BeginRebind(hotkey) => self.hotkey_settings.begin(hotkey),
+            Action::BeginRebind(hotkey) => {
+                self.hotkey_settings.begin(hotkey);
+                self.settings_take_keyboard();
+            }
             Action::CancelRebind => self.hotkey_settings.cancel(),
             Action::TurnOffHotkey => {
                 if self.hotkey_settings.turn_off(&mut self.settings.hotkeys) {
@@ -1151,9 +1181,9 @@ impl Minerva {
         self.sync_panel()
     }
 
-    /// The player pressed a key on the settings view: while a hotkey waits for its new
+    /// The player pressed a key on the Settings window: while a hotkey waits for its new
     /// combination, that may be it, or Backspace or Delete to turn it off (see
-    /// [`SettingsView`]). Saved with the settings, and registered in place of the old one
+    /// [`SettingsWindow`]). Saved with the settings, and registered in place of the old one
     /// once the hotkeys are live again.
     pub fn rebind_key(&mut self, press: KeyPress) -> &PanelState {
         self.record(Event::RebindKey { press: press.clone() });
@@ -1304,6 +1334,7 @@ impl Minerva {
             // opening it.
             PanelControl::Search if self.search.is_open() => return Some(Request::RaiseOverlay),
             PanelControl::Search => Action::OpenSearch,
+            PanelControl::Settings if self.hotkey_settings.is_open() => Action::CloseSettings,
             PanelControl::Settings => Action::OpenSettings,
             PanelControl::OpenMeowdbPage => {
                 return self.state.map.as_ref().map(|map| Request::OpenInBrowser { url: map.url.clone() });
@@ -1543,6 +1574,7 @@ impl Minerva {
             self.state.panel_showing().map(|at| (OurWindow::Panel, at)),
             self.state.grind_tracker.placement.map(|at| (OurWindow::GrindTracker, at)),
             self.state.personal_bests.placement.map(|at| (OurWindow::PersonalBests, at)),
+            self.state.settings_showing().map(|at| (OurWindow::Settings, at)),
             self.state.item_lookup_placement.map(|at| (OurWindow::Alert, at)),
         ]
         .into_iter()
@@ -1907,6 +1939,7 @@ impl Minerva {
         self.grind_tracker.open = settings.grind_tracker_open;
         self.grind_tracker.at = settings.grind_tracker_at;
         self.bests_window.at = settings.personal_bests_at;
+        self.settings_place.at = settings.settings_at;
         self.leaderboards.restore(settings.map_leaderboards.clone(), settings.map_leaderboards_met.clone());
         self.settings = settings;
         // The travel toggles change Distances.
@@ -1934,6 +1967,7 @@ impl Minerva {
             grind_tracker_open: self.grind_tracker.open,
             grind_tracker_at: self.grind_tracker.at,
             personal_bests_at: self.bests_window.at,
+            settings_at: self.settings_place.at,
             map_leaderboards: self.leaderboards.saved(),
             map_leaderboards_met: self.leaderboards.met(),
             ..self.settings.clone()
@@ -2146,6 +2180,7 @@ impl Minerva {
         self.state.draggable = self.panel.draggable();
         self.sync_grind_tracker();
         self.sync_personal_bests();
+        self.sync_settings_window();
         self.state.leaderboard_uploads = self.leaderboards.uploads();
         self.state.discord_link_requests = self.discord.requests();
         self.sync_item_lookup();
@@ -2155,6 +2190,7 @@ impl Minerva {
             self.state.panel_showing(),
             self.state.grind_tracker.placement,
             self.state.personal_bests.placement,
+            self.state.settings_showing(),
             self.state.item_lookup_placement,
             self.state.item_card_placement,
             self.state.deal_badges.as_ref().map(|badges| badges.placement),
@@ -2165,7 +2201,6 @@ impl Minerva {
         self.state.hotkeys = self.settings.hotkeys.clone();
         let in_front = self.panel.foreground.is_some_and(|foreground| foreground != Foreground::OtherApp);
         self.state.hotkeys_live = in_front && !self.hotkey_settings.is_rebinding();
-        self.state.settings_view = self.hotkey_settings.state(&self.settings.hotkeys);
         self.state.game_data = GameData {
             fetched_at_unix_ms: self.maps.saved_at_unix_ms(),
             refresh: self.refreshes.state(),
@@ -2180,7 +2215,7 @@ impl Minerva {
     /// Which of our windows take the keyboard, and which take clicks, as they show now.
     fn sync_input(&mut self) {
         let state = &mut self.state;
-        state.overlay_takes_keyboard = state.search.view.is_some() || state.settings_view.is_some();
+        state.overlay_takes_keyboard = state.search.view.is_some();
         let lookup = state.item_lookup.as_ref().filter(|_| state.item_lookup_placement.is_some());
         state.item_lookup_clickable = lookup.is_some_and(|line| matches!(line.outcome, ItemLookup::Choose { .. }));
         let hotkeys = &self.settings.hotkeys;
@@ -2227,8 +2262,12 @@ impl Minerva {
         self.state.item_card_placement = match &self.panel.game {
             Some(game) if shows => {
                 // Beside the panel, a card from Search keeps off our other windows there.
+                let settings = self.state.settings_showing();
                 let others: Vec<ScreenRect> =
-                    [self.state.grind_tracker.placement, self.state.personal_bests.placement].into_iter().flatten().collect();
+                    [self.state.grind_tracker.placement, self.state.personal_bests.placement, settings]
+                        .into_iter()
+                        .flatten()
+                        .collect();
                 self.item_cards.placement(game, &self.panel.avoid, self.state.panel_showing(), &others)
             }
             _ => None,
@@ -2393,7 +2432,39 @@ impl Minerva {
         self.state.personal_bests = PersonalBestsWindow { open: window.open, placement, characters, discord };
     }
 
-    /// Whether EXP tracking is on: the Grind Tracker is (the settings view's switch), and
+    /// The Settings window shows while it is open, setup's too (which opens it), and only
+    /// while the overlay can show (see [`Layer`]): beside the panel, off our other windows
+    /// there, until the player drags it. It loses the keyboard while it doesn't show, which
+    /// it would otherwise take from the game as it comes back.
+    fn sync_settings_window(&mut self) {
+        let shows = self.hotkey_settings.is_open() && self.panel.layer() != Layer::Hidden;
+        let placement = match (&self.panel.game, self.panel.placement()) {
+            (Some(game), Some(panel)) if shows => {
+                Some(self.settings_place.placement(game, panel, &self.panel.avoid, &self.settings_window_others()))
+            }
+            _ => None,
+        };
+        if placement.is_none() {
+            self.hotkey_settings.leave();
+        }
+        self.state.settings_window = self.hotkey_settings.state(&self.settings.hotkeys, placement);
+    }
+
+    /// Our windows the Settings window goes beside the panel clear of: the Grind Tracker's
+    /// and the Personal Bests window, as they show now.
+    fn settings_window_others(&self) -> Vec<ScreenRect> {
+        [self.state.grind_tracker.placement, self.state.personal_bests.placement].into_iter().flatten().collect()
+    }
+
+    /// The Settings window took the keyboard: the search view, which had it, closes.
+    fn settings_take_keyboard(&mut self) {
+        if self.hotkey_settings.is_open() && self.search.is_open() {
+            self.search.close();
+            self.sync_search();
+        }
+    }
+
+    /// Whether EXP tracking is on: the Grind Tracker is (the Settings window's switch), and
     /// there is a game window to read the EXP figures in.
     fn tracking_on(&self) -> bool {
         self.settings.grind_tracker_on && self.panel.game.is_some()

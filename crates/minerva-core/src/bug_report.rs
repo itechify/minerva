@@ -162,6 +162,7 @@ pub enum Event {
     DealBadgesSize { size: Size },
     GrindTrackerSize { size: Size },
     PersonalBestsSize { size: Size },
+    SettingsSize { size: Size },
     Act { action: Action },
     RebindKey { press: KeyPress },
     SearchQuery { query: String },
@@ -685,6 +686,7 @@ struct Last {
     deal_badges_size: Option<Size>,
     grind_tracker_size: Option<Size>,
     personal_bests_size: Option<Size>,
+    settings_size: Option<Size>,
     foreground: Option<Foreground>,
     unavailable_hotkeys: Option<(Vec<String>, Vec<String>)>,
     /// What the last title capture read as, and where the title was found.
@@ -765,6 +767,7 @@ impl Recorder {
             Event::DealBadgesSize { size } => changes(&mut last.deal_badges_size, size),
             Event::GrindTrackerSize { size } => changes(&mut last.grind_tracker_size, size),
             Event::PersonalBestsSize { size } => changes(&mut last.personal_bests_size, size),
+            Event::SettingsSize { size } => changes(&mut last.settings_size, size),
             Event::Foreground { foreground } => changes(&mut last.foreground, foreground),
             Event::HotkeysUnavailable { taken, invalid } => {
                 changes(&mut last.unavailable_hotkeys, &(taken.clone(), invalid.clone()))
@@ -1486,6 +1489,9 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::PersonalBestsSize { size } => {
                 minerva.set_personal_bests_size(size);
             }
+            Event::SettingsSize { size } => {
+                minerva.set_settings_size(size);
+            }
             Event::Act { action } => {
                 minerva.act(action);
             }
@@ -1902,7 +1908,8 @@ impl Event {
             Event::DealBadgesSize { size } => format!("Deal Badges size {}x{}", size.width, size.height),
             Event::GrindTrackerSize { size } => format!("Grind Tracker size {}x{}", size.width, size.height),
             Event::PersonalBestsSize { size } => format!("Personal Bests window size {}x{}", size.width, size.height),
-            Event::RebindKey { press } => format!("key pressed in the settings view {}", json(press)),
+            Event::SettingsSize { size } => format!("Settings window size {}x{}", size.width, size.height),
+            Event::RebindKey { press } => format!("key pressed in the Settings window {}", json(press)),
             Event::SearchPick { id } => format!("search picked {id}"),
             Event::SearchPickDestination { id } => format!("search picked map {id} as the Destination"),
             Event::SearchPickItem { id } => format!("search picked item {id}"),
