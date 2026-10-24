@@ -1961,8 +1961,9 @@ impl Event {
                             return "covered".to_string();
                         }
                         let name = row.name.as_deref().map_or("?".to_string(), |name| format!("{name:?}"));
+                        let tier = row.tier.map_or(String::new(), |tier| format!(" (a {tier:?} scroll's picture)"));
                         let price = row.price.map_or("?".to_string(), |p| format!("{} for {}", p.quantity, thousands(p.mesos)));
-                        format!("{name} {price}")
+                        format!("{name}{tier} {price}")
                     })
                     .collect();
                 format!("Player Shop read: {}", if rows.is_empty() { "no listings".into() } else { rows.join(", ") })

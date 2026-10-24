@@ -21,12 +21,17 @@
 //! name starts as the listing's does and is one item's. The name stands while what was read
 //! there stands. The tooltip by the pointer usually hides the listing's price, so its badge
 //! keeps the price read there before, marked covered.
+//!
+//! A scroll's name cut short is named by its picture, unhovered (#140): when every item whose
+//! name starts so is a scroll, the one of the tier its picture's colour shows. The tier read
+//! stands while what was read there stands, as the pointer passes over the picture. A tooltip
+//! that names another item than the picture leaves it "?": one of them was misread.
 
 use crate::item_card::item_id;
 use crate::item_lookup::item_key;
 use crate::item_tooltip::ItemTooltip;
 use crate::market_prices::MarketPrices;
-use crate::osms_items::{ItemFacts, ItemSet};
+use crate::osms_items::{ItemFacts, ItemSet, ScrollTier};
 use crate::panel::{GameWindow, ScreenRect, Size, clear_of};
 use crate::player_shop::{ListedPrice, ShopHover, ShopList, ShopReading, ShopRow};
 use serde::Serialize;
@@ -200,7 +205,8 @@ impl DealFinder {
     /// than what was read there before, or a listing read before is gone and not covered:
     /// then nothing read before is kept, nor the names tooltips gave it. A listing whose name
     /// is cut short is named by the Item Tooltip by the pointer on its slot, if the tooltip's
-    /// name starts as its does.
+    /// name starts as its does. A listing read again with no tier (its picture under the
+    /// pointer) keeps the tier read there before.
     pub fn read(&mut self, reading: ShopReading) {
         if !self.on {
             return;
@@ -219,7 +225,8 @@ impl DealFinder {
             }
             for row in list.rows.iter().filter(|row| whole(row)) {
                 match self.seen.iter_mut().find(|seen| same_slot(seen, row)) {
-                    Some(seen) => *seen = row.clone(),
+                    // The tier read before stands while the pointer covers the picture.
+                    Some(seen) => *seen = ShopRow { tier: row.tier.or(seen.tier), ..row.clone() },
                     None => self.seen.push(row.clone()),
                 }
             }
@@ -288,18 +295,32 @@ impl DealFinder {
             .map(|(row, shown)| {
                 // Covered, what was read there before; or so under the pointer, where its name
                 // reads as before and the tooltip by the pointer hides its price.
-                let seen = self.seen.iter().find(|seen| same_slot(seen, shown));
+                let in_slot = self.seen.iter().find(|seen| same_slot(seen, shown));
                 let hidden = shown.price.is_none()
                     && shown.name.is_some()
-                    && seen.is_some_and(|seen| seen.name == shown.name)
+                    && in_slot.is_some_and(|seen| seen.name == shown.name)
                     && self.hover.as_ref().is_some_and(|hover| on_slot(shop, shown, hover));
-                let seen = seen.filter(|_| shown.covered || hidden);
+                let seen = in_slot.filter(|_| shown.covered || hidden);
                 let listing = seen.unwrap_or(shown);
+                // Its picture's tier; with the pointer on the picture, the one read there before.
+                let tier = listing.tier.or_else(|| in_slot.filter(|seen| seen.name == listing.name).and_then(|seen| seen.tier));
                 let named = items.zip(listing.name.as_deref()).and_then(|(items, name)| {
                     item_named(items, name).or_else(|| {
                         let top = shown.area.y;
-                        let named = self.named.iter().find(|named| (named.top - top).abs() <= SAME_SLOT && named.cut == name)?;
-                        tooltip_named(items, &named.tooltip, name)
+                        let by_picture = tier.and_then(|tier| picture_named(items, name, tier));
+                        let by_tooltip = self
+                            .named
+                            .iter()
+                            .find(|named| (named.top - top).abs() <= SAME_SLOT && named.cut == name)
+                            .and_then(|named| tooltip_named(items, &named.tooltip, name));
+                        // Naming another item than the picture does, or a scroll of another tier,
+                        // one of them was misread.
+                        let other_tier = by_tooltip.as_ref().is_some_and(|(item, _)| tier.zip(item.tier).is_some_and(|(a, b)| a != b));
+                        match (by_picture, by_tooltip) {
+                            _ if other_tier => None,
+                            (Some((item, ids)), Some((_, tooltip_ids))) => (ids == tooltip_ids).then_some((item, ids)),
+                            (picture, tooltip) => picture.or(tooltip),
+                        }
                     })
                 });
                 let ids = named.as_ref().map(|(_, ids)| ids.clone());
@@ -384,6 +405,22 @@ fn item_named<'a>(items: &'a ItemSet, read: &str) -> Option<(&'a ItemFacts, Vec<
 fn tooltip_named<'a>(items: &'a ItemSet, tooltip: &str, cut: &str) -> Option<(&'a ItemFacts, Vec<u32>)> {
     let (item, ids) = alike(items.named(tooltip))?;
     starts_as(&item.name, cut).then_some((item, ids))
+}
+
+/// The scroll a listing whose name the game cut short as `cut` is, by the tier its picture
+/// shows: when every item whose name starts so is a scroll, the one name of that tier among
+/// them, as [`item_named`] has a whole name. `None` when an item that isn't a scroll starts
+/// so too, or no name or several are of that tier.
+fn picture_named<'a>(items: &'a ItemSet, cut: &str, tier: ScrollTier) -> Option<(&'a ItemFacts, Vec<u32>)> {
+    let names = items.names_starting_with(cut_start(cut)?);
+    if names.iter().flatten().any(|item| item.tier.is_none()) {
+        return None;
+    }
+    let mut of_tier = names.into_iter().filter(|name| name.iter().all(|item| item.tier == Some(tier)));
+    match (of_tier.next(), of_tier.next()) {
+        (Some(name), None) => alike(name),
+        _ => None,
+    }
 }
 
 /// The first of `found`, with them all, when they look alike (their kinds and shop prices).
