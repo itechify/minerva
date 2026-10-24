@@ -51,12 +51,23 @@ export interface BandsAnswer {
   bands: { band: number; levels: [number, number]; maps: number; entries: number }[];
 }
 
+/** A Map Mark: the emblem the game's minimap draws beside a map's title, for its area. */
+export interface MapMark {
+  id: string;
+  name: string;
+  picture: string;
+}
+
 /** A map as Where to train lists it for a Level Band. */
 export interface TrainingMap {
   map: string;
   /** The levels of the middle half of its spawns, from the ceilings table; `null` for a
    *  map with an entry there that the table doesn't hold. */
   mobs: [number, number] | null;
+  /** Its Map Mark, from the ceilings table: OSMS's name for it ("Rith"), the area it stands
+   *  for as players know it ("Lith Harbor"), and its picture on OSMS; `null` for a map
+   *  without one, or one the table doesn't hold. */
+  mark: MapMark | null;
   /** How many entries it has in the band, and the band's #1 there (`null` with none). */
   entries: number;
   best: Best | null;

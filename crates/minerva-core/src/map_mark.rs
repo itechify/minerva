@@ -43,7 +43,7 @@ pub(crate) fn pictures(set: &MapSet) -> impl Iterator<Item = String> + '_ {
 /// The area mark `mark` stands for, as players know it. OSMS names marks as the game's
 /// files do, some of them not as players call the place; any other is its name in words
 /// (`KerningCity` is "Kerning City").
-fn area_name(mark: &str) -> String {
+pub(crate) fn area_name(mark: &str) -> String {
     match mark {
         "Rith" => "Lith Harbor".into(),
         "MushroomVillage" => "Mushroom Town".into(),

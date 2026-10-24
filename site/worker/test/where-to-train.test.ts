@@ -1,6 +1,6 @@
 // Where to train lists, for each Level Band, the maps whose middle half of spawns is at its
 // levels (the ceilings table) and any map with an entry in it, each with its mob levels and
-// the band's #1 there (ADR 0024). The test config's table puts 100000062 in Lv 1–9, 100000060 in
+// the band's #1 there, and its Map Mark (ADR 0024). The test config's table puts 100000062 in Lv 1–9, 100000060 in
 // Lv 20–29, 100000061 in both Lv 20–29 and Lv 30–39, and api.ts's FIELD and RICH_FIELD in
 // Lv 70–79 and Lv 100–109. (D1 starts empty for each test file.)
 import { describe, expect, it } from "vitest";
@@ -8,6 +8,8 @@ import { call, entry, key, upload } from "./api";
 
 const TWENTIES = "100000060";
 const STRADDLING = "100000061";
+/** The test config's made-up Map Mark, which TWENTIES and 100000062 have. */
+const MADE_UP_TOWN = { id: "MadeUpTown", name: "Made-up Town", picture: "https://osms.invalid/images/map_marks/MadeUpTown.png" };
 /** A map the table doesn't hold. */
 const UNLISTED = "100000063";
 
@@ -37,7 +39,7 @@ describe("where to train", () => {
     });
   });
 
-  it("lists a band's maps with their mob levels, entries and #1", async () => {
+  it("lists a band's maps with their mob levels, Map Marks, entries and #1", async () => {
     const response = await call("/api/bands/20");
 
     expect(response.headers.get("cache-control")).toBe("public, max-age=60");
@@ -48,21 +50,23 @@ describe("where to train", () => {
         {
           map: TWENTIES,
           mobs: [22, 27],
+          mark: MADE_UP_TOWN,
           entries: 2,
           best: { name: "Bea", job: "Magician", level: 25, expPerHour: 250_000, setAt: 1_760_000_000_001 },
         },
-        { map: STRADDLING, mobs: [25, 34], entries: 0, best: null },
+        { map: STRADDLING, mobs: [25, 34], mark: null, entries: 0, best: null },
       ],
     });
   });
 
-  it("lists a map with an entry in the band that the table doesn't hold, without mob levels", async () => {
+  it("lists a map with an entry in the band that the table doesn't hold, without mob levels or a mark", async () => {
     const { maps } = await read<{ maps: unknown[] }>("/api/bands/40");
 
     expect(maps).toEqual([
       {
         map: UNLISTED,
         mobs: null,
+        mark: null,
         entries: 1,
         best: { name: "Ada", job: "Magician", level: 45, expPerHour: 10_000, setAt: 1_760_000_000_000 },
       },

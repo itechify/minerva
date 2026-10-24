@@ -1,12 +1,12 @@
 // Where to train, on the Map Leaderboards page, lists a Level Band's maps as GET
-// /api/bands/<band> gives them: each with its mob levels and the band's #1 there, the maps
-// with entries first, on every street or one (ADR 0024).
+// /api/bands/<band> gives them: each with its Map Mark, mob levels and the band's #1 there,
+// the maps with entries first, in every area or one, by its Map Mark (ADR 0024).
 import { describe, expect, it } from "vitest";
-import type { TrainingAnswer, TrainingMap } from "../../entries.ts";
+import type { MapMark, TrainingAnswer, TrainingMap } from "../../entries.ts";
 import { mapNames, readTrainingLink, trainingBands, trainingLinkTo, trainingTable, type TrainingLink } from "../leaderboards.ts";
 import { NOW, OCT_3 } from "./common.ts";
 
-// Made-up maps, in the fixture's shape: two streets, and an Event map.
+// Made-up maps, in the fixture's shape, and an Event map.
 const names = mapNames([
   { id: 100000000, street_name: "Made-up Road", name: "Pig Field", region: "Victoria Island" },
   { id: 100000001, street_name: "Made-up Road", name: "Boar Field", region: "Victoria Island" },
@@ -15,10 +15,15 @@ const names = mapNames([
   { id: 100000004, street_name: "Event Street", name: "Event Field", region: "Event" },
 ]);
 
-function map(id: string, mobs: [number, number] | null, best: number | null, entries = best === null ? 0 : 1): TrainingMap {
+/** Made-up Map Marks, in the API's shape. */
+const HARBOR: MapMark = { id: "Rith", name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" };
+const CITY: MapMark = { id: "KerningCity", name: "Kerning City", picture: "https://osms.invalid/images/map_marks/KerningCity.png" };
+
+function map(id: string, mobs: [number, number] | null, mark: MapMark | null, best: number | null, entries = best === null ? 0 : 1): TrainingMap {
   return {
     map: id,
     mobs,
+    mark,
     entries,
     best: best === null ? null : { name: "Bea", job: "Magician", level: 25, expPerHour: best, setAt: OCT_3 },
   };
@@ -26,44 +31,44 @@ function map(id: string, mobs: [number, number] | null, best: number | null, ent
 
 /** Band 20's maps: Pig Field and Party Field with entries, Boar Field and Quiet Field
  *  without (Quiet Field's mobs the lower), and a map the fixture doesn't name with an entry
- *  but no mob levels. */
+ *  but no mob levels or mark. Two in Lith Harbor, two in Kerning City. */
 const BAND_20: TrainingAnswer = {
   band: 20,
   levels: [20, 29],
   maps: [
-    map("100000000", [22, 27], 250_000, 3),
-    map("100000001", [25, 29], null),
-    map("100000002", [20, 24], null),
-    map("100000003", [24, 28], 600_000),
-    map("100000009", null, 50_000),
+    map("100000000", [22, 27], HARBOR, 250_000, 3),
+    map("100000001", [25, 29], HARBOR, null),
+    map("100000002", [20, 24], CITY, null),
+    map("100000003", [24, 28], CITY, 600_000),
+    map("100000009", null, null, 50_000),
   ],
 };
 
-const LINK: TrainingLink = { band: 20, street: null };
+const LINK: TrainingLink = { band: 20, area: null };
 
 function table(link: Partial<TrainingLink> = {}, answer = BAND_20) {
   return trainingTable(answer, names, { ...LINK, ...link }, NOW);
 }
 
 describe("where to train's address", () => {
-  it("names the band and the street", () => {
-    expect(readTrainingLink("?band=20&street=Hidden%20Street")).toEqual({ band: 20, street: "Hidden Street" });
-    expect(trainingLinkTo({ band: 20, street: "Hidden Street" })).toBe("/leaderboards/?band=20&street=Hidden+Street");
+  it("names the band and the area, by its Map Mark", () => {
+    expect(readTrainingLink("?band=20&area=KerningCity")).toEqual({ band: 20, area: "KerningCity" });
+    expect(trainingLinkTo({ band: 20, area: "KerningCity" })).toBe("/leaderboards/?band=20&area=KerningCity");
   });
 
-  it("opens with no band, on every street, when it names neither", () => {
-    expect(readTrainingLink("")).toEqual({ band: null, street: null });
-    expect(trainingLinkTo({ band: null, street: null })).toBe("/leaderboards/");
+  it("opens with no band, in every area, when it names neither", () => {
+    expect(readTrainingLink("")).toEqual({ band: null, area: null });
+    expect(trainingLinkTo({ band: null, area: null })).toBe("/leaderboards/");
   });
 
   it("reads a level as the band holding it, and drops what can't be one", () => {
-    expect(readTrainingLink("?band=23&street=")).toEqual({ band: 20, street: null });
-    expect(readTrainingLink("?band=999").band).toBeNull();
+    expect(readTrainingLink("?band=23&area=")).toEqual({ band: 20, area: null });
+    expect(readTrainingLink("?band=999&area=Kerning%20City")).toEqual({ band: null, area: null });
   });
 });
 
 describe("where to train's Level Bands", () => {
-  it("say how many maps each lists, the open one marked, each keeping the street", () => {
+  it("say how many maps each lists, the open one marked, each keeping the area", () => {
     const answer = {
       bands: [
         { band: 1, levels: [1, 9] as [number, number], maps: 1, entries: 0 },
@@ -71,18 +76,19 @@ describe("where to train's Level Bands", () => {
       ],
     };
 
-    expect(trainingBands(answer, { band: 20, street: "Hidden Street" })).toEqual([
-      { band: 1, levels: "Lv 1–9", maps: "1 map", href: "/leaderboards/?band=1&street=Hidden+Street", open: false },
-      { band: 20, levels: "Lv 20–29", maps: "24 maps", href: "/leaderboards/?band=20&street=Hidden+Street", open: true },
+    expect(trainingBands(answer, { band: 20, area: "Rith" })).toEqual([
+      { band: 1, levels: "Lv 1–9", maps: "1 map", href: "/leaderboards/?band=1&area=Rith", open: false },
+      { band: 20, levels: "Lv 20–29", maps: "24 maps", href: "/leaderboards/?band=20&area=Rith", open: true },
     ]);
   });
 });
 
 describe("where to train's table", () => {
-  it("writes each map with its mob levels, #1 and entries", () => {
+  it("writes each map with its Map Mark, mob levels, #1 and entries", () => {
     expect(table().rows[1]).toEqual({
       name: "Pig Field",
       street: "Made-up Road",
+      mark: { name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" },
       href: "/leaderboards/map/?map=100000000&band=20",
       mobs: "Lv 22–27",
       best: { expPerHour: "250,000", who: "Bea · Magician Lv 25", date: "3 Oct" },
@@ -98,29 +104,39 @@ describe("where to train's table", () => {
     const rows = table().rows;
 
     expect(rows.find((r) => r.name === "Boar Field")).toMatchObject({ best: null, entries: "No entries yet" });
-    expect(rows.find((r) => r.name === "Map 100000009")).toMatchObject({ mobs: null, entries: "1 entry" });
+    expect(rows.find((r) => r.name === "Map 100000009")).toMatchObject({ mark: null, mobs: null, entries: "1 entry" });
   });
 
-  it("shows one street's maps, and offers the streets the band's maps are on", () => {
-    const shown = table({ street: "Hidden Street" });
+  it("offers the areas the band's maps are in, by name, each linking to it", () => {
+    expect(table().areas).toEqual([
+      { ...CITY, href: "/leaderboards/?band=20&area=KerningCity", open: false },
+      { ...HARBOR, href: "/leaderboards/?band=20&area=Rith", open: false },
+    ]);
+  });
 
-    expect(shown.streets).toEqual(["Hidden Street", "Made-up Road", "Not in the map list"]);
-    expect(shown.street).toBe("Hidden Street");
+  it("shows one area's maps, the area marked, and a map without a Map Mark only among every area's", () => {
+    const shown = table({ area: "KerningCity" });
+
+    expect(shown.area).toBe("KerningCity");
+    expect(shown.areas.map((a) => [a.id, a.open])).toEqual([
+      ["KerningCity", true],
+      ["Rith", false],
+    ]);
     expect(shown.rows.map((r) => r.name)).toEqual(["Party Field", "Quiet Field"]);
-    expect(shown.caption).toBe("2 Hidden Street maps for Lv 20–29");
+    expect(shown.caption).toBe("2 Kerning City maps for Lv 20–29");
   });
 
-  it("shows every street for a street the band has no maps on", () => {
-    const shown = table({ street: "Nowhere Road" });
+  it("shows every area for an area the band has no maps in", () => {
+    const shown = table({ area: "Ellinia" });
 
-    expect(shown.street).toBeNull();
+    expect(shown.area).toBeNull();
     expect(shown.rows).toHaveLength(5);
     expect(shown.caption).toBe("5 maps for Lv 20–29");
   });
 
   it("leaves out an Event map with no entries, as search does, and keeps one with entries", () => {
-    const quiet = { ...BAND_20, maps: [map("100000004", [22, 27], null)] };
-    const busy = { ...BAND_20, maps: [map("100000004", [22, 27], 10_000)] };
+    const quiet = { ...BAND_20, maps: [map("100000004", [22, 27], null, null)] };
+    const busy = { ...BAND_20, maps: [map("100000004", [22, 27], null, 10_000)] };
 
     expect(table({}, quiet).rows).toEqual([]);
     expect(table({}, busy).rows.map((r) => r.name)).toEqual(["Event Field"]);
@@ -129,8 +145,8 @@ describe("where to train's table", () => {
   it("says so for a band with no maps", () => {
     expect(table({ band: 150 }, { band: 150, levels: [150, 159], maps: [] })).toEqual({
       rows: [],
-      streets: [],
-      street: null,
+      areas: [],
+      area: null,
       caption: null,
       empty: {
         text: "No map's mobs are at Lv 150–159, and no one has put a best there yet.",

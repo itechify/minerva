@@ -21,7 +21,7 @@ declare namespace Cloudflare {
      *  signed in with one, the maintainer's routes and /admin/ are theirs. */
     MAINTAINER_DISCORD_IDS?: string;
     /** The tests' made-up ceilings table, in place of osms-ceilings.json. */
-    TEST_CEILINGS?: Record<string, import("./ceilings").Ceiling>;
+    TEST_CEILINGS?: import("./ceilings").CeilingsTable;
   }
   interface GlobalProps {
     mainModule: typeof import("./index");

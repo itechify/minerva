@@ -183,7 +183,7 @@ A map's page on owlofminerva.app where players' Personal Bests stand side by sid
 _Avoid_: leaderboard (alone), ranking, high scores, hiscores
 
 **Where to train**:
-The Map Leaderboards page's table of the maps for one Level Band: each map whose middle half of spawns is at the band's levels, and each map with an entry in it, with its mob levels and the band's #1 there, the maps with entries first (ADR 0024).
+The Map Leaderboards page's table of the maps for one Level Band: each map whose middle half of spawns is at the band's levels, and each map with an entry in it, with its Map Mark, mob levels and the band's #1 there, the maps with entries first, in every area or one picked by its Map Mark (ADR 0024).
 _Avoid_: best maps, recommended maps, map ranking
 
 **Top spot taken**:

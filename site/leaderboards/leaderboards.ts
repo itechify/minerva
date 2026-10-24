@@ -6,7 +6,7 @@
 
 import { dayText } from "../../src/dates.ts";
 import { levels, rate, short, whole } from "../../src/figures.ts";
-import { type BandAnswer, type BandsAnswer, isMap, isName, type LatestAnswer, type Ranked, type TrainingAnswer } from "../entries.ts";
+import { type BandAnswer, type BandsAnswer, isMap, isName, type LatestAnswer, type MapMark, type Ranked, type TrainingAnswer } from "../entries.ts";
 import { bandOf, levelsOf } from "../level-bands.ts";
 import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts";
 
@@ -14,7 +14,7 @@ import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts
 // takes everything it shows from this module.
 export { mapNames, placeOf };
 export type { MapNameRow, MapNames, MapPlace } from "../map-names.ts";
-export type { BandAnswer, BandsAnswer, LatestAnswer, Ranked, TrainingAnswer } from "../entries.ts";
+export type { BandAnswer, BandsAnswer, LatestAnswer, MapMark, Ranked, TrainingAnswer } from "../entries.ts";
 
 /** A map's page as its address names it: `/leaderboards/map/?map=<ID>&band=<first level>&name=<name>`.
  *  Any part may be missing, or dropped for not being one. */
@@ -365,25 +365,26 @@ export function mapPicture(manifest: unknown, map: string): string | null {
 }
 
 /** The Map Leaderboards page as its address names it:
- *  `/leaderboards/?band=<first level>&street=<street>`. Either part may be missing, or
- *  dropped for not being one: with no band, Where to train asks for one; on every street
- *  unless it names one. */
+ *  `/leaderboards/?band=<first level>&area=<Map Mark>`, the area by OSMS's name for its Map
+ *  Mark ("KerningCity"). Either part may be missing, or dropped for not being one: with no
+ *  band, Where to train asks for one; in every area unless it names one. */
 export interface TrainingLink {
   band: number | null;
-  street: string | null;
+  area: string | null;
 }
 
 /** Where the Map Leaderboards page's address (its `location.search`) opens. */
 export function readTrainingLink(search: string): TrainingLink {
   const query = new URLSearchParams(search);
-  return { band: bandIn(query.get("band")), street: query.get("street")?.trim() || null };
+  const area = query.get("area");
+  return { band: bandIn(query.get("band")), area: area !== null && /^[A-Za-z0-9]{1,32}$/.test(area) ? area : null };
 }
 
 /** The address of the Map Leaderboards page, from the site's root. */
 export function trainingLinkTo(link: TrainingLink): string {
   const query = new URLSearchParams();
   if (link.band !== null) query.set("band", String(link.band));
-  if (link.street !== null) query.set("street", link.street);
+  if (link.area !== null) query.set("area", link.area);
   const search = String(query);
   return search === "" ? "/leaderboards/" : `/leaderboards/?${search}`;
 }
@@ -399,7 +400,7 @@ export interface TrainingBand {
   open: boolean;
 }
 
-/** Where to train's Level Bands, from GET /api/bands, each keeping the link's street. */
+/** Where to train's Level Bands, from GET /api/bands, each keeping the link's area. */
 export function trainingBands(answer: BandsAnswer, link: TrainingLink): TrainingBand[] {
   return answer.bands.map(({ band, maps }) => ({
     band,
@@ -414,6 +415,8 @@ export function trainingBands(answer: BandsAnswer, link: TrainingLink): Training
 export interface TrainingRow {
   name: string;
   street: string;
+  /** Its Map Mark, shown before its name; `null` for a map without one. */
+  mark: { name: string; picture: string } | null;
   /** Its Map Leaderboard, at the band. */
   href: string;
   /** The levels of the middle half of its spawns: "Lv 22–27"; `null` for a map the
@@ -425,29 +428,41 @@ export interface TrainingRow {
   entries: string;
 }
 
-/** Where to train's table for a band: its rows, the streets they're on (for the filter), the
- *  street it shows (`null`, all of them), what it says of itself, and why there are no rows
- *  when there are none. */
+/** An area Where to train offers to show the maps of: its Map Mark, and a link to it. */
+export interface TrainingArea extends MapMark {
+  href: string;
+  /** Whether it's the area the table shows. */
+  open: boolean;
+}
+
+/** Where to train's table for a band: its rows, the areas their Map Marks name (for the
+ *  choice), the area it shows (`null`, all of them), what it says of itself, and why there
+ *  are no rows when there are none. */
 export interface TrainingTable {
   rows: TrainingRow[];
-  streets: string[];
-  street: string | null;
+  areas: TrainingArea[];
+  area: string | null;
   caption: string | null;
   empty: Said | null;
 }
 
-/** Where to train's table for the band GET /api/bands/<band> answered, on the street `link`
+/** Where to train's table for the band GET /api/bands/<band> answered, in the area `link`
  *  names, with dates written as of `now`. A map the player can't normally enter (an Event
- *  or Dev map) is left out unless it has entries, as search leaves it out. A street the
- *  band has no maps on shows every street. The maps with entries come first, highest #1
+ *  or Dev map) is left out unless it has entries, as search leaves it out. An area the
+ *  band has no maps in shows every area; the areas are offered by name, and a map without
+ *  a Map Mark shows only among every area's. The maps with entries come first, highest #1
  *  first, then the rest by their mob levels, lowest first. Ties by name. */
 export function trainingTable(answer: TrainingAnswer, names: MapNames, link: TrainingLink, now: Date): TrainingTable {
   const maps = answer.maps
     .map((m) => ({ ...m, place: placeOf(names, m.map) }))
     .filter((m) => m.best !== null || !LEFT_OUT_REGIONS.includes(m.place.region));
-  const streets = [...new Set(maps.map((m) => m.place.street))].sort(byText);
-  const street = link.street !== null && streets.includes(link.street) ? link.street : null;
-  const shown = maps.filter((m) => street === null || m.place.street === street);
+  const marks = new Map<string, MapMark>();
+  for (const m of maps) if (m.mark !== null) marks.set(m.mark.id, m.mark);
+  const area = link.area !== null && marks.has(link.area) ? link.area : null;
+  const areas = [...marks.values()]
+    .sort((a, b) => byText(a.name, b.name))
+    .map((mark) => ({ ...mark, href: trainingLinkTo({ band: answer.band, area: mark.id }), open: mark.id === area }));
+  const shown = maps.filter((m) => area === null || m.mark?.id === area);
   type Shown = (typeof shown)[number];
   const best = (m: Shown) => m.best?.expPerHour ?? -1;
   // A map the ceilings table doesn't hold, with no mob levels, goes after the rest.
@@ -465,6 +480,7 @@ export function trainingTable(answer: TrainingAnswer, names: MapNames, link: Tra
     return {
       name: m.place.name,
       street: m.place.street,
+      mark: m.mark === null ? null : { name: m.mark.name, picture: m.mark.picture },
       href: linkTo({ map: m.map, band: answer.band, name: null }),
       mobs: m.mobs === null ? null : levels({ lowest: m.mobs[0], highest: m.mobs[1] }),
       best:
@@ -480,11 +496,12 @@ export function trainingTable(answer: TrainingAnswer, names: MapNames, link: Tra
   });
   const at = bandLevels(answer.band);
   let caption: string | null = null;
-  if (rows.length > 0) caption = street === null ? `${counted(rows.length, "map")} for ${at}` : `${whole(rows.length)} ${street} ${rows.length === 1 ? "map" : "maps"} for ${at}`;
+  const areaName = area === null ? null : marks.get(area)!.name;
+  if (rows.length > 0) caption = areaName === null ? `${counted(rows.length, "map")} for ${at}` : `${whole(rows.length)} ${areaName} ${rows.length === 1 ? "map" : "maps"} for ${at}`;
   return {
     rows,
-    streets,
-    street,
+    areas,
+    area,
     caption,
     empty: rows.length === 0 ? { text: `No map's mobs are at ${at}, and no one has put a best there yet.`, link: PUT_YOURS } : null,
   };

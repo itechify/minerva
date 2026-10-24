@@ -1,9 +1,9 @@
-// Where to train (ADR 0024): the maps for each Level Band, each with its mob levels and the
-// band's #1 there. A map is for a band when the middle half of its spawns is at the band's
+// Where to train (ADR 0024): the maps for each Level Band, each with its mob levels, its Map
+// Mark and the band's #1 there. A map is for a band when the middle half of its spawns is at the band's
 // levels (the ceilings table), or when it has an entry in the band.
 import type { Best, TrainingMap } from "../entries";
 import { bandFrom, bandOf, levelsOf } from "../level-bands";
-import { type Ceiling, ceilingsOf } from "./ceilings";
+import { type Ceiling, ceilingsOf, marksOf } from "./ceilings";
 import { type Answer, badRequest } from "./http";
 
 /** Whether the middle half of a map's spawns is at any of the band's levels. */
@@ -59,12 +59,17 @@ export async function readTraining(env: Env, first: string): Promise<Answer> {
     .all<{ map_id: string; name: string; job: string; level: number; exp_per_hour: number; set_at: number; entries: number }>();
   const tops = new Map(rows.results.map((r) => [r.map_id, r]));
   const table = ceilingsOf(env);
+  const marks = marksOf(env);
+  const markOf = (map: string) => {
+    const id = table[map]?.mark;
+    return id === undefined || marks[id] === undefined ? null : { id, ...marks[id] };
+  };
   const ids = new Set([...Object.keys(table).filter((map) => isFor(table[map], band)), ...tops.keys()]);
   const maps: TrainingMap[] = [...ids].sort().map((map) => {
     const top = tops.get(map);
     const best: Best | null =
       top === undefined ? null : { name: top.name, job: top.job, level: top.level, expPerHour: top.exp_per_hour, setAt: top.set_at };
-    return { map, mobs: table[map]?.mobs ?? null, entries: top?.entries ?? 0, best };
+    return { map, mobs: table[map]?.mobs ?? null, mark: markOf(map), entries: top?.entries ?? 0, best };
   });
   return { status: 200, body: { band, levels: levelsOf(band), maps } };
 }

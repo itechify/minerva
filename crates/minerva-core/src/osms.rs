@@ -50,11 +50,21 @@ impl OsmsFiles {
 pub type SavedFiles = Saved<OsmsFiles>;
 
 /// A map's row in the ceilings table ([`MapSet::solo_ceilings`]): its solo EXP/h ceiling,
-/// and the levels of the middle half of its spawns.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// the levels of the middle half of its spawns, and its Map Mark, by OSMS's name for it
+/// (`None` for a map without one).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SoloCeiling {
     pub exp_per_hour: u64,
     pub mob_levels: LevelRange,
+    pub mark: Option<String>,
+}
+
+/// A Map Mark as the site shows it beside a map's name: the area it stands for, as players
+/// know it, and where OSMS keeps its picture.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SiteMark {
+    pub name: String,
+    pub picture_url: String,
 }
 
 /// Every map's data from OSMS's file set: the map list, each listed map's figures, and
@@ -78,16 +88,27 @@ impl MapSet {
         self.maps.iter().map(|(entry, data)| (entry, data))
     }
 
-    /// Each map's solo EXP-per-hour ceiling from its Map Summary, and the levels of the
-    /// middle half of its spawns, by its 9-digit ID: the table the Map Leaderboards cap
-    /// entries with (ADR 0015) and match maps to a Level Band by (ADR 0024). A map with no
-    /// Map Summary, or a ceiling of 0, isn't in it.
+    /// Each map's solo EXP-per-hour ceiling from its Map Summary, the levels of the middle
+    /// half of its spawns and its Map Mark, by its 9-digit ID: the table the Map Leaderboards
+    /// cap entries with (ADR 0015), and Where to train matches maps to a Level Band and an
+    /// area by (ADR 0024). A map with no Map Summary, or a ceiling of 0, isn't in it.
     pub fn solo_ceilings(&self) -> BTreeMap<String, SoloCeiling> {
-        let ceiling = |data: &MapData| {
+        let ceiling = |entry: &MapEntry, data: &MapData| {
             let exp_per_hour = data.summary.map(|s| s.exp_per_hour.solo).filter(|&solo| solo > 0)?;
-            Some(SoloCeiling { exp_per_hour, mob_levels: data.middle_mob_levels()? })
+            Some(SoloCeiling { exp_per_hour, mob_levels: data.middle_mob_levels()?, mark: entry.mark.clone() })
         };
-        self.maps().filter_map(|(entry, data)| Some((entry.id.clone(), ceiling(data)?))).collect()
+        self.maps().filter_map(|(entry, data)| Some((entry.id.clone(), ceiling(entry, data)?))).collect()
+    }
+
+    /// Every Map Mark OSMS has a picture of, by OSMS's name for it, as the site shows it:
+    /// the marks the ceilings table's maps name.
+    pub fn site_marks(&self) -> BTreeMap<String, SiteMark> {
+        self.marks()
+            .map(|(mark, path)| {
+                let site = SiteMark { name: map_mark::area_name(mark), picture_url: format!("{PICTURES_URL}{path}") };
+                (mark.to_string(), site)
+            })
+            .collect()
     }
 
     /// The map list.
