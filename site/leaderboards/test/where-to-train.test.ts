@@ -119,7 +119,7 @@ describe("where to train's table", () => {
     expect(shown.streets).toEqual(["Hidden Street", "Made-up Road", "Not in the map list"]);
     expect(shown.street).toBe("Hidden Street");
     expect(shown.rows.map((r) => r.name)).toEqual(["Party Field", "Quiet Field"]);
-    expect(shown.caption).toBe("2 maps for Lv 20–29 on Hidden Street");
+    expect(shown.caption).toBe("2 Hidden Street maps for Lv 20–29");
   });
 
   it("shows every street for a street the band has no maps on", () => {

@@ -20,7 +20,8 @@ function bandsOf(row: Ceiling): number[] {
 }
 
 /** Every Level Band with maps, lowest first: how many maps each lists, and how many entries
- *  those have there. */
+ *  those have there. The page leaves out an Event or Dev map with no entries, which this
+ *  counts; the two agree while the ceilings table holds none, as it doesn't. */
 export async function readBands(env: Env): Promise<Answer> {
   const maps = new Map<number, Set<string>>();
   const add = (band: number, map: string) => {

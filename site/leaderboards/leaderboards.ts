@@ -504,7 +504,7 @@ export function trainingTable(answer: TrainingAnswer, names: MapNames, link: Tra
   });
   const at = bandLevels(answer.band);
   let caption: string | null = null;
-  if (rows.length > 0) caption = `${counted(rows.length, "map")} for ${at}${street === null ? "" : ` on ${street}`}`;
+  if (rows.length > 0) caption = street === null ? `${counted(rows.length, "map")} for ${at}` : `${whole(rows.length)} ${street} ${rows.length === 1 ? "map" : "maps"} for ${at}`;
   return {
     rows,
     streets,
