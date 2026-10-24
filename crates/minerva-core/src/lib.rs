@@ -1707,9 +1707,8 @@ impl Minerva {
         self.record_input(event, Some(reading.at_ms), crop);
         self.take_status_bar_reading(reading);
         let Some(exp) = exp else { return self.sync_panel() };
-        let crop = figures;
         let event = Event::ExpBar { at_ms: exp.at_ms, bar: exp.bar, place: exp.place };
-        self.record_input(event, Some(exp.at_ms), crop);
+        self.record_input(event, Some(exp.at_ms), figures);
         self.take_exp_bar_reading(exp)
     }
 

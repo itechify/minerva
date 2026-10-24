@@ -241,7 +241,7 @@ impl StatusBarReader {
         let near_miss = nearest.map(|near| StatusBarNearMiss {
             area: near.tiles.on_screen(origin),
             tiles: near.count,
-            box_height: size.map(|_| near.box_height),
+            box_height: near.box_height,
         });
         let Some(size) = size else { return Err(near_miss) };
         let at = AtSamplesSize::new(img, size);
@@ -351,7 +351,7 @@ fn oranges(img: &RgbImage) -> Vec<Component> {
 struct Nearest {
     tiles: Rect,
     count: u32,
-    box_height: u32,
+    box_height: Option<u32>,
 }
 
 /// The bar's UI Size (ADR 0020): its LV box's height next to the samples' [`BOX_H`]. The box
@@ -389,7 +389,7 @@ fn measure(img: &RgbImage) -> (Option<f32>, Option<Nearest>) {
         let (x0, x1) = (first.x0, group[group.len() - 1].x1);
         let top = group.iter().map(|b| b.y0).fold(first.y0, u32::min);
         let bottom = group.iter().map(|b| b.y1).fold(first.y1, u32::max);
-        let found = Nearest { tiles: Rect { x: x0, y: top, w: x1 - x0, h: bottom - top }, count: group.len() as u32, box_height: 0 };
+        let found = Nearest { tiles: Rect { x: x0, y: top, w: x1 - x0, h: bottom - top }, count: group.len() as u32, box_height: None };
         if nearest.is_none_or(|nearest| found.count > nearest.count) {
             nearest = Some(found);
         }
@@ -414,7 +414,7 @@ fn measure(img: &RgbImage) -> (Option<f32>, Option<Nearest>) {
             continue;
         }
         let box_height = (left + right) as f32 / 2.0;
-        return (Some(box_height / BOX_H), Some(Nearest { box_height: box_height.round() as u32, ..found }));
+        return (Some(box_height / BOX_H), Some(Nearest { box_height: Some(box_height.round() as u32), ..found }));
     }
     (None, nearest)
 }

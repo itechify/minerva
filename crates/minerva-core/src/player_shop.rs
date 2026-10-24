@@ -537,9 +537,12 @@ fn find_lists(img: &RgbImage, widths: RangeInclusive<u32>) -> (Vec<List>, Option
     }
     // A run a pixel short at one end ends a column over, or is narrower: count each end and
     // width with its neighbours.
+    // A stack as wide as a band counts no rows narrower than the narrowest band: those are kept
+    // for near misses alone.
     let near = |end: u32, width: u32| {
+        let floor = if width >= *lengths.start() { *lengths.start() } else { 0 };
         (end.saturating_sub(1)..=end + 1)
-            .flat_map(move |e| (width.saturating_sub(BAND_SLACK)..=width + BAND_SLACK).map(move |w| (e, w)))
+            .flat_map(move |e| (width.saturating_sub(BAND_SLACK).max(floor)..=width + BAND_SLACK).map(move |w| (e, w)))
             .filter_map(|key| ends.get(&key))
     };
     let count = |end: u32, width: u32| near(end, width).map(Vec::len).sum::<usize>();
