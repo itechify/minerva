@@ -1,8 +1,7 @@
-// The Map Leaderboards page (leaderboards/index.html): find a map by its name, each with how
-// many entries it has, and the most-uploaded maps. What it shows is worked out in
-// leaderboards.ts.
-import { byId, mapItem, names, read, said as saidWith, UNREACHABLE } from "./api.ts";
-import { type EntryCounts, entryCounts, linkTo, type MapsAnswer, mostUploaded, searchMaps, searchSaid } from "./leaderboards.ts";
+// The Map Leaderboards page's search (leaderboards/index.html): find a map by its name, each
+// with how many entries it has. What it shows is worked out in leaderboards.ts.
+import { byId, mapItem, names, read } from "./api.ts";
+import { type EntryCounts, entryCounts, linkTo, type MapsAnswer, searchMaps, searchSaid } from "./leaderboards.ts";
 
 const query = byId<HTMLInputElement>("map-query");
 const said = byId("search-said");
@@ -31,19 +30,9 @@ query.form!.addEventListener("submit", (event) => {
 // A query the browser kept (back to the page) finds its maps again.
 search();
 
-const mostSaid = byId("most-said");
-const most = byId<HTMLOListElement>("most-maps");
 read<MapsAnswer>("/api/maps").then((answer) => {
-  if (answer === null) {
-    mostSaid.textContent = UNREACHABLE;
-    return;
-  }
+  if (answer === null) return;
   // The search says how many entries each map has from now on, and lists those with some first.
   counts = entryCounts(answer);
   if (query.value.trim() !== "") search();
-  const shown = mostUploaded(names, answer);
-  if (shown.empty !== null) saidWith(mostSaid, shown.empty);
-  mostSaid.hidden = shown.empty === null;
-  most.replaceChildren(...shown.maps.map((map) => mapItem({ ...map, aside: map.entries })));
-  most.hidden = shown.maps.length === 0;
 });

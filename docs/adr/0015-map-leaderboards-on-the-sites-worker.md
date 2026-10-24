@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended by ADR-0024 (the Map Leaderboards page shows Where to train and Latest in place of the most-uploaded maps, and the ceilings table holds each map's mob levels and Map Mark)
 ---
 
 # Map Leaderboards on the site's Worker

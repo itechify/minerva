@@ -11,3 +11,10 @@ export function bandOf(level: number): number {
 export function levelsOf(band: number): [number, number] {
   return [band, band === 1 ? 9 : band + 9];
 }
+
+/** The Level Band an API path names by its first level ("20"), or `null` if `first` isn't
+ *  one's first level. */
+export function bandFrom(first: string): number | null {
+  const band = Number(first);
+  return /^\d+$/.test(first) && band >= 1 && bandOf(band) === band ? band : null;
+}

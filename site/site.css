@@ -1623,7 +1623,7 @@ button.icon-button:active {
 .lb-head h1 {
   margin-bottom: 14px;
 }
-/* Finding a map beside the most-uploaded maps. */
+/* Finding a map beside the newest bests. */
 .lb-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1632,6 +1632,7 @@ button.icon-button:active {
   padding-top: 48px;
 }
 .lb-section h2,
+.lb-train h2,
 .lb-questions h2,
 .lb-board h2 {
   margin-bottom: 12px;
@@ -1839,6 +1840,118 @@ button.icon-button:active {
   line-height: 16px;
 }
 
+/* Where to train: the Level Bands, then the areas, by their Map Marks, over the band's
+   maps. */
+.lb-train {
+  padding-top: 40px;
+}
+/* The areas, as the Level Bands are: light steel, each the game's Map Mark before its name,
+   the one shown selected. */
+.lb-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 60em;
+  margin-top: 14px;
+}
+.lb-areas[hidden] {
+  display: none;
+}
+.lb-area {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 5px;
+  border: 1px solid var(--select-edge);
+  border-radius: 4px;
+  background: var(--button-light);
+  box-shadow: inset 0 1px 0 #fff;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-decoration: none;
+}
+.lb-area:hover {
+  background: var(--button-light-hover);
+  color: var(--ink);
+}
+.lb-area:active {
+  background: var(--button-light);
+  box-shadow: var(--pressed-light-steel);
+  color: var(--ink);
+}
+.lb-area[aria-current] {
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--select-edge);
+  color: var(--ink);
+}
+/* A Map Mark at half the Mini Map's size, as the app shows it beside a map's name. */
+.lb-mark {
+  flex: none;
+  width: 19px;
+  height: 19px;
+}
+.lb-train-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lb-train .lb-said {
+  margin-top: 16px;
+}
+.lb-train-table {
+  margin-top: 16px;
+}
+.lb-train-table .lb-train-mobs,
+.lb-train-table .lb-train-best,
+.lb-train-table .lb-train-entries {
+  text-align: right;
+}
+.lb-train-table td.lb-train-mobs,
+.lb-train-table td.lb-train-entries,
+.lb-train-table td.lb-train-none {
+  color: var(--ink-2);
+}
+.lb-train-table td.lb-train-mobs,
+.lb-train-table td.lb-train-entries {
+  white-space: nowrap;
+}
+/* A map's name is its Map Leaderboard at the band, over its street. */
+.lb-train-table .lb-map-name {
+  display: block;
+  color: var(--ink);
+  text-decoration: none;
+}
+.lb-train-table .lb-map-name:hover {
+  color: var(--portal);
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+.lb-train-table .lb-map-street {
+  display: block;
+}
+.lb-train-exp {
+  display: block;
+  font-weight: 700;
+}
+.lb-train-who {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+/* The date a #1 was set on never breaks across lines ("22 / Oct"). */
+.lb-train-date {
+  white-space: nowrap;
+}
+/* Latest: an entry that took a map's top spot says so after its EXP/h. */
+.lb-took {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
 .lb-board {
   padding-top: 40px;
 }
@@ -1862,7 +1975,8 @@ button.icon-button:active {
 }
 /* A band's entries: the hotkey table's inset box, rows parted by Window Rules, figures
    right-aligned, the linked character's row selected. */
-.lb-table {
+.lb-table,
+.lb-train-table {
   width: 100%;
   max-width: 60em;
   border: 1px solid var(--inset-edge);
@@ -1874,18 +1988,22 @@ button.icon-button:active {
   font-variant-numeric: tabular-nums;
 }
 .lb-table th,
-.lb-table td {
+.lb-table td,
+.lb-train-table th,
+.lb-train-table td {
   padding: 8px 12px;
   text-align: left;
   vertical-align: baseline;
 }
-.lb-table thead th {
+.lb-table thead th,
+.lb-train-table thead th {
   font-size: 13px;
   font-weight: 400;
   line-height: 18px;
   color: var(--ink-2);
 }
-.lb-table tbody tr > * {
+.lb-table tbody tr > *,
+.lb-train-table tbody tr > * {
   border-top: 1px solid var(--rule);
 }
 .lb-table .lb-rank,
@@ -2376,7 +2494,7 @@ button.button {
   }
 }
 
-/* The Map Leaderboards, narrower: finding a map over the most-uploaded maps, the questions
+/* The Map Leaderboards, narrower: finding a map over the newest bests, the questions
    under their heading, and a feature's way to its page after its words. */
 @media (max-width: 960px) {
   .lb-columns,
@@ -2410,11 +2528,13 @@ button.button {
     padding-top: 28px;
   }
   /* The rows as cards, the table's roles kept in the markup; the caption still under them. */
-  .lb-table {
+  .lb-table,
+  .lb-train-table {
     display: flex;
     flex-direction: column;
   }
-  .lb-table tbody {
+  .lb-table tbody,
+  .lb-train-table tbody {
     display: block;
   }
   .lb-caption {
@@ -2423,6 +2543,47 @@ button.button {
     padding: 8px 12px;
     border-top: 1px solid var(--rule);
   }
+  /* A map's card: its name and street beside the #1, over its mobs and its entries. */
+  .lb-train-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "map best"
+      "mobs entries";
+    column-gap: 12px;
+    padding: 8px 12px;
+  }
+  .lb-train-table tbody tr + tr {
+    border-top: 1px solid var(--rule);
+  }
+  .lb-train-table tbody tr > * {
+    padding: 0;
+    border-top: 0;
+  }
+  .lb-train-table .lb-train-map {
+    grid-area: map;
+    overflow-wrap: anywhere;
+  }
+  .lb-train-table .lb-train-best {
+    grid-area: best;
+  }
+  .lb-train-table .lb-train-mobs {
+    grid-area: mobs;
+    text-align: left;
+  }
+  .lb-train-table .lb-train-entries {
+    grid-area: entries;
+  }
+  .lb-train-table td.lb-train-mobs,
+  .lb-train-table td.lb-train-entries {
+    font-size: 13px;
+    line-height: 20px;
+  }
+  /* A card says only what the map has: no dash for a #1 it hasn't got. */
+  .lb-train-table td.lb-train-none {
+    display: none;
+  }
+  .lb-train-table thead,
   .lb-table thead {
     position: absolute;
     width: 1px;

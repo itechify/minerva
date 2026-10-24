@@ -38,8 +38,9 @@ export async function readReports(env: Env): Promise<Answer> {
   return { status: 200, body: { reports: rows.results } };
 }
 
-/** Delete `name`'s entry on `map` in the Level Band starting at `band`, and its reports.
- *  The same Visit (the same EXP/h there) uploaded again is rejected as "removed". */
+/** Delete `name`'s entry on `map` in the Level Band starting at `band`, its reports, and the
+ *  top spot it took, if it took one. The same Visit (the same EXP/h there) uploaded again is
+ *  rejected as "removed". */
 export async function deleteEntry(env: Env, name: string, map: string, band: string): Promise<Answer> {
   const at = [name.toLowerCase(), map, Number(band)];
   const [removed] = await env.DB.batch([
@@ -49,6 +50,7 @@ export async function deleteEntry(env: Env, name: string, map: string, band: str
     ).bind(...at),
     env.DB.prepare("DELETE FROM entries WHERE name_key = ?1 AND map_id = ?2 AND band = ?3").bind(...at),
     env.DB.prepare("DELETE FROM reports WHERE name_key = ?1 AND map_id = ?2 AND band = ?3").bind(...at),
+    env.DB.prepare("DELETE FROM taken_tops WHERE name_key = ?1 AND map_id = ?2 AND band = ?3").bind(...at),
   ]);
   if (removed.meta.changes === 0) return { status: 404, body: { error: "no-entry" } };
   return { status: 204 };

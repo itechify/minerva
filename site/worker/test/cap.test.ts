@@ -1,6 +1,7 @@
 // An entry with EXP/h above 5× the map's solo ceiling is rejected; a map with no ceiling
 // falls back to one absolute cap, 25,000,000 EXP/h. The rest of the upload is taken.
 import { describe, expect, it } from "vitest";
+import type { CeilingsTable } from "../ceilings";
 import ceilings from "../osms-ceilings.json";
 import { FIELD, NO_CEILING, RICH_FIELD, band, entry, key, names, upload } from "./api";
 
@@ -36,13 +37,21 @@ describe("the cap", () => {
   });
 
   // The table the deployed Worker loads, written by `probe ceilings` from OSMS's live set.
-  it("loads a table of 9-digit map IDs and positive solo ceilings below the absolute cap", () => {
-    const table = Object.entries(ceilings as Record<string, number>);
+  it("loads a table of 9-digit map IDs, positive solo ceilings below the absolute cap, mob levels and Map Marks", () => {
+    const { maps, marks } = ceilings as unknown as CeilingsTable;
+    const table = Object.entries(maps);
 
     expect(table.length).toBeGreaterThan(0);
-    for (const [map, ceiling] of table) {
+    for (const [map, { ceiling, mobs, mark }] of table) {
       expect(map).toMatch(/^\d{9}$/);
       expect(Number.isSafeInteger(ceiling) && ceiling > 0 && ceiling * 5 <= 25_000_000).toBe(true);
+      expect(mobs).toHaveLength(2);
+      expect(mobs.every(Number.isSafeInteger) && 1 <= mobs[0] && mobs[0] <= mobs[1] && mobs[1] <= 200).toBe(true);
+      if (mark !== undefined) expect(marks[mark]).toBeDefined();
+    }
+    for (const { name, picture } of Object.values(marks)) {
+      expect(name.length).toBeGreaterThan(0);
+      expect(picture).toMatch(/^https:\/\/osmsdataexplorer\.com\/data\/[\w./-]+\.png$/);
     }
   });
 });

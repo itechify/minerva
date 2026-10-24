@@ -1,8 +1,9 @@
 <!doctype html>
-<!-- The Map Leaderboards page: find a map by its name (from the map names fixture, as the
-     panel names maps), and the maps players have uploaded the most bests for. A map's own
-     page is leaderboards/map/. Both read the site's API (ADR 0015) from the browser, so
-     without script the page says it needs it. -->
+<!-- The Map Leaderboards page: Where to train, a Level Band's maps with the best players got
+     on each; find a map by its name (from the map names fixture, as
+     the panel names maps); and Latest, the newest bests (ADR 0024). A map's own page is
+     leaderboards/map/. Both read the site's API (ADR 0015) from the browser, so without
+     script the page says it needs it. -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -10,7 +11,7 @@
     <title>Map Leaderboards · Minerva</title>
     <meta
       name="description"
-      content="Players' Personal Bests from Minerva, side by side on every map of MapleStory Classic World: each Level Band ranked by EXP per hour."
+      content="Where to train at your level in MapleStory Classic World: the maps for your Level Band, with the best EXP per hour Minerva players got on each, and their Personal Bests ranked by band."
     />
     <link rel="canonical" href="@SITE_URL@leaderboards/" />
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icon-32.png" />
@@ -20,7 +21,7 @@
     <meta property="og:title" content="Map Leaderboards · Minerva" />
     <meta
       property="og:description"
-      content="What EXP per hour do players at your level get on a map? Their Personal Bests from Minerva, side by side, each Level Band ranked."
+      content="Where should you train at your level? The maps for your Level Band, with what Minerva players really got on each, each band ranked."
     />
     <meta property="og:url" content="@SITE_URL@leaderboards/" />
     <meta property="og:image" content="@CARD_IMAGE@" />
@@ -35,7 +36,9 @@
     <link rel="stylesheet" href="../../src/theme.css" />
     <link rel="stylesheet" href="../site.css" />
     <script type="module" src="../site.ts"></script>
+    <script type="module" src="./training.ts"></script>
     <script type="module" src="./search.ts"></script>
+    <script type="module" src="./latest.ts"></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to the page</a>
@@ -48,9 +51,32 @@
             <h1>Map Leaderboards</h1>
             <p class="lede">
               Minerva players' <a href="/faq/#personal-bests">Personal Bests</a>, ranked on each map by
-              <strong>Level Band</strong>. Find a map to see what players at your level get there.
+              <strong>Level Band</strong>. Pick your band to see where to train, or find a map to see what players at
+              your level get there.
             </p>
           </header>
+
+          <section class="lb-train stop" id="where-to-train" data-mini="Where to train" aria-labelledby="train-title">
+            <h2 id="train-title">Where to train</h2>
+            <nav class="lb-bands" id="train-bands" aria-label="Level Bands" hidden></nav>
+            <nav class="lb-areas" id="train-areas" aria-label="Areas, by their Map Marks" hidden></nav>
+            <p class="lb-said" id="train-said" aria-live="polite">Loading the Level Bands…</p>
+            <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
+            <!-- The roles keep the table a table to assistive tech on a phone, where its rows
+                 are cards (display: grid). -->
+            <table class="lb-train-table" id="train-table" role="table" hidden>
+              <caption class="lb-caption" id="train-caption"></caption>
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th scope="col" role="columnheader" class="lb-train-map">Map</th>
+                  <th scope="col" role="columnheader" class="lb-train-mobs">Mobs</th>
+                  <th scope="col" role="columnheader" class="lb-train-best">Players' best</th>
+                  <th scope="col" role="columnheader" class="lb-train-entries">Entries</th>
+                </tr>
+              </thead>
+              <tbody id="train-rows" role="rowgroup"></tbody>
+            </table>
+          </section>
 
           <div class="lb-columns">
             <section class="lb-section stop" id="find" data-mini="Find a map" aria-labelledby="find-title">
@@ -63,17 +89,16 @@
               <ul class="lb-maps" id="search-maps" hidden></ul>
             </section>
 
-            <section class="lb-section stop" id="most-uploaded" data-mini="Most uploaded" aria-labelledby="most-uploaded-title">
-              <h2 id="most-uploaded-title">Most uploaded</h2>
-              <p class="lb-said" id="most-said" aria-live="polite">Loading the maps…</p>
-              <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
-              <ol class="lb-maps" id="most-maps" hidden></ol>
+            <section class="lb-section stop" id="latest" data-mini="Latest" aria-labelledby="latest-title">
+              <h2 id="latest-title">Latest</h2>
+              <p class="lb-said" id="latest-said" aria-live="polite">Loading the newest bests…</p>
+              <ol class="lb-maps" id="latest-entries" hidden></ol>
             </section>
           </div>
 
           <section class="lb-questions stop" id="questions" data-mini="Questions" aria-labelledby="questions-title">
             <h2 id="questions-title">How they work</h2>
-            <div class="qa-list" data-qa="map-leaderboards level-bands leaderboard-exp report-entry" data-group="leaderboards"></div>
+            <div class="qa-list" data-qa="map-leaderboards where-to-train level-bands leaderboard-exp report-entry" data-group="leaderboards"></div>
           </section>
         </div>
       </main>
