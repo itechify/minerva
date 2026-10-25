@@ -1,5 +1,6 @@
-//! Characters (GLOSSARY): the Status Bar names who is playing, and their level. A new name
-//! is another Character, and a new Session at once; the level read there is the one the
+//! Characters (GLOSSARY): the Status Bar names who is playing, and their level. A new name,
+//! read three times in a row, is another Character, and a new Session at once; one reading
+//! names no one, as the bar drawn afresh can be misread. The level read there is the one the
 //! Session learns, and a level-up it shows is taken at once. While no name can be read, the
 //! Session tells another Character from the EXP bar alone, as before.
 //!
@@ -60,38 +61,81 @@ fn egbert(level: u32) -> Option<Character> {
 }
 
 #[test]
-fn no_character_shows_until_the_status_bar_names_one_and_it_stays_through_a_moment_unread() {
+fn no_character_shows_until_the_status_bar_reads_a_name_three_times_in_a_row_and_it_stays_through_a_moment_unread() {
     let mut minerva = tracking();
     assert_eq!(minerva.panel_state().character, None);
     assert_eq!(status(&mut minerva, 0, None, Some(13)).character, None, "a level alone names no one");
 
-    assert_eq!(status(&mut minerva, S, Some("Egbert"), Some(13)).character, egbert(13));
-    assert_eq!(status(&mut minerva, 2 * S, None, None).character, egbert(13), "the pointer over the name");
-    assert_eq!(no_status_bar(&mut minerva, 3 * S).character, egbert(13), "the Session is still theirs");
+    assert_eq!(status(&mut minerva, S, Some("Egbert"), Some(13)).character, None, "once");
+    assert_eq!(status(&mut minerva, 2 * S, Some("Egbert"), Some(13)).character, None, "twice");
+    assert_eq!(status(&mut minerva, 3 * S, Some("Egbert"), Some(13)).character, egbert(13));
+    assert_eq!(status(&mut minerva, 4 * S, None, None).character, egbert(13), "the pointer over the name");
+    assert_eq!(no_status_bar(&mut minerva, 5 * S).character, egbert(13), "the Session is still theirs");
 }
 
 #[test]
-fn a_new_name_on_the_status_bar_starts_a_new_session_at_once() {
+fn a_name_misread_once_names_no_one() {
+    let mut minerva = tracking();
+    status(&mut minerva, 0, Some("Egbrt"), Some(13));
+    status(&mut minerva, S, Some("Egbert"), Some(13));
+    status(&mut minerva, 2 * S, Some("Egbert"), Some(13));
+    assert_eq!(status(&mut minerva, 3 * S, Some("Egbert"), Some(13)).character, egbert(13));
+}
+
+#[test]
+fn a_new_name_read_three_times_in_a_row_starts_a_new_session_and_none_of_their_exp_counts_before() {
     let mut minerva = egbert_a_minute_in();
     character_select(&mut minerva, 75, 79);
 
-    // Bob, at the same level as Egbert: no EXP reading has come yet, and none needs to.
-    let switched = status(&mut minerva, 80 * S, Some("Bob"), Some(13));
+    // Bob, at Egbert's level with more EXP than Egbert had: while his name is read once or
+    // twice, his EXP bar is no one's, and Egbert's Session counts none of it.
+    for at in [80, 81] {
+        status(&mut minerva, at * S, Some("Bob"), Some(13));
+        let held = read(&mut minerva, at * S, 3000, LV13);
+        assert!(!held.exp_tracking.character_switched);
+        assert_eq!(held.exp_tracking.bar, Some(ExpBar { exp: 860, percent_hundredths: percent(860, LV13) }));
+        assert_eq!(held.character, egbert(13));
+    }
+
+    // The third time, he is playing: a new Session, before his EXP bar is read again.
+    let switched = status(&mut minerva, 82 * S, Some("Bob"), Some(13));
     assert_eq!(
         switched.exp_tracking,
         ExpTracking { state: TrackingState::Waiting, character_switched: true, ..ExpTracking::default() }
     );
     assert_eq!(switched.character.as_ref().map(|c| c.name.as_str()), Some("Bob"));
 
-    // Bob's bar fits Egbert's level, with less EXP than Egbert had: it is no death, and
-    // what Bob gains next is all the new Session counts.
-    let first = read(&mut minerva, 80 * S, 500, LV13);
+    // What Bob gains next is all the new Session counts.
+    let first = read(&mut minerva, 82 * S, 3000, LV13);
     assert_eq!(first.exp_tracking.state, TrackingState::Waiting);
-    let started = read(&mut minerva, 90 * S, 600, LV13);
+    let started = read(&mut minerva, 92 * S, 3100, LV13);
     assert_eq!(started.exp_tracking.state, TrackingState::WarmingUp);
     assert_eq!(started.exp_tracking.deaths, Deaths::default());
-    let on = read(&mut minerva, 100 * S, 700, LV13);
+    let on = read(&mut minerva, 102 * S, 3200, LV13);
     assert_eq!(on.exp_tracking.session_average.map(|r| r.exp_per_hour), Some(36_000), "100 EXP in 10 s");
+}
+
+#[test]
+fn a_name_misread_once_as_the_status_bar_comes_back_is_no_switch_and_the_right_name_carries_on() {
+    let mut minerva = egbert_a_minute_in();
+    character_select(&mut minerva, 75, 79);
+
+    // Drawn afresh, the bar's name misreads once, a letter short.
+    status(&mut minerva, 80 * S, Some("Egbrt"), Some(13));
+    read(&mut minerva, 80 * S, 950, LV13);
+    // Then reads right: Egbert's Session goes on, and Egbrt is no one.
+    status(&mut minerva, 81 * S, Some("Egbert"), Some(13));
+    let on = read(&mut minerva, 81 * S, 960, LV13);
+    assert!(!on.exp_tracking.character_switched);
+    assert_eq!(on.exp_tracking.state, TrackingState::Active);
+    assert_eq!(on.exp_tracking.bar, Some(ExpBar { exp: 960, percent_hundredths: percent(960, LV13) }));
+    assert_eq!(on.character, egbert(13));
+
+    // The bar in sight, the misread again is set aside, however often.
+    for at in 82..=85 {
+        status(&mut minerva, at * S, Some("Egbrt"), Some(13));
+    }
+    assert_eq!(minerva.panel_state().character, egbert(13));
 }
 
 #[test]
@@ -244,4 +288,19 @@ fn the_status_bar_is_captured_across_the_bottom_of_the_client_area_while_the_gam
     let state = minerva.on_foreground(Foreground::OtherApp);
 
     assert_eq!(state.status_bar_capture, None, "another app's pixels are never read");
+}
+
+#[test]
+fn a_name_read_once_then_unreadable_holds_no_reading_back() {
+    let mut minerva = egbert_a_minute_in();
+    character_select(&mut minerva, 75, 79);
+
+    // Misread once as the bar comes back, then the pointer parks over the name: Egbert's EXP
+    // bar counts on, as the name wasn't read again.
+    status(&mut minerva, 80 * S, Some("Egbrt"), Some(13));
+    read(&mut minerva, 80 * S, 950, LV13);
+    status(&mut minerva, 81 * S, None, Some(13));
+    let on = read(&mut minerva, 81 * S, 960, LV13);
+    assert_eq!(on.exp_tracking.bar, Some(ExpBar { exp: 960, percent_hundredths: percent(960, LV13) }));
+    assert_eq!(on.character, egbert(13));
 }

@@ -256,6 +256,12 @@ const SWITCH_READINGS: u32 = 3;
 /// doesn't read whole is: it isn't being captured (the game window gone, or its size
 /// changed). Frames come every second.
 const OUT_OF_SIGHT_MS: u64 = 5_000;
+/// Readings in a row of a name, not the Character's, that make it the Character, when none is
+/// named or after the Status Bar was out of sight. The bar coming back into sight is being
+/// drawn afresh (after a loading screen, the Cash Shop), and one reading of it can drop a
+/// letter ("Egbrt" for "Egbert"): a Character it named would keep that name until the
+/// bar next went out of sight, the right one set aside as the misread.
+const NAME_READINGS: u32 = 3;
 /// Readings that fit a level of their own, carrying on from the last reading taken,
 /// are the same level learned anew if their level is within this many percent of the
 /// one learned. A misread narrows the range by far less, and another character's level
@@ -384,6 +390,10 @@ pub(crate) struct Session {
     /// The Status Bar has shown the Character's name since it was last out of sight: another
     /// name read now is a misread, and readings that fit another level aren't a switch.
     named: bool,
+    /// A name read, not the Character's, while the bar hasn't shown the Character's since it
+    /// was out of sight (or no one is named), and how many readings in a row it has been read:
+    /// at [`NAME_READINGS`] it is the Character.
+    unconfirmed_name: Option<(String, u32)>,
     /// The Status Bar has been out of sight since its level was last read: another level
     /// read now, with no name, is another Character.
     level_unseen: bool,
@@ -604,9 +614,17 @@ impl Session {
     /// whole, for longer than [`IDLE_MS`] since the last that did, a reading of the same
     /// level, or of the next, is taken as where the Session stands now, without counting
     /// the change since the last one: no one saw how it came about. One that fits neither
-    /// is weighed as ever, towards a misread or a character switch.
+    /// is weighed as ever, towards a misread or a character switch. While the Status Bar
+    /// reads a name not the Character's, not yet [`NAME_READINGS`] times, a reading is set
+    /// aside: it may be someone else's.
     pub fn on_bar(&mut self, bar: ExpBar, at_ms: u64) {
         self.tick(at_ms);
+        if self.character.is_some() && self.unconfirmed_name.is_some() {
+            // The Status Bar names someone else, not yet for sure: the reading may be theirs,
+            // and isn't the Character's to count.
+            self.notes.push(Note::NameUnconfirmedBar);
+            return;
+        }
         let unseen = self.unread_since.is_some()
             && self.read_at.is_some_and(|read_at| at_ms.saturating_sub(read_at) > IDLE_MS);
         if self.read_at.is_some_and(|read_at| at_ms.saturating_sub(read_at) > OUT_OF_SIGHT_MS) {
@@ -712,10 +730,11 @@ impl Session {
     }
 
     /// A Status Bar capture taken at `at_ms` found `bar`, or none (the character select
-    /// screen, say). A name other than the Character's, after the bar was out of sight, is
-    /// another Character: a new Session at once. With no name read, so is another level than
-    /// the one before, other than the next. The next level is a level-up the next EXP bar
-    /// reading is in; any other is learned afresh from it.
+    /// screen, say). A name other than the Character's, read [`NAME_READINGS`] times in a row
+    /// after the bar was out of sight, is another Character: a new Session at once. The first
+    /// name, read so, names the Character. With no name read, another level than the one
+    /// before, other than the next, is another Character. The next level is a level-up the
+    /// next EXP bar reading is in; any other is learned afresh from it.
     pub fn on_status_bar(&mut self, bar: Option<&StatusBar>, at_ms: u64) {
         self.tick(at_ms);
         // No capture for a while is the bar out of sight, as with the EXP bar.
@@ -726,25 +745,41 @@ impl Session {
         self.status_bar_at = Some(at_ms);
         let Some(bar) = bar else {
             self.named = false;
+            self.unconfirmed_name = None;
             self.level_unseen = true;
             return;
         };
         match (&bar.name, &self.character) {
-            (Some(name), Some(character)) if *name == character.name => self.named = true,
+            (Some(name), Some(character)) if *name == character.name => {
+                self.named = true;
+                self.unconfirmed_name = None;
+            }
             (Some(name), Some(_)) if self.named => {
                 // Two names on a bar that never went out of sight: one is a misread.
                 self.notes.push(Note::NameMisread { name: name.clone() });
                 return;
             }
-            (Some(name), Some(_)) => {
-                self.notes.push(Note::NameSwitch { name: name.clone() });
-                self.switch(Some(name.clone()));
+            (Some(name), character) => {
+                // Another name, or the first: it names the Character once it is read so a few
+                // times in a row, and a misread drawing the bar afresh isn't.
+                let count = match self.unconfirmed_name.take() {
+                    Some((read, count)) if read == *name => count + 1,
+                    _ => 1,
+                };
+                if count < NAME_READINGS {
+                    self.notes.push(Note::NameUnconfirmed { name: name.clone(), count });
+                    self.unconfirmed_name = Some((name.clone(), count));
+                } else if character.is_some() {
+                    self.notes.push(Note::NameSwitch { name: name.clone() });
+                    self.switch(Some(name.clone()));
+                } else {
+                    self.character = Some(Character { name: name.clone(), job: None, level: None });
+                    self.named = true;
+                }
             }
-            (Some(name), None) => {
-                self.character = Some(Character { name: name.clone(), job: None, level: None });
-                self.named = true;
-            }
-            (None, _) => {}
+            // A reading with no name ends the run of a name not yet the Character's: the EXP
+            // bar isn't held back on one reading.
+            (None, _) => self.unconfirmed_name = None,
         }
         if let Some(level) = bar.level {
             match self.level {
@@ -789,6 +824,7 @@ impl Session {
         self.level = None;
         self.level_up_at = None;
         self.named = name.is_some();
+        self.unconfirmed_name = None;
         self.character = name.map(|name| Character { name, job: None, level: None });
     }
 

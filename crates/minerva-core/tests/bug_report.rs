@@ -692,7 +692,9 @@ fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
 
     assert!(report.zip.len() <= MAX_TEXT_AND_CROPS_BYTES, "{} bytes", report.zip.len());
     assert!(recording.report.crops_left_out > 0);
-    assert_eq!(recording.report.crops + recording.report.crops_left_out, 12, "the last 10 minutes and the kept one");
+    // The kept ones: the EXP bar's misread, and the Status Bar's first, its name not yet the
+    // Character's.
+    assert_eq!(recording.report.crops + recording.report.crops_left_out, 13, "the last 10 minutes and the kept ones");
     assert!(recording.crops.contains(&format!("crops/exp-bar-{:010}.png", MIN)), "the kept one stays");
     assert!(recording.crops.contains(&format!("crops/exp-bar-{:010}.png", 20 * MIN)), "the newest stays");
 }
@@ -1238,7 +1240,7 @@ fn status_bar_reading(name: Option<&str>, at_ms: u64) -> StatusBarReading {
 }
 
 /// A run with Characters: Egbert's Status Bar read every second with the EXP bar, then the
-/// character select screen, then Bob's.
+/// character select screen, then Bob's, three times to name him.
 fn run_with_characters() -> Shell {
     let mut shell = Shell::new(FakeSource::osms());
     for second in 1..=10 {
@@ -1250,7 +1252,9 @@ fn run_with_characters() -> Shell {
         shell.play(second * S, CONSTRUCTION_SITE, |_| None);
         shell.minerva.on_status_bar_reading(StatusBarReading { bar: None, at_ms: second * S, near_miss: None });
     }
-    shell.minerva.on_status_bar_read(status_bar_capture(16 * S), status_bar_reading(Some("Bob"), 16 * S), None);
+    for second in 16..=18 {
+        shell.minerva.on_status_bar_read(status_bar_capture(second * S), status_bar_reading(Some("Bob"), second * S), None);
+    }
     shell.play(30 * S, CONSTRUCTION_SITE, grind);
     shell
 }

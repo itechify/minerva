@@ -113,6 +113,12 @@ pub enum Note {
     /// The Status Bar named another Character, `name`, after it was out of sight: a new
     /// Session.
     NameSwitch { name: String },
+    /// The Status Bar's name read as `name`, not the Character's, with none named or after it
+    /// was out of sight: `count` readings in a row so far, short of the three that name it.
+    NameUnconfirmed { name: String, count: u32 },
+    /// An EXP bar reading while the Status Bar's name read as another's, not yet three times
+    /// in a row: it may be theirs, and is set aside.
+    NameUnconfirmedBar,
     /// The Status Bar, with no name read, showed another level (`level`), not the next, after
     /// it was out of sight: another Character, and a new Session.
     LevelSwitch { level: u32 },
@@ -1979,6 +1985,10 @@ impl Note {
             Note::LevelSwitch { level } => {
                 format!("the Status Bar shows another character's level, {level}, and no name: a new Session")
             }
+            Note::NameUnconfirmed { name, count } => {
+                format!("the Status Bar's name read as {name:?}, {count} in a row: not yet the character")
+            }
+            Note::NameUnconfirmedBar => "the Status Bar names another, not yet for sure: set aside".to_string(),
             Note::NameMisread { name } => format!("the Status Bar's name misread as {name:?} while in sight: set aside"),
             Note::LevelShown { level } => format!("the Status Bar shows level {level}: the next reading is in it"),
             Note::LevelUpUncounted => "the Status Bar's level-up couldn't be counted: the new level is learned afresh".to_string(),
