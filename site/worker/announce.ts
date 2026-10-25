@@ -1,12 +1,13 @@
 // A new #1 on a Map Leaderboard, told to Discord (ADR 0022): when an upload takes a map and
-// Level Band's top spot from another Character, the Worker posts a line about it to a Discord
-// webhook. Only a spot *taken* is told, so a first entry in an empty band, a Character
-// beating its own best, and a top spot that fell to someone because an entry was deleted all
-// stay quiet.
+// Level Band's top spot from another Character, the Worker posts it to a Discord webhook, an
+// embed for each spot showing the map's Map Mark. Only a spot *taken* is told, so a first
+// entry in an empty band, a Character beating its own best, and a top spot that fell to
+// someone because an entry was deleted all stay quiet.
 import mapNameRows from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
 import { rate } from "../../src/figures";
 import { levelsOf } from "../level-bands";
 import { type MapNames, mapNames, placeOf } from "../map-names";
+import { markOf } from "./ceilings";
 
 /** The maps the fixture names, built once per isolate. */
 const PLACES: MapNames = mapNames(mapNameRows);
@@ -59,46 +60,60 @@ export function takenTops(before: Top[], after: Top[], nameKey: string): Taken[]
   return taken.sort((a, b) => b.expPerHour - a.expPerHour || a.map.localeCompare(b.map) || a.band - b.band);
 }
 
-/** The Map Leaderboards link a line points at: the map's page, opened at the band with the
- *  Character's entry marked, as the app's deep links do (ADR 0015). */
+/** The Map Leaderboards link a spot's embed points at: the map's page, opened at the band with
+ *  the Character's entry marked, as the app's deep links do (ADR 0015). Two spots never share
+ *  one, which matters: Discord folds embeds with the same link into one. */
 function linkTo(taken: Taken): string {
   const query = new URLSearchParams({ map: taken.map, band: String(taken.band), name: taken.name });
   return `https://owlofminerva.app/leaderboards/map/?${query}`;
 }
 
-/** A map's name as Discord markdown, so a name holding one of its characters is read as the
- *  name and not as formatting: "G* Coconut Season" is one in the map names fixture, and a
- *  "]" would end the link early. A Character's name is letters and digits only (ADR 0015),
- *  so it never needs this. */
-function escaped(name: string): string {
-  return name.replace(/[\\*_~`[\]|]/g, "\\$&");
+/** A spot's embed in a post. */
+interface Embed {
+  title: string;
+  url: string;
+  description: string;
+  /** The map's Map Mark; none for a map without one. */
+  thumbnail?: { url: string };
 }
 
-/** One taken spot as a line of the post. The map's name is the link, so Discord shows no
- *  preview under a post that names several. */
-function lineFor(taken: Taken): string {
-  const place = placeOf(PLACES, taken.map);
+/** One taken spot as an embed: titled with the map's name, linked to its Map Leaderboard, and
+ *  showing its Map Mark when it has one. The link is the title's, never the description's, so
+ *  Discord shows no preview under a post that names several. The title isn't markdown, so the
+ *  map's name goes in as the site writes it ("G* Coconut Season" is one in the map names
+ *  fixture); a Character's name is letters and digits only (ADR 0015), so the description
+ *  needs no escaping either. */
+function embedFor(taken: Taken, picture: string | null): Embed {
   const [first, last] = levelsOf(taken.band);
-  return (
-    `**${taken.name}** took #1 on [${escaped(place.name)}](${linkTo(taken)}), levels ${first}–${last}, ` +
-    `with ${rate(taken.expPerHour)} EXP/h, past ${taken.from}'s ${rate(taken.fromExpPerHour)}.`
-  );
+  const embed: Embed = {
+    title: placeOf(PLACES, taken.map).name,
+    url: linkTo(taken),
+    description:
+      `**${taken.name}** took #1, levels ${first}–${last}, ` +
+      `with ${rate(taken.expPerHour)} EXP/h, past ${taken.from}'s ${rate(taken.fromExpPerHour)}.`,
+  };
+  if (picture !== null) embed.thumbnail = { url: picture };
+  return embed;
 }
 
 /** What a Discord webhook is posted. */
-interface Post {
-  content: string;
+export interface Post {
+  /** How many more spots the upload took than it names; none when it names them all. */
+  content?: string;
+  embeds: Embed[];
   /** Nothing in a post ever pings: a Character's name is its own, not a mention. */
   allowed_mentions: { parse: [] };
 }
 
-/** The post for the spots an upload took, or `null` with none. */
-export function postFor(taken: Taken[]): Post | null {
+/** The post for the spots an upload took, or `null` with none, with `pictureOf` giving a
+ *  map's Map Mark picture (`null` for a map without one). */
+export function postFor(taken: Taken[], pictureOf: (map: string) => string | null): Post | null {
   if (taken.length === 0) return null;
-  const lines = taken.slice(0, MOST_TOLD).map(lineFor);
-  const rest = taken.length - lines.length;
-  if (rest > 0) lines.push(`…and ${rest} more top ${rest === 1 ? "spot" : "spots"} in the same upload.`);
-  return { content: lines.join("\n"), allowed_mentions: { parse: [] } };
+  const told = taken.slice(0, MOST_TOLD);
+  const post: Post = { embeds: told.map((t) => embedFor(t, pictureOf(t.map))), allowed_mentions: { parse: [] } };
+  const rest = taken.length - told.length;
+  if (rest > 0) post.content = `…and ${rest} more top ${rest === 1 ? "spot" : "spots"} in the same upload.`;
+  return post;
 }
 
 /** Post the taken spots to the Discord webhook, if one is set up (the DISCORD_WEBHOOK_URL
@@ -106,8 +121,9 @@ export function postFor(taken: Taken[]): Post | null {
  *  the record, and a post is only a nicety. */
 export async function tell(env: Env, taken: Taken[]): Promise<void> {
   const url = env.DISCORD_WEBHOOK_URL;
-  const post = postFor(taken);
-  if (!url || post === null) return;
+  if (!url) return;
+  const post = postFor(taken, (map) => markOf(env, map)?.picture ?? null);
+  if (post === null) return;
   try {
     await fetch(url, {
       method: "POST",

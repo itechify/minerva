@@ -2,21 +2,25 @@
 // the spot from another (ADR 0022): a first entry in an empty band, a Character beating its
 // own best, a re-upload of the same set and an opt-out that hands the spot on all stay quiet.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MOST_TOLD, type Taken, type Top, postFor, takenTops, tell } from "../announce";
+import { MOST_TOLD, type Post, type Taken, type Top, postFor, takenTops, tell } from "../announce";
 import { entry, key, optOut, upload } from "./api";
 
 /** The made-up webhook the test config sets (vitest.config.ts). */
 const WEBHOOK = "https://discord.invalid/api/webhooks/made-up/webhook";
 
 /** Maps of their own, so no other test's entries are in their bands. Henesys Hunting Ground I
- *  is a real map, to show a post names a map as the site does. */
+ *  is a real map, to show a post names a map as the site does. Of them only MARKED has a Map
+ *  Mark in the made-up ceilings (vitest.config.ts). */
 const HUNTING_GROUND = "010001010";
 const QUIET = "100000050";
 const CROWNED = "100000051";
+const MARKED = "100000060";
 
-interface Post {
-  content: string;
-}
+/** The made-up Map Mark's picture (vitest.config.ts). */
+const MADE_UP_TOWN = "https://osms.invalid/images/map_marks/MadeUpTown.png";
+
+/** No map has a Map Mark. */
+const NO_PICTURES = (): string | null => null;
 
 let posts: Post[];
 let realFetch: typeof globalThis.fetch;
@@ -89,45 +93,57 @@ describe("taken top spots", () => {
 
 describe("the post", () => {
   it("is nothing with no spot taken", () => {
-    expect(postFor([])).toBeNull();
+    expect(postFor([], NO_PICTURES)).toBeNull();
   });
 
-  it("names the map as the site does, the levels, the rate and who it was taken from", () => {
-    const post = postFor([taken(HUNTING_GROUND, 20, 153_216)])!;
+  it("is an embed for the spot, titled with the map as the site names it and linked to its Map Leaderboard", () => {
+    const post = postFor([taken(HUNTING_GROUND, 20, 153_216)], NO_PICTURES)!;
 
-    expect(post.content).toBe(
-      "**Hakuo** took #1 on [Henesys Hunting Ground I]" +
-        `(https://owlofminerva.app/leaderboards/map/?map=${HUNTING_GROUND}&band=20&name=Hakuo), ` +
-        "levels 20–29, with 153,000 EXP/h, past Egbert's 80,000.",
-    );
+    expect(post.content).toBeUndefined();
+    expect(post.embeds).toEqual([
+      {
+        title: "Henesys Hunting Ground I",
+        url: `https://owlofminerva.app/leaderboards/map/?map=${HUNTING_GROUND}&band=20&name=Hakuo`,
+        description: "**Hakuo** took #1, levels 20–29, with 153,000 EXP/h, past Egbert's 80,000.",
+      },
+    ]);
+  });
+
+  it("shows the map's Map Mark", () => {
+    const pictureOf = (map: string) => (map === MARKED ? MADE_UP_TOWN : null);
+
+    const [marked, unmarked] = postFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], pictureOf)!.embeds;
+
+    expect(marked.thumbnail).toEqual({ url: MADE_UP_TOWN });
+    expect(unmarked).not.toHaveProperty("thumbnail");
   });
 
   it("names a map the fixture doesn't by its ID", () => {
-    expect(postFor([taken(QUIET, 20)])!.content).toContain(`[Map ${QUIET}]`);
+    expect(postFor([taken(QUIET, 20)], NO_PICTURES)!.embeds[0].title).toBe(`Map ${QUIET}`);
   });
 
-  it("escapes a map name that would read as Discord formatting", () => {
+  it("titles a map whose name holds Discord formatting as it is written", () => {
     // "G* Coconut Season" (090040203) is one in the map names fixture.
-    expect(postFor([taken("090040203", 20)])!.content).toContain("[G\\* Coconut Season]");
+    expect(postFor([taken("090040203", 20)], NO_PICTURES)!.embeds[0].title).toBe("G* Coconut Season");
   });
 
   it("pings nobody", () => {
-    expect(postFor([taken(QUIET, 20)])!.allowed_mentions).toEqual({ parse: [] });
+    expect(postFor([taken(QUIET, 20)], NO_PICTURES)!.allowed_mentions).toEqual({ parse: [] });
   });
 
   it("counts the rest once an upload takes more than it names", () => {
     const many = Array.from({ length: MOST_TOLD + 2 }, (_, at) => taken(QUIET, (at + 2) * 10));
 
-    const lines = postFor(many)!.content.split("\n");
+    const post = postFor(many, NO_PICTURES)!;
 
-    expect(lines).toHaveLength(MOST_TOLD + 1);
-    expect(lines.at(-1)).toBe("…and 2 more top spots in the same upload.");
+    expect(post.embeds).toHaveLength(MOST_TOLD);
+    expect(post.content).toBe("…and 2 more top spots in the same upload.");
   });
 
   it("counts one left over as a spot", () => {
     const many = Array.from({ length: MOST_TOLD + 1 }, (_, at) => taken(QUIET, (at + 2) * 10));
 
-    expect(postFor(many)!.content.split("\n").at(-1)).toBe("…and 1 more top spot in the same upload.");
+    expect(postFor(many, NO_PICTURES)!.content).toBe("…and 1 more top spot in the same upload.");
   });
 });
 
@@ -151,9 +167,11 @@ describe("an upload", () => {
     await upload("Hakuo", key("hakuo"), [entry(CROWNED, 23, 90_000)]);
 
     await postsSettle(1);
-    expect(posts[0].content).toContain("**Hakuo** took #1");
-    expect(posts[0].content).toContain("past Egbert's 80,000");
-    expect(posts[0].content).toContain(`map=${CROWNED}&band=20&name=Hakuo`);
+    expect(posts[0].embeds[0].description).toContain("**Hakuo** took #1");
+    expect(posts[0].embeds[0].description).toContain("past Egbert's 80,000");
+    expect(posts[0].embeds[0].url).toContain(`map=${CROWNED}&band=20&name=Hakuo`);
+    // CROWNED has no Map Mark in the made-up ceilings.
+    expect(posts[0].embeds[0]).not.toHaveProperty("thumbnail");
   });
 
   it("posts nothing for the same set uploaded again", async () => {
@@ -170,7 +188,7 @@ describe("an upload", () => {
     // Only a real take is posted, so the next one proves the two above posted nothing.
     await upload("Fritz", key("fritz"), [entry(QUIET, 27, 95_000)]);
     await postsSettle(2);
-    expect(posts[1].content).toContain("**Fritz** took #1");
+    expect(posts[1].embeds[0].description).toContain("**Fritz** took #1");
   });
 
   it("posts nothing for the first entry in a band", async () => {
@@ -179,7 +197,7 @@ describe("an upload", () => {
     await upload("Horst", key("horst"), [entry("100000053", 25, 10_000)]);
     await upload("Ilse", key("ilse"), [entry("100000053", 25, 20_000)]);
     await postsSettle(1);
-    expect(posts[0].content).toContain("**Ilse** took #1");
+    expect(posts[0].embeds[0].description).toContain("**Ilse** took #1");
   });
 
   it("posts nothing when a Character beats its own best", async () => {
@@ -191,7 +209,7 @@ describe("an upload", () => {
 
     await upload("Lena", key("lena"), [entry("100000054", 25, 70_000)]);
     await postsSettle(2);
-    expect(posts[1].content).toContain("**Lena** took #1");
+    expect(posts[1].embeds[0].description).toContain("**Lena** took #1");
   });
 
   it("posts nothing when a top spot falls to someone because an entry went", async () => {
@@ -204,7 +222,7 @@ describe("an upload", () => {
 
     await upload("Olga", key("olga"), [entry("100000055", 25, 95_000)]);
     await postsSettle(2);
-    expect(posts[1].content).toContain("**Olga** took #1");
+    expect(posts[1].embeds[0].description).toContain("**Olga** took #1");
   });
 
   it("posts nothing for an entry the cap rejects", async () => {
@@ -214,7 +232,7 @@ describe("an upload", () => {
 
     await upload("Sven", key("sven"), [entry("100000000", 25, 450_000)]);
     await postsSettle(1);
-    expect(posts[0].content).toContain("**Sven** took #1");
+    expect(posts[0].embeds[0].description).toContain("**Sven** took #1");
   });
 
   it("posts one message for several spots taken at once", async () => {
@@ -224,6 +242,14 @@ describe("an upload", () => {
     await upload("Udo", key("udo"), [entry("100000056", 25, 20_000), entry("100000057", 25, 30_000)]);
 
     await postsSettle(1);
-    expect(posts[0].content.split("\n")).toHaveLength(2);
+    expect(posts[0].embeds).toHaveLength(2);
+  });
+
+  it("shows the Map Mark the ceilings table gives the map", async () => {
+    await upload("Vera", key("vera"), [entry(MARKED, 25, 10_000)]);
+    await upload("Wim", key("wim"), [entry(MARKED, 25, 20_000)]);
+
+    await postsSettle(1);
+    expect(posts[0].embeds[0].thumbnail).toEqual({ url: MADE_UP_TOWN });
   });
 });

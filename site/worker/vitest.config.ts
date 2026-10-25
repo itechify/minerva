@@ -23,7 +23,8 @@ export default defineConfig(async () => {
             DISCORD_CLIENT_SECRET: "made-up-client-secret",
             MAINTAINER_DISCORD_IDS: "900000000000000001",
             // A made-up ceilings table, in place of osms-ceilings.json: test/api.ts's maps, and
-            // test/where-to-train.test.ts's, with a made-up Map Mark.
+            // test/where-to-train.test.ts's, with a made-up Map Mark that test/latest.test.ts and
+            // test/announce.test.ts show on 100000060.
             TEST_CEILINGS: {
               maps: {
                 "100000000": { ceiling: 100_000, mobs: [70, 75] },
