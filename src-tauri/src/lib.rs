@@ -154,6 +154,9 @@ pub(crate) enum Command {
     /// The page in our window with this label (the overlay's, the Grind Tracker's, the
     /// Personal Bests', the Owl Bubble's or the Item Card's) is this tall (CSS px).
     Height(String, f64),
+    /// The page in our window with this label that fits its width to its content (the Owl
+    /// Bubble's) is this wide (CSS px).
+    Width(String, f64),
     /// The overlay window moved here (its outer top-left corner). The player's move only
     /// during a drag; otherwise the shell's own, or the system's (a DPI or monitor
     /// change).
@@ -245,6 +248,13 @@ fn act(action: Action, commands: tauri::State<'_, Sender<Command>>) {
 #[tauri::command]
 fn page_height(window: tauri::Window, height: f64, commands: tauri::State<'_, Sender<Command>>) {
     let _ = commands.send(Command::Height(window.label().to_string(), height));
+}
+
+/// A page reports how wide its content is, so its window fits it and takes no clicks beside
+/// it: the Owl Bubble's.
+#[tauri::command]
+fn page_width(window: tauri::Window, width: f64, commands: tauri::State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::Width(window.label().to_string(), width));
 }
 
 /// Where OSMS's file set and pictures, and MeowDB's search answers, are cached. WebView2
@@ -391,6 +401,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             act,
             page_height,
+            page_width,
             view::page_view,
             errors::window_error,
             setup::pick_game_window,
@@ -854,6 +865,12 @@ fn core_loop(
                     }
                 }
             },
+            Ok(Command::Width(label, width)) => {
+                if let Some(panel) = panels.by_label(&label) {
+                    panel.set_width(width);
+                    panel.tell_size(&mut minerva);
+                }
+            }
             Ok(Command::LaunchedAgain) => {
                 minerva.act(Action::LaunchedAgain);
                 setup_windows.bring_to_front();

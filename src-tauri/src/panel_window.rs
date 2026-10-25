@@ -37,7 +37,8 @@ pub struct WindowSpec {
     pub event: &'static str,
     /// The name of its watcher's thread ([`keep_on_top`]).
     pub watcher: &'static str,
-    /// Its width in CSS px (logical), which its page lays out to.
+    /// Its width in CSS px (logical), which its page lays out to; for a page that fits its
+    /// width to its content (the Owl Bubble's), the most it can be.
     pub width: f64,
     /// Its height in CSS px until its page reports its content's, and the bounds of that:
     /// past the most, the page scrolls.
@@ -84,6 +85,9 @@ pub struct PanelWindow {
     takes_keyboard: bool,
     /// Its content's height in CSS px, as the page last reported it.
     height: f64,
+    /// Its width in CSS px: the spec's, or its content's, as a page that fits it last
+    /// reported it.
+    width: f64,
     /// The player's drag of it.
     gesture: GestureTracker,
 }
@@ -112,6 +116,7 @@ impl PanelWindow {
             clickable: false,
             takes_keyboard: false,
             height: spec.height.default,
+            width: spec.width,
             gesture: GestureTracker::default(),
         }
     }
@@ -126,10 +131,16 @@ impl PanelWindow {
         self.height = height.clamp(min, max);
     }
 
+    /// The page's content is `width` CSS px wide: its window fits it, never wider than the
+    /// spec's.
+    pub fn set_width(&mut self, width: f64) {
+        self.width = width.clamp(1.0, self.spec.width);
+    }
+
     /// The window's size in physical px, for the display it is on.
     pub fn size(&self) -> Option<Size> {
         let scale = self.window.scale_factor().ok()?;
-        Some(physical((self.spec.width, self.height), scale))
+        Some(physical((self.width, self.height), scale))
     }
 
     /// Tell the core the window's size, for the display it is on now.

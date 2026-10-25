@@ -10,8 +10,9 @@ use serde::Serialize;
 
 pub const OWL_BUBBLE: &str = "owl-bubble";
 
-/// Its width in CSS px (logical); `src/owl-bubble.css` centres the owl and its bubble in it.
-/// Its height follows them, as the page reports it: never less than the owl.
+/// Its widest in CSS px (logical): the page reports how wide the owl and its bubble are, and
+/// the window fits them, so it takes no clicks beside them. Its height follows them too:
+/// never less than the owl.
 pub const SPEC: WindowSpec = WindowSpec {
     label: OWL_BUBBLE,
     event: "owl-bubble-state",

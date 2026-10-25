@@ -5,7 +5,8 @@
    the owl as the game's speech bubbles do. Together they are centred in the window, which
    the shell makes 520 CSS px wide (SPEC in src-tauri/src/owl_bubble.rs) and as tall as they
    are. The bubble sits over whatever the scene has there, so it takes the near-opaque
-   lavender the panel sets its densest reading on, not the see-through glass. A problem
+   lavender the panel sets its densest reading on, not the see-through glass. The window
+   fits them, so it takes no clicks beside them. A problem
    wears the panel's problem note: cream, with the orange dot. Item Lookup's line fades out
    over its last second, and a new one shows afresh; the update's line holds still until the
    player acts on it. */
@@ -20,6 +21,7 @@
   width: fit-content;
   max-width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
   animation: owl-fade var(--line-ms, 6000ms) linear forwards;
 }
 
@@ -32,12 +34,25 @@
   --bubble-edge: var(--problem-edge);
 }
 
-/* A pose is a picture per mood: until there are more, the one owl says all of them. */
+/* A pose is a picture per mood, at 96px (its 48-pixel sprite at 2x): a new pose replaces its
+   file and nothing more. Until there are more, they are the same owl. */
 .owl {
   flex: none;
   width: 48px;
   height: 48px;
   image-rendering: pixelated;
+}
+
+.owl-bubble[data-mood="news"] .owl {
+  content: url("../assets/owl-news.png");
+}
+
+.owl-bubble[data-mood="problem"] .owl {
+  content: url("../assets/owl-problem.png");
+}
+
+.owl-bubble[data-mood="waiting"] .owl {
+  content: url("../assets/owl-waiting.png");
 }
 
 .panel.bubble {
@@ -187,6 +202,13 @@
   font-size: 12px;
   color: var(--ink-3);
   white-space: nowrap;
+}
+
+/* Measured as wide as it would be in the widest window (src-tauri/src/owl_bubble.rs's
+   SPEC), not as the window is now. */
+.owl-bubble.measuring-width {
+  width: max-content;
+  max-width: 520px;
 }
 
 /* With nothing to say, the window draws nothing. */

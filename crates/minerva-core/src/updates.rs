@@ -296,7 +296,7 @@ impl Updater {
         if self.quitting {
             return Chosen::Nothing;
         }
-        self.told.clone_from(&self.newer);
+        self.told();
         if !self.can_install() {
             return Chosen::ReleasePage;
         }

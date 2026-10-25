@@ -9,19 +9,17 @@
 //!
 //! Worked example, as in `grind_tracker_window.rs`: the game's client area at (812,110),
 //! 1920x1200 physical px, on one 3440x1440 monitor; an expanded panel of 340x72, so at
-//! (2376,510), and an Owl Bubble of 420x40, which says what a lookup came to. The Item
+//! (2376,510), and an Owl Bubble of 420x56, which says what a lookup came to. The Item
 //! Tooltip's name line is read at (1000,600), clear of both.
 
 mod common;
 
-use common::{FakeSource, GAME, POINTER, NAME, found, requests};
+use common::{FakeSource, GAME, NAME, OWL, POINTER, found, owl_at, owl_clickable, owl_line, owl_mood, requests};
 use minerva_core::{
     Action, BESTS_VERSION, Minerva, Foreground, ItemChoice, ItemHit, ItemLookup, ItemTooltip,
     ItemTooltipReading, MapBests, OurWindow, OwlLine, OwlMood, PanelControl, PanelSizes, PanelState, Request, SavedBests, ScreenRect, Settings, Size, SourceError, VisitBest, meowdb,
 };
 
-/// The Owl Bubble's size.
-const OWL: Size = Size { width: 420, height: 40 };
 /// Where the expanded panel is.
 const PANEL: ScreenRect = ScreenRect { x: 2376, y: 510, width: 340, height: 72 };
 
@@ -151,11 +149,6 @@ fn answering_items(items: &[(&str, &str)]) -> FakeSource {
 fn look_up(minerva: &mut Minerva, name: &str, at_ms: u64) -> PanelState {
     assert_eq!(minerva.on_hotkey("ctrl+shift+u"), Some(Request::CaptureItemTooltip));
     minerva.on_item_tooltip_reading(found(name, at_ms)).clone()
-}
-
-/// Where the Owl Bubble shows, if it does.
-fn owl_at(state: &PanelState) -> Option<ScreenRect> {
-    state.owl_bubble.as_ref().map(|owl| owl.placement)
 }
 
 fn line(state: &PanelState) -> Option<ItemLookup> {
@@ -309,7 +302,7 @@ fn letters_the_recogniser_confuses_and_case_still_find_the_item() {
     let mut minerva = started_with(answering("Hero's Gladius"), common::set_up());
     let state = look_up(&mut minerva, "Heros GIadius", 1_000);
     assert!(matches!(line(&state), Some(ItemLookup::Choose { .. })), "punctuation and I for l: {state:?}");
-    assert!(state.owl_bubble.as_ref().is_some_and(|owl| owl.clickable), "its items are picked with a click");
+    assert!(owl_clickable(&state), "its items are picked with a click");
 }
 
 #[test]
@@ -584,7 +577,7 @@ fn the_owl_says_it_at_the_top_centre_of_the_game_window() {
     let state = look_up(&mut minerva, "Zqxv Nothing", 1_000);
 
     // Centred on the 1920 px client at x 812, a twentieth of its 1200 px down from y 110.
-    assert_eq!(owl_at(&state), Some(ScreenRect { x: 1562, y: 170, width: 420, height: 40 }));
+    assert_eq!(owl_at(&state), Some(ScreenRect { x: 1562, y: 170, width: 420, height: 56 }));
 }
 
 #[test]
@@ -629,7 +622,7 @@ fn the_owl_goes_below_a_minimap_title_found_where_it_would_be() {
 #[test]
 fn the_owl_is_never_wider_than_the_game_window() {
     let mut minerva = started();
-    minerva.set_owl_bubble_size(Size { width: 2400, height: 40 });
+    minerva.set_owl_bubble_size(Size { width: 2400, height: 56 });
 
     let owl = owl_at(&look_up(&mut minerva, "Zqxv Nothing", 1_000)).expect("the owl");
 
@@ -660,29 +653,24 @@ fn the_owl_over_the_name_says_so() {
     assert_eq!(line(state), Some(ItemLookup::Covered { by: OurWindow::OwlBubble }));
 }
 
-/// What the owl says, and its mood.
-fn owl_and_mood(state: &PanelState) -> Option<(OwlLine, OwlMood)> {
-    state.owl_bubble.as_ref().map(|owl| (owl.line.clone(), owl.mood))
-}
-
 #[test]
 fn the_owl_says_the_lookups_line_waiting_on_meowdb_then_with_news_or_a_problem() {
     let mut minerva = started_with(made_up_meowdb().items_taking(2), common::set_up());
 
     let state = look_up(&mut minerva, "Orihalcon Ore", 1_000);
-    let said = state.item_lookup.clone().expect("a line");
-    assert_eq!(owl_and_mood(&state), Some((OwlLine::ItemLookup(said), OwlMood::Waiting)));
-    assert!(!state.owl_bubble.as_ref().is_some_and(|owl| owl.clickable), "clicks go through to the game");
+    assert_eq!(owl_line(&state), state.item_lookup.clone().map(OwlLine::ItemLookup));
+    assert_eq!(owl_mood(&state), Some(OwlMood::Waiting));
+    assert!(!owl_clickable(&state), "clicks go through to the game");
 
     minerva.tick(1_100);
     let state = minerva.tick(1_200).clone();
     assert_eq!(line(&state), opened("Orihalcon Ore", "101"));
-    let said = state.item_lookup.clone().expect("a line");
-    assert_eq!(owl_and_mood(&state), Some((OwlLine::ItemLookup(said), OwlMood::News)));
+    assert_eq!(owl_line(&state), state.item_lookup.clone().map(OwlLine::ItemLookup));
+    assert_eq!(owl_mood(&state), Some(OwlMood::News));
 
     look_up(&mut minerva, "Zqxv Nothing", 5_000);
     minerva.tick(5_100);
     let state = minerva.tick(5_200).clone();
     assert_eq!(line(&state), not_found("Zqxv Nothing"));
-    assert_eq!(owl_and_mood(&state).map(|(_, mood)| mood), Some(OwlMood::Problem));
+    assert_eq!(owl_mood(&state), Some(OwlMood::Problem));
 }

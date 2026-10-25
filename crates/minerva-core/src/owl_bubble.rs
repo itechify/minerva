@@ -5,7 +5,7 @@
 //! into words; which line, its mood, where it goes and whether it takes clicks are decided
 //! here.
 
-use crate::item_lookup::{ItemLookup, ItemLookupLine};
+use crate::item_lookup::{CHOICES_MS, ItemLookup, ItemLookupLine, LINE_MS};
 use crate::panel::{GameWindow, ScreenRect, Size};
 use serde::Serialize;
 
@@ -22,6 +22,10 @@ pub struct OwlBubble {
     /// It takes clicks: an Item Lookup's list to pick from, or the update's line (its × and
     /// the bubble). Otherwise every click goes through it to the game.
     pub clickable: bool,
+    /// How long the line lasts from when it was said (ms), which the page fades it out over
+    /// the last second of; `None` while it stays: the update's line until the player acts
+    /// on it, and Item Lookup's while MeowDB is asked.
+    pub lasts_ms: Option<u64>,
 }
 
 /// What the owl says.
@@ -73,6 +77,17 @@ impl OwlLine {
             OwlLine::ItemLookup(line) => matches!(line.outcome, ItemLookup::Choose { .. }),
         }
     }
+
+    fn lasts_ms(&self) -> Option<u64> {
+        match self {
+            OwlLine::Update { .. } => None,
+            OwlLine::ItemLookup(line) => match line.outcome {
+                ItemLookup::LookingUp { .. } => None,
+                ItemLookup::Choose { .. } => Some(CHOICES_MS),
+                _ => Some(LINE_MS),
+            },
+        }
+    }
 }
 
 /// What the owl says, of Item Lookup's `lookup` and the update's `update` (the newer
@@ -89,7 +104,13 @@ pub(crate) fn bubble(
         (None, Some(version)) => OwlLine::Update { version },
         (None, None) => return None,
     };
-    Some(OwlBubble { placement: placement(game, size, avoid), mood: line.mood(), clickable: line.clickable(), line })
+    Some(OwlBubble {
+        placement: placement(game, size, avoid),
+        mood: line.mood(),
+        clickable: line.clickable(),
+        lasts_ms: line.lasts_ms(),
+        line,
+    })
 }
 
 /// The bubble's top edge sits this share of the game's client area down from its top.

@@ -30,18 +30,11 @@ type OwlLine = ({ says: "itemLookup" } & ItemLookupLine) | { says: "update"; ver
 
 /** Mirror of `minerva_core::OwlBubble`, as the shell sends it (its placement is the
  * window's). `mood` picks the bubble's look and the owl's pose. */
-type OwlBubble = { line: OwlLine; mood: "news" | "problem" | "waiting"; clickable: boolean };
+type OwlBubble = { line: OwlLine; mood: "news" | "problem" | "waiting"; clickable: boolean; lastsMs: number | null };
 
 /** What the shell sends: what the owl says, if anything, and the hotkey the player pressed,
  * for Item Lookup's line to name. */
 type OwlView = { bubble: OwlBubble | null; hotkey: string };
-
-/**
- * How long the core keeps Item Lookup's line (ms; `LINE_MS` and `CHOICES_MS` in
- * `crates/minerva-core/src/item_lookup.rs`): it fades out over its last second.
- */
-const LINE_MS = 6_000;
-const CHOICES_MS = 30_000;
 
 const owlEl = byId("owl-bubble");
 const bubbleEl = byId("bubble");
@@ -119,7 +112,7 @@ function render({ bubble, hotkey }: OwlView) {
     shownLine = "";
     return;
   }
-  const { line, mood } = bubble;
+  const { line, mood, lastsMs } = bubble;
   const key = JSON.stringify([line, mood, hotkey]);
   if (key === shownLine) return;
   shownLine = key;
@@ -135,21 +128,32 @@ function render({ bubble, hotkey }: OwlView) {
   const shared = (item: ItemChoice) => items.filter((other) => label(other) === label(item)).length > 1;
   choices.replaceChildren(...items.map((item) => choiceRow(item, shared(item) ? `${label(item)} · No. ${item.id}` : label(item))));
   choices.hidden = items.length === 0;
-  // The update's line, and Item Lookup's while waiting on MeowDB, stay; Item Lookup's
-  // others fade out over their last second.
-  const stays = update || (line.says === "itemLookup" && line.status === "lookingUp");
-  owlEl.classList.toggle("stays", stays);
-  const choosing = line.says === "itemLookup" && line.status === "choose";
-  owlEl.style.setProperty("--line-ms", `${choosing ? CHOICES_MS : LINE_MS}ms`);
+  // A line that lasts fades out over its last second; one that stays holds still.
+  owlEl.classList.toggle("stays", lastsMs === null);
+  owlEl.style.setProperty("--line-ms", `${lastsMs ?? 0}ms`);
   owlEl.style.animation = "none";
   void owlEl.offsetWidth;
   owlEl.style.animation = "";
   reportHeight();
 }
 
-// The shell sizes the window to the owl and its bubble, as the overlay does the panel.
-const reportHeight = heightReporter(owlEl, "page_height");
-window.addEventListener("resize", reportHeight);
+// The shell sizes the window to the owl and its bubble, as the overlay does the panel, its
+// width as well as its height: a window wider than them would take the game's clicks beside
+// them. Measured as wide as they would be (up to the widest the window can be), not as
+// the window is now, or it could never grow.
+const heightOnly = heightReporter(owlEl, "page_height");
+let reportedWidth = 0;
+function reportHeight() {
+  owlEl.classList.add("measuring-width");
+  const width = Math.ceil(owlEl.getBoundingClientRect().width);
+  owlEl.classList.remove("measuring-width");
+  if (width > 0 && width !== reportedWidth) {
+    reportedWidth = width;
+    invoke("page_width", { width });
+  }
+  heightOnly();
+}
+window.addEventListener("resize", heightOnly);
 // The height depends on the font: measure again once it has loaded.
 document.fonts.ready.then(reportHeight);
 

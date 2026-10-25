@@ -28,6 +28,7 @@ mod matcher;
 mod minimap_title;
 pub mod meowdb;
 mod mob_card;
+mod owl_bubble;
 pub mod osms;
 pub mod osms_items;
 mod pace;
@@ -43,7 +44,6 @@ mod search;
 mod session;
 mod settings;
 mod settings_window;
-mod owl_bubble;
 mod setup;
 mod shown_map;
 mod status_bar;
@@ -1250,8 +1250,8 @@ impl Minerva {
     }
 
     /// The card of the item listing `row`'s Deal Badge is about shows beside the badge; the
-    /// owl has nothing more to say of the last press. Nothing changes for a badge not showing, or one about
-    /// no item ("?").
+    /// owl has nothing more to say of the last press. Nothing changes for a badge not
+    /// showing, or one about no item ("?").
     fn open_deal_item(&mut self, row: u32) {
         let Some(DealBadges { placement, badges }) = &self.state.deal_badges else { return };
         let (Some(badge), Some(ids), Some(shop)) =
@@ -2254,10 +2254,11 @@ impl Minerva {
     /// The Owl Bubble, at the top centre of the game window while the owl has something to
     /// say, clear of the captured regions; only while the overlay can show (see [`Layer`]).
     /// Item Lookup's line goes first; the update's waits while Help & Setup shows, which says
-    /// it already.
+    /// it already, and is never said while "Check for updates" is off.
     fn sync_owl_bubble(&mut self) {
         let line = self.item_lookups.line();
-        let update = self.updater.owl_says().filter(|_| !self.state.setup.window_open);
+        let quiet = self.state.setup.window_open || !self.settings.check_for_updates;
+        let update = self.updater.owl_says().filter(|_| !quiet);
         self.state.owl_bubble = match &self.panel.game {
             Some(game) if self.panel.layer() != Layer::Hidden => {
                 owl_bubble::bubble(line.clone(), update, game, self.owl_size, &self.panel.avoid)

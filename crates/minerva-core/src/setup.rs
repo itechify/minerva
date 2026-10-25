@@ -32,7 +32,7 @@ pub struct SetupState {
     pub window_open: bool,
     /// Counts the player's asks to see About & Credits (a click on the owl's update line):
     /// the window turns to it each time this grows.
-    pub about: u32,
+    pub about_asks: u32,
 }
 
 #[derive(Debug, Default)]
@@ -46,7 +46,7 @@ pub(crate) struct Setup {
     /// Why setup was needed when the window was last opened for it (or closed).
     opened_for: Option<SetupReason>,
     /// Counts the player's asks to see About & Credits.
-    about: u32,
+    about_asks: u32,
 }
 
 impl Setup {
@@ -65,7 +65,7 @@ impl Setup {
     /// Open setup at About & Credits: the player clicked the owl's update line.
     pub fn open_about(&mut self) {
         self.request();
-        self.about += 1;
+        self.about_asks += 1;
     }
 
     /// The player closed setup without finishing it.
@@ -93,7 +93,7 @@ impl Setup {
             credit: map.is_some().then_some(MAP_NAMES_CREDIT),
             map,
             window_open: self.window_open,
-            about: self.about,
+            about_asks: self.about_asks,
         }
     }
 

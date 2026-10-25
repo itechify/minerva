@@ -108,10 +108,10 @@ pub struct ItemLookupLine {
 }
 
 /// How long a line stays, from when it was set (capture time). The Owl Bubble fades it out
-/// over its last second (`LINE_MS` and `CHOICES_MS` in `src/owl-bubble.ts`).
-const LINE_MS: u64 = 6_000;
+/// over its last second ([`crate::OwlBubble::lasts_ms`]).
+pub(crate) const LINE_MS: u64 = 6_000;
 /// How long the list of items sharing a name stays: long enough to read and pick.
-const CHOICES_MS: u64 = 30_000;
+pub(crate) const CHOICES_MS: u64 = 30_000;
 /// A result whose name isn't the one read counts if it is at least this similar to it
 /// (1 minus edits over length)...
 const CLOSE_ENOUGH: f32 = 0.85;

@@ -21,7 +21,7 @@ The pictures on the Minerva site, taken by hand in the game. The site's build fa
 | `navigation.png` | The Map section with the next portal's magenta ring and every spawn point dotted, and Navigation with a Hunting Target: the mob, the figures, and the route from the map you're on, each map with its Map Mark. | 349×510, the panel from its title down through its Navigation section | 0.11.0 |
 | `grind-tracker.png` | The Grind Tracker: Time to Level, the rates for the last 5 minutes and the Session, a Best row, the Pace Trace under them, the map's solo EXP/h with its ? help icon, and the EXP gauge at its foot with the character playing ("Egbert · Lv. 36") and its forecast. | 280×279, the Grind Tracker's window | 0.14.0 |
 | `item-card.png` | An Item Card at the pointer under the game's tooltip (One-Handed Blunt Weapon Attack Scroll: Greater), over the inventory: its window bar, the item's picture beside its name, Shop pays, and under Market its Price line with the Deal Line's filled ring, the buttons to add a line and open MesoWatch, and the credit's info icon at its foot. | 602×473, the inventory, the tooltip and the card | 0.14.0 |
-| `item-lookup.png` | An item's tooltip in the inventory, and the owl above it saying the page it opened in its speech bubble. | 611×742, the inventory, the tooltip and the owl | 0.7.0 |
+| `item-lookup.png` | An item's tooltip in the inventory, and the Item Lookup alert above it saying the page it opened. | 611×742, the inventory, the tooltip and the alert | 0.7.0 |
 | `setup.png` | Setup reopened, at Finding your map (step 3 of 4), its notice saying there's nothing to redo: the map found in the minimap's title (Kerning City) beside its Map Mark, tagged Found, with the hotkeys to use while you play. | 522×592, the setup window | 0.14.0 |
 | `deal-finder.png` | A Player Shop's first four listings with the Deal Finder's badges beside them: two pale (0%, +3%), a blue deal (−1% · 99,999) and a purple one (−25% · 6,632). Cut to the badges and the list, so no seller's name, chat or other player is in it. | 481×250, the badges and the shop's list | 0.14.0 |
 | `wip.png` | Not a shot: Minerva's owl in a hard hat beside a sign, "WIP, screenshot coming soon". The page shows it in place of a shot listed under Retake that is too far out of date to show, until it is retaken. | 1448×1086 | |
@@ -38,7 +38,7 @@ chrome --headless=new --hide-scrollbars --allow-file-access-from-files --window-
 
 When a change alters something a shot shows, the PR that makes it lists the shot here, with what changed. At release, the smoke test retakes every shot listed (`docs/releasing.md`) and empties the list.
 
-- `item-lookup.png`: Item Lookup's alert is now the owl saying it in a speech bubble (ADR 0025).
+- `item-lookup.png`: Item Lookup's alert is now the owl saying it in a speech bubble (ADR 0025). Retaken, the table's row and the home page's alt text say the owl in place of the alert.
 
 A release may go out without retaking them. Then the page shows `wip.png` in place of each shot too far out of date to show, and the shot stays listed. None does now. Retaking one means pointing its `<img>` back at its own file (a scene from the game, as the Item Card's, on its own stage again: `shot stage scene`, where the sign stood on the panel's), and writing its alt text afresh, from what it shows and the entries below.
 
