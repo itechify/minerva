@@ -68,6 +68,15 @@ function linkTo(taken: Taken): string {
   return `https://owlofminerva.app/leaderboards/map/?${query}`;
 }
 
+/** A spot's embed in a post. */
+interface Embed {
+  title: string;
+  url: string;
+  description: string;
+  /** The map's Map Mark; none for a map without one. */
+  thumbnail?: { url: string };
+}
+
 /** One taken spot as an embed: titled with the map's name, linked to its Map Leaderboard, and
  *  showing its Map Mark when it has one. The link is the title's, never the description's, so
  *  Discord shows no preview under a post that names several. The title isn't markdown, so the
@@ -85,15 +94,6 @@ function embedFor(taken: Taken, picture: string | null): Embed {
   };
   if (picture !== null) embed.thumbnail = { url: picture };
   return embed;
-}
-
-/** A spot's embed in a post. */
-interface Embed {
-  title: string;
-  url: string;
-  description: string;
-  /** The map's Map Mark; none for a map without one. */
-  thumbnail?: { url: string };
 }
 
 /** What a Discord webhook is posted. */

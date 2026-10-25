@@ -170,6 +170,8 @@ describe("an upload", () => {
     expect(posts[0].embeds[0].description).toContain("**Hakuo** took #1");
     expect(posts[0].embeds[0].description).toContain("past Egbert's 80,000");
     expect(posts[0].embeds[0].url).toContain(`map=${CROWNED}&band=20&name=Hakuo`);
+    // CROWNED has no Map Mark in the made-up ceilings.
+    expect(posts[0].embeds[0]).not.toHaveProperty("thumbnail");
   });
 
   it("posts nothing for the same set uploaded again", async () => {
