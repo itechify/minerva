@@ -142,10 +142,13 @@ fn a_status_bar_read_in_a_region_no_longer_captured_names_no_character() {
     assert_eq!(state.status_bar, None);
     assert_eq!(character(&state), None);
 
-    // Read where the core asks now, Egbert is playing.
+    // Read where the core asks now, three times in a row, Egbert is playing: the stale
+    // reading wasn't one of them.
     let now = state.status_bar_capture.expect("the bottom of the moved client area");
     assert_eq!(now, strip_of(common::GAME));
-    assert_eq!(character(&read_status_bar(&mut minerva, now, "Egbert", None, 2 * S)), Some("Egbert"));
+    read_status_bar(&mut minerva, now, "Egbert", None, 2 * S);
+    assert_eq!(character(&read_status_bar(&mut minerva, now, "Egbert", None, 3 * S)), None);
+    assert_eq!(character(&read_status_bar(&mut minerva, now, "Egbert", None, 4 * S)), Some("Egbert"));
 }
 
 #[test]

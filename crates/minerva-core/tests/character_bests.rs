@@ -127,7 +127,9 @@ fn the_best_row_races_the_unassigned_bests_until_a_name_is_read_then_the_charact
     player.status(None, 13);
     assert_eq!(best_row(&player.arrive(SUNSET_SAMPLE)), Some(9000));
 
+    // Named once the name is read three times in a row.
     player.status(Some("Egbert"), 13);
+    assert_eq!(best_row(&player.hunt(20 * S, 10)), Some(9000), "not yet");
     assert_eq!(best_row(&player.hunt(10 * S, 10)), Some(7200));
 }
 
@@ -143,7 +145,7 @@ fn a_best_set_while_no_character_is_named_is_unassigned_and_the_player_can_move_
 
     // Egbert named: he has no best on Sunset Sky, and the window offers him and Unassigned.
     player.status(Some("Egbert"), 13);
-    player.hunt(10 * S, 10);
+    player.hunt(30 * S, 10);
     assert_eq!(best_row(&player.arrive(SUNSET_SAMPLE)), None);
     let window = player.press(PanelControl::TogglePersonalBests).personal_bests;
     let choices: Vec<(Option<&str>, bool, usize)> =
@@ -227,8 +229,9 @@ fn playing_with(name: &str, bests: SavedBests) -> (Player, PanelState) {
     let mut minerva = tracking();
     minerva.restore_bests(bests);
     let mut player = Player::saved_by_the_shell(minerva);
+    // Read three times in a row, as a name must be to name the Character.
     player.status(Some(name), 41);
-    player.hunt(10 * S, 10);
+    player.hunt(30 * S, 10);
     player.arrive(SUNSET_SAMPLE);
     let state = player.press(PanelControl::TogglePersonalBests);
     (player, state)
