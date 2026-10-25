@@ -1,5 +1,5 @@
 //! Sending each of our pages but the overlay (setup, the Grind Tracker's, the Personal
-//! Bests', the Item Lookup alert's, the Item Card's and the Deal Badges') the view it
+//! Bests', the Owl Bubble's, the Item Card's and the Deal Badges') the view it
 //! renders: only when it changed, since the loop wakes up 20 times a second, and kept by its
 //! window's label for a page that loads after it was sent ([`page_view`]).
 

@@ -13,6 +13,11 @@
 //! - **The notice** of a newer version is decided here, whole: the one stage it is at, what
 //!   choosing to update offers then, and what Quit Minerva does ([`UpdateNotice`]). The tray
 //!   and Help & Setup only put it into words.
+//! - **The owl** (ADR 0025): a newer version a check Minerva made by itself found is said
+//!   by the owl too, in the Owl Bubble, until the player dismisses it, clicks it or chooses
+//!   to update; one their own Check for updates found is said in Help & Setup, which they
+//!   are looking at. Either way it is told: the owl says no more of it this launch, only of
+//!   a newer one.
 //! - **Updating** (#128): choosing to update, in a build that can install, downloads the newer
 //!   version (the shell checks its signature) and installs it, starting it again after. While
 //!   a Session is running, Help & Setup asks first: Update now, Update when I quit (the
@@ -249,6 +254,11 @@ pub(crate) struct Updater {
     last_id: u64,
     /// The check under way.
     in_flight: Option<u64>,
+    /// The player pressed Check for updates for the check under way.
+    in_flight_asked: bool,
+    /// The newer version the player has been told of this launch: what the owl no longer
+    /// says.
+    told: Option<String>,
     status: UpdateStatus,
     /// The newer version the last check that answered found.
     newer: Option<String>,
@@ -286,6 +296,7 @@ impl Updater {
         if self.quitting {
             return Chosen::Nothing;
         }
+        self.told.clone_from(&self.newer);
         if !self.can_install() {
             return Chosen::ReleasePage;
         }
@@ -416,6 +427,19 @@ impl Updater {
     /// The player pressed Check for updates: one under way counts.
     pub fn ask(&mut self) {
         self.asked = self.in_flight.is_none();
+        self.in_flight_asked |= self.in_flight.is_some();
+    }
+
+    /// The player has been told of the newer version: the owl says no more of it.
+    pub fn told(&mut self) {
+        self.told.clone_from(&self.newer);
+    }
+
+    /// The newer version the owl says is out: one the player hasn't been told of, at the
+    /// notice's first stage (out, or notify-only); `None` otherwise.
+    pub fn owl_says(&self) -> Option<String> {
+        let version = self.newer.as_ref().filter(|newer| self.told.as_ref() != Some(newer))?;
+        matches!(self.notice(version).stage, UpdateStage::Out | UpdateStage::NotifyOnly).then(|| version.clone())
     }
 
     /// Time passed to `at_ms`: start a check if one is due, by itself only while `on`.
@@ -430,7 +454,7 @@ impl Updater {
             return;
         }
         if self.asked || (on && at_ms >= self.due_at) {
-            self.asked = false;
+            self.in_flight_asked = std::mem::take(&mut self.asked);
             self.due_at = at_ms + CHECK_EVERY_MS;
             self.last_id += 1;
             self.in_flight = Some(self.last_id);
@@ -458,6 +482,10 @@ impl Updater {
         match newer {
             Some(newer) => {
                 self.newer = newer;
+                // The player asked: Help & Setup tells them.
+                if self.in_flight_asked {
+                    self.told();
+                }
                 // What is out now is known again.
                 if self.updating == Updating::Changed {
                     self.updating = Updating::Idle;

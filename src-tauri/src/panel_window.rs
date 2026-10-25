@@ -1,5 +1,5 @@
 //! Our windows over the game but the overlay: the Grind Tracker's, the Personal Bests', the
-//! Item Lookup alert's, the Item Card's and the Deal Badges'. Each is borderless like the
+//! Owl Bubble's, the Item Card's and the Deal Badges'. Each is borderless like the
 //! overlay, and like it on top of everything while it shows (only while the game or one of
 //! our windows is in front), and never activated by a click (`focusable: false` in
 //! `tauri.conf.json`, ADR 0001). Each is declared in `tauri.conf.json` (creating windows

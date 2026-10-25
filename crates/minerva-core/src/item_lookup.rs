@@ -5,11 +5,12 @@
 //! A search result counts only if its name is the name read, but for the letters the
 //! recogniser confuses (I, l and 1; O and 0), case, spacing and punctuation, or if it is
 //! clearly closer to the name read than any other result. Otherwise no page opens: the
-//! alert says no MeowDB item has that name, rather than open a guess. Several results
+//! owl says no MeowDB item has that name, rather than open a guess. Several results
 //! with the name are listed for the player to pick from.
 //!
-//! What a lookup comes to shows in an alert of its own at the top centre of the game
-//! window, where the player is looking, for a few seconds; the panel is left as it is.
+//! What a lookup comes to, the owl says in the Owl Bubble at the top centre of the game
+//! window, where the player is looking, for a few seconds (ADR 0025); the panel is left as
+//! it is.
 
 use crate::item_tooltip::{ItemTooltip, ItemTooltipReading};
 use crate::settings::Hotkey;
@@ -17,7 +18,7 @@ use crate::map_index::{Fetched, MapDataSource, SourceError};
 use crate::matcher::{key, levenshtein};
 use crate::meowdb;
 use crate::pace::Pace;
-use crate::panel::{GameWindow, ScreenRect, Size};
+use crate::panel::ScreenRect;
 use serde::{Deserialize, Serialize};
 use std::task::Poll;
 
@@ -33,7 +34,7 @@ pub struct ItemHit {
     pub category: Option<String>,
 }
 
-/// What the alert says about the latest Item Lookup.
+/// What the owl says about the latest Item Lookup.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "camelCase")]
 pub enum ItemLookup {
@@ -86,13 +87,13 @@ pub struct ItemChoice {
 pub enum OurWindow {
     Panel,
     GrindTracker,
-    /// The last Item Lookup's alert, still showing.
-    Alert,
+    /// The Owl Bubble, still saying the last Item Lookup's line, or the update's.
+    OwlBubble,
     PersonalBests,
     Settings,
 }
 
-/// The latest Item Lookup's alert.
+/// The latest Item Lookup's line, for the owl to say.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemLookupLine {
@@ -106,8 +107,8 @@ pub struct ItemLookupLine {
     pub outcome: ItemLookup,
 }
 
-/// How long an alert stays, from when it was set (capture time). Its window fades it out
-/// over its last second (`LINE_MS` and `CHOICES_MS` in `src/item-lookup.ts`).
+/// How long a line stays, from when it was set (capture time). The Owl Bubble fades it out
+/// over its last second (`LINE_MS` and `CHOICES_MS` in `src/owl-bubble.ts`).
 const LINE_MS: u64 = 6_000;
 /// How long the list of items sharing a name stays: long enough to read and pick.
 const CHOICES_MS: u64 = 30_000;
@@ -135,8 +136,6 @@ pub(crate) struct ItemLookups {
     now_ms: u64,
     /// MeowDB's pace, kept by the searches.
     pace: Pace,
-    /// The alert's size, in physical px for the current display.
-    pub size: Size,
 }
 
 impl ItemLookups {
@@ -151,14 +150,14 @@ impl ItemLookups {
         self.capturing
     }
 
-    /// Let the alert go: an Item Card shows in its place.
+    /// Let the line go: an Item Card shows in its place.
     pub fn clear(&mut self) {
         self.line = None;
         self.line_until = None;
     }
 
-    /// Show `outcome` in the alert: what kept an Item Card from showing, at `at_ms`.
-    pub fn alert(&mut self, outcome: ItemLookup, at_ms: u64) {
+    /// Say `outcome`: what kept an Item Card from showing, at `at_ms`.
+    pub fn say(&mut self, outcome: ItemLookup, at_ms: u64) {
         self.lookups += 1;
         self.now_ms = self.now_ms.max(at_ms);
         self.show_for(outcome, Hotkey::ItemCard);
@@ -289,30 +288,6 @@ impl ItemLookups {
         };
         self.line = Some(ItemLookupLine { lookup: self.lookups, hotkey, outcome });
     }
-}
-
-/// The alert's top edge sits this share of the game's client area down from its top.
-const ALERT_TOP_SHARE: f32 = 0.05;
-/// Gap kept between the alert and a captured region it moves clear of (physical px).
-const ALERT_GAP: i32 = 8;
-
-/// Where the alert of `size` goes: centred at the top of the game's client area, and
-/// below any of `avoid` (the captured regions) it would cover, since our windows show in
-/// our captures. Never wider than the client area.
-pub(crate) fn alert_placement(game: &GameWindow, size: Size, avoid: &[ScreenRect]) -> ScreenRect {
-    let client = game.client;
-    let width = size.width.min(client.width);
-    let x = client.x + (client.width - width) as i32 / 2;
-    let mut alert = ScreenRect { x, y: client.y + (client.height as f32 * ALERT_TOP_SHARE) as i32, width, height: size.height };
-    // Each move only goes down, so going over the regions twice settles it.
-    for _ in 0..2 {
-        for region in avoid {
-            if alert.overlaps(*region) {
-                alert.y = region.y + region.height as i32 + ALERT_GAP;
-            }
-        }
-    }
-    alert
 }
 
 /// The item's name in what the Item Tooltip's name line read as: trimmed, spaces

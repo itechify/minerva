@@ -77,11 +77,11 @@
         "contentProtected": false
       },
       {
-        "label": "item-lookup",
-        "title": "Item Lookup",
-        "url": "item-lookup.html",
-        "width": 440,
-        "height": 40,
+        "label": "owl-bubble",
+        "title": "Owl Bubble",
+        "url": "owl-bubble.html",
+        "width": 520,
+        "height": 56,
         "transparent": true,
         "decorations": false,
         "shadow": false,

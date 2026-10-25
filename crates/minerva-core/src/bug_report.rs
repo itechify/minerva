@@ -172,7 +172,9 @@ pub enum Event {
     },
     GameWindow { game: Option<GameWindow> },
     PanelSizes { sizes: PanelSizes },
-    ItemLookupSize { size: Size },
+    /// Once `itemLookupSize`, the Item Lookup alert's, which the Owl Bubble's window was.
+    #[serde(alias = "itemLookupSize")]
+    OwlBubbleSize { size: Size },
     ItemCardSize { size: Size },
     DealBadgesSize { size: Size },
     GrindTrackerSize { size: Size },
@@ -776,7 +778,7 @@ struct Last {
     bests_revision: u64,
     game: Option<Option<GameWindow>>,
     panel_sizes: Option<PanelSizes>,
-    item_lookup_size: Option<Size>,
+    owl_bubble_size: Option<Size>,
     item_card_size: Option<Size>,
     deal_badges_size: Option<Size>,
     grind_tracker_size: Option<Size>,
@@ -862,7 +864,7 @@ impl Recorder {
         match event {
             Event::GameWindow { game } => changes(&mut last.game, game),
             Event::PanelSizes { sizes } => changes(&mut last.panel_sizes, sizes),
-            Event::ItemLookupSize { size } => changes(&mut last.item_lookup_size, size),
+            Event::OwlBubbleSize { size } => changes(&mut last.owl_bubble_size, size),
             Event::ItemCardSize { size } => changes(&mut last.item_card_size, size),
             Event::DealBadgesSize { size } => changes(&mut last.deal_badges_size, size),
             Event::GrindTrackerSize { size } => changes(&mut last.grind_tracker_size, size),
@@ -1045,8 +1047,8 @@ impl Recorder {
                     &line.event,
                     Event::ItemTooltip { reading: Some(ItemTooltipReading { tooltip: ItemTooltip::Found { name: None, .. }, .. }) }
                 );
-                let no_such = state.item_lookup.as_ref().is_some_and(|alert| {
-                    matches!(alert.outcome, ItemLookup::NoSuchItem { .. } | ItemLookup::NotFound { .. })
+                let no_such = state.item_lookup.as_ref().is_some_and(|said| {
+                    matches!(said.outcome, ItemLookup::NoSuchItem { .. } | ItemLookup::NotFound { .. })
                 });
                 (true, unread || no_such)
             }
@@ -1613,8 +1615,8 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::PanelSizes { sizes } => {
                 minerva.set_panel_sizes(sizes);
             }
-            Event::ItemLookupSize { size } => {
-                minerva.set_item_lookup_size(size);
+            Event::OwlBubbleSize { size } => {
+                minerva.set_owl_bubble_size(size);
             }
             Event::ItemCardSize { size } => {
                 minerva.set_item_card_size(size);
@@ -2062,7 +2064,7 @@ impl Event {
                 let (e, c) = (sizes.expanded, sizes.collapsed);
                 format!("panel sizes {}x{}, collapsed {}x{}", e.width, e.height, c.width, c.height)
             }
-            Event::ItemLookupSize { size } => format!("Item Lookup alert size {}x{}", size.width, size.height),
+            Event::OwlBubbleSize { size } => format!("Owl Bubble size {}x{}", size.width, size.height),
             Event::ItemCardSize { size } => format!("Item Card size {}x{}", size.width, size.height),
             Event::DealBadgesSize { size } => format!("Deal Badges size {}x{}", size.width, size.height),
             Event::GrindTrackerSize { size } => format!("Grind Tracker size {}x{}", size.width, size.height),

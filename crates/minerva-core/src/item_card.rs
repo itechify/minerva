@@ -9,7 +9,7 @@
 //! The player can also find an item in Search: its card then shows beside the panel.
 //!
 //! One card shows at a time, until the player closes it or presses the hotkey again. What
-//! keeps a card from showing goes in the Item Lookup alert.
+//! keeps a card from showing, the owl says in the Owl Bubble (ADR 0025).
 
 use crate::grind_tracker::ClientOffset;
 use crate::item_lookup::{ItemLookup, OurWindow, item_name};
@@ -165,8 +165,8 @@ pub(crate) enum Pressed {
     Shown,
     /// No Item Tooltip by the pointer: the card showing closed, and nothing is said.
     Closed,
-    /// The alert says why no card shows.
-    Alert(ItemLookup),
+    /// The owl says why no card shows.
+    Say(ItemLookup),
 }
 
 /// The Item Card showing, if any.
@@ -230,19 +230,19 @@ impl ItemCards {
     ) -> Pressed {
         // One card at a time: the press replaces the card showing, or closes it.
         let had_card = self.shown.take().is_some();
-        let Some(reading) = reading else { return Pressed::Alert(ItemLookup::Unreadable) };
+        let Some(reading) = reading else { return Pressed::Say(ItemLookup::Unreadable) };
         let (area, name) = match &reading.tooltip {
             ItemTooltip::None if had_card => return Pressed::Closed,
-            ItemTooltip::None => return Pressed::Alert(ItemLookup::NoTooltip),
+            ItemTooltip::None => return Pressed::Say(ItemLookup::NoTooltip),
             ItemTooltip::Found { area, name } => (*area, name),
         };
         if let Some((by, _)) = ours.iter().find(|(_, window)| window.overlaps(area)) {
-            return Pressed::Alert(ItemLookup::Covered { by: *by });
+            return Pressed::Say(ItemLookup::Covered { by: *by });
         }
-        let Some(read) = name.as_deref().and_then(item_name) else { return Pressed::Alert(ItemLookup::Unreadable) };
+        let Some(read) = name.as_deref().and_then(item_name) else { return Pressed::Say(ItemLookup::Unreadable) };
         let items = match items {
             Ok(items) => items,
-            Err(missing) => return Pressed::Alert(missing),
+            Err(missing) => return Pressed::Say(missing),
         };
         let mut alike: Vec<(&ItemFacts, Vec<u32>)> = Vec::new();
         for item in items.named(&read) {
@@ -253,7 +253,7 @@ impl ItemCards {
         }
         let mut groups: Vec<Vec<u32>> = alike.into_iter().map(|(_, ids)| ids).collect();
         let showing = match groups.len() {
-            0 => return Pressed::Alert(ItemLookup::NoSuchItem { read }),
+            0 => return Pressed::Say(ItemLookup::NoSuchItem { read }),
             1 => Showing::Card(groups.remove(0)),
             _ => Showing::Choose(groups),
         };

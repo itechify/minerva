@@ -7,15 +7,17 @@
 //! Choosing to update (#128) downloads and installs it in a build that can install, asking first
 //! while a Session is running, and only opens the release page in one that can't. The notice
 //! the tray and Help & Setup turn into words is the core's: which stage it is at, what choosing
-//! to update offers, and what Quit Minerva does.
+//! to update offers, and what Quit Minerva does. A newer version Minerva found by itself is
+//! said over the game too, by the owl (ADR 0025), once a launch.
 
 mod common;
 
 use common::{FakeSource, HOUR, S};
 use common::player::Player;
 use minerva_core::{
-    Action, Build, DownloadAnswer, MINERVA_VERSION, Minerva, PanelControl, PanelState, QuitItem, Request, Settings,
-    UpdateAnswer, UpdateJob, UpdateNotice, UpdateOffer, UpdateStage, UpdateStatus, UpdateStep,
+    Action, Build, DownloadAnswer, Foreground, ItemTooltip, ItemTooltipReading, MINERVA_VERSION, Minerva, OwlLine,
+    OwlMood, PanelControl, PanelState, QuitItem, Request, ScreenRect, Settings, Size, UpdateAnswer, UpdateJob,
+    UpdateNotice, UpdateOffer, UpdateStage, UpdateStatus, UpdateStep,
 };
 
 /// The wall clock at capture time 0: 21 Oct 2026, 16:00 UTC.
@@ -697,4 +699,184 @@ fn quitting_while_the_update_for_when_i_quit_downloads_quits_without_it_if_anoth
     let state = player.minerva.on_update_download(id, got(MINERVA_VERSION)).clone();
     assert!(state.quit);
     assert_eq!(job(&state), None);
+}
+
+// The Owl Bubble's update line (ADR 0025).
+
+/// The Owl Bubble's size.
+const OWL: Size = Size { width: 420, height: 56 };
+
+/// A core at launch, set up, over the game window, its Owl Bubble's size known.
+fn over_the_game() -> Minerva {
+    let mut minerva = launched_with(common::set_up());
+    minerva.set_owl_bubble_size(OWL);
+    minerva.on_game_window(Some(common::window_on_wide_screen(common::GAME)));
+    minerva
+}
+
+/// Minerva's own check at launch finds `version`.
+fn found_at_launch(minerva: &mut Minerva, version: &str) -> PanelState {
+    tick(minerva, 0);
+    answer(minerva, latest(version))
+}
+
+/// What the owl says, if anything.
+fn owl_line(state: &PanelState) -> Option<OwlLine> {
+    state.owl_bubble.as_ref().map(|owl| owl.line.clone())
+}
+
+fn update_line(version: &str) -> Option<OwlLine> {
+    Some(OwlLine::Update { version: version.into() })
+}
+
+#[test]
+fn a_newer_version_minerva_found_by_itself_is_said_by_the_owl_at_the_top_centre_of_the_game_window() {
+    let mut minerva = over_the_game();
+
+    let state = found_at_launch(&mut minerva, NEWER);
+
+    let owl = state.owl_bubble.expect("the owl");
+    assert_eq!(owl.line, OwlLine::Update { version: NEWER.into() });
+    assert_eq!(owl.mood, OwlMood::News);
+    assert!(owl.clickable, "its × and the bubble take clicks");
+    // Centred on the 1920 px client at x 812, a twentieth of its 1200 px down from y 110.
+    assert_eq!(owl.placement, ScreenRect { x: 1562, y: 170, width: 420, height: 56 });
+}
+
+#[test]
+fn the_owl_says_nothing_of_this_version_nor_without_a_game_window_nor_while_another_app_is_in_front() {
+    let mut minerva = over_the_game();
+    assert_eq!(found_at_launch(&mut minerva, MINERVA_VERSION).owl_bubble, None);
+
+    let mut minerva = launched_with(common::set_up());
+    minerva.set_owl_bubble_size(OWL);
+    assert_eq!(found_at_launch(&mut minerva, NEWER).owl_bubble, None, "no game window");
+    let state = minerva.on_game_window(Some(common::window_on_wide_screen(common::GAME)));
+    assert_eq!(owl_line(state), update_line(NEWER));
+
+    assert_eq!(minerva.on_foreground(Foreground::OtherApp).owl_bubble, None);
+    assert_eq!(owl_line(minerva.on_foreground(Foreground::Game)), update_line(NEWER));
+}
+
+#[test]
+fn a_newer_version_the_players_check_for_updates_found_is_not_said_by_the_owl() {
+    let mut minerva = over_the_game();
+    found_at_launch(&mut minerva, MINERVA_VERSION);
+
+    minerva.act(Action::CheckForUpdates);
+    tick(&mut minerva, S);
+    let state = answer(&mut minerva, latest(NEWER));
+    assert_eq!(version(&state), Some(NEWER), "Help & Setup says it");
+    assert_eq!(state.owl_bubble, None);
+
+    // Nor when Minerva's own next check finds it again: the player has been told.
+    tick(&mut minerva, 6 * HOUR + S);
+    assert_eq!(answer(&mut minerva, latest(NEWER)).owl_bubble, None);
+}
+
+#[test]
+fn the_owls_x_dismisses_the_update_line_until_a_newer_version_is_found() {
+    let mut minerva = over_the_game();
+    found_at_launch(&mut minerva, NEWER);
+
+    let state = minerva.act(Action::DismissUpdateLine).clone();
+    assert_eq!(state.owl_bubble, None);
+    assert_eq!(version(&state), Some(NEWER), "the tray and Help & Setup still say it");
+
+    tick(&mut minerva, 6 * HOUR);
+    assert_eq!(answer(&mut minerva, latest(NEWER)).owl_bubble, None, "the same version");
+
+    tick(&mut minerva, 12 * HOUR);
+    assert_eq!(owl_line(&answer(&mut minerva, latest("999.0.1"))), update_line("999.0.1"));
+}
+
+#[test]
+fn a_dismissed_update_line_is_said_again_at_the_next_launch() {
+    let mut minerva = over_the_game();
+    found_at_launch(&mut minerva, NEWER);
+    minerva.act(Action::DismissUpdateLine);
+
+    let mut minerva = over_the_game();
+    assert_eq!(owl_line(&found_at_launch(&mut minerva, NEWER)), update_line(NEWER));
+}
+
+#[test]
+fn a_click_on_the_owls_update_line_opens_about_and_credits_and_dismisses_it() {
+    let mut minerva = over_the_game();
+    let about = found_at_launch(&mut minerva, NEWER).setup.about;
+
+    let state = minerva.act(Action::OpenUpdateLine).clone();
+    assert!(state.setup.window_open);
+    assert_eq!(state.setup.about, about + 1, "Help & Setup turns to About & Credits");
+
+    let state = minerva.act(Action::CancelSetup).clone();
+    assert!(!state.setup.window_open);
+    assert_eq!(state.owl_bubble, None);
+}
+
+#[test]
+fn the_owl_says_nothing_of_the_update_while_help_and_setup_shows() {
+    let mut minerva = over_the_game();
+    found_at_launch(&mut minerva, NEWER);
+
+    minerva.press(PanelControl::Setup);
+    assert_eq!(minerva.panel_state().owl_bubble, None);
+
+    let state = minerva.act(Action::CancelSetup);
+    assert_eq!(owl_line(state), update_line(NEWER), "closed without a click on the owl");
+}
+
+#[test]
+fn choosing_to_update_ends_the_owls_update_line_for_this_launch() {
+    let mut minerva = over_the_game();
+    minerva.on_build(Build::Nsis);
+    found_at_launch(&mut minerva, NEWER);
+    minerva.press(PanelControl::Update);
+    let id = downloading(minerva.panel_state());
+    minerva.act(Action::CancelSetup);
+    assert_eq!(minerva.panel_state().owl_bubble, None, "downloading");
+
+    let state = minerva.on_update_download(id, DownloadAnswer::Failed { why: "offline".into() }).clone();
+    assert_eq!(notice(&state).stage, UpdateStage::DownloadFailed);
+    assert_eq!(state.owl_bubble, None, "Help & Setup says it failed");
+
+    // A build that can't install only opens the release page.
+    let mut minerva = over_the_game();
+    found_at_launch(&mut minerva, NEWER);
+    assert_eq!(minerva.press(PanelControl::Update), Some(Request::OpenInBrowser { url: RELEASE_URL.into() }));
+    assert_eq!(notice(minerva.panel_state()).stage, UpdateStage::NotifyOnly);
+    assert_eq!(minerva.panel_state().owl_bubble, None);
+}
+
+#[test]
+fn the_check_after_a_download_of_another_version_is_the_players() {
+    let mut minerva = over_the_game();
+    minerva.on_build(Build::Nsis);
+    found_at_launch(&mut minerva, NEWER);
+    minerva.press(PanelControl::Update);
+    let id = downloading(minerva.panel_state());
+    minerva.on_update_download(id, got("998.0.0"));
+    minerva.act(Action::CancelSetup);
+
+    tick(&mut minerva, S);
+    let state = answer(&mut minerva, latest("999.0.1"));
+    assert_eq!(notice(&state).stage, UpdateStage::Out);
+    assert_eq!(state.owl_bubble, None, "Help & Setup said what is out now");
+}
+
+#[test]
+fn an_item_lookups_line_goes_before_the_update_line_which_comes_back_after() {
+    let mut minerva = over_the_game();
+    found_at_launch(&mut minerva, NEWER);
+
+    assert_eq!(minerva.on_hotkey("ctrl+shift+u"), Some(Request::CaptureItemTooltip));
+    let reading = ItemTooltipReading { pointer: common::POINTER, tooltip: ItemTooltip::None, at_ms: S };
+    let state = minerva.on_item_tooltip_reading(Some(reading)).clone();
+    let owl = state.owl_bubble.expect("the owl");
+    assert_eq!(owl.line, OwlLine::ItemLookup(state.item_lookup.clone().expect("a line")));
+    assert_eq!(owl.mood, OwlMood::Problem);
+    assert!(!owl.clickable, "clicks go through to the game");
+
+    assert!(matches!(owl_line(&tick(&mut minerva, 7 * S - 1)), Some(OwlLine::ItemLookup(_))));
+    assert_eq!(owl_line(&tick(&mut minerva, 7 * S)), update_line(NEWER), "once the lookup's line goes");
 }

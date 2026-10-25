@@ -52,6 +52,8 @@ type SetupView = {
     /** The map the minimap title shows, once one is found. */
     map: FoundMap | null;
     credit: string | null;
+    /** Counts the player's asks to see About & Credits (a click on the owl's update line). */
+    about: number;
   };
   /** No minimap title has been found for a while: the minimap may be closed. */
   titleLost: boolean;
@@ -84,6 +86,8 @@ let view: SetupView | null = null;
 let openedFor: SetupReason | null = null;
 let picking = false;
 let returnStep: Step = "window";
+/** The asks to see About & Credits already shown. */
+let aboutShown = 0;
 let renderedRead = "";
 
 function show(next: Step) {
@@ -336,6 +340,9 @@ function update(next: SetupView) {
   const stage = view.updates.notice?.stage;
   const shows = stage === "asking" || stage === "downloading" || stage === "downloadingForQuit";
   if (shows && stage !== before && step !== "about") show("about");
+  // A click on the owl's update line opens About & Credits, where updating is.
+  if (view.setup.about > aboutShown && step !== "about") show("about");
+  aboutShown = view.setup.about;
 }
 
 listen<SetupView>("setup-state", (e) => update(e.payload));
