@@ -589,3 +589,8 @@ pub fn owl_mood(state: &PanelState) -> Option<OwlMood> {
 pub fn owl_clickable(state: &PanelState) -> bool {
     state.owl_bubble.as_ref().is_some_and(|owl| owl.clickable)
 }
+
+/// How long the owl's line lasts, if the owl says anything: `None` inside while it stays.
+pub fn owl_lasts_ms(state: &PanelState) -> Option<Option<u64>> {
+    state.owl_bubble.as_ref().map(|owl| owl.lasts_ms)
+}

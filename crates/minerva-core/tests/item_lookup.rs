@@ -14,7 +14,7 @@
 
 mod common;
 
-use common::{FakeSource, GAME, NAME, OWL, POINTER, found, owl_at, owl_clickable, owl_line, owl_mood, requests};
+use common::{FakeSource, GAME, NAME, OWL, POINTER, found, owl_at, owl_clickable, owl_lasts_ms, owl_line, owl_mood, requests};
 use minerva_core::{
     Action, BESTS_VERSION, Minerva, Foreground, ItemChoice, ItemHit, ItemLookup, ItemTooltip,
     ItemTooltipReading, MapBests, OurWindow, OwlLine, OwlMood, PanelControl, PanelSizes, PanelState, Request, SavedBests, ScreenRect, Settings, Size, SourceError, VisitBest, meowdb,
@@ -303,6 +303,7 @@ fn letters_the_recogniser_confuses_and_case_still_find_the_item() {
     let state = look_up(&mut minerva, "Heros GIadius", 1_000);
     assert!(matches!(line(&state), Some(ItemLookup::Choose { .. })), "punctuation and I for l: {state:?}");
     assert!(owl_clickable(&state), "its items are picked with a click");
+    assert_eq!(owl_lasts_ms(&state), Some(Some(30_000)), "long enough to read and pick");
 }
 
 #[test]
@@ -660,6 +661,7 @@ fn the_owl_says_the_lookups_line_waiting_on_meowdb_then_with_news_or_a_problem()
     let state = look_up(&mut minerva, "Orihalcon Ore", 1_000);
     assert_eq!(owl_line(&state), state.item_lookup.clone().map(OwlLine::ItemLookup));
     assert_eq!(owl_mood(&state), Some(OwlMood::Waiting));
+    assert_eq!(owl_lasts_ms(&state), Some(None), "it stays until MeowDB answers");
     assert!(!owl_clickable(&state), "clicks go through to the game");
 
     minerva.tick(1_100);
@@ -667,6 +669,7 @@ fn the_owl_says_the_lookups_line_waiting_on_meowdb_then_with_news_or_a_problem()
     assert_eq!(line(&state), opened("Orihalcon Ore", "101"));
     assert_eq!(owl_line(&state), state.item_lookup.clone().map(OwlLine::ItemLookup));
     assert_eq!(owl_mood(&state), Some(OwlMood::News));
+    assert_eq!(owl_lasts_ms(&state), Some(Some(6_000)), "it fades out over its last second");
 
     look_up(&mut minerva, "Zqxv Nothing", 5_000);
     minerva.tick(5_100);

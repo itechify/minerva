@@ -12,7 +12,7 @@
 
 mod common;
 
-use common::{FakeSource, HOUR, OWL, S, owl_clickable, owl_line, owl_mood};
+use common::{FakeSource, HOUR, OWL, S, owl_clickable, owl_lasts_ms, owl_line, owl_mood};
 use common::player::Player;
 use minerva_core::{
     Action, Build, DownloadAnswer, Foreground, ItemTooltip, ItemTooltipReading, MINERVA_VERSION, Minerva, OwlLine,
@@ -730,6 +730,7 @@ fn a_newer_version_minerva_found_by_itself_is_said_by_the_owl_at_the_top_centre_
     assert_eq!(owl_line(&state), update_line(NEWER));
     assert_eq!(owl_mood(&state), Some(OwlMood::News));
     assert!(owl_clickable(&state), "its × and the bubble take clicks");
+    assert_eq!(owl_lasts_ms(&state), Some(None), "it stays until the player acts on it");
     // Centred on the 1920 px client at x 812, a twentieth of its 1200 px down from y 110.
     assert_eq!(common::owl_at(&state), Some(ScreenRect { x: 1562, y: 170, width: 420, height: 56 }));
 }

@@ -157,15 +157,15 @@ window.addEventListener("resize", heightOnly);
 // The height depends on the font: measure again once it has loaded.
 document.fonts.ready.then(reportHeight);
 
-// A click on an item opens its MeowDB page; on the update's line, About & Credits, where
-// updating is; on its ×, the owl says no more of it. The window takes clicks only while the
+// A click on an item opens its MeowDB page; on the update's line (the owl or its bubble),
+// About & Credits, where updating is; on its ×, the owl says no more of it. The window takes clicks only while the
 // core says so, and never the keyboard: it can't be activated.
 choices.addEventListener("click", (e) => {
   const button = e.target instanceof Element ? e.target.closest<HTMLElement>(".choice") : null;
   if (button?.dataset.id) invoke("pick_item", { id: button.dataset.id });
 });
 dismiss.addEventListener("click", () => invoke("act", { action: "dismissUpdateLine" }));
-bubbleEl.addEventListener("click", (e) => {
+owlEl.addEventListener("click", (e) => {
   if (update && !(e.target instanceof Element && e.target.closest("#dismiss"))) {
     invoke("act", { action: "openUpdateLine" });
   }
