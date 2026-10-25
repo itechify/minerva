@@ -28,6 +28,7 @@ mod matcher;
 mod minimap_title;
 pub mod meowdb;
 mod mob_card;
+mod owl_bubble;
 pub mod osms;
 pub mod osms_items;
 mod pace;
@@ -64,6 +65,7 @@ pub use item_card::{
 };
 pub use market_prices::{MARKET_PRICES_VERSION, MarketImport, MarketPrice, SavedMarketLine, SavedMarketPrices};
 pub use item_lookup::{ItemChoice, ItemHit, ItemLookup, ItemLookupLine, OurWindow};
+pub use owl_bubble::{OwlBubble, OwlLine, OwlMood};
 pub use item_tooltip::{ItemCapture, ItemTooltip, ItemTooltipReader, ItemTooltipReading};
 pub use discord_link::{DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest, DiscordLinkView, link_page, read_link_state, read_link_token};
 pub use leaderboards::{
@@ -273,7 +275,7 @@ pub struct PanelState {
     /// captures it every [`TITLE_SEARCH_MS`], not every [`TITLE_READ_MS`].
     pub title_searching: bool,
     /// Where our windows show on screen, as placed here: the overlay while it shows, the Grind
-    /// Tracker, the Personal Bests window, Item Lookup's alert, the Item Card and the Deal
+    /// Tracker, the Personal Bests window, the Owl Bubble, the Item Card and the Deal
     /// Badges. A capture of the screen holds them, and the Minimap Title is never read in them
     /// ([`TitleCapture::ours`]): the panel's own map name and NOT SURE pass for a minimap.
     #[serde(skip_serializing)]
@@ -343,15 +345,12 @@ pub struct PanelState {
     pub search: SearchState,
     /// What the latest Item Lookup came to, for a few seconds; `None` once it has gone.
     pub item_lookup: Option<ItemLookupLine>,
-    /// Where its alert goes on screen: at the top centre of the game window, clear of the
-    /// captured regions; `None` while there is none, no game window, or another app in
+    /// The owl at the top centre of the game window, saying Item Lookup's line or the
+    /// update's (ADR 0025); `None` with nothing to say, no game window, or another app in
     /// front (see [`Layer`]).
-    pub item_lookup_placement: Option<ScreenRect>,
-    /// The alert takes clicks: it shows, listing items to pick from. Otherwise every click
-    /// goes through it to the game.
-    pub item_lookup_clickable: bool,
-    /// The hotkey the alert names: the one the player pressed for the lookup it shows (Item
-    /// Lookup's or the Item Card's), and Item Lookup's while it shows none.
+    pub owl_bubble: Option<OwlBubble>,
+    /// The hotkey Item Lookup's line names: the one the player pressed for the lookup (Item
+    /// Lookup's or the Item Card's), and Item Lookup's while there is none.
     pub item_lookup_hotkey: String,
     /// The Item Card showing; `None` while there is none.
     pub item_card: Option<ShownItemCard>,
@@ -377,7 +376,8 @@ pub struct PanelState {
     /// The Settings window's Game Data: when OSMS's data was fetched, and the player's Refresh.
     pub game_data: GameData,
     /// Updates (ADR 0019): whether a newer version is out, for the tray and Help & Setup, and
-    /// the check under way for the shell to run. Nothing of it shows on the panels.
+    /// the check under way for the shell to run. Nothing of it shows on the panels; the owl
+    /// says it ([`PanelState::owl_bubble`]).
     pub updates: Updates,
 }
 
@@ -567,6 +567,8 @@ pub struct Minerva {
     item_reader: Option<ItemTooltipReader>,
     /// The latest Item Lookup.
     item_lookups: ItemLookups,
+    /// The Owl Bubble's size, in physical px for the current display.
+    owl_size: Size,
     /// OSMS's item files, for the Item Card, and when to ask for them next.
     items: Loader<ItemSet>,
     /// The Item Card showing.
@@ -644,6 +646,7 @@ impl Minerva {
             settings_place: SettingsPlace::default(),
             item_reader: None,
             item_lookups: ItemLookups::default(),
+            owl_size: Size::default(),
             items: Loader::default(),
             item_cards: ItemCards::default(),
             card_capturing: false,
@@ -938,10 +941,10 @@ impl Minerva {
         self.sync_panel()
     }
 
-    /// The Item Lookup alert's size, in physical px for the current display.
-    pub fn set_item_lookup_size(&mut self, size: Size) -> &PanelState {
-        self.record(Event::ItemLookupSize { size });
-        self.item_lookups.size = size;
+    /// The Owl Bubble's size, in physical px for the current display.
+    pub fn set_owl_bubble_size(&mut self, size: Size) -> &PanelState {
+        self.record(Event::OwlBubbleSize { size });
+        self.owl_size = size;
         self.sync_panel()
     }
 
@@ -1008,6 +1011,11 @@ impl Minerva {
             }
             Action::FinishSetup => self.setup.finish(),
             Action::RequestSetup => self.setup.request(),
+            Action::DismissUpdateLine => self.updater.told(),
+            Action::OpenUpdateLine => {
+                self.updater.told();
+                self.setup.open_about();
+            }
             Action::LaunchedAgain => {
                 if self.state.setup.window_open {
                     // Setup shows already.
@@ -1242,8 +1250,8 @@ impl Minerva {
     }
 
     /// The card of the item listing `row`'s Deal Badge is about shows beside the badge; the
-    /// alert has nothing more to say. Nothing changes for a badge not showing, or one about
-    /// no item ("?").
+    /// owl has nothing more to say of the last press. Nothing changes for a badge not
+    /// showing, or one about no item ("?").
     fn open_deal_item(&mut self, row: u32) {
         let Some(DealBadges { placement, badges }) = &self.state.deal_badges else { return };
         let (Some(badge), Some(ids), Some(shop)) =
@@ -1256,8 +1264,8 @@ impl Minerva {
         self.item_lookups.clear();
     }
 
-    /// The card of items `ids`, picked from Search, shows beside the panel; the alert has
-    /// nothing more to say.
+    /// The card of items `ids`, picked from Search, shows beside the panel; the owl has
+    /// nothing more to say of the last press.
     fn show_card(&mut self, ids: Vec<u32>) {
         self.item_cards.show(ids);
         self.item_lookups.clear();
@@ -1351,7 +1359,11 @@ impl Minerva {
                         self.setup.request();
                         self.sync_panel();
                     }
-                    Chosen::ReleasePage => return self.open_release(),
+                    Chosen::ReleasePage => {
+                        // The player has been told: the owl says no more of it.
+                        self.sync_panel();
+                        return self.open_release();
+                    }
                     Chosen::Nothing => {}
                 }
                 return None;
@@ -1576,7 +1588,7 @@ impl Minerva {
             self.state.grind_tracker.placement.map(|at| (OurWindow::GrindTracker, at)),
             self.state.personal_bests.placement.map(|at| (OurWindow::PersonalBests, at)),
             self.state.settings_showing().map(|at| (OurWindow::Settings, at)),
-            self.state.item_lookup_placement.map(|at| (OurWindow::Alert, at)),
+            self.state.owl_bubble.as_ref().map(|owl| (OurWindow::OwlBubble, owl.placement)),
         ]
         .into_iter()
         .flatten()
@@ -1586,7 +1598,7 @@ impl Minerva {
             match self.item_cards.read(reading, &ours, self.items.items()) {
                 Pressed::Shown => self.item_lookups.clear(),
                 Pressed::Closed => {}
-                Pressed::Alert(outcome) => self.item_lookups.alert(outcome, at_ms),
+                Pressed::Say(outcome) => self.item_lookups.say(outcome, at_ms),
             }
             return self.sync_panel();
         }
@@ -1760,8 +1772,7 @@ impl Minerva {
 
     /// The player clicked the Item Card's name, at `at_ms` (on the clock of frames and
     /// ticks): open the item's MeowDB page, through MeowDB's search as Item Lookup does.
-    /// The page comes from [`Minerva::take_request`], and the Item Lookup alert says what
-    /// came of it.
+    /// The page comes from [`Minerva::take_request`], and the owl says what came of it.
     pub fn open_card_meowdb_page(&mut self, at_ms: u64) -> &PanelState {
         self.record(Event::OpenCardMeowdbPage { at_ms });
         let Some(item) = self.items.items().ok().and_then(|items| self.item_cards.item(items)) else {
@@ -1903,7 +1914,7 @@ impl Minerva {
     }
 
     /// Another window came to the front. The hotkeys are live, and the overlay, the Grind
-    /// Tracker's window and the Item Lookup alert show (with the game), while the game or
+    /// Tracker's window and the Owl Bubble show (with the game), while the game or
     /// one of our windows is in front, and nowhere else (see [`Layer`]).
     pub fn on_foreground(&mut self, foreground: Foreground) -> &PanelState {
         self.record(Event::Foreground { foreground });
@@ -2193,7 +2204,7 @@ impl Minerva {
         self.sync_settings_window();
         self.state.leaderboard_uploads = self.leaderboards.uploads();
         self.state.discord_link_requests = self.discord.requests();
-        self.sync_item_lookup();
+        self.sync_owl_bubble();
         self.sync_item_card();
         self.sync_deal_finder();
         self.state.our_windows = [
@@ -2201,7 +2212,7 @@ impl Minerva {
             self.state.grind_tracker.placement,
             self.state.personal_bests.placement,
             self.state.settings_showing(),
-            self.state.item_lookup_placement,
+            self.state.owl_bubble.as_ref().map(|owl| owl.placement),
             self.state.item_card_placement,
             self.state.deal_badges.as_ref().map(|badges| badges.placement),
         ]
@@ -2226,10 +2237,8 @@ impl Minerva {
     fn sync_input(&mut self) {
         let state = &mut self.state;
         state.overlay_takes_keyboard = state.search.view.is_some();
-        let lookup = state.item_lookup.as_ref().filter(|_| state.item_lookup_placement.is_some());
-        state.item_lookup_clickable = lookup.is_some_and(|line| matches!(line.outcome, ItemLookup::Choose { .. }));
         let hotkeys = &self.settings.hotkeys;
-        let named = match lookup.map(|line| line.hotkey) {
+        let named = match state.item_lookup.as_ref().map(|line| line.hotkey) {
             Some(Hotkey::ItemCard) => &hotkeys.item_card,
             _ => &hotkeys.item_lookup,
         };
@@ -2242,14 +2251,17 @@ impl Minerva {
         state.deal_badges_clickable = state.deal_badges.as_ref().is_some_and(|shown| !shown.badges.is_empty());
     }
 
-    /// The Item Lookup's alert, at the top centre of the game window while it has one,
-    /// clear of the captured regions; only while the overlay can show (see [`Layer`]).
-    fn sync_item_lookup(&mut self) {
+    /// The Owl Bubble, at the top centre of the game window while the owl has something to
+    /// say, clear of the captured regions; only while the overlay can show (see [`Layer`]).
+    /// Item Lookup's line goes first; the update's waits while Help & Setup shows, which says
+    /// it already, and is never said while "Check for updates" is off.
+    fn sync_owl_bubble(&mut self) {
         let line = self.item_lookups.line();
-        let shows = self.panel.layer() != Layer::Hidden;
-        self.state.item_lookup_placement = match (&line, &self.panel.game) {
-            (Some(_), Some(game)) if shows => {
-                Some(item_lookup::alert_placement(game, self.item_lookups.size, &self.panel.avoid))
+        let quiet = self.state.setup.window_open || !self.settings.check_for_updates;
+        let update = self.updater.owl_says().filter(|_| !quiet);
+        self.state.owl_bubble = match &self.panel.game {
+            Some(game) if self.panel.layer() != Layer::Hidden => {
+                owl_bubble::bubble(line.clone(), update, game, self.owl_size, &self.panel.avoid)
             }
             _ => None,
         };

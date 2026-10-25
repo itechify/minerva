@@ -3,7 +3,7 @@
 //! Tooltip's name is read, and the card shows at the pointer what the game's tooltip
 //! doesn't: what a shop pays for the item, and the market prices the player keeps for it on
 //! their Market Lines (ADR 0011), with links to its MeowDB page and to MesoWatch's market
-//! prices. Failures go to the Item Lookup alert.
+//! prices. Failures go to the Owl Bubble.
 //!
 //! The readings here stand for what the Item Tooltip reader made of a capture. OSMS's item
 //! files are made up in their shapes ([`common::items`]).
@@ -214,12 +214,12 @@ fn throwing_stars_say_no_shop_price_is_known_until_a_sale_in_the_game_confirms_w
     assert_eq!(card_of(items, "Subi Throwing Stars").shop, ShopPrice::Unknown);
 }
 
-/// What the alert says, and for which hotkey.
-fn alert(state: &PanelState) -> Option<(ItemLookup, Hotkey)> {
+/// What the owl says of the press, and for which hotkey.
+fn owl_says(state: &PanelState) -> Option<(ItemLookup, Hotkey)> {
     state.item_lookup.as_ref().map(|line| (line.outcome.clone(), line.hotkey))
 }
 
-fn card_alert(outcome: ItemLookup) -> Option<(ItemLookup, Hotkey)> {
+fn card_line(outcome: ItemLookup) -> Option<(ItemLookup, Hotkey)> {
     Some((outcome, Hotkey::ItemCard))
 }
 
@@ -262,27 +262,27 @@ fn a_name_one_letter_off_finds_the_item_far_closer_than_any_other() {
 }
 
 #[test]
-fn a_name_as_close_to_two_items_finds_neither_and_the_alert_says_no_item_has_it() {
+fn a_name_as_close_to_two_items_finds_neither_and_the_owl_says_no_item_has_it() {
     let mut minerva = started_with(FakeSource::osms_offline().with_items(ores()));
 
     let state = press_over(&mut minerva, "Steel Orx", 1_000);
 
     assert_eq!(state.item_card, None);
-    assert_eq!(alert(&state), card_alert(ItemLookup::NoSuchItem { read: "Steel Orx".into() }));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::NoSuchItem { read: "Steel Orx".into() }));
 }
 
 #[test]
-fn a_name_no_item_has_shows_no_card_and_the_alert_says_so() {
+fn a_name_no_item_has_shows_no_card_and_the_owl_says_so() {
     let mut minerva = started();
 
     let state = press_over(&mut minerva, "Zqxv Nothing", 1_000);
 
     assert_eq!(state.item_card, None);
-    assert_eq!(alert(&state), card_alert(ItemLookup::NoSuchItem { read: "Zqxv Nothing".into() }));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::NoSuchItem { read: "Zqxv Nothing".into() }));
 }
 
 #[test]
-fn no_item_tooltip_by_the_pointer_says_so_in_the_alert() {
+fn no_item_tooltip_by_the_pointer_says_so_by_the_owl() {
     let mut minerva = started();
     minerva.on_hotkey("ctrl+shift+i");
 
@@ -290,25 +290,25 @@ fn no_item_tooltip_by_the_pointer_says_so_in_the_alert() {
     let state = minerva.on_item_tooltip_reading(Some(reading)).clone();
 
     assert_eq!(state.item_card, None);
-    assert_eq!(alert(&state), card_alert(ItemLookup::NoTooltip));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::NoTooltip));
 }
 
 #[test]
-fn a_name_that_cant_be_read_or_a_capture_that_failed_says_so_in_the_alert() {
+fn a_name_that_cant_be_read_or_a_capture_that_failed_says_so_by_the_owl() {
     let mut minerva = started();
     minerva.on_hotkey("ctrl+shift+i");
     let tooltip = ItemTooltip::Found { area: NAME, name: None };
     let state = minerva.on_item_tooltip_reading(Some(ItemTooltipReading { tooltip, pointer: POINTER, at_ms: 1_000 })).clone();
-    assert_eq!(alert(&state), card_alert(ItemLookup::Unreadable));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::Unreadable));
 
     minerva.on_hotkey("ctrl+shift+i");
     let state = minerva.on_item_tooltip_reading(None).clone();
-    assert_eq!(alert(&state), card_alert(ItemLookup::Unreadable));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::Unreadable));
     assert_eq!(state.item_card, None);
 }
 
 #[test]
-fn the_panel_over_the_items_name_says_so_in_the_alert_as_it_would_be_read_instead() {
+fn the_panel_over_the_items_name_says_so_by_the_owl_as_it_would_be_read_instead() {
     let mut minerva = started();
     let panel = minerva.panel_state().placement.expect("the panel shows");
     minerva.on_hotkey("ctrl+shift+i");
@@ -317,7 +317,7 @@ fn the_panel_over_the_items_name_says_so_in_the_alert_as_it_would_be_read_instea
     let state = minerva.on_item_tooltip_reading(Some(ItemTooltipReading { tooltip, pointer: POINTER, at_ms: 1_000 })).clone();
 
     assert_eq!(state.item_card, None);
-    assert_eq!(alert(&state), card_alert(ItemLookup::Covered { by: OurWindow::Panel }));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::Covered { by: OurWindow::Panel }));
 }
 
 #[test]
@@ -386,22 +386,22 @@ fn pressing_away_from_any_item_closes_the_card_and_says_nothing() {
     let state = minerva.on_item_tooltip_reading(Some(reading)).clone();
 
     assert_eq!(state.item_card, None);
-    assert_eq!(state.item_lookup, None, "no alert: the press closed the card");
+    assert_eq!(state.item_lookup, None, "nothing for the owl to say: the press closed the card");
 }
 
 #[test]
-fn a_press_over_an_item_without_a_card_closes_the_last_card_and_says_why_in_the_alert() {
+fn a_press_over_an_item_without_a_card_closes_the_last_card_and_says_why_by_the_owl() {
     let mut minerva = started();
     press_over(&mut minerva, "Bronze Ore", 1_000);
 
     let state = press_over(&mut minerva, "Zqxv Nothing", 2_000);
 
     assert_eq!(state.item_card, None);
-    assert_eq!(alert(&state), card_alert(ItemLookup::NoSuchItem { read: "Zqxv Nothing".into() }));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::NoSuchItem { read: "Zqxv Nothing".into() }));
 }
 
 #[test]
-fn a_card_showing_takes_the_place_of_the_alert() {
+fn a_card_showing_takes_the_place_of_what_the_owl_says_of_the_last_press() {
     let mut minerva = started();
     press_over(&mut minerva, "Zqxv Nothing", 1_000);
 
@@ -586,24 +586,24 @@ fn bronze_ore_price(minerva: &mut Minerva, at_ms: u64) -> Option<ShopPrice> {
 }
 
 #[test]
-fn until_osmss_item_files_arrive_the_alert_says_they_are_loading() {
+fn until_osmss_item_files_arrive_the_owl_says_they_are_loading() {
     let mut minerva = started_with(FakeSource::osms_offline().answering_item_set(vec![Poll::Pending]));
 
     let state = press_over(&mut minerva, "Bronze Ore", 1_000);
 
     assert_eq!(state.item_card, None);
-    assert_eq!(alert(&state), card_alert(ItemLookup::ItemsLoading));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::ItemsLoading));
 }
 
 #[test]
-fn with_osms_unreachable_and_no_item_files_saved_the_alert_says_so_and_they_are_asked_for_a_minute_on() {
+fn with_osms_unreachable_and_no_item_files_saved_the_owl_says_so_and_they_are_asked_for_a_minute_on() {
     let source = FakeSource::osms_offline();
     let asked = source.item_set_requests.clone();
     let mut minerva = started_with(source);
     assert_eq!(asked.load(Ordering::SeqCst), 1);
 
     let state = press_over(&mut minerva, "Bronze Ore", 1_000);
-    assert_eq!(alert(&state), card_alert(ItemLookup::ItemsUnavailable));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::ItemsUnavailable));
 
     minerva.tick(59_000);
     assert_eq!(asked.load(Ordering::SeqCst), 1, "not on every tick");
@@ -617,7 +617,7 @@ fn item_files_that_dont_read_with_none_saved_say_the_card_needs_an_update() {
 
     let state = press_over(&mut minerva, "Bronze Ore", 1_000);
 
-    assert_eq!(alert(&state), card_alert(ItemLookup::ItemsFormatChanged));
+    assert_eq!(owl_says(&state), card_line(ItemLookup::ItemsFormatChanged));
 }
 
 #[test]
@@ -754,14 +754,14 @@ fn of_meowdb_items_sharing_the_name_the_one_of_the_cards_kind_opens() {
 }
 
 #[test]
-fn of_meowdb_items_sharing_the_name_none_of_the_cards_kind_are_listed_in_the_alert_to_pick() {
+fn of_meowdb_items_sharing_the_name_none_of_the_cards_kind_are_listed_by_the_owl_to_pick() {
     let mut minerva = with_meowdb();
     press_over(&mut minerva, "Red Potion", 1_000);
 
     let state = minerva.open_card_meowdb_page(2_000).clone();
 
     assert!(requests(&mut minerva).is_empty());
-    assert!(matches!(alert(&state), Some((ItemLookup::Choose { .. }, Hotkey::ItemLookup))), "{:?}", state.item_lookup);
+    assert!(matches!(owl_says(&state), Some((ItemLookup::Choose { .. }, Hotkey::ItemLookup))), "{:?}", state.item_lookup);
 }
 
 #[test]

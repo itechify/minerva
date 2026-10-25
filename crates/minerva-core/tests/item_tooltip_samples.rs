@@ -72,7 +72,7 @@ fn sample_items(samples: &[Sample]) -> ItemWorld {
 }
 
 /// What the core shows for a sample pressed with Ctrl+Shift+I: the card of the item it read,
-/// or the alert.
+/// or what the owl says instead.
 fn press(minerva: &mut Minerva, sample: &Sample) -> PanelState {
     let img = image::open(common::samples_in("item-tooltip").join(&sample.file)).unwrap_or_else(|e| panic!("{}: {e}", sample.file)).to_rgba8();
     let frame = Frame { width: img.width(), height: img.height(), rgba: img.into_raw(), at_ms: 1_000 };
@@ -90,7 +90,7 @@ fn started(samples: &[Sample]) -> Minerva {
     minerva
 }
 
-/// The card's item, by its name as samples write it; or what the alert says.
+/// The card's item, by its name as samples write it; or what the owl says.
 fn shown(state: &PanelState) -> Result<String, Option<ItemLookup>> {
     match state.item_card.as_ref().map(|shown| &shown.view) {
         Some(ItemCardView::Card(card)) => Ok(slug(&card.name)),

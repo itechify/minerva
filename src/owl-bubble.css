@@ -1,0 +1,233 @@
+/* The Owl Bubble (ADR 0025): the owl at the top centre of the game window, where the player
+   is looking, saying what the latest Item Lookup came to or that a newer version is out. The
+   owl at 48px (its 48-pixel sprite at 2x, never smoothed), and beside it the bubble: one of
+   the panel's windows without its bar, as wide as its words, its stepped tail pointing at
+   the owl as the game's speech bubbles do. Together they are centred in the window, which
+   the shell makes 520 CSS px wide (SPEC in src-tauri/src/owl_bubble.rs) and as tall as they
+   are. The bubble sits over whatever the scene has there, so it takes the near-opaque
+   lavender the panel sets its densest reading on, not the see-through glass. The window
+   fits them, so it takes no clicks beside them. A problem
+   wears the panel's problem note: cream, with the orange dot. Item Lookup's line fades out
+   over its last second, and a new one shows afresh; the update's line holds still until the
+   player acts on it. */
+.owl-bubble {
+  /* Solid, not the panel's 95%: the tail lies over the bubble's edge, and two layers of
+     the see-through body would show where they meet. */
+  --bubble-bg: var(--body-solid);
+  --bubble-edge: var(--window-edge);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  animation: owl-fade var(--line-ms, 6000ms) linear forwards;
+}
+
+.owl-bubble.stays {
+  animation: none;
+}
+
+.owl-bubble[data-mood="problem"] {
+  --bubble-bg: var(--problem-bg);
+  --bubble-edge: var(--problem-edge);
+}
+
+/* A pose is a picture per mood, at 96px (its 48-pixel sprite at 2x): a new pose replaces its
+   file and nothing more. Until there are more, they are the same owl. */
+.owl {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+}
+
+.owl-bubble[data-mood="news"] .owl {
+  content: url("../assets/owl-news.png");
+}
+
+.owl-bubble[data-mood="problem"] .owl {
+  content: url("../assets/owl-problem.png");
+}
+
+.owl-bubble[data-mood="waiting"] .owl {
+  content: url("../assets/owl-waiting.png");
+}
+
+.panel.bubble {
+  /* The panel's inline-size containment would size it as if empty. */
+  container-type: normal;
+  /* The tail reaches out past its edge. */
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  margin-top: 6px;
+  padding: 6px 12px 7px;
+  border-color: var(--bubble-edge);
+  background: var(--bubble-bg);
+  text-shadow:
+    0 0 2px rgba(238, 242, 255, 0.85),
+    0 0 4px rgba(238, 242, 255, 0.6);
+}
+
+/* The tail: a triangle stepped in 3px stairs, its flat top pointing at the owl, drawn in
+   the bubble's edge and filled with its body a pixel in, over the edge where they meet, as
+   the game draws its speech bubbles' tails, pixel by pixel. */
+.panel.bubble::before,
+.panel.bubble::after {
+  content: "";
+  position: absolute;
+}
+
+.panel.bubble::before {
+  left: -12px;
+  top: 8px;
+  width: 12px;
+  height: 12px;
+  background: var(--bubble-edge);
+  clip-path: polygon(0 0, 12px 0, 12px 12px, 9px 12px, 9px 9px, 6px 9px, 6px 6px, 3px 6px, 3px 3px, 0 3px);
+}
+
+.panel.bubble::after {
+  left: -11px;
+  top: 9px;
+  width: 12px;
+  height: 10px;
+  background: var(--bubble-bg);
+  clip-path: polygon(0 0, 12px 0, 12px 10px, 9px 10px, 9px 8px, 6px 8px, 6px 5px, 3px 5px, 3px 2px, 0 2px);
+}
+
+/* Read in full, never cut short. */
+.panel.bubble .note {
+  white-space: normal;
+  text-wrap: pretty;
+  text-align: center;
+  color: var(--ink);
+}
+
+.owl-bubble[data-mood="problem"] .bubble {
+  box-shadow: none;
+  text-shadow: none;
+}
+
+/* The dot's ring reaches past the dot: the line must not clip it, as the panel's lines
+   clip what overflows them. */
+.owl-bubble[data-mood="problem"] .bubble .note {
+  position: relative;
+  overflow: visible;
+  padding-left: 17px;
+  text-align: left;
+  color: var(--problem-ink);
+}
+
+.owl-bubble[data-mood="problem"] .bubble .note::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange-deep);
+}
+
+/* The update's line opens About & Credits, where updating is: the whole bubble is its
+   button, with its × at the right. */
+.panel.bubble.opens {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding-right: 6px;
+}
+
+.panel.bubble.opens:hover {
+  --bubble-bg: var(--select);
+  --bubble-edge: var(--select-edge);
+}
+
+.panel.bubble.opens .note {
+  text-align: left;
+  font-weight: 700;
+}
+
+.dismiss {
+  flex: none;
+}
+
+/* The items sharing the name read, each a link to its MeowDB page, with its category. */
+.choices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 260px;
+}
+
+.choice {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 3px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.choice:hover {
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--select-edge);
+  color: var(--portal);
+}
+
+.choice:active {
+  color: var(--frame);
+}
+
+.choice-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.choice-category {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* Measured as wide as it would be in the widest window (src-tauri/src/owl_bubble.rs's
+   SPEC), not as the window is now. */
+.owl-bubble.measuring-width {
+  width: max-content;
+  max-width: 520px;
+}
+
+/* With nothing to say, the window draws nothing. */
+.hidden .owl-bubble {
+  display: none;
+}
+
+@keyframes owl-fade {
+  0%,
+  83% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .owl-bubble {
+    animation: none;
+  }
+}

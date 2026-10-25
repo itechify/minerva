@@ -18,6 +18,8 @@ MeowDB's item pages are numbered by MeowDB's own IDs (`/msclassic/item-db/418`),
 
 What a lookup comes to (looking up, opened, why nothing opened, or the items to pick from) shows in an alert of its own at the top centre of the game window, where the player is looking when they press the hotkey, for a few seconds. The panel is left as it is, collapsed or not. The alert is a window of ours like the Grind Tracker's (ADR 0001): no-activate, on top of everything only while the game or one of our windows is in front, and clear of the captured regions. Clicks pass through it to the game, except while it lists items to pick from. Like our other windows it shows in our captures, so an alert still showing over the next tooltip's name is reported as covering it.
 
+**Amended by ADR 0025.** The alert is now the Owl Bubble: the owl says the same line in a speech bubble, in the same spot, and says a newer version is out there too, Item Lookup's line going first.
+
 ## Considered options
 
 - **An index of `/msclassic/item-db/all`**, fetched and cached like the map index, with the closest name picked. It works offline after the first fetch. But that page leaves out 68 items that have pages ("Hat MP Scroll: Greater" among them), so a perfect reading of a missing item would land on a near neighbour with full confidence. It is also 2.6 MB to fetch.

@@ -103,6 +103,12 @@ pub enum Action {
     FinishSetup,
     /// The player wants to redo setup (the re-setup hotkey).
     RequestSetup,
+    /// The Owl Bubble's ×, on the update's line: the owl says no more of that version this
+    /// launch (ADR 0025). The tray and Help & Setup still say it.
+    DismissUpdateLine,
+    /// A click on the Owl Bubble's update line: open Help & Setup at About & Credits, where
+    /// updating is, and say no more of that version this launch.
+    OpenUpdateLine,
     /// The player started Minerva again while it runs; only one runs at a time, so
     /// this one shows itself: the panel, expanded, while there is a game window to show
     /// it on (once the game is back in front, if another app is now); setup otherwise.
@@ -299,7 +305,7 @@ pub enum PlacementMode {
 /// Whether the overlay window shows, on top of everything, or not at all. Wherever the
 /// panel is placed (inside, docked or detached), it belongs to the game window: it shows
 /// only while there is a game window and the game or one of Minerva's own windows
-/// is in front ([`Foreground`]). The Grind Tracker's window and the Item Lookup alert
+/// is in front ([`Foreground`]). The Grind Tracker's window and the Owl Bubble
 /// show only while the overlay can (their placements are `None` otherwise).
 ///
 /// Until the shell first reports what is in front, the overlay counts as shown with the

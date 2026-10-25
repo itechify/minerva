@@ -11,8 +11,8 @@ use minerva_core::osms::{OsmsFiles, SavedFiles};
 use minerva_core::osms_items::{ItemFiles, SavedItemFiles};
 use minerva_core::{
     ExpBar, ExpBarPlace, ExpBarReading, Fetched, Frame, GameWindow, ItemHit, ItemTooltip, ItemTooltipReading, MINERVA_VERSION,
-    MapDataSource, Minerva, PanelState, Request, ScreenPoint, ScreenRect, Settings, SourceError, TitleCapture, TitleLines,
-    TitleReading,
+    MapDataSource, Minerva, OwlLine, OwlMood, PanelState, Request, ScreenPoint, ScreenRect, Settings, Size, SourceError,
+    TitleCapture, TitleLines, TitleReading,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -565,4 +565,32 @@ pub fn osms_changed_format() -> OsmsAnswer {
 /// OSMS's item files can't be reached.
 pub fn items_unreachable() -> ItemSetAnswer {
     Poll::Ready(Err(unreachable()))
+}
+
+/// The Owl Bubble's size (ADR 0025).
+pub const OWL: Size = Size { width: 420, height: 56 };
+
+/// Where the Owl Bubble shows, if it does.
+pub fn owl_at(state: &PanelState) -> Option<ScreenRect> {
+    state.owl_bubble.as_ref().map(|owl| owl.placement)
+}
+
+/// What the owl says, if anything.
+pub fn owl_line(state: &PanelState) -> Option<OwlLine> {
+    state.owl_bubble.as_ref().map(|owl| owl.line.clone())
+}
+
+/// How the owl says it, if it says anything.
+pub fn owl_mood(state: &PanelState) -> Option<OwlMood> {
+    state.owl_bubble.as_ref().map(|owl| owl.mood)
+}
+
+/// The Owl Bubble shows, and takes clicks.
+pub fn owl_clickable(state: &PanelState) -> bool {
+    state.owl_bubble.as_ref().is_some_and(|owl| owl.clickable)
+}
+
+/// How long the owl's line lasts, if the owl says anything: `None` inside while it stays.
+pub fn owl_lasts_ms(state: &PanelState) -> Option<Option<u64>> {
+    state.owl_bubble.as_ref().map(|owl| owl.lasts_ms)
 }

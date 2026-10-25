@@ -4,7 +4,7 @@
 //! for Item Lookup, the client area with the pointer), feeds frames, hotkeys and drags to
 //! the core and renders the panel state in an overlay on top of everything (detached, with a taskbar entry), the
 //! Grind Tracker in a window of its own beside it, the Personal Bests window over the game
-//! while the player has it open, and the Item Lookup alert at the top centre of the game
+//! while the player has it open, and the Owl Bubble at the top centre of the game
 //! window: all four only while the game or one of our windows is in front. All logic
 //! lives in the core.
 
@@ -20,12 +20,12 @@ mod grind_tracker;
 mod hotkeys;
 mod http;
 mod item_card;
-mod item_lookup;
 mod leaderboards;
 mod market_prices;
 mod meowdb;
 mod old_caches;
 pub mod osms;
+mod owl_bubble;
 mod panel_window;
 mod pictures;
 mod search;
@@ -152,8 +152,11 @@ pub(crate) enum Command {
     /// sharing the name it read.
     PickItem(String),
     /// The page in our window with this label (the overlay's, the Grind Tracker's, the
-    /// Personal Bests', the Item Lookup alert's or the Item Card's) is this tall (CSS px).
+    /// Personal Bests', the Owl Bubble's or the Item Card's) is this tall (CSS px).
     Height(String, f64),
+    /// The page in our window with this label that fits its width to its content (the Owl
+    /// Bubble's) is this wide (CSS px).
+    Width(String, f64),
     /// The overlay window moved here (its outer top-left corner). The player's move only
     /// during a drag; otherwise the shell's own, or the system's (a DPI or monitor
     /// change).
@@ -240,11 +243,18 @@ fn act(action: Action, commands: tauri::State<'_, Sender<Command>>) {
 }
 
 /// A page reports how tall its content is, so its window fits it: the overlay's expanded
-/// panel, the Grind Tracker, the Personal Bests, the Settings, the Item Lookup alert and the
+/// panel, the Grind Tracker, the Personal Bests, the Settings, the Owl Bubble and the
 /// Item Card.
 #[tauri::command]
 fn page_height(window: tauri::Window, height: f64, commands: tauri::State<'_, Sender<Command>>) {
     let _ = commands.send(Command::Height(window.label().to_string(), height));
+}
+
+/// A page reports how wide its content is, so its window fits it and takes no clicks beside
+/// it: the Owl Bubble's.
+#[tauri::command]
+fn page_width(window: tauri::Window, width: f64, commands: tauri::State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::Width(window.label().to_string(), width));
 }
 
 /// Where OSMS's file set and pictures, and MeowDB's search answers, are cached. WebView2
@@ -391,6 +401,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             act,
             page_height,
+            page_width,
             view::page_view,
             errors::window_error,
             setup::pick_game_window,
@@ -443,7 +454,7 @@ struct Panels {
     grind_tracker: PanelWindow,
     personal_bests: PanelWindow,
     settings: PanelWindow,
-    item_lookup: PanelWindow,
+    owl_bubble: PanelWindow,
     item_card: PanelWindow,
     deal_badges: PanelWindow,
 }
@@ -456,7 +467,7 @@ impl Panels {
             grind_tracker: PanelWindow::new(app, &grind_tracker::SPEC, commands.clone()),
             personal_bests: PanelWindow::new(app, &bests_window::SPEC, commands.clone()),
             settings: PanelWindow::new(app, &settings_window::SPEC, commands.clone()),
-            item_lookup: PanelWindow::new(app, &item_lookup::SPEC, commands.clone()),
+            owl_bubble: PanelWindow::new(app, &owl_bubble::SPEC, commands.clone()),
             item_card: PanelWindow::new(app, &item_card::SPEC, commands.clone()),
             deal_badges: PanelWindow::new(app, &deal_badges::SPEC, commands.clone()),
         }
@@ -467,7 +478,7 @@ impl Panels {
             &mut self.grind_tracker,
             &mut self.personal_bests,
             &mut self.settings,
-            &mut self.item_lookup,
+            &mut self.owl_bubble,
             &mut self.item_card,
             &mut self.deal_badges,
         ]
@@ -483,7 +494,7 @@ impl Panels {
         grind_tracker::sync(&mut self.grind_tracker, state);
         bests_window::sync(&mut self.personal_bests, state);
         settings_window::sync(&mut self.settings, state);
-        item_lookup::sync(&mut self.item_lookup, state);
+        owl_bubble::sync(&mut self.owl_bubble, state);
         item_card::sync(&mut self.item_card, state);
         deal_badges::sync(&mut self.deal_badges, state);
     }
@@ -854,6 +865,12 @@ fn core_loop(
                     }
                 }
             },
+            Ok(Command::Width(label, width)) => {
+                if let Some(panel) = panels.by_label(&label) {
+                    panel.set_width(width);
+                    panel.tell_size(&mut minerva);
+                }
+            }
             Ok(Command::LaunchedAgain) => {
                 minerva.act(Action::LaunchedAgain);
                 setup_windows.bring_to_front();
@@ -1299,6 +1316,8 @@ mod tests {
             (r#""updateWhenIQuit""#, Action::UpdateWhenIQuit),
             (r#""updateLater""#, Action::UpdateLater),
             (r#""finishSetup""#, Action::FinishSetup),
+            (r#""dismissUpdateLine""#, Action::DismissUpdateLine),
+            (r#""openUpdateLine""#, Action::OpenUpdateLine),
         ];
         for (sent, action) in actions {
             assert_eq!(serde_json::from_str::<Action>(sent).ok(), Some(action), "{sent}");

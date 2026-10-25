@@ -9,19 +9,17 @@
 //!
 //! Worked example, as in `grind_tracker_window.rs`: the game's client area at (812,110),
 //! 1920x1200 physical px, on one 3440x1440 monitor; an expanded panel of 340x72, so at
-//! (2376,510), and an Item Lookup alert of 420x40. The Item Tooltip's name line is read
-//! at (1000,600), clear of both.
+//! (2376,510), and an Owl Bubble of 420x56, which says what a lookup came to. The Item
+//! Tooltip's name line is read at (1000,600), clear of both.
 
 mod common;
 
-use common::{FakeSource, GAME, POINTER, NAME, found, requests};
+use common::{FakeSource, GAME, NAME, OWL, POINTER, found, owl_at, owl_clickable, owl_lasts_ms, owl_line, owl_mood, requests};
 use minerva_core::{
     Action, BESTS_VERSION, Minerva, Foreground, ItemChoice, ItemHit, ItemLookup, ItemTooltip,
-    ItemTooltipReading, MapBests, OurWindow, PanelControl, PanelSizes, PanelState, Request, SavedBests, ScreenRect, Settings, Size, SourceError, VisitBest, meowdb,
+    ItemTooltipReading, MapBests, OurWindow, OwlLine, OwlMood, PanelControl, PanelSizes, PanelState, Request, SavedBests, ScreenRect, Settings, Size, SourceError, VisitBest, meowdb,
 };
 
-/// The Item Lookup alert's size.
-const ALERT: Size = Size { width: 420, height: 40 };
 /// Where the expanded panel is.
 const PANEL: ScreenRect = ScreenRect { x: 2376, y: 510, width: 340, height: 72 };
 
@@ -35,7 +33,7 @@ fn started_with(source: FakeSource, settings: Settings) -> Minerva {
         collapsed: Size { width: 44, height: 44 },
     });
     minerva.set_grind_tracker_size(Size { width: 300, height: 150 });
-    minerva.set_item_lookup_size(ALERT);
+    minerva.set_owl_bubble_size(OWL);
     minerva.on_game_window(Some(common::window_on_wide_screen(GAME)));
     common::found_title(&mut minerva, common::title_on(GAME), 0);
     minerva
@@ -304,7 +302,8 @@ fn letters_the_recogniser_confuses_and_case_still_find_the_item() {
     let mut minerva = started_with(answering("Hero's Gladius"), common::set_up());
     let state = look_up(&mut minerva, "Heros GIadius", 1_000);
     assert!(matches!(line(&state), Some(ItemLookup::Choose { .. })), "punctuation and I for l: {state:?}");
-    assert!(state.item_lookup_clickable, "its items are picked with a click");
+    assert!(owl_clickable(&state), "its items are picked with a click");
+    assert_eq!(owl_lasts_ms(&state), Some(Some(30_000)), "long enough to read and pick");
 }
 
 #[test]
@@ -573,62 +572,62 @@ fn each_lookup_is_numbered_so_the_same_line_twice_shows_afresh() {
 }
 
 #[test]
-fn the_alert_shows_at_the_top_centre_of_the_game_window() {
+fn the_owl_says_it_at_the_top_centre_of_the_game_window() {
     let mut minerva = started();
 
     let state = look_up(&mut minerva, "Zqxv Nothing", 1_000);
 
     // Centred on the 1920 px client at x 812, a twentieth of its 1200 px down from y 110.
-    assert_eq!(state.item_lookup_placement, Some(ScreenRect { x: 1562, y: 170, width: 420, height: 40 }));
+    assert_eq!(owl_at(&state), Some(ScreenRect { x: 1562, y: 170, width: 420, height: 56 }));
 }
 
 #[test]
-fn there_is_no_alert_before_a_lookup_or_once_its_line_goes() {
+fn the_owl_says_nothing_before_a_lookup_nor_once_its_line_goes() {
     let mut minerva = started();
-    assert_eq!(minerva.panel_state().item_lookup_placement, None);
+    assert_eq!(owl_at(minerva.panel_state()), None);
 
     look_up(&mut minerva, "Zqxv Nothing", 1_000);
 
-    assert!(minerva.tick(6_999).item_lookup_placement.is_some());
-    assert_eq!(minerva.tick(7_000).item_lookup_placement, None);
+    assert!(owl_at(minerva.tick(6_999)).is_some());
+    assert_eq!(owl_at(minerva.tick(7_000)), None);
 }
 
 #[test]
-fn the_alert_hides_while_another_app_is_in_front_of_the_game_and_shows_again_until_it_goes() {
+fn the_owl_hides_while_another_app_is_in_front_of_the_game_and_shows_again_until_it_goes() {
     let mut minerva = started();
-    let shown = look_up(&mut minerva, "Zqxv Nothing", 1_000).item_lookup_placement;
+    let shown = owl_at(&look_up(&mut minerva, "Zqxv Nothing", 1_000));
     assert!(shown.is_some());
 
     // The browser, say, with the page an Item Lookup opened.
-    assert_eq!(minerva.on_foreground(Foreground::OtherApp).item_lookup_placement, None);
+    assert_eq!(owl_at(minerva.on_foreground(Foreground::OtherApp)), None);
 
-    assert_eq!(minerva.on_foreground(Foreground::Game).item_lookup_placement, shown);
+    assert_eq!(owl_at(minerva.on_foreground(Foreground::Game)), shown);
     minerva.on_foreground(Foreground::OtherApp);
-    assert_eq!(minerva.on_foreground(Foreground::Minerva).item_lookup_placement, shown);
-    assert_eq!(minerva.tick(7_000).item_lookup_placement, None, "it goes when it would have");
+    assert_eq!(owl_at(minerva.on_foreground(Foreground::Minerva)), shown);
+    assert_eq!(owl_at(minerva.tick(7_000)), None, "it goes when it would have");
 }
 
 #[test]
-fn the_alert_goes_below_a_minimap_title_found_where_it_would_be() {
+fn the_owl_goes_below_a_minimap_title_found_where_it_would_be() {
     let mut minerva = started_with(FakeSource::osms_offline(), common::set_up());
     // A minimap title found at the top centre of the client area.
     let region = ScreenRect { x: GAME.x + 800, y: GAME.y + 40, width: 320, height: 48 };
     common::found_title(&mut minerva, region, 0);
 
-    let alert = look_up(&mut minerva, "Zqxv Nothing", 1_000).item_lookup_placement.expect("an alert");
+    let owl = owl_at(&look_up(&mut minerva, "Zqxv Nothing", 1_000)).expect("the owl");
 
-    assert!(alert.y >= region.y + region.height as i32, "{alert:?} clear of {region:?}");
-    assert_eq!(alert.x, 1562, "still centred");
+    assert!(owl.y >= region.y + region.height as i32, "{owl:?} clear of {region:?}");
+    assert_eq!(owl.x, 1562, "still centred");
 }
 
 #[test]
-fn the_alert_is_never_wider_than_the_game_window() {
+fn the_owl_is_never_wider_than_the_game_window() {
     let mut minerva = started();
-    minerva.set_item_lookup_size(Size { width: 2400, height: 40 });
+    minerva.set_owl_bubble_size(Size { width: 2400, height: 56 });
 
-    let alert = look_up(&mut minerva, "Zqxv Nothing", 1_000).item_lookup_placement.expect("an alert");
+    let owl = owl_at(&look_up(&mut minerva, "Zqxv Nothing", 1_000)).expect("the owl");
 
-    assert_eq!((alert.x, alert.width), (GAME.x, GAME.width));
+    assert_eq!((owl.x, owl.width), (GAME.x, GAME.width));
 }
 
 #[test]
@@ -636,21 +635,45 @@ fn a_collapsed_panel_stays_collapsed_whatever_a_lookup_comes_to() {
     let mut minerva = started();
     minerva.act(Action::ToggleExpanded);
 
-    assert!(!look_up(&mut minerva, "Zqxv Nothing", 1_000).expanded, "a failure shows in the alert");
+    assert!(!look_up(&mut minerva, "Zqxv Nothing", 1_000).expanded, "the owl says a failure");
     assert!(!look_up(&mut minerva, "Hero's Gladius", 2_000).expanded, "and so does a list to pick from");
     assert!(!look_up(&mut minerva, "Orihalcon Ore", 3_000).expanded);
     assert!(!minerva.settings().expanded);
 }
 
 #[test]
-fn the_last_lookups_alert_over_the_name_says_so() {
+fn the_owl_over_the_name_says_so() {
     let mut minerva = started();
-    let alert = look_up(&mut minerva, "Zqxv Nothing", 1_000).item_lookup_placement.expect("an alert");
+    let owl = owl_at(&look_up(&mut minerva, "Zqxv Nothing", 1_000)).expect("the owl");
     minerva.on_hotkey("ctrl+shift+u");
 
-    let under_alert = ScreenRect { x: alert.x + 20, y: alert.y + 10, width: 170, height: 19 };
-    let tooltip = ItemTooltip::Found { area: under_alert, name: Some("Orihalcon Ore".into()) };
+    let under_owl = ScreenRect { x: owl.x + 20, y: owl.y + 10, width: 170, height: 19 };
+    let tooltip = ItemTooltip::Found { area: under_owl, name: Some("Orihalcon Ore".into()) };
     let state = minerva.on_item_tooltip_reading(Some(ItemTooltipReading { pointer: POINTER, tooltip, at_ms: 2_000 }));
 
-    assert_eq!(line(state), Some(ItemLookup::Covered { by: OurWindow::Alert }));
+    assert_eq!(line(state), Some(ItemLookup::Covered { by: OurWindow::OwlBubble }));
+}
+
+#[test]
+fn the_owl_says_the_lookups_line_waiting_on_meowdb_then_with_news_or_a_problem() {
+    let mut minerva = started_with(made_up_meowdb().items_taking(2), common::set_up());
+
+    let state = look_up(&mut minerva, "Orihalcon Ore", 1_000);
+    assert_eq!(owl_line(&state), state.item_lookup.clone().map(OwlLine::ItemLookup));
+    assert_eq!(owl_mood(&state), Some(OwlMood::Waiting));
+    assert_eq!(owl_lasts_ms(&state), Some(None), "it stays until MeowDB answers");
+    assert!(!owl_clickable(&state), "clicks go through to the game");
+
+    minerva.tick(1_100);
+    let state = minerva.tick(1_200).clone();
+    assert_eq!(line(&state), opened("Orihalcon Ore", "101"));
+    assert_eq!(owl_line(&state), state.item_lookup.clone().map(OwlLine::ItemLookup));
+    assert_eq!(owl_mood(&state), Some(OwlMood::News));
+    assert_eq!(owl_lasts_ms(&state), Some(Some(6_000)), "it fades out over its last second");
+
+    look_up(&mut minerva, "Zqxv Nothing", 5_000);
+    minerva.tick(5_100);
+    let state = minerva.tick(5_200).clone();
+    assert_eq!(line(&state), not_found("Zqxv Nothing"));
+    assert_eq!(owl_mood(&state), Some(OwlMood::Problem));
 }

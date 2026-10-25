@@ -256,8 +256,14 @@ The mark beside a Player Shop listing while the Deal Finder is on: how far below
 _Avoid_: tag, label, highlight
 
 **Item Lookup**:
-The hotkey (Ctrl+Shift+U by default) that reads the Item Tooltip nearest the pointer and opens the item's MeowDB page. An alert at the top centre of the game window says what came of it, and when several items share the name, lists them for the player to pick. The same alert says what kept an Item Card from showing.
+The hotkey (Ctrl+Shift+U by default) that reads the Item Tooltip nearest the pointer and opens the item's MeowDB page. The Owl Bubble says what came of it, and when several items share the name, lists them for the player to pick. The same line says what kept an Item Card from showing.
 _Avoid_: item search (Search is the search view's)
+
+### Over the game
+
+**Owl Bubble**:
+The owl at the top centre of the game window, saying one line at a time in a speech bubble, clear of what Minerva reads (ADR 0025). Item Lookup's line comes first, for a few seconds; otherwise the update's line, "A newer version of Minerva is available!", once a launch for a version a check Minerva made by itself found. That one stays until the player clicks it (opening Help & Setup's About & Credits), dismisses it with its ×, or chooses to update. Each line has a mood (news, a problem, or waiting) that picks the bubble's look and the owl's pose.
+_Avoid_: alert, toast, notification, popup
 
 ### Settings
 
@@ -277,7 +283,7 @@ What a reader that found nothing came closest with, written down with its readin
 ### Updating
 
 **Update Check**:
-Minerva asking its feed (`latest.json` on GitHub's newest release) which version is the latest: at launch, every 6 hours while "Check for updates" is on, and whenever the player presses Check for updates. It sends only the version. It comes to up to date, a newer version (shown in the tray and Help & Setup, never on the panels), or "Couldn't check", which is also what one unanswered for 2 minutes comes to (ADR 0019).
+Minerva asking its feed (`latest.json` on GitHub's newest release) which version is the latest: at launch, every 6 hours while "Check for updates" is on, and whenever the player presses Check for updates. It sends only the version. It comes to up to date, a newer version (shown in the tray and Help & Setup, never on the panels, and said by the Owl Bubble when Minerva's own check found it), or "Couldn't check", which is also what one unanswered for 2 minutes comes to (ADR 0019).
 _Avoid_: ping, poll, auto-update (nothing installs by itself)
 
 **Update when I quit**:

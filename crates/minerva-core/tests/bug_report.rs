@@ -314,6 +314,40 @@ fn update_checks_their_answers_the_build_and_the_setting_replay_and_read_in_the_
 }
 
 #[test]
+fn the_owls_update_line_dismissed_and_opened_replays_and_reads_in_the_timeline() {
+    // The launch check finds a newer version, which the owl says; the player dismisses it,
+    // then a later check finds a newer one still, and they click it.
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.minerva.set_owl_bubble_size(Size { width: 420, height: 56 });
+    shell.play(5 * S, CONSTRUCTION_SITE, grind);
+    let id = shell.minerva.panel_state().updates.check.expect("the launch check");
+    shell.minerva.on_update_answer(id, UpdateAnswer::Latest { version: "999.0.0".into() });
+    assert!(shell.minerva.panel_state().owl_bubble.is_some(), "the owl says it");
+    shell.minerva.act(Action::DismissUpdateLine);
+    shell.minerva.act(Action::CheckForUpdates);
+    shell.play(10 * S, CONSTRUCTION_SITE, grind);
+    let id = shell.minerva.panel_state().updates.check.expect("the check pressed for");
+    shell.minerva.on_update_answer(id, UpdateAnswer::Latest { version: "999.0.1".into() });
+    shell.minerva.act(Action::OpenUpdateLine);
+    shell.play(15 * S, CONSTRUCTION_SITE, grind);
+
+    let (_, recording) = shell.report();
+    let replay = bug_report::replay(&recording, Some(osms::game().files()));
+    assert_eq!(replay.divergence, None);
+    assert_eq!(replay.lines, recording.lines.len());
+    let timeline = recording.timeline(0);
+    for said in ["Owl Bubble size 420x56", "action \"dismissUpdateLine\"", "action \"openUpdateLine\""] {
+        assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
+    }
+}
+
+#[test]
+fn the_item_lookup_alerts_size_in_a_report_from_before_the_owl_reads_as_the_owl_bubbles() {
+    let event: bug_report::Event = serde_json::from_str(r#"{"itemLookupSize": {"size": {"width": 440, "height": 40}}}"#).unwrap();
+    assert_eq!(event, bug_report::Event::OwlBubbleSize { size: Size { width: 440, height: 40 } });
+}
+
+#[test]
 fn updating_its_choices_downloads_and_installs_replay_and_read_in_the_timeline() {
     // A Session running, so choosing to update asks first: Later, then Update when I quit,
     // whose download fails; then Update now, whose installer doesn't start; then Update when
