@@ -1,29 +1,22 @@
 mod common;
 
-use minerva_core::{PickupLine, PickupLogCapture, PickupLogReader, PickupLogSeen, ScreenPoint, ScreenRect, StatusBar, StatusBarReading};
+use minerva_core::{PickupLine, PickupLogCapture, PickupLogReader, PickupLogSeen, ScreenPoint, ScreenRect};
 
 fn clip(name: &str, size: f32) -> Vec<PickupLine> {
     let path = common::samples_in("pickup-log").join(name);
-    let mut frames: Vec<_> =
-        std::fs::read_dir(&path).unwrap().map(|e| e.unwrap().path()).filter(|p| p.extension().is_some_and(|e| e == "png")).collect();
-    frames.sort();
+    let frames = common::pngs_in(&path);
     let mut reader = PickupLogReader::bundled();
-    let mut minerva = common::tracking();
+    let items = common::items::item_world(vec![
+        common::items::etc(4_000_000, "Ligator Skin"),
+        common::items::use_item(2_060_000, "Arrows for Crossbow"),
+        common::items::use_item(2_061_000, "Arrows for Bows"),
+    ]);
+    let mut minerva = common::tracking_with(common::FakeSource::osms().with_items(items));
+    minerva.tick(0);
     for at_ms in [0, 100, 200] {
-        minerva.on_status_bar_reading(StatusBarReading {
-            at_ms,
-            near_miss: None,
-            bar: Some(StatusBar {
-                area: ScreenRect { x: 0, y: 1145, width: 331, height: 55 },
-                level: None,
-                job: Some("Magician".into()),
-                name: Some("Egbert".into()),
-                exp_figures: None,
-            }),
-        });
+        minerva.on_status_bar_reading(common::status_bar_reading(Some("Egbert"), at_ms));
     }
-    common::read(&mut minerva, 300, 160, 381);
-    common::read(&mut minerva, 1300, 266, 633);
+    common::start_session(&mut minerva, 300, 1300);
     let expected_mesos = mesos(&truth(name));
     let mut arrived = Vec::new();
     for path in frames {
@@ -41,6 +34,17 @@ fn clip(name: &str, size: f32) -> Vec<PickupLine> {
     if size == 1.0 {
         let counted = match name { "empty-to-pickups" => 26, "covered" => 0, _ => expected_mesos };
         assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, counted, "{name}");
+        let expected_items = match name {
+            "cut-short" => vec![
+                minerva_core::PickedItem { name: "Arrows for Crossbow".into(), count: 21 },
+                minerva_core::PickedItem { name: "Ligator Skin".into(), count: 1 },
+            ],
+            "colour-breaks-tie" => vec![minerva_core::PickedItem { name: "Ligator Skin".into(), count: 1 }],
+            _ => vec![],
+        };
+        let pickups = &minerva.panel_state().exp_tracking.pickups;
+        assert_eq!(pickups.items, expected_items, "{name}");
+        assert_eq!(pickups.items_total, match name { "cut-short" => 22, "colour-breaks-tie" => 1, _ => 0 }, "{name}");
     }
     arrived
 }
@@ -58,8 +62,7 @@ fn mesos(lines: &[PickupLine]) -> u64 {
 #[test]
 fn a_mob_covering_the_first_capture_after_reset_cannot_recount_pickups() {
     let mut minerva = common::tracking();
-    common::read(&mut minerva, 0, 160, 381);
-    common::read(&mut minerva, 1000, 266, 633);
+    common::start_session(&mut minerva, 0, 1000);
     let mut reader = PickupLogReader::bundled();
     let capture = |sample: u64, at_ms| {
         let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{sample:08}.png"));
@@ -198,9 +201,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
 #[test]
 fn first_sighting_is_a_baseline_even_after_an_apparently_empty_log() {
     let path = common::samples_in("pickup-log/empty-to-pickups");
-    let mut frames: Vec<_> =
-        std::fs::read_dir(&path).unwrap().map(|e| e.unwrap().path()).filter(|p| p.extension().is_some_and(|e| e == "png")).collect();
-    frames.sort();
+    let frames = common::pngs_in(&path);
     let mut reader = PickupLogReader::bundled();
     let mut arrived = Vec::new();
     for path in frames {
@@ -217,27 +218,11 @@ fn first_sighting_is_a_baseline_even_after_an_apparently_empty_log() {
 fn log_band_captures_count_mesos_on_the_panel_and_replay_without_pixels() {
     let mut minerva = common::tracking();
     for at_ms in [0, 100, 200] {
-        minerva.on_status_bar_reading(StatusBarReading {
-            at_ms,
-            near_miss: None,
-            bar: Some(StatusBar {
-                area: ScreenRect { x: 0, y: 1145, width: 331, height: 55 },
-                level: None,
-                job: Some("Magician".into()),
-                name: Some("Egbert".into()),
-                exp_figures: None,
-            }),
-        });
+        minerva.on_status_bar_reading(common::status_bar_reading(Some("Egbert"), at_ms));
     }
-    common::read(&mut minerva, 300, 160, 381);
-    common::read(&mut minerva, 1300, 266, 633);
+    common::start_session(&mut minerva, 300, 1300);
     let band = minerva.panel_state().pickup_log_capture.unwrap();
-    let mut files = std::fs::read_dir(common::samples_in("pickup-log/empty-to-pickups"))
-        .unwrap()
-        .map(|e| e.unwrap().path())
-        .filter(|p| p.extension().is_some_and(|e| e == "png"))
-        .collect::<Vec<_>>();
-    files.sort();
+    let files = common::pngs_in(common::samples_in("pickup-log/empty-to-pickups"));
     for path in files {
         let at_ms = path.file_stem().unwrap().to_str().unwrap().parse().unwrap();
         let img = image::open(path).unwrap().to_rgba8();

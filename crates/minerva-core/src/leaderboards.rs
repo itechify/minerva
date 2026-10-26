@@ -616,14 +616,14 @@ fn entries(history: &SavedBests, name: &str, now_unix_ms: u64) -> Vec<Leaderboar
                 job: job.clone(),
                 exp_per_hour: visit.exp_per_hour,
                 set_at,
-                party: visit.party,
+                party: visit.kind.is_party(),
             })
         };
         // One that can't be an entry leaves the next best of its kind in its band to stand in.
-        let mut of_map: Vec<(LevelBand, bool, LeaderboardEntry)> = Vec::new();
-        for party in [false, true] {
-            let can_be_entries = map.visits.iter().filter(|visit| visit.party == party && entry(visit).is_some());
-            of_map.extend(band_bests(can_be_entries).into_iter().filter_map(|(band, visit)| Some((band, party, entry(visit)?))));
+        let mut of_map: Vec<(LevelBand, crate::BestKind, LeaderboardEntry)> = Vec::new();
+        for kind in [crate::BestKind::Solo, crate::BestKind::Party] {
+            let can_be_entries = map.visits.iter().filter(|visit| visit.kind == kind && entry(visit).is_some());
+            of_map.extend(band_bests(can_be_entries).into_iter().filter_map(|(band, visit)| Some((band, kind, entry(visit)?))));
         }
         of_map.sort_by_key(|(band, party, _)| (*band, *party));
         entries.extend(of_map.into_iter().map(|(_, _, entry)| entry));

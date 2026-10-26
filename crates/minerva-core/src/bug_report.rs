@@ -2339,7 +2339,7 @@ fn visit_words(visit: &VisitBest) -> String {
     let set = visit.set_at_unix_ms.map_or("no date".to_string(), |at| format!("set at {at}"));
     let level = visit.level.map(|level| format!(", level {level}")).unwrap_or_default();
     let job = visit.job.as_ref().map(|job| format!(" {job:?}")).unwrap_or_default();
-    let kind = if visit.party { ", a Party Best" } else { "" };
+    let kind = if visit.kind.is_party() { ", a Party Best" } else { "" };
     format!("{} EXP/h{level}{job}{kind}, {set}", thousands(visit.exp_per_hour))
 }
 

@@ -156,7 +156,7 @@ fn a_visit_moved_to_the_party_bests_replays_and_reads_in_the_timeline() {
     shell.minerva.set_visit_party(None, SUNSET_SKY_ID, &moved, true);
     shell.play(2 * MIN, CONSTRUCTION_SITE, grind);
 
-    assert!(shell.minerva.bests().unassigned[0].visits[0].party);
+    assert!(shell.minerva.bests().unassigned[0].visits[0].kind.is_party());
     let (_, recording) = shell.report();
     assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
     let said = format!(
@@ -1287,14 +1287,7 @@ fn status_bar_capture(at_ms: u64) -> StatusBarCapture {
 }
 
 /// The Status Bar read as a level 13 Magician named `name` (`None`: unreadable).
-fn status_bar_reading(name: Option<&str>, at_ms: u64) -> StatusBarReading {
-    let area = ScreenRect { x: 334, y: 1145, width: 331, height: 55 };
-    StatusBarReading {
-        bar: Some(StatusBar { area, level: Some(13), job: Some("Magician".into()), name: name.map(String::from), exp_figures: None }),
-        at_ms,
-        near_miss: None,
-    }
-}
+use common::status_bar_reading;
 
 /// A run with Characters: Egbert's Status Bar read every second with the EXP bar, then the
 /// character select screen, then Bob's, three times to name him.

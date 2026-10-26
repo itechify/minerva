@@ -1,21 +1,15 @@
 mod common;
 
 use minerva_core::bug_report::{self, Event};
-use minerva_core::{Action, Foreground, Minerva, ScreenRect, StatusBar, StatusBarReading};
+use minerva_core::{Action, Foreground, Minerva, ScreenRect, StatusBarReading};
 use minerva_core::{PickupLine, PickupLogCapture, PickupLogReading, PickupLogSeen, ReportAbout, ScreenPoint};
 
 fn character(minerva: &mut Minerva, size: f32) {
-    minerva.on_status_bar_reading(StatusBarReading {
-        at_ms: 100,
-        bar: Some(StatusBar {
-            area: ScreenRect { x: 0, y: 1140, width: (300.0 * size) as u32, height: (55.0 * size) as u32 },
-            level: Some(30),
-            job: Some("Magician".into()),
-            name: Some("Egbert".into()),
-            exp_figures: None,
-        }),
-        near_miss: None,
-    });
+    let mut reading = common::status_bar_reading(Some("Egbert"), 100);
+    let bar = reading.bar.as_mut().unwrap();
+    bar.area = ScreenRect { x: 0, y: 1140, width: (300.0 * size) as u32, height: (55.0 * size) as u32 };
+    bar.level = Some(30);
+    minerva.on_status_bar_reading(reading);
 }
 
 #[test]
@@ -34,21 +28,33 @@ fn pickup_capture_needs_the_tracker_a_character_and_a_visible_overlay() {
 }
 
 #[test]
+fn the_core_starts_a_new_pickup_stream_only_at_capture_or_character_boundaries() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let first = minerva.panel_state().pickup_log_generation;
+    character(&mut minerva, 1.0);
+    minerva.tick(200);
+    assert_eq!(minerva.panel_state().pickup_log_generation, first);
+    minerva.on_status_bar_reading(common::status_bar_reading(Some("Bob"), 300));
+    let bob = minerva.panel_state().pickup_log_generation;
+    assert!(bob > first);
+    minerva.act(Action::SetGrindTracker { on: false });
+    minerva.act(Action::SetGrindTracker { on: true });
+    let resumed = minerva.panel_state().pickup_log_generation;
+    assert!(resumed > bob);
+    minerva.on_foreground(Foreground::OtherApp);
+    minerva.on_foreground(Foreground::Game);
+    assert!(minerva.panel_state().pickup_log_generation > resumed);
+}
+
+#[test]
 fn a_reading_and_a_stale_capture_are_recorded_and_replay_without_pixels() {
     let mut minerva = common::tracking();
     character(&mut minerva, 1.0);
-    common::read(&mut minerva, 110, 160, 381);
-    common::read(&mut minerva, 150, 266, 633);
+    common::start_session(&mut minerva, 110, 150);
     let region = minerva.panel_state().pickup_log_capture.unwrap();
-    let reading = PickupLogReading {
-        at_ms: 200,
-        seen: PickupLogSeen::Clear { area: region },
-        rows: vec![5],
-        shift: 1,
-        arrived: vec![PickupLine::Mesos { amount: 1_234 }],
-        chose: false,
-        overflowed: false,
-    };
+    let reading = PickupLogReading { rows: vec![5], shift: 1,
+        ..common::pickup_reading(200, PickupLogSeen::Clear { area: region }, vec![PickupLine::Mesos { amount: 1_234 }]) };
     minerva.on_pickup_log_reading(reading.clone());
     assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 1_234);
     minerva.on_foreground(Foreground::OtherApp);
@@ -94,7 +100,7 @@ fn reports_keep_only_ambiguous_missing_and_unreadable_log_crops() {
         let arrived = if at_ms == 600 { vec![PickupLine::Unreadable] } else { vec![] };
         minerva.on_pickup_log_read(
             capture,
-            PickupLogReading { at_ms, seen, rows: vec![], shift: 0, arrived, chose: at_ms == 300, overflowed: false },
+            PickupLogReading { chose: at_ms == 300, ..common::pickup_reading(at_ms, seen, arrived) },
         );
     }
     assert!(minerva.panel_state().pickup_log_capture.is_some());
@@ -113,7 +119,7 @@ fn a_window_before_the_log_is_found_does_not_make_an_empty_capture_interesting()
         let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y } };
         minerva.on_pickup_log_read(
             capture,
-            PickupLogReading { at_ms, seen, rows: vec![], shift: 0, arrived: vec![], chose: false, overflowed: false },
+            common::pickup_reading(at_ms, seen, vec![]),
         );
     }
     assert!(minerva.panel_state().pickup_log_capture.is_some());

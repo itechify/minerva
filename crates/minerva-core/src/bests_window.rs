@@ -276,14 +276,14 @@ fn rows<'a>(
                     set_at_unix_ms: visit.set_at_unix_ms,
                     level: visit.level,
                     job: visit.job.clone(),
-                    party: visit.party,
+                    party: visit.kind.is_party(),
                     ceiling_share_hundredths: ceiling.map(|c| share_hundredths(visit.exp_per_hour, c)),
                     this_visit: this_visit.contains(&(bests.id.as_str(), at)),
                 })
                 .collect();
             // A kind's best is the first Visit of that kind: the Visits are highest first.
-            let kind = |party: bool| {
-                let best = bests.visits.iter().find(|v| v.party == party)?;
+            let kind = |kind: crate::BestKind| {
+                let best = bests.visits.iter().find(|v| v.kind == kind)?;
                 Some(PersonalBestsKind {
                     exp_per_hour: best.exp_per_hour,
                     set_at_unix_ms: best.set_at_unix_ms,
@@ -302,8 +302,8 @@ fn rows<'a>(
                 best_of_all: false,
                 mob_levels: data.and_then(MapData::mob_levels),
                 exp_per_hour: best.exp_per_hour,
-                solo: kind(false),
-                party: kind(true),
+                solo: kind(crate::BestKind::Solo),
+                party: kind(crate::BestKind::Party),
                 solo_exp_ceiling: ceiling,
                 ceiling_share_hundredths: ceiling.map(|c| share_hundredths(best.exp_per_hour, c)),
                 set_at_unix_ms: best.set_at_unix_ms,

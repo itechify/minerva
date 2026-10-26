@@ -91,7 +91,7 @@ pub use panel::{
 };
 pub use pickup_items::PickedItem;
 pub use pickup_log::{PICKUP_LOG_CAPTURE_MS, PickupLine, PickupLogCapture, PickupLogReader, PickupLogReading, PickupLogSeen};
-pub use personal_best::{BESTS_VERSION, CharacterBests, MapBests, SavedBests, VisitBest};
+pub use personal_best::{BESTS_VERSION, BestKind, CharacterBests, MapBests, SavedBests, VisitBest};
 pub use osms_items::ScrollTier;
 pub use player_shop::{ListedPrice, PlayerShopReader, ShopCapture, ShopHover, ShopList, ShopNearMiss, ShopReading, ShopRow};
 pub use search::{
@@ -306,6 +306,8 @@ pub struct PanelState {
     /// Where on screen to capture for the Pickup Log (physical px), every
     /// [`PICKUP_LOG_CAPTURE_MS`] on a thread of its own (ADR 0026); `None` while it isn't read.
     pub pickup_log_capture: Option<ScreenRect>,
+    /// Reader stream identity. The capture thread resets its reader when this changes.
+    pub pickup_log_generation: u64,
     /// One of our windows has been over the Pickup Log for more than a few seconds, so it can't
     /// read the lines under it: the Grind Tracker says so, quietly. While it shows.
     pub pickup_log_covered: bool,
@@ -1437,7 +1439,7 @@ impl Minerva {
     pub fn set_visit_party(&mut self, character: Option<&str>, map: &str, visit: &VisitBest, party: bool) -> &PanelState {
         let event = Event::SetVisitParty { map: map.to_string(), visit: visit.clone(), party, character: character.map(String::from) };
         self.record(event);
-        self.session.set_visit_party(character, map, visit, party);
+        self.session.set_visit_party(character, map, visit, party.into());
         self.sync_panel()
     }
 
@@ -1747,6 +1749,13 @@ impl Minerva {
         self.take_pickup_log_reading(reading)
     }
 
+    /// End both the core and capture thread readers' current stream.
+    fn reset_pickup_log(&mut self) {
+        self.pickup_log_reader = None;
+        self.pickup_log_seen = false;
+        self.state.pickup_log_generation += 1;
+    }
+
     /// What a Pickup Log reading does, once the input is written down: the Session counts the
     /// mesos that arrived in a clean capture, and tells the player's own EXP lines from Party
     /// EXP (the EXP Split, and a party window from a solo one).
@@ -1850,8 +1859,7 @@ impl Minerva {
 
     fn take_status_bar_reading(&mut self, reading: StatusBarReading) -> &PanelState {
         if self.state.status_bar.as_ref().and_then(|bar|bar.name.as_ref()) != reading.bar.as_ref().and_then(|bar|bar.name.as_ref()) {
-            self.pickup_log_reader = None;
-            self.pickup_log_seen = false;
+            self.reset_pickup_log();
         }
         self.session.on_status_bar(reading.bar.as_ref(), reading.at_ms);
         if let (Some(bar), Some(game)) = (&reading.bar, &self.panel.game) {
@@ -2450,21 +2458,9 @@ impl Minerva {
         self.state.pickup_log_capture = self.panel.game.as_ref()
             .filter(|_| shows && self.settings.grind_tracker_on)
             .zip(self.state.status_bar.as_ref().filter(|bar| bar.name.is_some()))
-            .map(|(game, bar)| {
-                // The Status Bar's area is 55 rows at the samples' UI Size (ADR 0020).
-                // Leave room above the six rows and left of a cut-short Item's name.
-                let size = bar.area.height as f32 / 55.0;
-                let width = ((400.0 * size).ceil() as u32).min(game.client.width);
-                let height = ((480.0 * size).ceil() as u32).min(game.client.height);
-                ScreenRect {
-                    x: game.client.x + (game.client.width - width) as i32,
-                    y: game.client.y + (game.client.height - height) as i32,
-                    width, height,
-                }
-            });
+            .map(|(game, bar)| pickup_log::capture_band(game.client, bar.area));
         if previous_pickup_capture != self.state.pickup_log_capture {
-            self.pickup_log_reader = None;
-            self.pickup_log_seen = false;
+            self.reset_pickup_log();
         }
     }
 

@@ -711,7 +711,7 @@ impl ReaderThread {
 struct PickupLogTarget {
     region: ScreenRect,
     ours: Vec<ScreenRect>,
-    character: Option<String>,
+    generation: u64,
 }
 
 /// Capture and OCR have their own clock and thread, so a shop or minimap recognition
@@ -727,6 +727,7 @@ impl PickupLogThread {
         std::thread::Builder::new().name("pickup-log".into()).spawn(move || {
             let mut reader = PickupLogReader::bundled();
             let mut target: Option<PickupLogTarget> = None;
+            let mut generation = None;
             let mut next = Instant::now();
             loop {
                 let update = if target.is_some() {
@@ -736,8 +737,9 @@ impl PickupLogThread {
                 };
                 match update {
                     Ok(new) => {
-                        let stream = |t: &Option<PickupLogTarget>| t.as_ref().map(|t| (t.region, t.character.clone()));
-                        if stream(&new) != stream(&target) {
+                        if let Some(new) = &new
+                            && generation != Some(new.generation) {
+                            generation = Some(new.generation);
                             reader.reset();
                             next = Instant::now();
                         }
@@ -763,7 +765,7 @@ impl PickupLogThread {
     fn follow(&mut self, state: &PanelState) {
         let target = state.pickup_log_capture.map(|region| PickupLogTarget {
             region, ours: state.our_windows.clone(),
-            character: state.status_bar.as_ref().and_then(|bar| bar.name.clone()),
+            generation: state.pickup_log_generation,
         });
         if target != self.last {
             let _ = self.targets.send(target.clone());

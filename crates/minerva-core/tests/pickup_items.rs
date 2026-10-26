@@ -9,11 +9,10 @@
 mod common;
 
 use common::items::{ItemWorld, equip, etc, item_world, scroll, setup, use_item, weapon};
-use common::{FakeSource, S, read, tracking_with};
-use minerva_core::{Action, Minerva, PanelControl, PanelState, PickedItem, PickupLine, PickupLogReading, PickupLogSeen, ScreenRect};
+use common::{FakeSource, S, tracking_with};
+use minerva_core::{Action, Minerva, PanelControl, PickedItem, PickupLine, PickupLogSeen};
 
-/// Where the log was seen, in the bottom right of a 1920x1200 client area at the origin.
-const LOG: ScreenRect = ScreenRect { x: 1500, y: 800, width: 408, height: 160 };
+use common::{LOG, picked_up, read};
 
 /// Made-up item data: a few items of each tab.
 fn world() -> ItemWorld {
@@ -38,8 +37,7 @@ fn world() -> ItemWorld {
 fn started(world: ItemWorld) -> Minerva {
     let mut minerva = tracking_with(FakeSource::osms().with_items(world));
     minerva.tick(0);
-    read(&mut minerva, 0, 160, 381);
-    read(&mut minerva, 10 * S, 266, 633);
+    common::start_session(&mut minerva, 0, 10 * S);
     minerva
 }
 
@@ -51,13 +49,6 @@ fn item(name: &str, quantity: u32, tab: &str) -> PickupLine {
 /// An Item line whose name the game cut short: `name` is without the "...".
 fn cut(name: &str, quantity: u32, tab: &str) -> PickupLine {
     PickupLine::Item { name: name.into(), quantity, tab: tab.into(), cut_short: true }
-}
-
-/// A clean reading of `lines` arriving at `at_ms`.
-fn picked_up(minerva: &mut Minerva, at_ms: u64, lines: Vec<PickupLine>) -> PanelState {
-    let reading =
-        PickupLogReading { at_ms, seen: PickupLogSeen::Clear { area: LOG }, rows: vec![], shift: 0, arrived: lines, chose: false, overflowed: false };
-    minerva.on_pickup_log_reading(reading).clone()
 }
 
 fn tally(name: &str, count: u64) -> PickedItem {
@@ -177,8 +168,7 @@ fn two_lines_of_one_unmatched_name_in_one_reading_are_two_lines() {
 #[test]
 fn without_item_files_a_name_is_tallied_once_read_on_two_lines() {
     let mut minerva = tracking_with(FakeSource::osms_offline());
-    read(&mut minerva, 0, 160, 381);
-    read(&mut minerva, 10 * S, 266, 633);
+    common::start_session(&mut minerva, 0, 10 * S);
 
     picked_up(&mut minerva, 11 * S, vec![item("Red Potion", 1, "Use")]);
     let state = picked_up(&mut minerva, 12 * S, vec![item("Red Potion", 1, "Use")]);
@@ -195,15 +185,7 @@ fn only_the_lines_of_a_clean_capture_in_a_started_session_count() {
     picked_up(&mut minerva, 5 * S, vec![item("Red Potion", 9, "Use")]);
     read(&mut minerva, 10 * S, 266, 633);
 
-    let covered = PickupLogReading {
-        at_ms: 11 * S,
-        seen: PickupLogSeen::Covered { area: LOG },
-        rows: vec![],
-        shift: 0,
-        arrived: vec![item("Red Potion", 9, "Use")],
-        chose: false,
-        overflowed: false,
-    };
+    let covered = common::pickup_reading(11 * S, PickupLogSeen::Covered { area: LOG }, vec![item("Red Potion", 9, "Use")]);
     minerva.on_pickup_log_reading(covered);
     let state = picked_up(&mut minerva, 12 * S, vec![item("Red Potion", 1, "Use")]);
 

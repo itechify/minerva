@@ -70,7 +70,7 @@
 use crate::ExpBar;
 use crate::bug_report::{Level, Note};
 use crate::pickup_items::{ItemTally, Named, PickedItem};
-use crate::personal_best::{Bests, SavedBests, Stamp, VisitBest};
+use crate::personal_best::{BestKind, Bests, SavedBests, Stamp, VisitBest};
 use crate::pickup_log::{PickupLine, PickupLogReading};
 use crate::status_bar::StatusBar;
 use serde::{Deserialize, Serialize};
@@ -551,8 +551,8 @@ struct Against {
     map: Option<String>,
     /// The Character whose Personal Best it is: the Unassigned one for `None`.
     character: Option<String>,
-    /// The Rolling Rate's window has Party EXP in it: the Best row is the Party Best's.
-    party: bool,
+    /// The kind of the Rolling Rate's window: the Best row races that kind.
+    kind: BestKind,
 }
 
 /// The Best row: the map's Personal Best as it stands, in EXP/h, and whether this Visit set it.
@@ -1106,11 +1106,11 @@ impl Session {
     /// best from its history. What is shown is measured afresh against the next best, at once.
     pub fn remove_best(&mut self, map: &str) {
         let character = self.character_name().map(String::from);
-        let party = self.party_window();
-        if self.best_row(map, party).is_some_and(|row| row.this_visit) {
-            self.remove_this_visit(character.as_deref(), map, party);
+        let kind = self.best_kind();
+        if self.best_row(map, kind).is_some_and(|row| row.this_visit) {
+            self.remove_this_visit(character.as_deref(), map, kind);
         } else {
-            self.bests.remove(character.as_deref(), map, party);
+            self.bests.remove(character.as_deref(), map, kind);
         }
         self.shown = None;
     }
@@ -1119,8 +1119,8 @@ impl Session {
     /// (the Unassigned one for `None`), this Visit's included: if it was there, what is
     /// shown is measured afresh, at once, as the Best row may name another.
     pub fn remove_visit(&mut self, character: Option<&str>, map: &str, visit: &VisitBest) {
-        let removed = if self.bests.this_visits_best(character, map, visit.party) == Some(visit) {
-            self.remove_this_visit(character, map, visit.party)
+        let removed = if self.bests.this_visits_best(character, map, visit.kind) == Some(visit) {
+            self.remove_this_visit(character, map, visit.kind)
         } else {
             self.bests.remove_visit(character, map, visit)
         };
@@ -1132,14 +1132,14 @@ impl Session {
     /// Remove this Visit's best on `map`, if it is `character`'s: only the play from now on
     /// counts towards it again, so what set it (a misread, say) isn't counted again. So too
     /// for the Session a reset set aside, should the player undo it. Whether there was one.
-    /// Its Party Best if `party`, otherwise its Solo Best.
-    fn remove_this_visit(&mut self, character: Option<&str>, map: &str, party: bool) -> bool {
-        let removed = self.bests.remove_this_visit(character, map, party);
+    /// Only the best of `kind` is removed.
+    fn remove_this_visit(&mut self, character: Option<&str>, map: &str, kind: BestKind) -> bool {
+        let removed = self.bests.remove_this_visit(character, map, kind);
         if removed {
             let now = self.now;
             let undone = self.undo.as_mut().map(|undo| &mut undo.figures);
             for figures in self.figures.iter_mut().chain(undone) {
-                figures.best_from[usize::from(party)] = figures.active(now);
+                figures.best_from[kind.index()] = figures.active(now);
             }
         }
         removed
@@ -1155,10 +1155,10 @@ impl Session {
     }
 
     /// The player moved the Visit whose best was `visit` on `map`, of the Character named
-    /// `character` (the Unassigned one for `None`), to the Party Bests if `party`, otherwise to
-    /// the Solo Bests: if it was there, what is shown is measured afresh, at once.
-    pub fn set_visit_party(&mut self, character: Option<&str>, map: &str, visit: &VisitBest, party: bool) {
-        if self.bests.set_visit_party(character, map, visit, party) {
+    /// `character` (the Unassigned one for `None`), to the bests of `kind`: if it was there,
+    /// what is shown is measured afresh, at once.
+    pub fn set_visit_party(&mut self, character: Option<&str>, map: &str, visit: &VisitBest, kind: BestKind) {
+        if self.bests.set_visit_party(character, map, visit, kind) {
             self.shown = None;
         }
     }
@@ -1232,10 +1232,10 @@ impl Session {
     /// Whether the Rolling Rate's window, the last 5 minutes of active play, has Party EXP in
     /// it: any such window is party, and the Best row races the Party Best. With 5 minutes
     /// gone since the last Party EXP, it is solo again.
-    fn party_window(&self) -> bool {
+    fn best_kind(&self) -> BestKind {
         self.figures.as_ref().is_some_and(|figures| {
             figures.play.last_party_at.is_some_and(|at| at + ROLLING_MS >= figures.active(self.now))
-        })
+        }).into()
     }
 
     /// The EXP Split as it stands: `None` until Party EXP has come in this Session.
@@ -1296,8 +1296,8 @@ impl Session {
         // another ceiling or best (the map's page come, or another Candidate chosen).
         let unreadable = fresh.state == TrackingState::Unreadable;
         let character = self.character_name().map(String::from);
-        let party = self.party_window();
-        let against = Against { visit: self.visit.id, ceiling, map: map.map(String::from), character, party };
+        let kind = self.best_kind();
+        let against = Against { visit: self.visit.id, ceiling, map: map.map(String::from), character, kind };
         let holds = self.shown.as_ref().is_some_and(|shown| {
             shown.against == against
                 && (unreadable
@@ -1319,18 +1319,18 @@ impl Session {
                 if let Some(map) = map {
                     // The Rolling Rate shown over a full 5 minutes of active play here
                     // counts towards this Visit's best, unless nothing is known of the EXP.
-                    let here = self.figures.as_ref().map(|f| f.rolling_since(self.now, f.best_from[usize::from(party)]));
+                    let here = self.figures.as_ref().map(|f| f.rolling_since(self.now, f.best_from[kind.index()]));
                     let full = here.filter(|h| h.over_ms >= ROLLING_MS && h.exp > 0);
                     let counted = full.filter(|_| !unreadable).map(|here| here.per_hour(1, 1) as u64);
-                    self.bests.on_shown(map, counted, party, now_unix_ms, &self.stamp());
+                    self.bests.on_shown(map, counted, kind, now_unix_ms, &self.stamp());
                     // Over a full 5 minutes here, the Rolling Rate shown is the one counted,
                     // against the Character's best of the kind being played (the Unassigned
                     // one while none is named).
-                    let row = self.best_row(map, party);
+                    let row = self.best_row(map, kind);
                     let best = row.map(|row| row.exp_per_hour);
                     fresh.personal_best = best;
                     fresh.personal_best_this_visit = row.is_some_and(|row| row.this_visit);
-                    fresh.personal_best_party = party && row.is_some();
+                    fresh.personal_best_party = kind.is_party() && row.is_some();
                     // The star: Last 5 min is the best this Visit set on the row, as written.
                     fresh.new_best = fresh.personal_best_this_visit
                         && counted.zip(best).is_some_and(|(rate, best)| three_figures(rate) == three_figures(best));
@@ -1358,13 +1358,13 @@ impl Session {
     }
 
     /// `map`'s Best row for the Character the Session is for (the Unassigned one while none
-    /// is named), if the map has a best of the kind being played: the Party Best if `party`,
-    /// otherwise the Solo Best. This Visit's takes it from the history's only once it reads
+    /// is named), if the map has a best of `kind`. This Visit's takes it from the history's
+    /// only once it reads
     /// higher, as the Grind Tracker writes them.
-    fn best_row(&self, map: &str, party: bool) -> Option<BestRow> {
+    fn best_row(&self, map: &str, kind: BestKind) -> Option<BestRow> {
         let character = self.character_name();
-        let earlier = self.bests.history_best(character, map, party).map(|best| best.exp_per_hour);
-        let this_visit = self.bests.this_visits_best(character, map, party).map(|best| best.exp_per_hour);
+        let earlier = self.bests.history_best(character, map, kind).map(|best| best.exp_per_hour);
+        let this_visit = self.bests.this_visits_best(character, map, kind).map(|best| best.exp_per_hour);
         let row = |exp_per_hour, this_visit| BestRow { exp_per_hour, this_visit };
         match (earlier, this_visit) {
             (Some(earlier), Some(visits)) if three_figures(visits) > three_figures(earlier) => Some(row(visits, true)),

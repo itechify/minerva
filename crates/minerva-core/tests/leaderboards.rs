@@ -117,7 +117,7 @@ fn turning_a_character_on_uploads_their_best_in_each_level_band() {
 
 #[test]
 fn a_maps_solo_best_and_party_best_are_entries_of_their_own() {
-    let party = |exp, days_ago, level| VisitBest { party: true, ..visit(exp, days_ago, level) };
+    let party = |exp, days_ago, level| VisitBest { kind: minerva_core::BestKind::Party, ..visit(exp, days_ago, level) };
     let egbert = CharacterBests {
         name: "Egbert".to_string(),
         maps: vec![map(

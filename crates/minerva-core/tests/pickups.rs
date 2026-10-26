@@ -9,21 +9,11 @@ mod common;
 
 use common::{S, read, tracking};
 use minerva_core::{
-    Action, Minerva, PanelControl, PanelSizes, PanelState, PickupLine, PickupLogReading, PickupLogSeen, ScreenRect, Size,
+    Action, Minerva, PanelControl, PanelSizes, PanelState, PickupLine, PickupLogSeen, ScreenRect, Size,
     StatusBar, StatusBarReading, TrackingState,
 };
 
-/// Where the log was seen, in the bottom right of a 1920x1200 client area at the origin.
-const LOG: ScreenRect = ScreenRect { x: 1500, y: 800, width: 408, height: 160 };
-
-fn arrived(at_ms: u64, seen: PickupLogSeen, lines: Vec<PickupLine>) -> PickupLogReading {
-    PickupLogReading { at_ms, seen, rows: vec![], shift: 0, arrived: lines, chose: false, overflowed: false }
-}
-
-/// A clean reading of `lines` arriving at `at_ms`.
-fn picked_up(minerva: &mut Minerva, at_ms: u64, lines: Vec<PickupLine>) -> PanelState {
-    minerva.on_pickup_log_reading(arrived(at_ms, PickupLogSeen::Clear { area: LOG }, lines)).clone()
-}
+use common::{LOG, picked_up, pickup_reading as arrived};
 
 fn mesos(amount: u64) -> PickupLine {
     PickupLine::Mesos { amount }
@@ -32,8 +22,7 @@ fn mesos(amount: u64) -> PickupLine {
 /// A Session a minute in: started at 10 s, 69 EXP gained by 70 s.
 fn a_minute_in() -> Minerva {
     let mut minerva = tracking();
-    read(&mut minerva, 0, 160, 381);
-    read(&mut minerva, 10 * S, 266, 633);
+    common::start_session(&mut minerva, 0, 10 * S);
     read(&mut minerva, 70 * S, 335, 798);
     minerva
 }

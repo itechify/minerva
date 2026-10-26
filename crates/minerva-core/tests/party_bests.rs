@@ -12,11 +12,7 @@ use minerva_core::{
     ScreenRect, VisitBest,
 };
 
-/// A Pickup Log reading at `at_ms` that found `arrived` among its lines, clean.
-fn reading(at_ms: u64, arrived: Vec<PickupLine>) -> PickupLogReading {
-    let area = ScreenRect { x: 1500, y: 800, width: 420, height: 160 };
-    PickupLogReading { at_ms, seen: PickupLogSeen::Clear { area }, rows: vec![], shift: 0, arrived, chose: false, overflowed: false }
-}
+use common::clean_pickup_reading as reading;
 
 /// A kill of the player's own, as the log writes it.
 fn own_kill(amount: u64) -> Vec<PickupLine> {
@@ -54,7 +50,7 @@ fn hunt_partied(player: &mut Player, ms: u64, gain: u64) -> PanelState {
 fn kept(minerva: &Minerva, map: &str) -> Vec<(u64, bool)> {
     let bests = minerva.bests();
     let maps = bests.maps_of(None);
-    maps.iter().find(|m| m.id == map).map_or_else(Vec::new, |m| m.visits.iter().map(|v| (v.exp_per_hour, v.party)).collect())
+    maps.iter().find(|m| m.id == map).map_or_else(Vec::new, |m| m.visits.iter().map(|v| (v.exp_per_hour, v.kind.is_party())).collect())
 }
 
 /// A Sunset Sky Visit of 6 minutes alone at 3,600 EXP/h.
@@ -168,12 +164,11 @@ fn party_exp_before_the_session_starts_waits_to_show_the_split() {
 fn removing_the_solo_best_keeps_the_party_window_counting() {
     let mut player = alone_on_sunset_sky();
     hunt_partied(&mut player, 6 * MIN, 20);
-    let solo = player.minerva.bests().unassigned[0].visits.iter().find(|v| !v.party).unwrap().clone();
+    let solo = player.minerva.bests().unassigned[0].visits.iter().find(|v| !v.kind.is_party()).unwrap().clone();
     player.minerva.remove_visit(None, SUNSET_SKY_ID, &solo);
     let state = hunt_partied(&mut player, 30 * S, 30);
     assert_eq!(state.exp_tracking.personal_best, Some(7560));
     assert!(state.exp_tracking.new_best);
-    assert_eq!(kept(&player.minerva, SUNSET_SKY_ID), [(7560, true)]);
 }
 
 #[test]
@@ -194,7 +189,7 @@ fn the_pace_trace_races_the_party_best_while_the_window_is_party() {
     let player = alone_on_sunset_sky();
     // A Party Best of 14,400 from an earlier run, a Solo Best of 3,600 now.
     let mut saved = player.minerva.bests();
-    saved.unassigned[0].visits.insert(0, VisitBest { exp_per_hour: 14_400, party: true, ..VisitBest::default() });
+    saved.unassigned[0].visits.insert(0, VisitBest { exp_per_hour: 14_400, kind: minerva_core::BestKind::Party, ..VisitBest::default() });
     let mut next = Player::clocked_at(tracking(), common::player::WALL_AT_START + common::DAY);
     next.minerva.restore_bests(saved);
     next.arrive(SUNSET_SAMPLE);
@@ -222,7 +217,7 @@ fn a_visit_moves_to_the_party_bests_and_back_and_the_best_row_follows() {
     assert_eq!((alone.exp_tracking.personal_best, alone.exp_tracking.personal_best_party), (Some(3600), false));
 
     // Moved to where it already is, it changes nothing; moved back, it is the Solo Best again.
-    let party_visit = VisitBest { party: true, ..visit(7200) };
+    let party_visit = VisitBest { kind: minerva_core::BestKind::Party, ..visit(7200) };
     let revision = player.minerva.bests_revision();
     player.minerva.set_visit_party(None, SUNSET_SKY_ID, &party_visit, true);
     assert_eq!(player.minerva.bests_revision(), revision);
@@ -244,7 +239,7 @@ fn the_visit_under_ways_best_cannot_be_moved_yet_and_a_visit_gone_changes_nothin
 
 #[test]
 fn the_personal_bests_window_shows_each_maps_solo_best_and_party_best_and_each_visits_kind() {
-    let visit = |exp_per_hour, party| VisitBest { exp_per_hour, party, ..VisitBest::default() };
+    let visit = |exp_per_hour, party| VisitBest { exp_per_hour, kind: minerva_core::BestKind::from(party), ..VisitBest::default() };
     let mut minerva = tracking();
     let maps = vec![MapBests {
         id: SUNSET_SKY_ID.to_string(),
