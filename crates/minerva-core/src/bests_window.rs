@@ -103,8 +103,13 @@ pub struct PersonalBestsMap {
     /// The lowest and highest of its mobs' levels; `None` if it isn't in the map list, or
     /// has no mobs.
     pub mob_levels: Option<LevelRange>,
-    /// Its Personal Best: the Rolling Rate's EXP/h, as the Visit's best was set.
+    /// Its Personal Best: the Rolling Rate's EXP/h, as the Visit's best was set. The higher of
+    /// its Solo Best and its Party Best, as an upload's entry is.
     pub exp_per_hour: u64,
+    /// Its Solo Best and its Party Best, each if the map has one. The row's figures above are
+    /// of the higher.
+    pub solo: Option<PersonalBestsKind>,
+    pub party: Option<PersonalBestsKind>,
     /// The map's solo EXP/h ceiling (its Map Summary), what the share is of; `None` if it
     /// isn't in the map list, or has no Map Summary.
     pub solo_exp_ceiling: Option<u64>,
@@ -122,6 +127,18 @@ pub struct PersonalBestsMap {
     pub visits: Vec<PersonalBestsVisit>,
 }
 
+/// A map's Solo Best or its Party Best in the Personal Bests window.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonalBestsKind {
+    /// The best's EXP/h, and when it was set.
+    pub exp_per_hour: u64,
+    pub set_at_unix_ms: Option<u64>,
+    /// The best as a share of the map's solo EXP/h ceiling, in hundredths of a percent;
+    /// `None` with no ceiling.
+    pub ceiling_share_hundredths: Option<u64>,
+}
+
 /// One of a map's Visits in the Personal Bests window: what the player removes, or moves, it
 /// by.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -133,6 +150,9 @@ pub struct PersonalBestsVisit {
     pub set_at_unix_ms: Option<u64>,
     pub level: Option<u32>,
     pub job: Option<String>,
+    /// It is a Party Best: its 5 minutes had Party EXP in them, or the player moved it to the
+    /// Party Bests. Otherwise a Solo Best.
+    pub party: bool,
     /// The best as a share of the map's solo EXP/h ceiling, in hundredths of a percent, as
     /// the row's; `None` with no ceiling.
     pub ceiling_share_hundredths: Option<u64>,
@@ -186,14 +206,15 @@ impl BestsWindow {
 }
 
 /// The Personal Bests window's choices for the bests `saved`, with `current` the Character
-/// playing (`None`: none named) and `level` the level the Status Bar shows, and `this_visit` the Visit under way's best among them:
-/// whose it is, its map, and its place in the map's Visits. `map` gives a map's entry in the
+/// playing (`None`: none named) and `level` the level the Status Bar shows, and `this_visit` the
+/// Visit under way's bests (a Solo Best and a Party Best at most) among them: whose each is, its
+/// map, and its place in the map's Visits. `map` gives a map's entry in the
 /// map list and its data, if it is in the list; `here` is the map the player is certainly
 /// on, if any. `toggle` gives a Character's "Share to the Map Leaderboards".
 pub(crate) fn characters<'a>(
     saved: &SavedBests,
     (current, level): (Option<&str>, Option<u32>),
-    this_visit: Option<(Option<&str>, &str, usize)>,
+    this_visit: &[(Option<&str>, &str, usize)],
     map: impl Fn(&str) -> Option<(&'a MapEntry, &'a MapData)> + Copy,
     here: Option<&str>,
     toggle: impl Fn(&str) -> LeaderboardToggle,
@@ -208,7 +229,8 @@ pub(crate) fn characters<'a>(
     owners
         .into_iter()
         .map(|owner| {
-            let this_visit = this_visit.filter(|(whose, _, _)| *whose == owner).map(|(_, map, at)| (map, at));
+            let this_visit: Vec<(&str, usize)> =
+                this_visit.iter().filter(|(whose, _, _)| *whose == owner).map(|&(_, map, at)| (map, at)).collect();
             // The band of the Character playing, as the Status Bar shows it; another's, of their
             // best on the map.
             let playing = level.filter(|_| owner.is_none() || owner == current).map(LevelBand::of);
@@ -218,7 +240,7 @@ pub(crate) fn characters<'a>(
                 let band = playing.or_else(|| bests.visits.iter().find_map(|v| v.level).map(LevelBand::of));
                 Some(leaderboards::map_url(&bests.id, band, Some(name)))
             };
-            let mut maps = rows(saved.maps_of(owner), this_visit, map, here, link);
+            let mut maps = rows(saved.maps_of(owner), &this_visit, map, here, link);
             // The star on a Character's best of all maps, with another to compare it with.
             if owner.is_some() && maps.len() > 1 {
                 maps[0].best_of_all = true;
@@ -229,12 +251,12 @@ pub(crate) fn characters<'a>(
 }
 
 /// The Personal Bests window's rows for one Character's bests on `saved` maps, with
-/// `this_visit` the Visit under way's best among them: its map, and its place in the map's
-/// Visits. `map` gives a map's entry in the map list and its data, if it is in the list;
+/// `this_visit` the Visit under way's bests among them: their maps, and their places in the
+/// map's Visits. `map` gives a map's entry in the map list and its data, if it is in the list;
 /// `here` is the map the player is certainly on, if any.
 fn rows<'a>(
     saved: &[MapBests],
-    this_visit: Option<(&str, usize)>,
+    this_visit: &[(&str, usize)],
     map: impl Fn(&str) -> Option<(&'a MapEntry, &'a MapData)>,
     here: Option<&str>,
     link: impl Fn(&MapBests) -> Option<String>,
@@ -254,10 +276,20 @@ fn rows<'a>(
                     set_at_unix_ms: visit.set_at_unix_ms,
                     level: visit.level,
                     job: visit.job.clone(),
+                    party: visit.party,
                     ceiling_share_hundredths: ceiling.map(|c| share_hundredths(visit.exp_per_hour, c)),
-                    this_visit: this_visit == Some((bests.id.as_str(), at)),
+                    this_visit: this_visit.contains(&(bests.id.as_str(), at)),
                 })
                 .collect();
+            // A kind's best is the first Visit of that kind: the Visits are highest first.
+            let kind = |party: bool| {
+                let best = bests.visits.iter().find(|v| v.party == party)?;
+                Some(PersonalBestsKind {
+                    exp_per_hour: best.exp_per_hour,
+                    set_at_unix_ms: best.set_at_unix_ms,
+                    ceiling_share_hundredths: ceiling.map(|c| share_hundredths(best.exp_per_hour, c)),
+                })
+            };
             Some(PersonalBestsMap {
                 id: bests.id.clone(),
                 street_name: entry.map_or_else(String::new, |e| e.street_name.clone()),
@@ -270,6 +302,8 @@ fn rows<'a>(
                 best_of_all: false,
                 mob_levels: data.and_then(MapData::mob_levels),
                 exp_per_hour: best.exp_per_hour,
+                solo: kind(false),
+                party: kind(true),
                 solo_exp_ceiling: ceiling,
                 ceiling_share_hundredths: ceiling.map(|c| share_hundredths(best.exp_per_hour, c)),
                 set_at_unix_ms: best.set_at_unix_ms,

@@ -22,6 +22,7 @@ fn visit(exp: u64, days_ago: Option<u64>, level: u32) -> VisitBest {
         set_at_unix_ms: days_ago.map(|days| WALL - days * DAY),
         level: Some(level),
         job: Some("Magician".to_string()),
+        ..VisitBest::default()
     }
 }
 
@@ -107,6 +108,27 @@ fn turning_a_character_on_uploads_their_best_in_each_level_band() {
     let upload = LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: Some(egberts_entries()) };
     assert_eq!(state.leaderboard_uploads, [upload]);
     assert_eq!(toggle(&state, "Egbert"), LeaderboardToggle { on: true, status: LeaderboardStatus::Sending, ..off });
+}
+
+#[test]
+fn a_maps_entry_is_the_higher_of_the_solo_best_and_the_party_best() {
+    let party = |exp, days_ago, level| VisitBest { party: true, ..visit(exp, days_ago, level) };
+    let egbert = CharacterBests {
+        name: "Egbert".to_string(),
+        maps: vec![map(
+            SUNSET_SKY_ID,
+            // Level 23: a Party Best over the Solo Best; level 13: a Solo Best over a Party Best.
+            vec![party(9000, Some(3), 23), visit(8000, Some(2), 25), visit(5000, Some(9), 13), party(4000, Some(8), 13)],
+        )],
+    };
+    let mut minerva = tracking();
+    minerva.restore(Settings { map_leaderboards_met: Some(vec!["Egbert".to_string()]), ..minerva.settings() });
+    minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned: Vec::new(), characters: vec![egbert] });
+    minerva.on_wall_clock(WALL);
+    minerva.show_on_leaderboards("Egbert", true);
+    let state = minerva.tick(50).clone();
+    let entries = vec![entry(SUNSET_SKY_ID, 13, 5000, 9), entry(SUNSET_SKY_ID, 23, 9000, 3)];
+    assert_eq!(state.leaderboard_uploads, [LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: Some(entries) }]);
 }
 
 /// The entries of the uploads under way, by whose they are: `None` to delete them.

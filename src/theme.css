@@ -31,6 +31,11 @@
   --you: #ffd21f;
   --you-light: #fff6c2;
   --you-edge: #7a5a00;
+  /* The game's yellow for Party EXP in the Pickup Log, toned for the light body (the EXP Split's
+     party share, the party mark): a gold that holds 3:1 on the lavender. */
+  --party: #a97800;
+  /* The same gold darkened to hold 4.5:1 as small text. */
+  --party-ink: #7a5a00;
   --select: #d3def3;
   --select-edge: #98afda;
   --tag-bg: #dae3f3;

@@ -146,6 +146,27 @@ fn a_visit_removed_in_the_personal_bests_window_replays_and_reads_in_the_timelin
 }
 
 #[test]
+fn a_visit_moved_to_the_party_bests_replays_and_reads_in_the_timeline() {
+    let mut shell = Shell::new(FakeSource::osms());
+    let moved = VisitBest { exp_per_hour: 7200, set_at_unix_ms: Some(WALL_AT_START - HOUR), ..VisitBest::default() };
+    let maps = vec![MapBests { id: SUNSET_SKY_ID.into(), visits: vec![moved.clone()] }];
+    shell.minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned: maps, characters: Vec::new() });
+    shell.play(MIN, CONSTRUCTION_SITE, grind);
+
+    shell.minerva.set_visit_party(None, SUNSET_SKY_ID, &moved, true);
+    shell.play(2 * MIN, CONSTRUCTION_SITE, grind);
+
+    assert!(shell.minerva.bests().unassigned[0].visits[0].party);
+    let (_, recording) = shell.report();
+    assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
+    let said = format!(
+        "Unassigned Visit on {SUNSET_SKY_ID} moved to the Party Bests: 7,200 EXP/h, set at {}",
+        WALL_AT_START - HOUR
+    );
+    assert!(recording.timeline(0).iter().any(|line| line.ends_with(&said)), "{:#?}", recording.timeline(0));
+}
+
+#[test]
 fn this_visits_best_removed_from_the_best_row_replays_counting_only_the_play_since() {
     // 6 minutes on the Construction Site set this Visit's best, which the Best row shows.
     let mut shell = Shell::new(FakeSource::osms());
@@ -173,6 +194,7 @@ fn a_visit_moved_and_characters_removed_and_merged_replay_and_read_in_the_timeli
         set_at_unix_ms: None,
         level: Some(level),
         job: Some("Magician".to_string()),
+        ..VisitBest::default()
     };
     let on_the_site = |visit: VisitBest| vec![MapBests { id: CONSTRUCTION_SITE_ID.into(), visits: vec![visit] }];
     let characters = vec![
@@ -233,6 +255,7 @@ fn showing_a_character_on_the_map_leaderboards_and_each_answer_replay_and_read_i
         set_at_unix_ms: Some(WALL_AT_START - HOUR),
         level: Some(13),
         job: Some("Magician".to_string()),
+        ..VisitBest::default()
     };
     let maps = vec![MapBests { id: CONSTRUCTION_SITE_ID.into(), visits: vec![best] }];
     let characters = vec![CharacterBests { name: "Egbert".into(), maps }];
@@ -413,7 +436,7 @@ fn discord_link_request(shell: &Shell) -> u64 {
 fn linking_discord_its_answers_and_the_prompt_dismissed_replay_and_read_in_the_timeline() {
     // A best, so the Personal Bests window opens.
     let mut shell = Shell::new(FakeSource::osms());
-    let best = VisitBest { exp_per_hour: 5000, set_at_unix_ms: None, level: None, job: None };
+    let best = VisitBest { exp_per_hour: 5000, ..VisitBest::default() };
     let unassigned = vec![MapBests { id: CONSTRUCTION_SITE_ID.into(), visits: vec![best] }];
     shell.minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned, characters: Vec::new() });
     shell.minerva.press(PanelControl::TogglePersonalBests);

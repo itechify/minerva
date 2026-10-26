@@ -34,6 +34,9 @@ export type ExpTracking = {
   personalBest: number | null;
   /** The Best row's figure was set on this Visit: the row says "this visit". */
   personalBestThisVisit: boolean;
+  /** The Best row races the map's Party Best, because Party EXP is in the Rolling Rate's
+   *  window: the row carries a small party mark. Otherwise it races the Solo Best. */
+  personalBestParty: boolean;
   /** The star on the Last 5 min row: the core says when the Rolling Rate is the best this
    *  Visit set on the Best row, as both are written. */
   newBest: boolean;
@@ -48,6 +51,9 @@ export type ExpTracking = {
   noStatusBar: boolean;
   /** What the Pickup Log says the Session picked up. */
   pickups: Pickups;
+  /** The EXP Split: the shares of the Session's EXP that were the player's own and Party EXP,
+   *  in hundredths of a percent, 10,000 together; none until Party EXP has come in. */
+  expSplit: ExpSplit | null;
 };
 
 /** Mirror of `minerva_core::Pickups`: read from the Pickup Log, so possibly fewer than were
@@ -59,6 +65,9 @@ export type Pickups = {
    *  the Session has active time. */
   mesosPerHour: number | null;
 };
+
+/** Mirror of `minerva_core::ExpSplit`. */
+export type ExpSplit = { ownHundredths: number; partyHundredths: number };
 
 /** Mirror of `minerva_core::PacePoint`: active time before the last EXP change, and the
  *  EXP gained since the trace's first point. */
