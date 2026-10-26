@@ -126,7 +126,10 @@
   display: contents;
 }
 
+/* Every row starts in the first column: a row with fewer cells than the grid's columns
+   (the Best row's × fills only four) would otherwise pull the next row's label up beside it. */
 .rates .period {
+  grid-column: 1;
   padding-right: 8px;
   white-space: nowrap;
 }
@@ -199,16 +202,6 @@
   align-self: center;
   justify-self: start;
   margin: -1px 0;
-}
-
-/* The meso coin beside the Mesos label: the label's own height, so it sits in the row's
-   text; pixel art, so kept crisp when it's scaled. */
-.rates .period .meso-icon {
-  width: auto;
-  height: 1em;
-  margin-left: 4px;
-  vertical-align: -2px;
-  image-rendering: pixelated;
 }
 
 .rates .unit {
