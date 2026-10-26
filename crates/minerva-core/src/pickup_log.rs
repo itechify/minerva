@@ -192,6 +192,9 @@ impl PickupLogReader {
     /// touching the last known log skips the capture, preserving its last clean stack.
     pub fn read_avoiding(&mut self, capture: &PickupLogCapture, ours: &[ScreenRect]) -> PickupLogReading {
         let reading = self.read_located(capture, ours);
+        // A line that arrived and read as a known kind confirms the layout too: a fresh line is
+        // the easiest to read, where the rows already there, faded, often aren't.
+        self.confirmed |= self.layout.is_some() && reading.arrived.iter().any(|line| *line != PickupLine::Unreadable);
         // A layout none of whose rows has read as a known line kind may be a lookalike: it
         // is followed, so its first arrivals are counted once it is confirmed, but it reports
         // nothing until then, and a miss is dropped ([`Self::confirm`]).
