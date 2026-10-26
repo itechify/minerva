@@ -35,6 +35,7 @@ mod pace;
 mod panel;
 mod personal_best;
 mod pickup_cover;
+mod pickup_items;
 mod pickup_log;
 mod player_shop;
 mod pictures;
@@ -88,6 +89,7 @@ pub use panel::{
     PlacementMode, ScreenPoint,
     ScreenRect, Section, Size,
 };
+pub use pickup_items::PickedItem;
 pub use pickup_log::{PICKUP_LOG_CAPTURE_MS, PickupLine, PickupLogCapture, PickupLogReader, PickupLogReading, PickupLogSeen};
 pub use personal_best::{BESTS_VERSION, CharacterBests, MapBests, SavedBests, VisitBest};
 pub use osms_items::ScrollTier;
@@ -1714,7 +1716,18 @@ impl Minerva {
         self.pickup_cover.on_reading(&reading, &self.state.our_windows);
         if self.tracking_on() {
             let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });
-            self.session.on_pickups(if clear { &reading.arrived } else { &[] }, reading.at_ms);
+            let lines = if clear { &reading.arrived[..] } else { &[] };
+            let set = self.items.items().ok();
+            let items = lines
+                .iter()
+                .filter_map(|line| match line {
+                    PickupLine::Item { name, quantity, tab, cut_short } => {
+                        Some((pickup_items::name(set, name, *cut_short, tab), *quantity))
+                    }
+                    _ => None,
+                })
+                .collect();
+            self.session.on_pickups(lines, items, reading.at_ms);
         } else {
             self.session.tick(reading.at_ms);
         }
