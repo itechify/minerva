@@ -127,10 +127,17 @@ const JOB_ICONS: Partial<Record<JobClass, { src: string; size: number }>> = {
 };
 
 /** A job as the pages write it: its class's icon, then its name ("Cleric"), or its name alone
- *  for a job without one. The icon is decoration: the name says the job. */
-export function jobWithIcon(job: string, jobClass: JobClass | null, className = ""): HTMLSpanElement {
+ *  for a job without one; `inColumn`, where jobs stand one under another, a job without one
+ *  keeps the icon's room, so the names line up. The icon is decoration: the name says the
+ *  job. */
+export function jobWithIcon(job: string, jobClass: JobClass | null, className = "", inColumn = true): HTMLSpanElement {
   const line = make("span", className ? `lb-job-line ${className}` : "lb-job-line");
   const icon = jobClass === null ? undefined : JOB_ICONS[jobClass];
+  if (icon === undefined && inColumn) {
+    const slot = make("span", "lb-job-slot");
+    slot.setAttribute("aria-hidden", "true");
+    line.append(slot);
+  }
   if (icon !== undefined) {
     const img = make("img", "lb-job-icon");
     img.src = icon.src;

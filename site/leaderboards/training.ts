@@ -205,7 +205,7 @@ function drawRow(row: TrainingRow): HTMLTableRowElement {
   if (row.best === null) cell("lb-train-best lb-train-none");
   else {
     const who = make("span", "lb-train-who");
-    who.append(characterLink(row.best.name, row.best.nameHref), " · ", jobWithIcon(row.best.who, row.best.jobClass), " · ", make("span", "lb-train-date", row.best.date));
+    who.append(characterLink(row.best.name, row.best.nameHref), " · ", jobWithIcon(row.best.who, row.best.jobClass, "", false), " · ", make("span", "lb-train-date", row.best.date));
     cell("lb-train-best", make("span", "lb-train-exp", row.best.expPerHour), who);
   }
   if (row.entries === null) cell("lb-train-entries lb-train-none");

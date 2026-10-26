@@ -144,7 +144,7 @@ async function load() {
   const page = characterPage(answer, names, new Date());
   document.title = `${page.name} · Minerva`;
   byId("name").textContent = page.name;
-  byId("who").replaceChildren(jobWithIcon(page.who, page.whoClass));
+  byId("who").replaceChildren(jobWithIcon(page.who, page.whoClass, "", false));
   drawStats(page.stats);
   said.hidden = true;
   byId("loaded").textContent = `${page.name}: ${page.stats.map((s) => `${s.value} ${s.label}`).join(", ")}.`;

@@ -1962,7 +1962,8 @@ button.icon-button:active {
     align-items: flex-start;
     padding-top: 3px;
   }
-  .lb-latest .lb-entry-job .lb-job-icon {
+  .lb-latest .lb-entry-job .lb-job-icon,
+  .lb-latest .lb-entry-job .lb-job-slot {
     flex: none;
     margin-block: -4px 0;
   }
@@ -3129,10 +3130,12 @@ button.button {
     padding: 8px 12px;
     border-top: 1px solid var(--rule);
   }
-  /* A map's card: its name and street beside the #1, over its mobs and its entries. */
+  /* A map's card: its name and street beside the #1, over its mobs and its entries. The #1
+     takes at most half the card, its line of who and when wrapping, so the map's name keeps
+     room for its words. */
   .lb-train-table tr {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) fit-content(50%);
     grid-template-areas:
       "map best"
       "mobs entries";
@@ -3539,6 +3542,28 @@ button.button {
   stroke-width: 1.1;
   stroke-linejoin: round;
 }
+/* A job the site has no icon for (a Pirate's, or one the game doesn't name) keeps the icon's
+   room where jobs stand in a column (a band's table, a Character's, Latest), so its words line
+   up with the rest. */
+.lb-job-slot {
+  display: inline-block;
+  width: 26px;
+  margin-right: 6px;
+}
+/* In a table's job cell, a job too long for its column wraps past its icon, under its first
+   word, the icon (26px and 6px, or its room) hanging before it. */
+.lb-table td.lb-job .lb-job-line,
+.ch-table td.ch-job .lb-job-line {
+  display: inline-block;
+  padding-left: 32px;
+  text-indent: -32px;
+}
+/* On a phone, Latest's name and job are one line, not columns: no room to keep. */
+@media (max-width: 640px) {
+  .lb-latest .lb-job-slot {
+    display: none;
+  }
+}
 /* A job beside its class's icon, the game's own, drawn pixel for pixel at its 26px (27px for
    the warrior's and the thief's), set on the text's middle and taking 20px of the line, so a
    table's row is no taller for it and a card's line or Latest's grows by a pixel or two rather
@@ -3621,11 +3646,11 @@ button.button {
   .ch-table tr {
     position: relative;
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(min-content, max-content) max-content minmax(0, 1fr) auto;
     grid-template-areas:
-      "map map map exp"
-      "rank job level date"
-      "mobs mobs mobs mobs";
+      "map map map map exp"
+      "rank job level . date"
+      "mobs mobs mobs mobs mobs";
     column-gap: 10px;
     padding: 8px 12px;
   }
