@@ -38,6 +38,7 @@ chrome --headless=new --hide-scrollbars --allow-file-access-from-files --window-
 
 When a change alters something a shot shows, the PR that makes it lists the shot here, with what changed. At release, the smoke test retakes every shot listed (`docs/releasing.md`) and empties the list.
 
+- `grind-tracker.png`: with Party EXP in the Session, a thin two-colour bar (the EXP Split) sits under the Session rate, and the Best row carries a small party mark while it races the Party Best. Retake it from a party run, with both showing.
 - `item-lookup.png`: Item Lookup's alert is now the owl saying it in a speech bubble (ADR 0025). Retaken, the table's row and the home page's alt text say the owl in place of the alert.
 
 A release may go out without retaking them. Then the page shows `wip.png` in place of each shot too far out of date to show, and the shot stays listed. None does now. Retaking one means pointing its `<img>` back at its own file (a scene from the game, as the Item Card's, on its own stage again: `shot stage scene`, where the sign stood on the panel's), and writing its alt text afresh, from what it shows and the entries below.
