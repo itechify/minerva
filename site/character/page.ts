@@ -126,7 +126,13 @@ async function load() {
   if (name === null) return say(noCharacter(null).text, true);
   const answer = await readCharacter(name);
   if (answer === "none") {
-    // The name as asked: the page can't know it as last uploaded.
+    // The name as asked: the page can't know it as last uploaded. A page for a name with no
+    // entries is the site's 404 in all but status, so search engines keep it out, as they do
+    // the 404 itself.
+    const robots = make("meta");
+    robots.name = "robots";
+    robots.content = "noindex";
+    document.head.append(robots);
     document.title = `${name} · Minerva`;
     byId("name").textContent = name;
     return say(noCharacter(name).text, true);
