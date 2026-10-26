@@ -1433,19 +1433,6 @@ impl Minerva {
         self.sync_panel()
     }
 
-    /// The player moved a Visit on `map` of the Character named `character` (`None`: an
-    /// Unassigned one), named by its best as the window lists it, to the Party Bests (`party`)
-    /// or back to the Solo Bests, after confirming: it joins that kind's Visits on the map, as
-    /// any Visit does, and the Best row races the kind being played from its next refresh. The
-    /// Visit under way's best, a Visit no longer there, or one already of that kind, changes
-    /// nothing.
-    pub fn set_visit_party(&mut self, character: Option<&str>, map: &str, visit: &VisitBest, party: bool) -> &PanelState {
-        let event = Event::SetVisitParty { map: map.to_string(), visit: visit.clone(), party, character: character.map(String::from) };
-        self.record(event);
-        self.session.set_visit_party(character, map, visit, party.into());
-        self.sync_panel()
-    }
-
     /// The player gave the Character named `to` every Unassigned Visit in the Personal Bests
     /// window, after confirming: each joins their Visits on its map, as any Visit does, as if
     /// moved one by one.

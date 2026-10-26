@@ -66,9 +66,9 @@ pub struct LeaderboardEntry {
     /// When the Visit set it, in ms since the Unix epoch.
     pub set_at: u64,
     /// It is the map's Party Best, not its Solo Best (ADR 0026): the site ranks the two apart
-    /// and marks a party entry. Left out of the body for a Solo Best, which is all the site
-    /// knew before.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// and marks a party entry. Always in the body: an entry that says nothing of it is a
+    /// Party Best to the site, as a best of no known kind is everywhere.
+    #[serde(default)]
     pub party: bool,
 }
 

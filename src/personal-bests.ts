@@ -14,8 +14,7 @@ type BestsVisit = {
   /** The level and job that set it, as the Status Bar showed them; `null`: not read. */
   level: number | null;
   job: string | null;
-  /** A Party Best: its 5 minutes had Party EXP in them, or the player moved it to the Party
-   *  Bests. Otherwise a Solo Best. */
+  /** A Party Best: its 5 minutes had Party EXP in them. Otherwise a Solo Best. */
   party: boolean;
   ceilingShareHundredths: number | null;
   /** The Visit under way's best: not in the Visit History until the Visit ends, so it can
@@ -382,7 +381,7 @@ function row(m: BestsMap, marks: MapMarks) {
 
 /** Under a row's figure, which of its two bests it is, and the other: a map with both says
  *  "Solo" and "Party" each with its figure, one with a Party Best alone says "Party", and one
- *  with a Solo Best alone (as every map was) says nothing. */
+ *  with a Solo Best alone says nothing. */
 function kinds(m: BestsMap) {
   const el = span("kinds", "");
   if (m.party === null) return el;
@@ -431,7 +430,7 @@ function visitRow(m: BestsMap, v: BestsVisit, key: string, place: number, last: 
   first.append(span("sr-only", `${mapName(m)}, visit ${place} of ${m.visits.length}`));
   const level = setBy(v);
   if (level) first.append(span("visit-level", level));
-  // Which kind of best it is, said only of a Party Best: a Solo Best is what every best was.
+  // Which kind of best it is, said only of a Party Best.
   if (v.party) first.append(span("visit-party", "Party Best"));
   tr.append(first, cell(null, "blank"));
 
@@ -455,7 +454,7 @@ function visitRow(m: BestsMap, v: BestsVisit, key: string, place: number, last: 
   // Visit under way's can't be moved until it ends: its tag stands in Move's place.
   if (armed !== `remove:${key}`) {
     if (v.thisVisit) controls.append(span("this-visit", "This visit"));
-    else controls.append(moveButton(key));
+    else if (moveTargets().length > 0) controls.append(moveButton(key));
   }
   controls.append(removeButton(key));
   tr.append(controls);
@@ -520,7 +519,7 @@ function removeButton(key: string) {
 
 /** A Visit's Move, which lists the Characters to move it to under its line. */
 function moveButton(key: string) {
-  const button = textButton(`move:${key}`, false, "Move", "Move", "Move this visit to the Party Bests or Solo Bests, or to another of your characters");
+  const button = textButton(`move:${key}`, false, "Move", "Move", "Move this visit to another of your characters");
   button.classList.add("move");
   button.setAttribute("aria-expanded", String(picking("move", key)));
   return button;
@@ -532,13 +531,8 @@ function picking(what: "move" | "merge" | "assign", key: string) {
   return armed === `${what}:${key}` || !!armed?.startsWith(`${what}:${key}>`);
 }
 
-/** The target of a Move that is the other kind of best, not a Character: no name has a #. */
-const PARTY = "#party";
-const SOLO = "#solo";
-
-/** Under a Visit whose Move is open: a button for the other kind of best (a Solo Best to the
- *  Party Bests, a Party Best back to the Solo Bests) and for each other Character to move it
- *  to, each asking again once clicked. */
+/** Under a Visit whose Move is open: a button for each other Character to move it to, each
+ *  asking again once clicked. */
 function moveRow(key: string) {
   const tr = document.createElement("tr");
   tr.className = "visit move-row";
@@ -547,11 +541,6 @@ function moveRow(key: string) {
   const to = document.createElement("div");
   to.className = "move-to";
   to.append(span("move-label", "Move this visit to"));
-  const visit = listed.get(key)?.visit;
-  if (visit) {
-    const [target, words] = visit.party ? [SOLO, "Solo Bests"] : [PARTY, "Party Bests"];
-    to.append(textButton(`move:${key}>${target}`, true, words, `Move to ${words}?`, `Move this visit to your ${words}`));
-  }
   for (const name of moveTargets()) {
     const arm = `move:${key}>${name}`;
     to.append(textButton(arm, true, name, `Move to ${name}?`, `Move this visit to ${name}'s bests`));
@@ -1030,10 +1019,7 @@ function act(arm: string) {
     }
   } else if (what === "move") {
     const visit = listed.get(key);
-    if (visit && c && (target === PARTY || target === SOLO)) {
-      const args = { character: c.name, map: visit.map, visit: visitArgs(visit.visit), party: target === PARTY };
-      invoke("personal_bests_set_visit_party", args);
-    } else if (visit && c && target) {
+    if (visit && c && target) {
       invoke("personal_bests_move_visit", { from: c.name, map: visit.map, visit: visitArgs(visit.visit), to: target });
     }
   } else if (what === "assign" && target) {

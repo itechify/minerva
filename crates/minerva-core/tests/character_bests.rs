@@ -35,20 +35,15 @@ fn bests_saved_before_characters_read_in_as_unassigned_with_nothing_lost() {
         "version": 3,
         "unassigned": [
             { "id": SUNSET_SKY_ID, "visits": [
-                { "expPerHour": 7200, "setAtUnixMs": WALL_AT_START },
-                { "expPerHour": 3600, "setAtUnixMs": null }
+                { "expPerHour": 7200, "setAtUnixMs": WALL_AT_START, "party": true },
+                { "expPerHour": 3600, "setAtUnixMs": null, "party": true }
             ]},
-            { "id": CONSTRUCTION_SITE_ID, "visits": [{ "expPerHour": 5000, "setAtUnixMs": null }] }
+            { "id": CONSTRUCTION_SITE_ID, "visits": [{ "expPerHour": 5000, "setAtUnixMs": null, "party": true }] }
         ],
         "characters": []
     });
+    // Version 1 had no kinds: each Visit is a Party Best, as a best of no known kind is.
     assert_eq!(handed_out(&minerva), expected);
-
-    // With no Character read, the Grind Tracker races them.
-    let mut player = Player::new(minerva);
-    assert_eq!(best_row(&player.arrive(SUNSET_SAMPLE)), Some(7200));
-    player.hunt(MIN, 10);
-    assert_eq!(best_row(&player.arrive(CONSTRUCTION_SAMPLE)), Some(5000));
 }
 
 /// What the bests `minerva` hands out keep for `character` (`None`: Unassigned) on `map`:
@@ -215,7 +210,7 @@ fn at_level(exp_per_hour: u64, level: u32) -> serde_json::Value {
 
 /// Bests saved at an earlier launch: each Character's Visits on each map.
 fn saved(characters: serde_json::Value) -> SavedBests {
-    serde_json::from_value(serde_json::json!({ "version": 2, "unassigned": [], "characters": characters })).unwrap()
+    serde_json::from_value(serde_json::json!({ "version": 3, "unassigned": [], "characters": characters })).unwrap()
 }
 
 /// The Personal Bests window's choices, as (name, current, how many maps).

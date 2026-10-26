@@ -281,16 +281,6 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         from: Option<String>,
     },
-    /// The player moved the Visit whose best was `visit` on `map`, the Character's named
-    /// `character` (the Unassigned one for `None`), to the Party Bests (`party`) or to the Solo
-    /// Bests.
-    SetVisitParty {
-        map: String,
-        visit: VisitBest,
-        party: bool,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        character: Option<String>,
-    },
     /// The player gave the Character named `to` every Unassigned Visit.
     AssignUnassigned { to: String },
     /// The player removed the Character named `name`, with their bests.
@@ -1760,9 +1750,6 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::MoveVisit { map, visit, to, from } => {
                 minerva.move_visit(from.as_deref(), &map, &visit, &to);
             }
-            Event::SetVisitParty { map, visit, party, character } => {
-                minerva.set_visit_party(character.as_deref(), &map, &visit, party);
-            }
             Event::AssignUnassigned { to } => {
                 minerva.assign_unassigned(&to);
             }
@@ -1889,7 +1876,6 @@ impl Recording {
                     | Event::ImportMarketPrices { .. }
                     | Event::RemoveVisit { .. }
                     | Event::MoveVisit { .. }
-                    | Event::SetVisitParty { .. }
                     | Event::AssignUnassigned { .. }
                     | Event::RemoveCharacter { .. }
                     | Event::MergeCharacters { .. }
@@ -2213,11 +2199,6 @@ impl Event {
             Event::MoveVisit { map, visit, to, from } => {
                 let whose = from.as_ref().map_or("Unassigned".to_string(), |name| format!("{name:?}'s"));
                 format!("{whose} Visit on {map} moved to {to:?}: {}", visit_words(visit))
-            }
-            Event::SetVisitParty { map, visit, party, character } => {
-                let whose = character.as_ref().map_or("Unassigned".to_string(), |name| format!("{name:?}'s"));
-                let to = if *party { "the Party Bests" } else { "the Solo Bests" };
-                format!("{whose} Visit on {map} moved to {to}: {}", visit_words(visit))
             }
             Event::AssignUnassigned { to } => format!("Every Unassigned Visit given to {to:?}"),
             Event::RemoveCharacter { name } => format!("Character {name:?} removed, with their bests"),

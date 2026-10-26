@@ -58,7 +58,7 @@ function entriesOf(body: unknown, now: number): Upload[] | string {
   const entries: Upload[] = [];
   const places = new Set<string>();
   for (const e of given) {
-    const { map, level, job, expPerHour, setAt, party = false } = (e ?? {}) as Record<string, unknown>;
+    const { map, level, job, expPerHour, setAt, party = true } = (e ?? {}) as Record<string, unknown>;
     if (typeof map !== "string" || !isMap(map)) return "an entry's map isn't a 9-digit ID";
     if (!isWhole(level, 1, 200)) return "an entry's level isn't 1 to 200";
     if (typeof job !== "string" || job.length < 1 || job.length > 32) return "an entry's job isn't 1 to 32 characters";

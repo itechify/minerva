@@ -21,18 +21,24 @@ export interface Entry {
   job: string;
   expPerHour: number;
   setAt: number;
-  /** A Party Best's; left out, a Solo Best's. */
+  /** A Party Best's if true, a Solo Best's if false; left out, a Party Best's: an entry with no
+   *  known kind is one. */
   party?: boolean;
 }
 
-/** An entry on `map` at `level`, with `expPerHour`, set at `setAt`. */
+/** A Solo Best's entry on `map` at `level`, with `expPerHour`, set at `setAt`. */
 export function entry(map: string, level: number, expPerHour: number, setAt = 1_760_000_000_000): Entry {
+  return { ...unkindedEntry(map, level, expPerHour, setAt), party: false };
+}
+
+/** An entry as a Minerva from before party entries uploaded it: no `party` in it. */
+export function unkindedEntry(map: string, level: number, expPerHour: number, setAt = 1_760_000_000_000): Entry {
   return { map, level, job: "Magician", expPerHour, setAt };
 }
 
 /** A Party Best's entry on `map` at `level`, with `expPerHour`, set at `setAt`. */
 export function partyEntry(map: string, level: number, expPerHour: number, setAt = 1_760_000_000_000): Entry {
-  return { ...entry(map, level, expPerHour, setAt), party: true };
+  return { ...unkindedEntry(map, level, expPerHour, setAt), party: true };
 }
 
 export function call(path: string, init: RequestInit = {}): Promise<Response> {

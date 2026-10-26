@@ -15,9 +15,10 @@
 //! - A map has two Personal Bests, a Solo Best and a Party Best (GLOSSARY). A Visit's best is
 //!   of the kind of the window it was measured over: a Party Best if the 5 minutes had Party
 //!   EXP in them, otherwise a Solo Best (the Session decides). A Visit has one of each at most
-//!   on a map. Bests saved before party play was told apart (versions 1 and 2) are Solo Bests.
-//!   The player can move a Visit to the other kind, after confirming. Both kinds go up as entries
-//!   of their own in each Level Band.
+//!   on a map. A best of no known kind is a Party Best: the bests saved before party play was
+//!   told apart (versions 1 and 2) are, so a player's earlier bests race as Party Bests until
+//!   they set a Solo Best. A Visit's kind is never changed by the player. Both kinds go up as
+//!   entries of their own in each Level Band.
 //! - A map's Personal Best, for a Character (or Unassigned), is the best of its Visits'.
 //!   Each keeps a history of its best Visits on each map, the ones that have ended. The
 //!   Grind Tracker's Best row shows the current Character's (or the Unassigned one's while no
@@ -53,7 +54,7 @@ use serde::{Deserialize, Serialize};
 
 /// The shape [`SavedBests`] has now. Bumped whenever it changes. Version 1 had no
 /// Characters: its bests read in as Unassigned. Version 2 had no Party Bests: its bests read in
-/// as Solo Bests.
+/// as Party Bests (a best of no known kind is one).
 pub const BESTS_VERSION: u32 = 3;
 
 /// How many Visits' bests each Character's history of a map keeps: the best of them, besides
@@ -178,8 +179,9 @@ pub struct VisitBest {
     /// The Character's job then, as the game writes it ("Magician"); `None` if it wasn't read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub job: Option<String>,
-    /// Party if its window had Party EXP (or the player moved it); otherwise Solo,
-    /// as every best saved before party play was told apart is.
+    /// Party if its window had Party EXP, otherwise Solo. The file leaves `party` out of a
+    /// Solo Best of version 3 or later; a file older than that has none, and every best in it
+    /// is a Party Best (see [`Bests::restore`]).
     #[serde(rename = "party", default, skip_serializing_if = "BestKind::is_solo")]
     pub kind: BestKind,
 }
@@ -366,23 +368,6 @@ impl Bests {
         moved
     }
 
-    /// Move the Visit whose best was `visit` on `map`, of the Character named `character`
-    /// (the Unassigned one for `None`), to the bests of `kind`, where it joins their Visits
-    /// as any Visit does; whether there was one to move.
-    pub fn set_visit_party(&mut self, character: Option<&str>, map: &str, visit: &VisitBest, kind: BestKind) -> bool {
-        if visit.kind == kind {
-            return false;
-        }
-        let mut moved = false;
-        self.changing(|bests| {
-            moved = take(&mut bests.history, character, map, visit);
-            if moved {
-                join(&mut bests.history, character, map.to_string(), VisitBest { kind, ..visit.clone() });
-            }
-        });
-        moved
-    }
-
     /// Move every Unassigned Visit to the history of the Character named `to`, where each
     /// joins their Visits on its map as any Visit does; whether there was one.
     pub fn assign_unassigned(&mut self, to: &str) -> bool {
@@ -484,6 +469,11 @@ impl Bests {
     pub fn restore(&mut self, mut saved: SavedBests) {
         if !saved.in_a_known_shape() {
             return;
+        }
+        // Before version 3 no best had a kind: each is a Party Best, as a best of no known kind is.
+        if saved.version < 3 {
+            let maps = saved.unassigned.iter_mut().chain(saved.characters.iter_mut().flat_map(|c| c.maps.iter_mut()));
+            maps.flat_map(|map| map.visits.iter_mut()).for_each(|visit| visit.kind = BestKind::Party);
         }
         saved.version = BESTS_VERSION;
         drop_empty(&mut saved.unassigned);

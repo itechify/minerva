@@ -150,8 +150,7 @@ pub struct PersonalBestsVisit {
     pub set_at_unix_ms: Option<u64>,
     pub level: Option<u32>,
     pub job: Option<String>,
-    /// It is a Party Best: its 5 minutes had Party EXP in them, or the player moved it to the
-    /// Party Bests. Otherwise a Solo Best.
+    /// It is a Party Best: its 5 minutes had Party EXP in them. Otherwise a Solo Best.
     pub party: bool,
     /// The best as a share of the map's solo EXP/h ceiling, in hundredths of a percent, as
     /// the row's; `None` with no ceiling.

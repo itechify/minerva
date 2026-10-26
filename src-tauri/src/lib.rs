@@ -117,7 +117,6 @@ pub(crate) enum Command {
     /// The player moved the Visit whose best was `visit` on `map`, the Character's named `from`
     /// (`None`: an Unassigned one), to the Character named `to`, in the Personal Bests window.
     MoveVisit { from: Option<String>, map: String, visit: VisitBest, to: String },
-    SetVisitParty { character: Option<String>, map: String, visit: VisitBest, party: bool },
     /// The player gave the Character with this name every Unassigned Visit, in the Personal
     /// Bests window.
     AssignUnassigned(String),
@@ -420,7 +419,6 @@ pub fn run() {
             bests_window::personal_bests_open_map,
             bests_window::personal_bests_remove_visit,
             bests_window::personal_bests_move_visit,
-            bests_window::personal_bests_set_visit_party,
             bests_window::personal_bests_assign_unassigned,
             bests_window::personal_bests_send_again,
             bests_window::personal_bests_remove_character,
@@ -852,9 +850,6 @@ fn core_loop(
             }
             Ok(Command::RemoveVisit { character, map, visit }) => {
                 minerva.remove_visit(character.as_deref(), &map, &visit);
-            }
-            Ok(Command::SetVisitParty { character, map, visit, party }) => {
-                minerva.set_visit_party(character.as_deref(), &map, &visit, party);
             }
             Ok(Command::MoveVisit { from, map, visit, to }) => {
                 minerva.move_visit(from.as_deref(), &map, &visit, &to);

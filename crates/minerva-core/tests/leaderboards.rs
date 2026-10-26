@@ -570,10 +570,10 @@ fn an_upload_is_the_apis_put_of_the_whole_set_or_its_delete() {
     assert_eq!(put.path(), "api/characters/Egbert/entries");
     let body: serde_json::Value = serde_json::from_str(&put.body().unwrap()).unwrap();
     let expected = serde_json::json!({ "entries": [
-        { "map": SUNSET_SKY_ID, "level": 23, "job": "Magician", "expPerHour": 9000, "setAt": WALL - 3 * DAY }
+        { "map": SUNSET_SKY_ID, "level": 23, "job": "Magician", "expPerHour": 9000, "setAt": WALL - 3 * DAY, "party": false }
     ]});
     assert_eq!(body, expected);
-    // A party entry says so; a solo one says nothing (a site before this reads it as solo).
+    // Every entry says which kind it is: a site reads an entry that says nothing as a Party Best.
     let party = LeaderboardUpload { entries: Some(vec![party_entry(SUNSET_SKY_ID, 23, 9000, 3)]), ..put.clone() };
     let body: serde_json::Value = serde_json::from_str(&party.body().unwrap()).unwrap();
     let expected = serde_json::json!({ "entries": [

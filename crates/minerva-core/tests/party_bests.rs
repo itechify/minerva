@@ -95,7 +95,22 @@ fn a_session_solo_then_partied_then_solo_has_each_window_set_the_best_of_its_kin
 }
 
 #[test]
-fn bests_saved_before_party_play_was_told_apart_are_solo_bests() {
+fn bests_saved_at_version_3_keep_their_kinds() {
+    let version_3 = format!(
+        r#"{{"version": 3, "unassigned": [
+            {{"id": "{SUNSET_SKY_ID}", "visits": [
+                {{"expPerHour": 9000, "setAtUnixMs": null, "party": true}},
+                {{"expPerHour": 7200, "setAtUnixMs": null}}
+            ]}}
+        ], "characters": []}}"#
+    );
+    let mut minerva = tracking();
+    minerva.restore_bests(serde_json::from_str(&version_3).unwrap());
+    assert_eq!(kept(&minerva, SUNSET_SKY_ID), [(9000, true), (7200, false)]);
+}
+
+#[test]
+fn bests_saved_before_party_play_was_told_apart_are_party_bests() {
     let version_2 = format!(
         r#"{{"version": 2, "unassigned": [
             {{"id": "{SUNSET_SKY_ID}", "visits": [{{"expPerHour": 7200, "setAtUnixMs": null}}]}}
@@ -104,18 +119,19 @@ fn bests_saved_before_party_play_was_told_apart_are_solo_bests() {
     let saved: SavedBests = serde_json::from_str(&version_2).unwrap();
     let mut minerva = tracking();
     minerva.restore_bests(saved);
-    assert_eq!(kept(&minerva, SUNSET_SKY_ID), [(7200, false)]);
-    // The shell saves them in this version's shape, and nothing says "party" of a Solo Best.
+    assert_eq!(kept(&minerva, SUNSET_SKY_ID), [(7200, true)]);
+    // The shell saves them in this version's shape, now marked as Party Bests.
     let handed = serde_json::to_value(minerva.bests()).unwrap();
     assert_eq!(handed["version"], 3);
-    assert!(handed["unassigned"][0]["visits"][0].get("party").is_none());
+    assert_eq!(handed["unassigned"][0]["visits"][0]["party"], true);
 
-    // The Grind Tracker races it alone, and a party window doesn't race it.
+    // A solo window has no best to race on the map: the 7,200 is a Party Best.
     let mut player = Player::clocked(minerva);
     let alone = player.arrive(SUNSET_SAMPLE);
-    assert_eq!((alone.exp_tracking.personal_best, alone.exp_tracking.personal_best_party), (Some(7200), false));
+    assert_eq!((alone.exp_tracking.personal_best, alone.exp_tracking.personal_best_party), (None, false));
+    // A party window races it.
     let partied = hunt_partied(&mut player, 30 * S, 10);
-    assert_eq!((partied.exp_tracking.personal_best, partied.exp_tracking.personal_best_party), (None, false));
+    assert_eq!((partied.exp_tracking.personal_best, partied.exp_tracking.personal_best_party), (Some(7200), true));
 }
 
 #[test]
@@ -199,42 +215,6 @@ fn the_pace_trace_races_the_party_best_while_the_window_is_party() {
     assert!(pace.best.is_some());
     assert!(state.exp_tracking.personal_best_party);
     assert_eq!(state.exp_tracking.personal_best, Some(14_400));
-}
-
-#[test]
-fn a_visit_moves_to_the_party_bests_and_back_and_the_best_row_follows() {
-    let visit = |exp_per_hour| VisitBest { exp_per_hour, ..VisitBest::default() };
-    let mut minerva = tracking();
-    let maps = vec![MapBests { id: SUNSET_SKY_ID.to_string(), visits: vec![visit(7200), visit(3600)] }];
-    minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned: maps, characters: Vec::new() });
-    let mut player = Player::clocked(minerva);
-    assert_eq!(player.arrive(SUNSET_SAMPLE).exp_tracking.personal_best, Some(7200));
-
-    // Moved to the Party Bests, the 7,200 is no longer the Solo Best the player races alone.
-    player.minerva.set_visit_party(None, SUNSET_SKY_ID, &visit(7200), true);
-    assert_eq!(kept(&player.minerva, SUNSET_SKY_ID), [(7200, true), (3600, false)]);
-    let alone = player.minerva.panel_state().clone();
-    assert_eq!((alone.exp_tracking.personal_best, alone.exp_tracking.personal_best_party), (Some(3600), false));
-
-    // Moved to where it already is, it changes nothing; moved back, it is the Solo Best again.
-    let party_visit = VisitBest { kind: minerva_core::BestKind::Party, ..visit(7200) };
-    let revision = player.minerva.bests_revision();
-    player.minerva.set_visit_party(None, SUNSET_SKY_ID, &party_visit, true);
-    assert_eq!(player.minerva.bests_revision(), revision);
-    player.minerva.set_visit_party(None, SUNSET_SKY_ID, &party_visit, false);
-    assert_eq!(kept(&player.minerva, SUNSET_SKY_ID), [(7200, false), (3600, false)]);
-    assert_eq!(player.minerva.panel_state().exp_tracking.personal_best, Some(7200));
-}
-
-#[test]
-fn the_visit_under_ways_best_cannot_be_moved_yet_and_a_visit_gone_changes_nothing() {
-    let mut player = alone_on_sunset_sky();
-    let revision = player.minerva.bests_revision();
-    let under_way = VisitBest { exp_per_hour: 3600, set_at_unix_ms: player.wall_clock(), ..VisitBest::default() };
-    player.minerva.set_visit_party(None, SUNSET_SKY_ID, &under_way, true);
-    player.minerva.set_visit_party(None, SUNSET_SKY_ID, &VisitBest { exp_per_hour: 99, ..VisitBest::default() }, true);
-    assert_eq!(kept(&player.minerva, SUNSET_SKY_ID), [(3600, false)]);
-    assert_eq!(player.minerva.bests_revision(), revision);
 }
 
 #[test]

@@ -1,9 +1,10 @@
 // A Character's Solo Best and Party Best on a map in a Level Band are entries of their own
 // (ADR 0015, amended): a Map Leaderboard ranks each Character once by their higher entry and
 // marks the party ones, and can be filtered to the solo or the party entries alone. An entry
-// with no kind, as every upload before this, is solo. (D1 starts empty for each test file.)
+// with no kind, as every upload from a Minerva before this, is a Party Best, as a best of no
+// known kind is everywhere. (D1 starts empty for each test file.)
 import { describe, expect, it } from "vitest";
-import { admin, band, call, entry, key, names, partyEntry, report, upload } from "./api";
+import { admin, band, call, entry, key, names, partyEntry, report, unkindedEntry, upload } from "./api";
 
 // Maps of their own, so no other test's entries are in their bands.
 const MIXED = "100000100";
@@ -71,11 +72,12 @@ describe("solo and party entries", () => {
     expect((await band(MIXED, 20, "bea", "party")).character).toBeNull();
   });
 
-  it("reads an upload with no kind as solo", async () => {
-    await upload("Emil", key("emil"), [entry(TWINS, 44, 10_000)]);
+  it("reads an upload with no kind as a Party Best", async () => {
+    await upload("Emil", key("emil"), [unkindedEntry(TWINS, 44, 10_000)]);
 
-    expect(await names(TWINS, 40, "solo")).toEqual(["Emil"]);
-    expect(await names(TWINS, 40, "party")).toEqual([]);
+    expect(await names(TWINS, 40, "party")).toEqual(["Emil"]);
+    expect(await names(TWINS, 40, "solo")).toEqual([]);
+    expect((await band(TWINS, 40, "emil")).character).toMatchObject({ party: true });
   });
 
   it("replaces both kinds at each upload", async () => {

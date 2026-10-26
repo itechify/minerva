@@ -1154,15 +1154,6 @@ impl Session {
         }
     }
 
-    /// The player moved the Visit whose best was `visit` on `map`, of the Character named
-    /// `character` (the Unassigned one for `None`), to the bests of `kind`: if it was there,
-    /// what is shown is measured afresh, at once.
-    pub fn set_visit_party(&mut self, character: Option<&str>, map: &str, visit: &VisitBest, kind: BestKind) {
-        if self.bests.set_visit_party(character, map, visit, kind) {
-            self.shown = None;
-        }
-    }
-
     /// The player gave the Character named `to` every Unassigned Visit: if there was one,
     /// what is shown is measured afresh, at once.
     pub fn assign_unassigned(&mut self, to: &str) {

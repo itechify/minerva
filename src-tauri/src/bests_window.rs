@@ -84,20 +84,6 @@ pub fn personal_bests_move_visit(
     let _ = commands.send(Command::MoveVisit { from, map, visit, to });
 }
 
-/// The player confirmed moving a Visit on the map (its ID) of the Character named `character`
-/// (`None`: an Unassigned one), by its best as the window lists it, to the Party Bests (`party`)
-/// or the Solo Bests.
-#[tauri::command]
-pub fn personal_bests_set_visit_party(
-    character: Option<String>,
-    map: String,
-    visit: VisitBest,
-    party: bool,
-    commands: State<'_, Sender<Command>>,
-) {
-    let _ = commands.send(Command::SetVisitParty { character, map, visit, party });
-}
-
 /// The player confirmed giving the Character named `to` every Unassigned Visit.
 #[tauri::command]
 pub fn personal_bests_assign_unassigned(to: String, commands: State<'_, Sender<Command>>) {
