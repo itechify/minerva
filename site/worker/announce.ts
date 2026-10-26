@@ -24,6 +24,8 @@ export interface Top {
   nameKey: string;
   name: string;
   expPerHour: number;
+  /** It is the Character's Party Best, not its Solo Best. */
+  party: boolean;
 }
 
 /** A top spot an upload took from another Character. */
@@ -33,6 +35,8 @@ export interface Taken {
   /** The Character that holds it now. */
   name: string;
   expPerHour: number;
+  /** It took the spot with its Party Best, not its Solo Best. */
+  party: boolean;
   /** The Character it was taken from, and what it held. */
   from: string;
   fromExpPerHour: number;
@@ -53,6 +57,7 @@ export function takenTops(before: Top[], after: Top[], nameKey: string): Taken[]
       band: now.band,
       name: now.name,
       expPerHour: now.expPerHour,
+      party: now.party,
       from: was.name,
       fromExpPerHour: was.expPerHour,
     });
@@ -90,7 +95,7 @@ function embedFor(taken: Taken, picture: string | null): Embed {
     url: linkTo(taken),
     description:
       `**${taken.name}** took #1, levels ${first}–${last}, ` +
-      `with ${rate(taken.expPerHour)} EXP/h, past ${taken.from}'s ${rate(taken.fromExpPerHour)}.`,
+      `with ${rate(taken.expPerHour)} EXP/h${taken.party ? " in a party" : ""}, past ${taken.from}'s ${rate(taken.fromExpPerHour)}.`,
   };
   if (picture !== null) embed.thumbnail = { url: picture };
   return embed;

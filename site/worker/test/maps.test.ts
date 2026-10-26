@@ -32,9 +32,9 @@ describe("maps", () => {
     expect(await response.json()).toEqual({
       map: QUIET,
       bands: [
-        { band: 1, levels: [1, 9], entries: 1 },
-        { band: 10, levels: [10, 19], entries: 1 },
-        { band: 30, levels: [30, 39], entries: 1 },
+        { band: 1, levels: [1, 9], entries: 1, solo: 1, party: 0 },
+        { band: 10, levels: [10, 19], entries: 1, solo: 1, party: 0 },
+        { band: 30, levels: [30, 39], entries: 1, solo: 1, party: 0 },
       ],
     });
   });

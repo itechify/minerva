@@ -52,7 +52,7 @@ describe("where to train", () => {
           mobs: [22, 27],
           mark: MADE_UP_TOWN,
           entries: 2,
-          best: { name: "Bea", job: "Magician", level: 25, expPerHour: 250_000, setAt: 1_760_000_000_001 },
+          best: { name: "Bea", job: "Magician", level: 25, expPerHour: 250_000, setAt: 1_760_000_000_001, party: false },
         },
         { map: STRADDLING, mobs: [25, 34], mark: null, entries: 0, best: null },
       ],
@@ -68,7 +68,7 @@ describe("where to train", () => {
         mobs: null,
         mark: null,
         entries: 1,
-        best: { name: "Ada", job: "Magician", level: 45, expPerHour: 10_000, setAt: 1_760_000_000_000 },
+        best: { name: "Ada", job: "Magician", level: 45, expPerHour: 10_000, setAt: 1_760_000_000_000, party: false },
       },
     ]);
   });

@@ -1,9 +1,10 @@
 // The Map Leaderboards: each Character's entries, mirrored whole from the app, and each
 // map's Level Bands ranked from them.
-import { isMap, isName } from "../entries";
+import { type Kind, isMap, isName } from "../entries";
 import { bandFrom, bandOf, levelsOf } from "../level-bands";
 import { type Taken, type Top, takenTops, tell } from "./announce";
 import { type Answer, badRequest, body } from "./http";
+import { boardOf } from "./kinds";
 import { accountOfKey, touchKey } from "./accounts";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
@@ -33,6 +34,8 @@ interface Upload {
   job: string;
   expPerHour: number;
   setAt: number;
+  /** A Party Best's entry, not a Solo Best's. */
+  party: boolean;
 }
 
 /** The most entries one upload may hold: far more than a Character has (a map's Visit
@@ -55,17 +58,19 @@ function entriesOf(body: unknown, now: number): Upload[] | string {
   const entries: Upload[] = [];
   const places = new Set<string>();
   for (const e of given) {
-    const { map, level, job, expPerHour, setAt } = (e ?? {}) as Record<string, unknown>;
+    const { map, level, job, expPerHour, setAt, party = false } = (e ?? {}) as Record<string, unknown>;
     if (typeof map !== "string" || !isMap(map)) return "an entry's map isn't a 9-digit ID";
     if (!isWhole(level, 1, 200)) return "an entry's level isn't 1 to 200";
     if (typeof job !== "string" || job.length < 1 || job.length > 32) return "an entry's job isn't 1 to 32 characters";
     if (!isWhole(expPerHour, 1)) return "an entry's expPerHour isn't a positive whole number";
     if (!isWhole(setAt, 0, now + CLOCK_SLACK_MS)) return "an entry's setAt isn't ms since the Unix epoch, up to a day from now";
+    if (typeof party !== "boolean") return "an entry's party is true or false";
     const band = bandOf(level);
-    const place = `${map} ${band}`;
-    if (places.has(place)) return "two entries are for one map and Level Band";
+    // A Character's Solo Best and Party Best in a band are two entries; two of a kind aren't.
+    const place = `${map} ${band} ${party}`;
+    if (places.has(place)) return "two entries are for one map, Level Band and kind";
     places.add(place);
-    entries.push({ map, band, level, job, expPerHour, setAt });
+    entries.push({ map, band, level, job, expPerHour, setAt, party });
   }
   return entries;
 }
@@ -74,6 +79,8 @@ function entriesOf(body: unknown, now: number): Upload[] | string {
 interface Rejected {
   map: string;
   band: number;
+  /** It was a Party Best's entry; left out, a Solo Best's. */
+  party?: true;
   reason: "over-cap" | "removed";
   /** For "over-cap": the most EXP/h an entry on the map may have. */
   cap?: number;
@@ -140,7 +147,7 @@ const HELD = `EXISTS (SELECT 1 FROM characters WHERE name_key = ?1 AND ${MAY_WRI
  *  the same Character's. Another Character taking the spot leaves it, since the entry that
  *  took it still stands. */
 const UNMATCHED = `NOT EXISTS (SELECT 1 FROM entries e WHERE e.name_key = taken_tops.name_key AND e.map_id = taken_tops.map_id
-                   AND e.band = taken_tops.band AND e.exp_per_hour = taken_tops.exp_per_hour)`;
+                   AND e.band = taken_tops.band AND e.exp_per_hour = taken_tops.exp_per_hour AND e.party = taken_tops.party)`;
 
 /** A place on the Map Leaderboards: one map's Level Band. */
 interface Place {
@@ -152,7 +159,9 @@ interface Place {
  *  parameters, and a D1 statement takes at most 100. */
 const PLACES_PER_READ = 40;
 
-/** The top entry of each of `places` that has one. Places with no entry are left out. */
+/** The top entry of each of `places` that has one, on the board that ranks each Character by
+ *  their higher entry (the one a Map Leaderboard opens at), with the kind it is. Places with no
+ *  entry are left out. */
 async function topsAt(env: Env, places: Place[]): Promise<Top[]> {
   const tops: Top[] = [];
   for (let from = 0; from < places.length; from += PLACES_PER_READ) {
@@ -160,17 +169,24 @@ async function topsAt(env: Env, places: Place[]): Promise<Top[]> {
     const rows = await env.DB.prepare(
       `WITH places (map_id, band) AS (VALUES ${asked.map(() => "(?, ?)").join(", ")}),
          ranked AS (
-           SELECT e.map_id, e.band, e.name_key, c.name, e.exp_per_hour,
+           SELECT e.map_id, e.band, e.name_key, c.name, e.exp_per_hour, e.party,
                   ROW_NUMBER() OVER (PARTITION BY e.map_id, e.band
                                      ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank
-           FROM entries e JOIN characters c USING (name_key)
+           FROM ${boardOf(null)} e JOIN characters c USING (name_key)
            JOIN places p ON p.map_id = e.map_id AND p.band = e.band)
-       SELECT map_id, band, name_key, name, exp_per_hour FROM ranked WHERE rank = 1`,
+       SELECT map_id, band, name_key, name, exp_per_hour, party FROM ranked WHERE rank = 1`,
     )
       .bind(...asked.flatMap((p) => [p.map, p.band]))
-      .all<{ map_id: string; band: number; name_key: string; name: string; exp_per_hour: number }>();
+      .all<{ map_id: string; band: number; name_key: string; name: string; exp_per_hour: number; party: number }>();
     for (const r of rows.results) {
-      tops.push({ map: r.map_id, band: r.band, nameKey: r.name_key, name: r.name, expPerHour: r.exp_per_hour });
+      tops.push({
+        map: r.map_id,
+        band: r.band,
+        nameKey: r.name_key,
+        name: r.name,
+        expPerHour: r.exp_per_hour,
+        party: r.party === 1,
+      });
     }
   }
   return tops;
@@ -185,36 +201,49 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
   const claimed = (await claim(env, request, name, now))!;
   if (!("nameKey" in claimed)) return claimed;
   const { nameKey, keyHash } = claimed;
-  type EntryRow = { map_id: string; band: number; exp_per_hour: number };
+  type EntryRow = { map_id: string; band: number; exp_per_hour: number; party: number };
   const [removed, had] = await env.DB.batch<EntryRow>([
-    env.DB.prepare("SELECT map_id, band, exp_per_hour FROM removed_entries WHERE name_key = ?").bind(nameKey),
-    env.DB.prepare("SELECT map_id, band, exp_per_hour FROM entries WHERE name_key = ?").bind(nameKey),
+    env.DB.prepare("SELECT map_id, band, exp_per_hour, party FROM removed_entries WHERE name_key = ?").bind(nameKey),
+    env.DB.prepare("SELECT map_id, band, exp_per_hour, party FROM entries WHERE name_key = ?").bind(nameKey),
   ]);
   const wasRemoved = (e: Upload) =>
-    removed.results.some((r) => r.map_id === e.map && r.band === e.band && r.exp_per_hour === e.expPerHour);
+    removed.results.some(
+      (r) => r.map_id === e.map && r.band === e.band && r.exp_per_hour === e.expPerHour && (r.party === 1) === e.party,
+    );
   const rejected: Rejected[] = [];
   const accepted = entries.filter((e) => {
     const cap = capOn(env, e.map);
-    if (e.expPerHour > cap) rejected.push({ map: e.map, band: e.band, reason: "over-cap", cap });
-    else if (wasRemoved(e)) rejected.push({ map: e.map, band: e.band, reason: "removed" });
+    const place = { map: e.map, band: e.band, ...(e.party ? { party: true as const } : {}) };
+    if (e.expPerHour > cap) rejected.push({ ...place, reason: "over-cap", cap });
+    else if (wasRemoved(e)) rejected.push({ ...place, reason: "removed" });
     else return true;
     return false;
   });
-  // Only an entry that is new, or higher than the one it replaces, can take a top spot, so
-  // the top spots are read for those places alone. `takenTops` would turn the rest down
-  // anyway; this is what keeps the reads off almost every upload, since the app uploads a
-  // Character's whole set as each Visit ends and nearly all of it is unchanged (ADR 0022).
-  const held = new Map(had.results.map((r) => [`${r.map_id} ${r.band}`, r.exp_per_hour]));
-  const improved: Place[] = accepted.filter((e) => (held.get(`${e.map} ${e.band}`) ?? 0) < e.expPerHour);
+  // Only an entry that is new, or higher than the Character's higher one in the place, can take
+  // a top spot (a board ranks a Character by their higher entry), so the top spots are read for
+  // those places alone. `takenTops` would turn the rest down anyway; this is what keeps the
+  // reads off almost every upload, since the app uploads a Character's whole set as each Visit
+  // ends and nearly all of it is unchanged (ADR 0022).
+  const held = new Map<string, number>();
+  for (const r of had.results) {
+    const place = `${r.map_id} ${r.band}`;
+    held.set(place, Math.max(held.get(place) ?? 0, r.exp_per_hour));
+  }
+  const improved: Place[] = [];
+  for (const e of accepted) {
+    if ((held.get(`${e.map} ${e.band}`) ?? 0) < e.expPerHour && !improved.some((p) => p.map === e.map && p.band === e.band)) {
+      improved.push({ map: e.map, band: e.band });
+    }
+  }
   const before = improved.length === 0 ? [] : await topsAt(env, improved);
   await env.DB.batch([
     env.DB.prepare(`UPDATE characters SET name = ?3 WHERE name_key = ?1 AND ${MAY_WRITE}`).bind(nameKey, keyHash, name),
     env.DB.prepare(`DELETE FROM entries WHERE name_key = ?1 AND ${HELD}`).bind(nameKey, keyHash),
     ...accepted.map((e) =>
       env.DB.prepare(
-        `INSERT INTO entries (name_key, map_id, band, level, job, exp_per_hour, set_at)
-         SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8 WHERE ${HELD}`,
-      ).bind(nameKey, keyHash, e.map, e.band, e.level, e.job, e.expPerHour, e.setAt),
+        `INSERT INTO entries (name_key, map_id, band, level, job, exp_per_hour, set_at, party)
+         SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8, ?9 WHERE ${HELD}`,
+      ).bind(nameKey, keyHash, e.map, e.band, e.level, e.job, e.expPerHour, e.setAt, e.party ? 1 : 0),
     ),
     // A top spot taken stays marked only while the entry that took it stands.
     env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD} AND ${UNMATCHED}`).bind(nameKey, keyHash),
@@ -238,10 +267,10 @@ async function keepTaken(env: Env, nameKey: string, keyHash: string, taken: Take
   await env.DB.batch(
     taken.map((t) =>
       env.DB.prepare(
-        `INSERT OR REPLACE INTO taken_tops (name_key, map_id, band, exp_per_hour, from_name_key, from_exp_per_hour, taken_at)
-         SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8 WHERE ${HELD}`,
+        `INSERT OR REPLACE INTO taken_tops (name_key, map_id, band, exp_per_hour, from_name_key, from_exp_per_hour, taken_at, party)
+         SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8, ?9 WHERE ${HELD}`,
         // A name in lower case is its Character's key, whatever its case (ADR 0015).
-      ).bind(nameKey, keyHash, t.map, t.band, t.expPerHour, t.from.toLowerCase(), t.fromExpPerHour, now),
+      ).bind(nameKey, keyHash, t.map, t.band, t.expPerHour, t.from.toLowerCase(), t.fromExpPerHour, now, t.party ? 1 : 0),
     ),
   );
 }
@@ -268,29 +297,39 @@ interface Row {
   level: number;
   exp_per_hour: number;
   set_at: number;
+  party: number;
   rank: number;
   total: number;
 }
 
 /** Map `map`'s Level Band starting at level `first`: its top 50, and `name`'s entry there
- *  with its rank, if given and it has one. */
-export async function readBand(env: Env, map: string, first: string, name: string | null): Promise<Answer> {
+ *  with its rank, if given and it has one. Of the entries of one `kind`, or, with none, each
+ *  Character's higher entry. */
+export async function readBand(env: Env, map: string, first: string, name: string | null, kind: Kind | null): Promise<Answer> {
   if (!isMap(map)) return badRequest("a map is its 9-digit ID");
   const band = bandFrom(first);
   if (band === null) return badRequest("a Level Band is its first level: 1, 10, 20...");
   const nameKey = name?.toLowerCase() ?? null;
   const rows = await env.DB.prepare(
     `WITH ranked AS (
-       SELECT e.name_key, c.name, e.job, e.level, e.exp_per_hour, e.set_at,
+       SELECT e.name_key, c.name, e.job, e.level, e.exp_per_hour, e.set_at, e.party,
               ROW_NUMBER() OVER (ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank,
               COUNT(*) OVER () AS total
-       FROM entries e JOIN characters c USING (name_key)
+       FROM ${boardOf(kind)} e JOIN characters c USING (name_key)
        WHERE e.map_id = ?1 AND e.band = ?2)
      SELECT * FROM ranked WHERE rank <= ?3 OR name_key = ?4 ORDER BY rank`,
   )
     .bind(map, band, TOP, nameKey)
     .all<Row>();
-  const ranked = (r: Row) => ({ rank: r.rank, name: r.name, job: r.job, level: r.level, expPerHour: r.exp_per_hour, setAt: r.set_at });
+  const ranked = (r: Row) => ({
+    rank: r.rank,
+    name: r.name,
+    job: r.job,
+    level: r.level,
+    expPerHour: r.exp_per_hour,
+    setAt: r.set_at,
+    party: r.party === 1,
+  });
   const character = rows.results.find((r) => r.name_key === nameKey);
   return {
     status: 200,
@@ -313,7 +352,7 @@ const MOST_MAPS = 10_000;
 /** Every map with entries on its Map Leaderboard, the most entries first. */
 export async function readMaps(env: Env): Promise<Answer> {
   const rows = await env.DB.prepare(
-    `SELECT map_id AS map, COUNT(DISTINCT name_key) AS characters, COUNT(*) AS entries FROM entries
+    `SELECT map_id AS map, COUNT(DISTINCT name_key) AS characters, COUNT(*) AS entries FROM ${boardOf(null)}
      GROUP BY map_id ORDER BY entries DESC, characters DESC, map_id LIMIT ?`,
   )
     .bind(MOST_MAPS)
@@ -321,12 +360,17 @@ export async function readMaps(env: Env): Promise<Answer> {
   return { status: 200, body: { maps: rows.results } };
 }
 
-/** Map `map`'s Level Bands that have entries, lowest first, with how many each has. */
+/** Map `map`'s Level Bands that have entries, lowest first, with how many each has: ranked
+ *  (each Character's higher entry), and of each kind. */
 export async function readMap(env: Env, map: string): Promise<Answer> {
   if (!isMap(map)) return badRequest("a map is its 9-digit ID");
-  const rows = await env.DB.prepare("SELECT band, COUNT(*) AS entries FROM entries WHERE map_id = ? GROUP BY band ORDER BY band")
+  const rows = await env.DB.prepare(
+    `SELECT band, (SELECT COUNT(*) FROM ${boardOf(null)} h WHERE h.map_id = ?1 AND h.band = e.band) AS entries,
+            SUM(party = 0) AS solo, SUM(party = 1) AS party
+     FROM entries e WHERE map_id = ?1 GROUP BY band ORDER BY band`,
+  )
     .bind(map)
-    .all<{ band: number; entries: number }>();
-  const bands = rows.results.map((r) => ({ band: r.band, levels: levelsOf(r.band), entries: r.entries }));
+    .all<{ band: number; entries: number; solo: number; party: number }>();
+  const bands = rows.results.map((r) => ({ band: r.band, levels: levelsOf(r.band), entries: r.entries, solo: r.solo, party: r.party }));
   return { status: 200, body: { map, bands } };
 }
