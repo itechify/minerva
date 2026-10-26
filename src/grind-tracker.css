@@ -126,6 +126,11 @@
   display: contents;
 }
 
+/* The Meso row's grid takes no room in the box while its row is hidden. */
+.rates:not(:has(> .row:not([hidden]))) {
+  display: none;
+}
+
 /* Every row starts in the first column: a row with fewer cells than the grid's columns
    (the Best row's × fills only four) would otherwise pull the next row's label up beside it. */
 .rates .period {

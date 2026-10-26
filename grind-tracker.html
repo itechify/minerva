@@ -77,27 +77,6 @@
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
                 </button>
               </div>
-              <!-- The mesos the Pickup Log says the Session has picked up, and mesos an hour,
-                   laid out as the rows above are but without their units: the label says what
-                   the first figure is, the "/h" what the second. -->
-              <div class="row" id="meso-row" hidden>
-                <span class="period">Mesos</span>
-                <span class="value" id="meso-total"></span><span class="unit"></span>
-                <span class="value" id="meso-rate"></span><span class="unit per">/h</span>
-              </div>
-            </div>
-            <!-- The rest of the Pickups, under the Meso row: the Items the Pickup Log says the
-                 Session picked up. Collapsed to its header at first, with the Items' count on
-                 it; open, the 5 picked up most, each with its count, and "+N more" for the rest.
-                 It stays as the player left it across launches. No rate: Items aren't per hour. -->
-            <div class="pickups" id="pickups" hidden>
-              <button type="button" class="pickups-head" id="pickups-head" data-control="togglePickups" aria-expanded="false" aria-controls="pickups-items">
-                <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l5 5-5 5" /></svg>
-                <span class="label">Pickups</span>
-                <span class="count" id="pickups-count"></span>
-              </button>
-              <ul class="pickups-items" id="pickups-items" hidden></ul>
-              <button type="button" class="pickups-more" id="pickups-more" hidden></button>
             </div>
             <!-- The Pace Trace: the last 5 minutes of play up to the last EXP gain, raced
                  against the 5 minutes before them, as split times against a ghost. The flat
@@ -131,6 +110,31 @@
               <circle class="you" id="pace-you" r="3.5" />
             </svg>
             <p class="line" id="tracking-deaths" hidden></p>
+            <!-- The Pickups, under the EXP figures and the Pace Trace so EXP stays together: the
+                 Meso row in a rates grid of its own, laid out as the EXP rows are. -->
+            <div class="rates" id="meso-rates">
+              <!-- The mesos the Pickup Log says the Session has picked up, and mesos an hour,
+                   laid out as the rows above are but without their units: the label says what
+                   the first figure is, the "/h" what the second. -->
+              <div class="row" id="meso-row" hidden>
+                <span class="period">Mesos</span>
+                <span class="value" id="meso-total"></span><span class="unit"></span>
+                <span class="value" id="meso-rate"></span><span class="unit per">/h</span>
+              </div>
+            </div>
+            <!-- The rest of the Pickups, under the Meso row: the Items the Pickup Log says the
+                 Session picked up. Collapsed to its header at first, with the Items' count on
+                 it; open, the 5 picked up most, each with its count, and "+N more" for the rest.
+                 It stays as the player left it across launches. No rate: Items aren't per hour. -->
+            <div class="pickups" id="pickups" hidden>
+              <button type="button" class="pickups-head" id="pickups-head" data-control="togglePickups" aria-expanded="false" aria-controls="pickups-items">
+                <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l5 5-5 5" /></svg>
+                <span class="label">Pickups</span>
+                <span class="count" id="pickups-count"></span>
+              </button>
+              <ul class="pickups-items" id="pickups-items" hidden></ul>
+              <button type="button" class="pickups-more" id="pickups-more" hidden></button>
+            </div>
             <!-- One of our windows has been over the Pickup Log for a while: said quietly, in the
                  lines' ink, so a dip in mesos an hour has its reason in sight. -->
             <p class="line" id="tracking-pickup-covered" hidden>Pickup Log covered: some mesos may be missed.</p>
