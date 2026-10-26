@@ -155,8 +155,24 @@ The last 5 minutes of active play drawn kill by kill on the Grind Tracker, raced
 _Avoid_: graph, chart, sparkline
 
 **Personal Best**:
-The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in their Visit History of the map, or the Visit under way's once it beats that. Each is stamped with the Character, level and job the Status Bar showed at the refresh that set it. The Grind Tracker's Best row shows the Character playing's (the Unassigned one while no name is read) as it stands, from arriving on the map and from the refresh that sets a new one, saying "this visit" while the Visit under way set it; a star marks the Rolling Rate while it is that best (ADR 0018).
+The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in their Visit History of the map, or the Visit under way's once it beats that. Each is stamped with the Character, level and job the Status Bar showed at the refresh that set it. The Grind Tracker's Best row shows the Character playing's (the Unassigned one while no name is read) as it stands, from arriving on the map and from the refresh that sets a new one, saying "this visit" while the Visit under way set it; a star marks the Rolling Rate while it is that best (ADR 0018). A map has two, its Solo Best and its Party Best.
 _Avoid_: record, high score, PB, max
+
+**Solo Best**:
+A map's Personal Best over 5 minutes with no Party EXP in them. Bests set before Minerva told party play from solo are Solo Bests, and the player can move a Visit to the Party Bests.
+_Avoid_: personal solo best, solo record
+
+**Party Best**:
+A map's Personal Best over 5 minutes with Party EXP in them, kept apart from its Solo Best so a party run never hides what the Character does alone. The Grind Tracker races the Party Best while the player is partied.
+_Avoid_: group best, party record
+
+**Party EXP**:
+The EXP the Pickup Log says came from being in a party: a share of a partymate's kill ("You received EXP" in yellow) and the bonus on every kill while partied ("Bonus EXP for PARTY"). The player's own EXP is "You received EXP" in white.
+_Avoid_: shared EXP, group EXP, bonus EXP (only part of it)
+
+**EXP Split**:
+How much of the Session's EXP was the player's own and how much was Party EXP, as shares of what the EXP bar gained, drawn in two colours under the Grind Tracker's Session rate once Party EXP has come in.
+_Avoid_: EXP breakdown, EXP sources
 
 **Level Band**:
 Ten levels, 1–9, 10–19, 20–29 and so on, that a Visit's best is counted in by the level that set it. A Visit History keeps the best Visit in each, and a Map Leaderboard ranks each on its own.
@@ -209,6 +225,10 @@ _Avoid_: chat, drop log, kill feed
 **Meso**:
 The in-game currency; the game itself says "mesos".
 _Avoid_: miso, gold, money
+
+**Pickups**:
+The mesos and Items the Pickup Log says the player picked up in a Session, each Item tallied by name. Read from the Pickup Log, they may be fewer than were picked up, never more (ADR 0025).
+_Avoid_: loot, drops, haul
 
 ### Items
 
