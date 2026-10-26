@@ -1332,6 +1332,37 @@ fn characters_replay_through_the_same_states() {
 }
 
 #[test]
+fn item_names_cut_short_and_matching_no_item_are_written_down_for_tuning_the_matching() {
+    use minerva_core::{PickupLine, PickupLogReading, PickupLogSeen};
+    let items = item_world(vec![
+        common::items::use_item(2_060_000, "Arrows for Crossbow"),
+        common::items::use_item(2_061_000, "Arrows for Bow"),
+    ]);
+    let mut shell = Shell::new(FakeSource::osms().with_items(items));
+    shell.play(12 * S, CONSTRUCTION_SITE, grind);
+    let line = |name: &str, cut_short| PickupLine::Item { name: name.into(), quantity: 2, tab: "Use".into(), cut_short };
+    let arrived = vec![line("Arrows for", true), line("Zorg Dung", false), line("Arrows for Crossbow", false)];
+    let area = ScreenRect { x: 1500, y: 800, width: 408, height: 160 };
+    shell.minerva.on_pickup_log_reading(PickupLogReading {
+        at_ms: 12 * S + 100,
+        seen: PickupLogSeen::Clear { area },
+        arrived,
+        chose: false,
+        overflowed: false,
+    });
+    shell.play(13 * S, CONSTRUCTION_SITE, grind);
+
+    let (_, recording) = shell.report();
+
+    let notes: Vec<&Note> = recording.lines.iter().flat_map(|line| &line.notes).collect();
+    assert!(notes.contains(&&Note::ItemCutShort { name: "Arrows for...".into() }), "{notes:?}");
+    assert!(notes.contains(&&Note::ItemUnmatched { name: "Zorg Dung".into(), lines: 1 }), "{notes:?}");
+    assert_eq!(notes.iter().filter(|note| matches!(note, Note::ItemCutShort { .. } | Note::ItemUnmatched { .. })).count(), 2);
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains(r#"Pickup Log item "Zorg Dung" matches no item"#), "{timeline}");
+}
+
+#[test]
 fn a_status_bar_read_the_same_as_before_is_written_as_such_with_no_crop() {
     let (report, recording) = run_with_characters().report();
 

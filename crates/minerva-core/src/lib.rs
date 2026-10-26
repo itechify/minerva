@@ -35,6 +35,7 @@ mod pace;
 mod panel;
 mod personal_best;
 mod pickup_cover;
+mod pickup_items;
 mod pickup_log;
 mod player_shop;
 mod pictures;
@@ -88,6 +89,7 @@ pub use panel::{
     PlacementMode, ScreenPoint,
     ScreenRect, Section, Size,
 };
+pub use pickup_items::PickedItem;
 pub use pickup_log::{PICKUP_LOG_CAPTURE_MS, PickupLine, PickupLogCapture, PickupLogReader, PickupLogReading, PickupLogSeen};
 pub use personal_best::{BESTS_VERSION, CharacterBests, MapBests, SavedBests, VisitBest};
 pub use osms_items::ScrollTier;
@@ -472,6 +474,9 @@ pub enum PanelControl {
     /// The × on the Grind Tracker's Best row: remove the shown map's Personal Best the row
     /// shows, this Visit's or the best of the earlier Visits.
     RemoveBest,
+    /// The Grind Tracker window's Pickups header: open the Items picked up in the Session, or
+    /// collapse them to the header. Kept across launches.
+    TogglePickups,
     /// The Grind Tracker window's ×: close it.
     CloseGrindTracker,
     /// The Grind Tracker window's Personal Bests button, or its Best row's "Best": open
@@ -1058,6 +1063,7 @@ impl Minerva {
                 // With no best left, there is nothing for the Personal Bests window to show.
                 self.bests_window.open &= self.session.bests().any();
             }
+            Action::TogglePickups => self.settings.pickups_open = !self.settings.pickups_open,
             Action::ToggleGrindTracker => self.grind_tracker.open = !self.grind_tracker.open,
             Action::CloseGrindTracker => self.grind_tracker.open = false,
             Action::GrindTrackerMoved { x, y } => {
@@ -1353,6 +1359,7 @@ impl Minerva {
             PanelControl::ResetSession => Action::ResetSession,
             PanelControl::UndoReset => Action::UndoReset,
             PanelControl::RemoveBest => Action::RemoveBest,
+            PanelControl::TogglePickups => Action::TogglePickups,
             PanelControl::CloseGrindTracker => Action::CloseGrindTracker,
             PanelControl::TogglePersonalBests => Action::TogglePersonalBests,
             PanelControl::ClosePersonalBests => Action::ClosePersonalBests,
@@ -1730,7 +1737,18 @@ impl Minerva {
         self.pickup_cover.on_reading(&reading, &self.state.our_windows);
         if self.tracking_on() {
             let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });
-            self.session.on_pickups(if clear { &reading.arrived } else { &[] }, reading.at_ms);
+            let lines = if clear { &reading.arrived[..] } else { &[] };
+            let set = self.items.items().ok();
+            let items = lines
+                .iter()
+                .filter_map(|line| match line {
+                    PickupLine::Item { name, quantity, tab, cut_short } => {
+                        Some((pickup_items::name(set, name, *cut_short, tab), *quantity))
+                    }
+                    _ => None,
+                })
+                .collect();
+            self.session.on_pickups(lines, items, reading.at_ms);
         }
         self.session.on_pickup_log(&reading);
         self.sync_panel()
@@ -2484,6 +2502,7 @@ impl Minerva {
             open: self.grind_tracker.open,
             placement,
             personal_bests: self.session.bests().any(),
+            pickups_open: self.settings.pickups_open,
         };
     }
 
