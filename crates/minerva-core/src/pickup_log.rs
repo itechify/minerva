@@ -13,6 +13,7 @@ use crate::ui_size::AtSamplesSize;
 use crate::{Frame, ScreenPoint, ScreenRect};
 use image::{GrayImage, RgbImage};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 /// How often the Pickup Log is captured while it is read (ms): 10 times a second, on a thread
 /// of its own (ADR 0026).
@@ -40,6 +41,10 @@ const RIGHT_MARGIN: std::ops::RangeInclusive<f32> = 2.0..=16.0;
 /// How far a located layout's size may differ from the UI Size the Status Bar measured, as a
 /// share of it.
 const SIZE_TOLERANCE: f32 = 0.15;
+/// The same, for a parenthesis found in a capture scaled up from a smaller UI Size: the colour mask
+/// takes a pixel or two off a blurred glyph's tips, and its height reads 0.65 to 1.06 of the true
+/// 17 (the Bug Report of 0.15.0, 2026-10-26 14:41).
+const SIZE_TOLERANCE_BLURRED: f32 = 0.4;
 /// How much darker the pixel a glyph's shadow falls on must be for the glyph's pixel to be ink, from
 /// none (at the floor) to all of it (a span above it).
 const INK_SHADOW_FLOOR: f32 = 20.0;
@@ -47,7 +52,20 @@ const INK_SHADOW_SPAN: f32 = 30.0;
 /// How long a located layout may go on without one of its rows reading as a known line kind
 /// before it is given up and searched for again (ms).
 const UNCONFIRMED_DROP_MS: u64 = 3000;
-
+/// How long captures may match nothing of the last clean capture (a stack that changed under a
+/// Mob, a skill effect or a moving background, beyond what a shift explains) before the next one is
+/// taken as the new baseline, instead of waiting for the old stack to come back (ms).
+const RESYNC_MS: u64 = 3000;
+/// How much of the last 45 columns of a line (its parenthesis and its amount) must agree between two
+/// captures for it to be the same line, in per cent.
+const TAIL_AGREES: usize = 80;
+/// The same, for a capture scaled up from a smaller UI Size, whose glyphs are blurred and a pixel
+/// off: a line over a moving background agrees in 74 to 79% there (the Bug Report of 0.15.0,
+/// 2026-10-26 14:41).
+const TAIL_AGREES_BLURRED: usize = 65;
+/// The weight above which a pixel of a line's ink is ink in the third read of a line scaled up from a
+/// smaller UI Size: a cut that keeps a digit's body whole, where a higher one reads a "9" as a "0".
+const CUT_INK: f32 = 0.35;
 /// The generous discovery band, anchored to the client's bottom-right and sized by the
 /// Status Bar. The reader measures the lines' own UI Size within it.
 pub(crate) fn capture_band(client: ScreenRect, status_bar: ScreenRect) -> ScreenRect {
@@ -145,6 +163,8 @@ pub struct PickupLogReader {
     confirmed: bool,
     /// When the layout was located, while it is unconfirmed.
     located_at_ms: Option<u64>,
+    /// Since when the captures' stacks have matched none of the last clean capture's shifts.
+    unmatched_since: Option<u64>,
     dimensions: (u32, u32),
     ui_size: f32,
 }
@@ -158,6 +178,8 @@ struct Layout {
 
 struct Stack {
     rows: Vec<Option<Row>>,
+    /// Scaled up from a smaller UI Size than the samples' (see [rows_match]).
+    blurred: bool,
 }
 
 struct Row {
@@ -187,7 +209,7 @@ impl std::fmt::Debug for PickupLogReader {
 impl PickupLogReader {
     /// A reader with the bundled recogniser.
     pub fn bundled() -> Self {
-        Self { recogniser: Recogniser::bundled(), read: RememberedLines::default(), previous: None, layout: None, confirmed: false, located_at_ms: None, dimensions: (0, 0), ui_size: 0.0 }
+        Self { recogniser: Recogniser::bundled(), read: RememberedLines::default(), previous: None, layout: None, confirmed: false, located_at_ms: None, unmatched_since: None, dimensions: (0, 0), ui_size: 0.0 }
     }
 
     /// Read one capture, the next after the last one read.
@@ -266,7 +288,7 @@ impl PickupLogReader {
             })
             .collect::<Vec<_>>();
         if !self.confirmed {
-            self.confirm(&rows, capture.frame.at_ms);
+            self.confirm(&rows, capture.frame.at_ms, !matches!(at.img, Cow::Borrowed(_)));
         }
         if rows.iter().all(Option::is_none) {
             return reading;
@@ -281,14 +303,24 @@ impl PickupLogReader {
             height: (y1 - y0).round() as u32,
         };
         reading.seen = PickupLogSeen::Clear { area };
-        let mut current = Stack { rows };
-        if let Some(previous) = &self.previous {
-            reading.chose = (0..=ROWS).filter(|&s| stack_matches_shift(previous, &current, s, false)).count() > 1;
-            let shifts = (0..=ROWS).filter(|&s| stack_matches_shift(previous, &current, s, true)).collect::<Vec<_>>();
+        let mut current = Stack { rows, blurred: !matches!(at.img, Cow::Borrowed(_)) };
+        if let Some(previous) = self.previous.take() {
+            reading.chose = (0..=ROWS).filter(|&s| stack_matches_shift(&previous, &current, s, false)).count() > 1;
+            let shifts = (0..=ROWS).filter(|&s| stack_matches_shift(&previous, &current, s, true)).collect::<Vec<_>>();
             let Some(&shift) = shifts.first() else {
-                reading.seen = PickupLogSeen::Covered { area };
+                let since = *self.unmatched_since.get_or_insert(capture.frame.at_ms);
+                if capture.frame.at_ms.saturating_sub(since) < RESYNC_MS {
+                    self.previous = Some(previous);
+                    reading.seen = PickupLogSeen::Covered { area };
+                    return reading;
+                }
+                // Nothing in the last clean capture is in this one any more: whatever is in this one
+                // is the new baseline, and what arrived meanwhile is missed, never guessed at.
+                self.unmatched_since = None;
+                self.previous = Some(current);
                 return reading;
             };
+            self.unmatched_since = None;
             reading.shift = shift as u8;
             reading.overflowed = shift == ROWS;
             for i in 0..ROWS - shift {
@@ -296,7 +328,7 @@ impl PickupLogReader {
                     new.shape = old.shape.clone();
                 }
             }
-            reading.arrived = self.read_arrivals(&current.rows[ROWS - shift..]);
+            reading.arrived = self.read_arrivals(&current.rows[ROWS - shift..], matches!(at.img, Cow::Borrowed(_)));
         }
         self.previous = Some(current);
         reading
@@ -305,10 +337,10 @@ impl PickupLogReader {
     /// Whether a row of a located layout that isn't yet trusted reads as a known line kind. If
     /// none has for [`UNCONFIRMED_DROP_MS`], the layout was a miss: it is dropped, to be
     /// searched for again, so a lookalike is never kept.
-    fn confirm(&mut self, rows: &[Option<Row>], at_ms: u64) {
+    fn confirm(&mut self, rows: &[Option<Row>], at_ms: u64, blurred: bool) {
         let readable = rows.iter().flatten().filter(|r| r.readable).collect::<Vec<_>>();
         let inks = readable.iter().map(|r| r.ink.clone()).collect::<Vec<_>>();
-        let known = self.read.read(&self.recogniser, &inks, 3).into_iter().zip(&readable).any(|(text, r)| text.is_some_and(|t| parse(&t, r.yellow).is_some()));
+        let known = self.read.read(&self.recogniser, &inks, 3).into_iter().zip(&readable).any(|(text, r)| text.is_some_and(|t| parse(&t, r.yellow, blurred).is_some()));
         if known {
             self.confirmed = true;
         } else if self.located_at_ms.is_some_and(|at| at_ms.saturating_sub(at) >= UNCONFIRMED_DROP_MS) {
@@ -318,32 +350,49 @@ impl PickupLogReader {
         }
     }
 
-    fn read_arrivals(&mut self, rows: &[Option<Row>]) -> Vec<PickupLine> {
+    /// Read the rows that arrived. At the samples' size a line is read once, and again with its
+    /// ink weighed another way if that read didn't parse. Scaled up from a smaller UI Size the
+    /// glyphs are blurred and a digit slips with the ink (`39` as `30`, in the footage, by what
+    /// the world behind the line adds), so there a line is read three ways (as is, with the ink
+    /// weighed another way, and with it cut at a threshold) and counts only when all three parse and
+    /// agree on its kind and figures, else it is `Unreadable`: fewer, never another.
+    fn read_arrivals(&mut self, rows: &[Option<Row>], at_samples_size: bool) -> Vec<PickupLine> {
         let new: Vec<_> = rows.iter().flatten().collect();
         let inks = new.iter().map(|r| r.ink.clone()).collect::<Vec<_>>();
         let texts = self.read.read(&self.recogniser, &inks, 3);
-        let mut arrived: Vec<PickupLine> =
-            new.iter().zip(texts).map(|(r, t)| t.and_then(|t| parse(&t, r.yellow)).unwrap_or(PickupLine::Unreadable)).collect();
-        let missed =
-            arrived.iter().enumerate().filter_map(|(i, r)| (*r == PickupLine::Unreadable).then_some(i)).collect::<Vec<_>>();
-        let alternatives = missed
-            .iter()
-            .map(|&i| {
-                let mut ink = inks[i].clone();
-                for p in ink.pixels_mut() {
-                    let weight = (255 - p[0]) as f32 / 255.0;
-                    p[0] = (255.0 * (1.0 - ((weight * 170.0 - 40.0) / 130.0).clamp(0.0, 1.0))).round() as u8;
-                }
-                ink
-            })
-            .collect::<Vec<_>>();
-        let alternatives = self.read.read(&self.recogniser, &alternatives, 2);
-        for (&i, text) in missed.iter().zip(alternatives) {
-            if let Some(line) = text.and_then(|t| parse(&t, new[i].yellow)) {
-                arrived[i] = line;
+        let first: Vec<Option<PickupLine>> = new.iter().zip(texts).map(|(r, t)| t.and_then(|t| parse(&t, r.yellow, !at_samples_size))).collect();
+        let again = (0..new.len()).filter(|&i| !at_samples_size || first[i].is_none()).collect::<Vec<_>>();
+        let weighed = |weight: fn(f32) -> f32, upscale: u32, this: &mut Self| {
+            let inks = again
+                .iter()
+                .map(|&i| {
+                    let mut ink = inks[i].clone();
+                    for p in ink.pixels_mut() {
+                        p[0] = (255.0 * (1.0 - weight((255 - p[0]) as f32 / 255.0))).round() as u8;
+                    }
+                    ink
+                })
+                .collect::<Vec<_>>();
+            let mut lines = vec![None; new.len()];
+            for (&i, text) in again.iter().zip(this.read.read(&this.recogniser, &inks, upscale)) {
+                lines[i] = text.and_then(|t| parse(&t, new[i].yellow, !at_samples_size));
             }
-        }
-        arrived
+            lines
+        };
+        let second = weighed(|w| ((w * 170.0 - 40.0) / 130.0).clamp(0.0, 1.0), 2, self);
+        let third = if at_samples_size { Vec::new() } else { weighed(|w| f32::from(w > CUT_INK), 3, self) };
+        first
+            .into_iter()
+            .zip(second)
+            .enumerate()
+            .map(|(i, (a, b))| match (a, b) {
+                (Some(a), Some(b)) if !same_figures(&a, &b) => PickupLine::Unreadable,
+                (Some(a), _) if at_samples_size => a,
+                (None, Some(b)) if at_samples_size => b,
+                (Some(a), Some(_)) if third[i].as_ref().is_some_and(|c| same_figures(&a, c)) => a,
+                _ => PickupLine::Unreadable,
+            })
+            .collect()
     }
 
     /// Start a new stream after capture stops, or the Character changes. Keep the OCR
@@ -353,6 +402,7 @@ impl PickupLogReader {
         self.layout = None;
         self.confirmed = false;
         self.located_at_ms = None;
+        self.unmatched_since = None;
     }
 }
 
@@ -362,28 +412,41 @@ impl PickupLogReader {
 /// The parenthesis's 17-row height is checked against that size even with only one line; the
 /// other parentheses confirm its 22-row pitch.
 fn locate_log(img: &RgbImage, ui_size: f32) -> Option<Layout> {
-    let (mask, ends) = closing_parentheses(img, ui_size);
-    let mut ranked = ends.iter().map(|e| (ends.iter().filter(|other| aligned_with(e, other, ui_size)).count(), e)).collect::<Vec<_>>();
+    let at = AtSamplesSize::new(img, ui_size);
+    if matches!(at.img, Cow::Borrowed(_)) {
+        return locate_log_as_drawn(img, ui_size, false);
+    }
+    // The game's own smaller drawing has strokes a pixel wide, joined only at their corners, and
+    // shadows a pixel off: the readers below were tuned at the samples' size, so it is located
+    // there, as every reader does (ADR 0020), and the layout brought back to this capture.
+    let found = locate_log_as_drawn(&at.img, 1.0, true)?;
+    let (right, bottom) = at.back(found.right as f32 + 0.5, found.bottom as f32 + 0.5);
+    Some(Layout { right: right.floor() as u32, bottom: bottom.floor() as u32, size: ui_size })
+}
+
+fn locate_log_as_drawn(img: &RgbImage, ui_size: f32, blurred: bool) -> Option<Layout> {
+    let (mask, ends) = closing_parentheses(img, ui_size, blurred);
+    let mut ranked = ends.iter().map(|e| (ends.iter().filter(|other| aligned_with(e, other, ui_size, blurred)).count(), e)).collect::<Vec<_>>();
     ranked.sort_by_key(|&(count, e)| std::cmp::Reverse((count, e.right)));
     // Only the strongest alignment hypotheses need scaling. A textured world can
     // contain many narrow components; resampling once for every one is not a 10 Hz reader.
     ranked
         .into_iter()
         .take(4)
-        .filter_map(|(_, e)| refine_layout(img, &mask, &ends, e, ui_size))
-        .filter(|(_, _, l)| fits(img, l, ui_size))
+        .filter_map(|(_, e)| refine_layout(img, &mask, &ends, e, ui_size, blurred))
+        .filter(|(_, _, l)| fits(img, l, ui_size, blurred))
         .max_by_key(|(n, x, _)| (*n, *x))
         .map(|(_, _, l)| l)
 }
 
 /// Whether a layout's last pixel is within [`RIGHT_MARGIN`] of the frame's right edge and its
 /// size is near `ui_size`.
-fn fits(img: &RgbImage, layout: &Layout, ui_size: f32) -> bool {
+fn fits(img: &RgbImage, layout: &Layout, ui_size: f32, blurred: bool) -> bool {
     let from_edge = (img.width() - 1).saturating_sub(layout.right) as f32 / ui_size;
-    RIGHT_MARGIN.contains(&from_edge) && (layout.size - ui_size).abs() <= SIZE_TOLERANCE * ui_size
+    RIGHT_MARGIN.contains(&from_edge) && (layout.size - ui_size).abs() <= if blurred { SIZE_TOLERANCE_BLURRED } else { SIZE_TOLERANCE } * ui_size
 }
 
-fn closing_parentheses(img: &RgbImage, ui_size: f32) -> (RgbImage, Vec<Layout>) {
+fn closing_parentheses(img: &RgbImage, ui_size: f32, blurred: bool) -> (RgbImage, Vec<Layout>) {
     let mut mask = RgbImage::new(img.width(), img.height());
     // Only the columns the log's last glyphs can be in: the rest is the world.
     let from = img.width().saturating_sub(((RIGHT_MARGIN.end() + 12.0) * ui_size).ceil() as u32);
@@ -407,7 +470,10 @@ fn closing_parentheses(img: &RgbImage, ui_size: f32) -> (RgbImage, Vec<Layout>) 
         let size = c.h() as f32 / TEXT_HEIGHT as f32;
         let mid = c.y0 + c.h() / 2;
         let left_at = |y| (c.x0..c.x1).find(|&x| mask.get_pixel(x, y)[0] != 0).unwrap_or(c.x1);
-        if left_at(mid) <= left_at(c.y0) || left_at(mid) <= left_at(c.y1 - 1) {
+        // A ')' bulges right at its middle. A blurred one may have lost a tip to the colour mask, so
+        // one side bulging is enough.
+        let (top, bottom) = (left_at(mid) > left_at(c.y0), left_at(mid) > left_at(c.y1 - 1));
+        if !(top && bottom || blurred && (top || bottom)) {
             continue;
         }
         let x = c.x1 - 1;
@@ -416,24 +482,24 @@ fn closing_parentheses(img: &RgbImage, ui_size: f32) -> (RgbImage, Vec<Layout>) 
             continue;
         }
         let layout = Layout { right: x, bottom: c.y1 - 1, size };
-        if fits(img, &layout, ui_size) {
+        if fits(img, &layout, ui_size, blurred) {
             ends.push(layout);
         }
     }
     (mask, ends)
 }
 
-fn aligned_with(e: &Layout, other: &Layout, ui_size: f32) -> bool {
+fn aligned_with(e: &Layout, other: &Layout, ui_size: f32, blurred: bool) -> bool {
     let pitch = ROW_PITCH as f32 * ui_size;
     let dy = other.bottom.abs_diff(e.bottom) as f32;
-    other.right.abs_diff(e.right) <= 2 && (other.size - e.size).abs() < 0.1 && (dy / pitch - (dy / pitch).round()).abs() < 0.1
+    other.right.abs_diff(e.right) <= 2 && (other.size - e.size).abs() < if blurred { SIZE_TOLERANCE_BLURRED } else { 0.1 } && (dy / pitch - (dy / pitch).round()).abs() < 0.1
 }
 
 /// The layout a parenthesis `e` starts: the log is drawn at `ui_size`, the Status Bar's, to the
 /// pixel; a parenthesis's own height or two rows' pitch is only a pixel or two over a bright
 /// background, and so a few per cent off, which would shrink every line before it is read.
-fn refine_layout(img: &RgbImage, mask: &RgbImage, ends: &[Layout], e: &Layout, ui_size: f32) -> Option<(usize, u32, Layout)> {
-    let aligned = ends.iter().filter(|other| aligned_with(e, other, ui_size)).collect::<Vec<_>>();
+fn refine_layout(img: &RgbImage, mask: &RgbImage, ends: &[Layout], e: &Layout, ui_size: f32, blurred: bool) -> Option<(usize, u32, Layout)> {
+    let aligned = ends.iter().filter(|other| aligned_with(e, other, ui_size, blurred)).collect::<Vec<_>>();
     let bottom = aligned.iter().map(|e| e.bottom).max()?;
     let top = aligned.iter().map(|e| e.bottom).min()?;
     let distance = (bottom - top) as f32;
@@ -593,7 +659,7 @@ fn read_row(img: &RgbImage, right: u32, top: i32) -> Option<Row> {
     Some(Row { ink, contrast, fill, shape, yellow: yellow * 2 > strong, readable, fresh })
 }
 
-fn rows_match(old: &Row, new: &Row, tie_break: bool) -> bool {
+fn rows_match(old: &Row, new: &Row, tie_break: bool, blurred: bool) -> bool {
     if tie_break && old.yellow != new.yellow && old.fresh && new.fresh {
         return false;
     }
@@ -620,7 +686,7 @@ fn rows_match(old: &Row, new: &Row, tie_break: bool) -> bool {
         && (!tie_break || !brightened)
         && matched * 100 >= points.len() * 65
         && end_matches * 2 >= ending.len()
-        && tail_matches * 100 >= tail.len() * 80
+        && tail_matches * 100 >= tail.len() * if blurred { TAIL_AGREES_BLURRED } else { TAIL_AGREES }
 }
 
 fn points_fill(old: &Row, new: &Row) -> Vec<f32> {
@@ -629,15 +695,19 @@ fn points_fill(old: &Row, new: &Row) -> Vec<f32> {
 
 fn stack_matches_shift(old: &Stack, new: &Stack, shift: usize, tie_break: bool) -> bool {
     let anchored = (0..ROWS - shift).any(|i| match (&old.rows[i + shift], &new.rows[i]) {
-        (Some(a), Some(b)) => rows_match(a, b, tie_break),
+        (Some(a), Some(b)) => rows_match(a, b, tie_break, new.blurred),
         _ => false,
     });
-    if new.rows[ROWS - shift..].iter().any(|r| r.as_ref().is_none_or(|r| !r.fresh && !(anchored && r.readable))) {
+    // A line arrives at full brightness. At the samples' size a readable row beside one that matched
+    // may stand in for it; scaled up, a row is too uncertain (a faded top line that stopped
+    // reading would put every shift beyond it in reach), so only a full-brightness row is new.
+    let stands_in = |r: &Row| anchored && r.readable && !new.blurred;
+    if new.rows[ROWS - shift..].iter().any(|r| r.as_ref().is_none_or(|r| !r.fresh && !stands_in(r))) {
         return false;
     }
     for i in 0..ROWS - shift {
         match (&old.rows[i + shift], &new.rows[i]) {
-            (Some(a), Some(b)) if b.fresh && !rows_match(a, b, tie_break) || a.fresh && !b.readable => return false,
+            (Some(a), Some(b)) if b.fresh && !rows_match(a, b, tie_break, new.blurred) || a.fresh && !b.readable && !rows_match(a, b, tie_break, new.blurred) => return false,
             (Some(a), None) if a.fresh => return false,
             (None, Some(b)) if b.fresh => return false,
             _ => {}
@@ -668,19 +738,45 @@ fn reads_as(word: &str, fixed: &str) -> bool {
     crate::matcher::levenshtein(&letters(word), &letters(fixed)) <= 2
 }
 
-fn parse(text: &str, yellow: bool) -> Option<PickupLine> {
+/// Whether two reads of one line agree on everything that is counted: its kind and its amount
+/// (or quantity and tab), and for EXP whose it is. The name of an Item is not one of them: it is
+/// matched against the item files, and a misread one is only ever left as read.
+fn same_figures(a: &PickupLine, b: &PickupLine) -> bool {
+    match (a, b) {
+        (PickupLine::Item { quantity: qa, tab: ta, .. }, PickupLine::Item { quantity: qb, tab: tb, .. }) => qa == qb && ta == tb,
+        _ => a == b,
+    }
+}
+
+fn parse(text: &str, yellow: bool, blurred: bool) -> Option<PickupLine> {
     let text = text.trim();
     for kind in [GainKind::OwnOrPartyExp, GainKind::PartyBonus, GainKind::Mesos] {
         if let Some((label, tail)) = text.rsplit_once('(')
             && reads_as(label, kind.prefix())
         {
-            // The game's "+" reads as "*" too.
-            let number = tail.trim().strip_prefix(['+', '*'])?.strip_suffix(')')?;
-            let amount = number.replace(',', "").parse().ok()?;
-            return Some(kind.line(amount, yellow));
+            return Some(kind.line(gain_amount(tail, if blurred { 2 } else { 1 })?, yellow));
         }
     }
     parse_item(text)
+}
+
+/// The amount in what follows a gain line's last "(": the digits, after the "+" and before the
+/// ")". Each of those marks reads as another one (`*`, `:`, `;`, `?`) or is lost, so up to
+/// `marks` marks of any kind stand in for the "+" and any marks for the ")"; but more marks before
+/// the digits, or a `?` after them, might be a digit the recogniser had no word for, so they make
+/// the line unreadable. One mark is allowed at the samples' size; scaled up, a blurred "+" often
+/// reads as two (`(??58;`), and the three reads that must agree stand guard.
+fn gain_amount(tail: &str, marks: usize) -> Option<u64> {
+    let tail = tail.trim();
+    let number = tail.trim_start_matches(|c: char| c.is_ascii_punctuation() || c == ' ');
+    if tail.len() - number.len() > marks {
+        return None;
+    }
+    let number = number.trim_end_matches(|c: char| c.is_ascii_punctuation() && !matches!(c, ',' | '?') || c == ' ');
+    if !number.starts_with(|c: char| c.is_ascii_digit()) || !number.ends_with(|c: char| c.is_ascii_digit()) {
+        return None;
+    }
+    number.replace(',', "").parse().ok()
 }
 
 /// "<name> x<quantity> earned. (<tab>)", with the fixed words and the "x" read as the recogniser
