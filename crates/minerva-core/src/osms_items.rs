@@ -51,6 +51,33 @@ pub(crate) struct ItemFacts {
     pub tier: Option<ScrollTier>,
 }
 
+/// An inventory tab, shared by the Pickup Log parser and Item matching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InventoryTab { Equip, Use, Etc, Setup, Cash }
+
+impl InventoryTab {
+    pub fn as_str(self) -> &'static str {
+        match self { Self::Equip => "Equip", Self::Use => "Use", Self::Etc => "Etc", Self::Setup => "Setup", Self::Cash => "Cash" }
+    }
+
+    pub fn named(read: &str) -> Option<Self> {
+        [Self::Equip, Self::Use, Self::Etc, Self::Setup, Self::Cash].into_iter().find(|tab| tab.as_str().eq_ignore_ascii_case(read.trim()))
+    }
+}
+
+impl ItemFacts {
+    /// OSMS's kind is an equipment slot or weapon kind, and Scrolls belong in Use.
+    pub fn inventory_tab(&self) -> InventoryTab {
+        match self.kind.as_str() {
+            "Use" | "Scroll" => InventoryTab::Use,
+            "Etc" => InventoryTab::Etc,
+            "Setup" => InventoryTab::Setup,
+            "Cash" => InventoryTab::Cash,
+            _ => InventoryTab::Equip,
+        }
+    }
+}
+
 /// A scroll's tier, which its picture shows by its colour alone (#140): every scroll of a tier
 /// has the same picture, whatever it improves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

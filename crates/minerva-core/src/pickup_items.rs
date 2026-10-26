@@ -10,7 +10,7 @@
 //! lines, so a single misread never makes an Item of its own.
 
 use crate::bug_report::Note;
-use crate::osms_items::{ItemFacts, ItemSet};
+use crate::osms_items::{InventoryTab, ItemSet};
 use serde::Serialize;
 
 /// One Item the Session has picked up, and how many.
@@ -46,49 +46,13 @@ pub(crate) fn name(items: Option<&ItemSet>, name: &str, cut_short: bool, tab: &s
     let mut names = items.names_starting_with(name);
     // The game's tabs are Equip, Use, Etc, Setup and Cash. A tab it isn't can't narrow the
     // choice (a misread), and narrows it to nothing if no name starting so is filed under it.
-    if let Some(tab) = Tab::named(tab) {
-        names.retain(|name| name.iter().any(|item| Tab::of(item) == tab));
+    if let Some(tab) = InventoryTab::named(tab) {
+        names.retain(|name| name.iter().any(|item| item.inventory_tab() == tab));
     }
     match names.len() {
         0 => Named::Unmatched(shown),
         1 => Named::Item(names[0][0].name.clone()),
         _ => Named::CutShort(shown),
-    }
-}
-
-/// An inventory tab of the game.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Tab {
-    Equip,
-    Use,
-    Etc,
-    Setup,
-    Cash,
-}
-
-impl Tab {
-    /// The tab the game's Pickup Log writes as `read`.
-    fn named(read: &str) -> Option<Tab> {
-        match read.trim().to_ascii_lowercase().as_str() {
-            "equip" => Some(Tab::Equip),
-            "use" => Some(Tab::Use),
-            "etc" => Some(Tab::Etc),
-            "setup" => Some(Tab::Setup),
-            "cash" => Some(Tab::Cash),
-            _ => None,
-        }
-    }
-
-    /// The tab the game files `item` under: OSMS's `kind` is the slot or weapon kind of
-    /// equipment, and "Scroll" for a scroll, which the game keeps in Use.
-    fn of(item: &ItemFacts) -> Tab {
-        match item.kind.as_str() {
-            "Use" | "Scroll" => Tab::Use,
-            "Etc" => Tab::Etc,
-            "Setup" => Tab::Setup,
-            "Cash" => Tab::Cash,
-            _ => Tab::Equip,
-        }
     }
 }
 
