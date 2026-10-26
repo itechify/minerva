@@ -201,11 +201,14 @@
   margin: -1px 0;
 }
 
-/* The help beside the Mesos label: its 18px box is taller than the row's 17px line, so it
-   lends its height back and the row is no taller than the ones above it. */
-.rates .period .solo-exp-help {
-  margin-top: -2px;
-  margin-bottom: -2px;
+/* The meso coin beside the Mesos label: the label's own height, so it sits in the row's
+   text; pixel art, so kept crisp when it's scaled. */
+.rates .period .meso-icon {
+  width: auto;
+  height: 1em;
+  margin-left: 4px;
+  vertical-align: -2px;
+  image-rendering: pixelated;
 }
 
 .rates .unit {

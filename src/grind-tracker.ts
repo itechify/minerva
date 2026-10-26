@@ -1,9 +1,8 @@
 import "./errors";
 import { byId, span } from "./dom";
 import type { Character, ExpRate, ExpTracking, PacePoint, PaceTrace, Pickups } from "./exp-tracking";
-import { percent, rate, sharePercent, whole } from "./figures";
+import { percent, rate, whole } from "./figures";
 import { dragByHandles, followView, heightReporter, pressControls } from "./shell";
-import { helpButton, soloExpHelp } from "./solo-exp-help";
 
 /** What the shell sends: the figures, the Character playing (none until the Status Bar names
  *  one), whether the window shows at all, whether some map has a Personal Best (the Personal
@@ -46,17 +45,8 @@ const bestRow = byId("best-row");
 const bestExp = byId("best-exp");
 const bestThisVisit = byId("best-this-visit");
 const mesoRow = byId("meso-row");
-const mesoPeriod = byId("meso-period");
 const mesoTotal = byId("meso-total");
 const mesoRate = byId("meso-rate");
-// Beside "Mesos": where the figures are read from, and why they can be low.
-mesoPeriod.append(
-  helpButton("Where the mesos are read from", [
-    "Mesos are read from the Pickup Log, the lines in the game's bottom-right corner that announce what you pick up.",
-    "A figure here can be low, never high: a line that something covered, or that came faster than the log could show, may not be counted. Mesos picked up before your first EXP of the Session aren't either.",
-    "Mesos an hour is over the Session's active time, as the EXP rates are.",
-  ]),
-);
 const pickupCovered = byId("tracking-pickup-covered");
 const bestParty = byId("best-party");
 const expSplit = byId("exp-split");
@@ -73,9 +63,6 @@ pickupsMore.addEventListener("click", () => {
   allItems = !allItems;
   if (shown) render(shown);
 });
-const share = byId("tracking-share");
-const shareText = document.createElement("span");
-share.append(shareText, soloExpHelp());
 const deaths = byId("tracking-deaths");
 const exp = byId("tracking-exp");
 const expFigures = byId("exp-figures");
@@ -219,11 +206,6 @@ function render(view: TrackerView) {
   // Said quietly, only while the Session shows figures that a cover would leave low.
   pickupCovered.hidden = !started || !view.pickupLogCovered;
 
-  const shareOf = t.ceilingShareHundredths;
-  share.hidden = shareOf === null || t.soloExpCeiling === null;
-  if (shareOf !== null && t.soloExpCeiling !== null) {
-    shareText.textContent = `${sharePercent(shareOf)} of this map's solo EXP/h (${whole(t.soloExpCeiling)})`;
-  }
   const died = t.deaths.count;
   deaths.hidden = died === 0;
   // No-break spaces: where the line wraps, the loss reads as one.

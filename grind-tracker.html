@@ -79,10 +79,10 @@
               </div>
               <!-- The mesos the Pickup Log says the Session has picked up, and mesos an hour,
                    laid out as the rows above are but without their units: the label says what
-                   the first figure is, the "/h" what the second. The help beside the label
-                   (added by the script) says where they are read from and why they can be low. -->
+                   the first figure is, the "/h" what the second. The meso coin beside the
+                   label is decoration: the label says it. -->
               <div class="row" id="meso-row" hidden>
-                <span class="period" id="meso-period">Mesos</span>
+                <span class="period">Mesos<img class="meso-icon" src="/assets/meso.png" alt="" draggable="false" /></span>
                 <span class="value" id="meso-total"></span><span class="unit"></span>
                 <span class="value" id="meso-rate"></span><span class="unit per">/h</span>
               </div>
@@ -131,7 +131,6 @@
               <text class="split" id="pace-split"></text>
               <circle class="you" id="pace-you" r="3.5" />
             </svg>
-            <p class="line" id="tracking-share" hidden></p>
             <p class="line" id="tracking-deaths" hidden></p>
             <!-- One of our windows has been over the Pickup Log for a while: said quietly, in the
                  lines' ink, so a dip in mesos an hour has its reason in sight. -->
