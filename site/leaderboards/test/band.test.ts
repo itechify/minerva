@@ -19,13 +19,25 @@ describe("a Level Band", () => {
     );
 
     expect(table.rows).toEqual([
-      { rank: "1", name: "Egbert", nameHref: "/character/?name=Egbert", job: "Magician", level: "23", expPerHour: "153,000", date: "3 Oct", you: false, lane: expect.any(Number) },
-      { rank: "2", name: "Ada", nameHref: "/character/?name=Ada", job: "Bowman", level: "29", expPerHour: "66,600", date: "30 Dec 2025", you: false, lane: expect.any(Number) },
+      { rank: "1", medal: 1, name: "Egbert", nameHref: "/character/?name=Egbert", job: "Magician", jobClass: "magician", level: "23", expPerHour: "153,000", date: "3 Oct", you: false, lane: expect.any(Number) },
+      { rank: "2", medal: 2, name: "Ada", nameHref: "/character/?name=Ada", job: "Bowman", jobClass: "bowman", level: "29", expPerHour: "66,600", date: "30 Dec 2025", you: false, lane: expect.any(Number) },
     ]);
     expect(table.yours).toBe(null);
     expect(table.gap).toBe(null);
     expect(table.note).toBe(null);
     expect(table.empty).toBe(null);
+  });
+
+  it("crowns the band's top 3 gold, silver and bronze, and no one past them", () => {
+    const table = bandTable(answer([1, 2, 3, 4].map((rank) => ranked(rank, `Crowd${rank}`))), null, NOW);
+
+    expect(table.rows.map((r) => r.medal)).toEqual([1, 2, 3, null]);
+  });
+
+  it("names the class of a job the game names, and none of one it doesn't", () => {
+    const table = bandTable(answer([{ ...ranked(1, "Egbert"), job: "Dragon Knight" }, { ...ranked(2, "Ada"), job: "Jester" }]), null, NOW);
+
+    expect(table.rows.map((r) => r.jobClass)).toEqual(["warrior", null]);
   });
 
   it("says under the table how many entries it shows, of how many", () => {
@@ -57,9 +69,11 @@ describe("a Level Band", () => {
     expect(table.gap).toBe("6 more entries");
     expect(table.yours).toEqual({
       rank: "57",
+      medal: null,
       name: "Egbert",
       nameHref: "/character/?name=Egbert",
       job: "Magician",
+      jobClass: "magician",
       level: "23",
       expPerHour: "1,230",
       date: "3 Oct",

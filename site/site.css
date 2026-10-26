@@ -3477,18 +3477,27 @@ button.button {
 .ch-table .lb-map-street {
   display: block;
 }
-/* A #1's crown in Crown Gold: the Map Leaderboards drawing's metal, lit at its top as a medal
-   is, ringed in a dark bronze. Never You Yellow, which marks the player's own best, and only
-   ever this shape, so it reads as neither doubt nor a deal. */
-.ch-crown {
+/* A place in a band's top 3, on a map's page and a Character's: a crown in Crown Gold, Crown
+   Silver or Crown Bronze, each metal lit at its top as a medal is and ringed in a darker edge
+   (its gradient drawn with it, leaderboards/api.ts). Never You Yellow, which marks the
+   player's own best, and only ever this shape, so it reads as neither doubt nor a deal. */
+.lb-crown {
   width: 14px;
   height: 14px;
   margin-right: 5px;
   vertical-align: -1px;
-  fill: url(#crown-gold);
-  stroke: #6e4a00;
   stroke-width: 1.1;
   stroke-linejoin: round;
+}
+/* A job beside its class's icon, the game's own, drawn pixel for pixel at its 26px (27px for
+   the warrior's and the thief's), set on the text's middle and taking 20px of the line, so a
+   table's row is no taller for it and a card's line or Latest's grows by a pixel or two rather
+   than the icon reaching into the lines around it. A long job's name wraps after its first
+   word, never between the icon and it. */
+.lb-job-icon {
+  margin: -3px 6px -3px 0;
+  vertical-align: middle;
+  image-rendering: pixelated;
 }
 /* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
 .ch-board .lb-said.ch-lost-said {

@@ -7,7 +7,8 @@ import { dayText } from "../../src/dates.ts";
 import { levels, rate, whole } from "../../src/figures.ts";
 import { type CharacterAnswer, isName, type MapMark } from "../entries.ts";
 import { levelsOf } from "../level-bands.ts";
-import { linkTo, type MapNames, placeOf, type Said } from "../leaderboards/leaderboards.ts";
+import { type JobClass, linkTo, type MapNames, type Medal, medalOf, placeOf, type Said } from "../leaderboards/leaderboards.ts";
+import { classOf } from "../jobs.ts";
 
 export type { CharacterAnswer } from "../entries.ts";
 
@@ -31,8 +32,8 @@ export interface CharacterRow {
   /** "#2", and how many the band has there: "of 12". */
   rank: string;
   of: string;
-  /** Whether it's the band's #1 there: a crown marks it. */
-  top: boolean;
+  /** Its crown, for a place in the band's top 3: gold, silver or bronze. */
+  medal: Medal | null;
   map: string;
   street: string;
   /** The map's Map Mark, shown before its name; `null` for a map without one. */
@@ -41,6 +42,8 @@ export interface CharacterRow {
    *  table doesn't hold. */
   mobs: string | null;
   job: string;
+  /** The job's class, whose icon goes beside it; `null` for a job the game doesn't name. */
+  jobClass: JobClass | null;
   level: string;
   expPerHour: string;
   date: string;
@@ -61,8 +64,10 @@ export interface CharacterBand {
  *  the figures under the name, and their Level Bands, highest first. */
 export interface CharacterPage {
   name: string;
-  /** "Cleric Lv 31 · newest best 22 Oct". */
+  /** "Cleric Lv 31 · newest best 22 Oct", and the class of the job, whose icon goes before
+   *  it. */
   who: string;
+  whoClass: JobClass | null;
   stats: Stat[];
   bands: CharacterBand[];
 }
@@ -105,12 +110,13 @@ export function characterPage(answer: CharacterAnswer, names: MapNames, now: Dat
   const row = (e: Placed): CharacterRow => ({
     rank: `#${whole(e.rank)}`,
     of: `of ${whole(e.total)}`,
-    top: e.rank === 1,
+    medal: medalOf(e.rank),
     map: e.place.name,
     street: e.place.street,
     mark: e.mark === null ? null : markOf(e.mark),
     mobs: e.mobs === null ? null : levels({ lowest: e.mobs[0], highest: e.mobs[1] }),
     job: e.job,
+    jobClass: classOf(e.job),
     level: String(e.level),
     expPerHour: rate(e.expPerHour),
     date: dated(e.setAt),
@@ -126,6 +132,7 @@ export function characterPage(answer: CharacterAnswer, names: MapNames, now: Dat
   return {
     name: answer.name,
     who: `${newest.job} Lv ${newest.level} · newest best ${dated(newest.setAt)}`,
+    whoClass: classOf(newest.job),
     stats: [
       { value: whole(tops), label: tops === 1 ? "#1 held" : "#1s held", detail: null },
       { value: whole(podiums), label: podiums === 1 ? "Podium" : "Podiums", detail: "Top 3 in a band" },

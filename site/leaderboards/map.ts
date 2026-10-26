@@ -5,7 +5,7 @@
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import { STAR } from "../star.ts";
-import { byId, characterLink, names, read, said as saidWith, unreachable } from "./api.ts";
+import { byId, characterLink, crown, jobWithIcon, names, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
@@ -373,7 +373,8 @@ interface RowsAt {
   morph: Map<string, string> | null;
 }
 
-/** An entry's row: its rank, name (a link to the Character's page), job, level, EXP/h, lane,
+/** An entry's row: its rank (crowned in the top 3), name (a link to the Character's page), job
+ *  (beside its class's icon), level, EXP/h, lane,
  *  date and report link; or, for the linked Character's, the You Yellow star before the name
  *  and no report link (the player takes their own entries off from Minerva). A row that
  *  slides in a switch takes its Character's name for it. */
@@ -397,7 +398,12 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
     report.addEventListener("click", () => openReport(row, place, band));
     reportCell.append(report);
   }
-  const cells = [make("td", "lb-rank", row.rank), make("td", "lb-job", row.job), make("td", "lb-level", row.level)];
+  const rank = make("td", "lb-rank");
+  if (row.medal !== null) rank.append(crown(row.medal));
+  rank.append(row.rank);
+  const job = make("td", "lb-job");
+  job.append(jobWithIcon(row.job, row.jobClass));
+  const cells = [rank, job, make("td", "lb-level", row.level)];
   const exp = make("td", "lb-exp", row.expPerHour);
   // Its lane again under the figure, for a page too narrow for the lanes' own column.
   exp.append(lane(row, "lb-lane-track lb-under"));

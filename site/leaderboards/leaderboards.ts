@@ -17,6 +17,7 @@ import {
   type Ranked,
   type TrainingAnswer,
 } from "../entries.ts";
+import { classOf, type JobClass } from "../jobs.ts";
 import { bandOf, levelsOf } from "../level-bands.ts";
 import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts";
 
@@ -25,6 +26,16 @@ import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts
 // shows from this module.
 export { characterLinkTo, mapNames, placeOf };
 export type { MapNameRow, MapNames, MapPlace } from "../map-names.ts";
+export type { JobClass } from "../jobs.ts";
+
+/** A place in a band's top 3, crowned in gold, silver or bronze. */
+export type Medal = 1 | 2 | 3;
+
+/** The crown an entry at `rank` wears: gold for #1, silver for #2, bronze for #3; none
+ *  past them. */
+export function medalOf(rank: number): Medal | null {
+  return rank >= 1 && rank <= 3 ? (rank as Medal) : null;
+}
 export type { BandAnswer, BandsAnswer, LatestAnswer, MapMark, Ranked, TrainingAnswer } from "../entries.ts";
 
 /** A map's page as its address names it: `/leaderboards/map/?map=<ID>&band=<first level>&name=<name>`.
@@ -284,10 +295,14 @@ export function mapPage(link: Link, names: MapNames, answer: MapAnswer): MapPage
 /** An entry as a band's table writes it. */
 export interface Row {
   rank: string;
+  /** Its crown, for a place in the band's top 3. */
+  medal: Medal | null;
   name: string;
   /** The Character's page. */
   nameHref: string;
   job: string;
+  /** The job's class, whose icon goes beside it; `null` for a job the game doesn't name. */
+  jobClass: JobClass | null;
   level: string;
   expPerHour: string;
   date: string;
@@ -347,9 +362,11 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
     const set = new Date(entry.setAt);
     return {
       rank: String(entry.rank),
+      medal: medalOf(entry.rank),
       name: entry.name,
       nameHref: characterLinkTo(entry.name),
       job: entry.job,
+      jobClass: classOf(entry.job),
       level: String(entry.level),
       expPerHour: rate(entry.expPerHour),
       date: dayText(set, set.getFullYear() !== now.getFullYear()),
@@ -490,7 +507,7 @@ export interface TrainingRow {
   /** The band's #1 there: its EXP/h, who set it (their name, linking to their page, and
    *  "Magician Lv 25") and when; `null` with no entries, its cell left empty, as its entries
    *  say there are none. */
-  best: { expPerHour: string; name: string; nameHref: string; who: string; date: string } | null;
+  best: { expPerHour: string; name: string; nameHref: string; who: string; jobClass: JobClass | null; date: string } | null;
   /** "3 entries", or "No entries yet"; `null` when none of the maps shown has any, which
    *  the table says once, over them, its cell left empty. */
   entries: string | null;
@@ -582,6 +599,7 @@ export function trainingTable(
               name: m.best.name,
               nameHref: characterLinkTo(m.best.name),
               who: `${m.best.job} Lv ${m.best.level}`,
+              jobClass: classOf(m.best.job),
               date: dayText(set, set.getFullYear() !== now.getFullYear()),
             },
       entries: none ? null : m.entries === 0 ? "No entries yet" : entriesCounted(m.entries),
@@ -617,6 +635,8 @@ export interface LatestLine {
   nameHref: string;
   /** "Magician Lv 23". */
   who: string;
+  /** The job's class, whose icon goes beside it; `null` for a job the game doesn't name. */
+  jobClass: JobClass | null;
   /** "153,000", its EXP/h. */
   expPerHour: string;
   map: string;
@@ -648,6 +668,7 @@ export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): {
       name: e.name,
       nameHref: characterLinkTo(e.name),
       who: `${e.job} Lv ${e.level}`,
+      jobClass: classOf(e.job),
       expPerHour: rate(e.expPerHour),
       map: placeOf(names, e.map).name,
       mark: e.mark === null ? null : { name: e.mark.name, picture: e.mark.picture },

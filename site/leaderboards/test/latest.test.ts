@@ -24,6 +24,7 @@ describe("latest", () => {
           name: "Hakuo",
           nameHref: "/character/?name=Hakuo",
           who: "Magician Lv 23",
+          jobClass: "magician",
           expPerHour: "153,000",
           map: "Pig Field",
           mark: { name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" },
