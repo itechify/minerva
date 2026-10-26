@@ -28,10 +28,14 @@ Each directory is a short sequence of 10 Hz log-band crops, named by capture mil
 with `truth.json` listing the arrivals checked by eye, oldest first. Its first frame is a
 baseline: lines already there are not arrivals. `source` identifies the maintainer's
 2026-10-25 party (`1025`) or 2026-10-07 solo (`1007`) recording. Frames are cut to a 325×139
-band: client (1590,830) for 1025 and (1590,830) for 1007. The closing parentheses and six
+band at client (1590,830) in both recordings, checked against the source frames. The
+2026-10-25 recording was captured at client (1400,730), 520×260: the committed clips
+start at (190,100) within it. The 2026-10-07 recording was captured at client
+(1560,780), 355×220: the clips start at (30,50) within it. The closing parentheses and six
 22 px slots are kept; no game window size or log position is supplied to the reader.
-Each clip must count its arrivals once, never more, and at other UI Sizes may read fewer,
-never another line (`tests/pickup_log_samples.rs`). The `covered` clip has another player's
+Each clip must count only its arrivals, never more. An unlocated empty baseline cannot
+prove the log is empty: the first located stack establishes the baseline, so those first
+lines may be missed. At other UI Sizes it may read fewer, never another line (`tests/pickup_log_samples.rs`). The `covered` clip has another player's
 entire name plate painted black in frames 6600–7200, including its border. All other clips
 contain no player names. A Bug Report's `crops/pickup-log-<ms>.png` belongs in a short
 sequence showing the frame before and after the problem, with the same privacy rule.
