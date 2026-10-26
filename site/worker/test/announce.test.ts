@@ -22,6 +22,11 @@ const MADE_UP_TOWN = "https://osms.invalid/images/map_marks/MadeUpTown.png";
 /** No map has a Map Mark. */
 const NO_PICTURES = (): string | null => null;
 
+/** A Character's name as a post writes it: a link to their page (ADR 0027). */
+function linked(name: string): string {
+  return `[${name}](https://owlofminerva.app/character/?name=${name})`;
+}
+
 let posts: Post[];
 let realFetch: typeof globalThis.fetch;
 
@@ -115,7 +120,9 @@ describe("the post", () => {
       {
         title: "Henesys Hunting Ground I",
         url: `https://owlofminerva.app/leaderboards/map/?map=${HUNTING_GROUND}&band=20&name=Hakuo&kind=solo`,
-        description: "**Hakuo** took #1, levels 20–29, with 153,000 EXP/h, past Egbert's 80,000.",
+        description:
+          "**[Hakuo](https://owlofminerva.app/character/?name=Hakuo)** took #1, levels 20–29, with 153,000 EXP/h, " +
+          "past [Egbert](https://owlofminerva.app/character/?name=Egbert)'s 80,000.",
       },
     ]);
   });
@@ -124,7 +131,8 @@ describe("the post", () => {
     const post = postFor([taken(HUNTING_GROUND, 20, 153_216, true)], NO_PICTURES)!;
 
     expect(post.embeds[0].description).toBe(
-      "**Hakuo** took #1, levels 20–29, with 153,000 EXP/h in a party, past Egbert's 80,000.",
+      "**[Hakuo](https://owlofminerva.app/character/?name=Hakuo)** took #1, levels 20–29, with 153,000 EXP/h in a party, " +
+        "past [Egbert](https://owlofminerva.app/character/?name=Egbert)'s 80,000.",
     );
   });
 
@@ -186,8 +194,8 @@ describe("an upload", () => {
     await upload("Hakuo", key("hakuo"), [entry(CROWNED, 23, 90_000)]);
 
     await postsSettle(1);
-    expect(posts[0].embeds[0].description).toContain("**Hakuo** took #1");
-    expect(posts[0].embeds[0].description).toContain("past Egbert's 80,000");
+    expect(posts[0].embeds[0].description).toContain(`**${linked("Hakuo")}** took #1`);
+    expect(posts[0].embeds[0].description).toContain(`past ${linked("Egbert")}'s 80,000`);
     expect(posts[0].embeds[0].url).toContain(`map=${CROWNED}&band=20&name=Hakuo`);
     // CROWNED has no Map Mark in the made-up ceilings.
     expect(posts[0].embeds[0]).not.toHaveProperty("thumbnail");
@@ -198,7 +206,7 @@ describe("an upload", () => {
     await upload("Kora", key("kora"), [entry(map, 25, 10_000), partyEntry(map, 25, 80_000)]);
     await upload("Lars", key("lars"), [partyEntry(map, 25, 90_000)]);
     await postsSettle(1);
-    expect(posts[0].embeds[0].description).toContain("**Lars** took #1");
+    expect(posts[0].embeds[0].description).toContain("**[Lars](https://owlofminerva.app/character/?name=Lars)** took #1");
     expect(posts[0].embeds[0].description).toContain("in a party");
     expect(posts[0].embeds[0].url).toContain("kind=party");
 
@@ -206,17 +214,17 @@ describe("an upload", () => {
     await upload("Lars", key("lars"), [entry(map, 25, 20_000), partyEntry(map, 25, 90_000)]);
     await postsSettle(2);
     expect(posts[1].embeds[0].description).not.toContain("in a party");
-    expect(posts[1].embeds[0].description).toContain("past Kora's 10,000");
+    expect(posts[1].embeds[0].description).toContain("past [Kora](https://owlofminerva.app/character/?name=Kora)'s 10,000");
     expect(posts[1].embeds[0].url).toContain("kind=solo");
 
     await upload("Kora", key("kora"), [entry(map, 25, 50_000), partyEntry(map, 25, 80_000)]);
     await postsSettle(3);
-    expect(posts[2].embeds[0].description).toContain("**Kora** took #1");
+    expect(posts[2].embeds[0].description).toContain("**[Kora](https://owlofminerva.app/character/?name=Kora)** took #1");
     // Improving her own solo top, even past the party top, takes no new spot.
     await upload("Kora", key("kora"), [entry(map, 25, 95_000), partyEntry(map, 25, 80_000)]);
     await upload("Lars", key("lars"), [entry(map, 25, 96_000), partyEntry(map, 25, 90_000)]);
     await postsSettle(4);
-    expect(posts[3].embeds[0].description).toContain("past Kora's 95,000");
+    expect(posts[3].embeds[0].description).toContain("past [Kora](https://owlofminerva.app/character/?name=Kora)'s 95,000");
   });
 
   it("posts nothing for the same set uploaded again", async () => {
@@ -233,7 +241,7 @@ describe("an upload", () => {
     // Only a real take is posted, so the next one proves the two above posted nothing.
     await upload("Fritz", key("fritz"), [entry(QUIET, 27, 95_000)]);
     await postsSettle(2);
-    expect(posts[1].embeds[0].description).toContain("**Fritz** took #1");
+    expect(posts[1].embeds[0].description).toContain(`**${linked("Fritz")}** took #1`);
   });
 
   it("posts nothing for the first entry in a band", async () => {
@@ -242,7 +250,7 @@ describe("an upload", () => {
     await upload("Horst", key("horst"), [entry("100000053", 25, 10_000)]);
     await upload("Ilse", key("ilse"), [entry("100000053", 25, 20_000)]);
     await postsSettle(1);
-    expect(posts[0].embeds[0].description).toContain("**Ilse** took #1");
+    expect(posts[0].embeds[0].description).toContain(`**${linked("Ilse")}** took #1`);
   });
 
   it("posts nothing when a Character beats its own best", async () => {
@@ -254,7 +262,7 @@ describe("an upload", () => {
 
     await upload("Lena", key("lena"), [entry("100000054", 25, 70_000)]);
     await postsSettle(2);
-    expect(posts[1].embeds[0].description).toContain("**Lena** took #1");
+    expect(posts[1].embeds[0].description).toContain(`**${linked("Lena")}** took #1`);
   });
 
   it("posts nothing when a top spot falls to someone because an entry went", async () => {
@@ -267,7 +275,7 @@ describe("an upload", () => {
 
     await upload("Olga", key("olga"), [entry("100000055", 25, 95_000)]);
     await postsSettle(2);
-    expect(posts[1].embeds[0].description).toContain("**Olga** took #1");
+    expect(posts[1].embeds[0].description).toContain(`**${linked("Olga")}** took #1`);
   });
 
   it("posts nothing for an entry the cap rejects", async () => {
@@ -277,7 +285,7 @@ describe("an upload", () => {
 
     await upload("Sven", key("sven"), [entry("100000000", 25, 450_000)]);
     await postsSettle(1);
-    expect(posts[0].embeds[0].description).toContain("**Sven** took #1");
+    expect(posts[0].embeds[0].description).toContain(`**${linked("Sven")}** took #1`);
   });
 
   it("posts one message for several spots taken at once", async () => {

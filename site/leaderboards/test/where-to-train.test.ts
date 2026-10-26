@@ -142,7 +142,7 @@ describe("where to train's table", () => {
       mark: { name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" },
       href: "/leaderboards/map/?map=100000000&band=20",
       mobs: "Lv 22–27",
-      best: { expPerHour: "250,000", who: "Bea · Magician Lv 25", date: "3 Oct", party: false },
+      best: { expPerHour: "250,000", name: "Bea", nameHref: "/character/?name=Bea", who: "Magician Lv 25", jobClass: "magician", date: "3 Oct", party: false },
       entries: "3 entries",
     });
   });

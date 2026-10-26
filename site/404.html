@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- The site's 404 (ADR 0027): Cloudflare serves it, with its 404 status, for any address that
+     is neither a file of the site's nor the API's (site/wrangler.jsonc, "404-page"). The owl
+     lost, in place of the heading's words, which are its alt text; no tab is lit, and the tabs
+     are the way on. It is served at any depth, so everything it names is from the site's root,
+     as the build writes it. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Not found · Minerva</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/icon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ececec" />
+    <link rel="preload" href="./fonts/Maplestory-Light.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/Maplestory-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../src/theme.css" />
+    <link rel="stylesheet" href="./site.css" />
+    <script type="module" src="./site.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the page</a>
+    <div class="window">
+      @WINDOW_HEAD@
+
+      <main class="window-body" id="main">
+        <div class="part" data-street="Not found">
+          <header class="lb-head stop" id="top" data-mini="Not found">
+            <h1>
+              <img class="lost-art" src="./art/not-found.png" alt="404 Not Found" width="440" height="287" fetchpriority="high" />
+            </h1>
+          </header>
+        </div>
+      </main>
+
+      <footer class="window-foot" id="credits" data-mini="Credits">
+@CREDITS@
+      </footer>
+    </div>
+  </body>
+</html>

@@ -26,3 +26,23 @@ One over each group's heading in `site/faq/index.html`, the owl holding what the
 | `faq-leaderboards.png` | Map Leaderboards | The owl over a board of five ranked players, the Slime, the Orange Mushroom and a pink horned mob cheering under it | 217×240 |
 | `faq-items.png` | Items | The owl in a headband carrying a shopping bag of coins and a potion | 301×240 |
 | `faq-trouble.png` | Troubleshooting & Bug Reports | The owl in a hard hat with a wrench at a laptop, a speech bubble with a warning, a wrench and a bug, the Orange Mushroom worried beside it | 331×240 |
+
+## The owl lost
+
+Over a page with nothing to show: the site's 404 (`site/404.html`), heading it in place of a heading's words, which are its alt text; a Character's page with no entries, or a link naming none (`site/character/index.html`); and a map's page naming no map, or one there isn't (`site/leaderboards/map/index.html`). The page shows it 440px wide (300px on a phone), and its alt text is the sign's words. Trimmed of the supplied drawing's faint stray pixels under the ground.
+
+| File | Shows on | What it shows | Size |
+| --- | --- | --- | --- |
+| `not-found.png` | The 404, a Character's page and a map's page with nothing to show | The owl puzzled, a question mark over it and a torn map with a red cross in its wing, beside a wooden signpost lettered "404" over "Not Found" | 880×574 |
+
+## The job icons
+
+Beside each job the site writes (`site/jobs.ts` gives a job's class, `site/leaderboards/api.ts` draws it): the game's class icons, supplied by the owner (October 2026) as GIFs with white corners, kept here as PNGs with those corners made transparent and nothing else changed. They show pixel for pixel, at their own size. A Pirate has no icon yet, and shows none.
+
+| File | Class | What it shows | Size |
+| --- | --- | --- | --- |
+| `jobs/beginner.png` | Beginner | A figure in white on a teal square, sparkles around it | 26×26 |
+| `jobs/warrior.png` | Warrior | A figure swinging a sword, in white on red to yellow | 27×27 |
+| `jobs/magician.png` | Magician | A figure casting, in white on blue | 26×26 |
+| `jobs/bowman.png` | Bowman | A figure drawing a bow, in white on green | 26×26 |
+| `jobs/thief.png` | Thief | A figure throwing, in white on brown to cream | 27×27 |

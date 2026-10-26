@@ -1,7 +1,7 @@
 // A Map Leaderboards entry as the Worker (`site/worker`) checks and answers it and the
-// pages (`site/leaderboards`) read it: what a Character's name and a map's ID may be, and
-// the answers the pages read: a Level Band's, Where to train's and Latest's. Plain data, so
-// both can take it.
+// pages (`site/leaderboards`, `site/character`) read it: what a Character's name and a map's
+// ID may be, and the answers the pages read: a Level Band's, Where to train's, Latest's and a
+// Character's. Plain data, so both can take it.
 
 /** Whether `name` can be a Character's: 1 to 16 letters and digits. */
 export function isName(name: string): boolean {
@@ -104,4 +104,40 @@ export interface LatestEntry extends Best {
 /** GET /api/latest: the newest entries, by when their Visit set them. */
 export interface LatestAnswer {
   entries: LatestEntry[];
+}
+
+/** A Character's page (ADR 0027), from the site's root: `/character/?name=Egbert`. Every
+ *  name the site shows links to it, and so does a new #1's post on Discord. */
+export function characterLinkTo(name: string): string {
+  return `/character/?${new URLSearchParams({ name })}`;
+}
+
+/** One of a Character's entries as their page shows it: where, its rank of how many of its
+ *  kind in the band there, and the map's mob levels and Map Mark, as Where to train gives them. */
+export interface CharacterEntry {
+  map: string;
+  band: number;
+  rank: number;
+  /** How many entries of its kind the band has on the map. */
+  total: number;
+  job: string;
+  level: number;
+  expPerHour: number;
+  /** When the Visit set it, in ms since the Unix epoch. */
+  setAt: number;
+  /** Whether it's a Party Best's: its rank is among the band's Party Bests, and a Solo
+   *  Best's among its Solo Bests (ADR 0015). */
+  party: boolean;
+  /** The levels of the middle half of the map's spawns; `null` for a map the ceilings
+   *  table doesn't hold. */
+  mobs: [number, number] | null;
+  mark: MapMark | null;
+}
+
+/** GET /api/characters/<name>: the Character's name as last uploaded, and every entry of
+ *  theirs on the Map Leaderboards, each with its rank. A name with no entries, for whatever
+ *  reason, is a 404. */
+export interface CharacterAnswer {
+  name: string;
+  entries: CharacterEntry[];
 }

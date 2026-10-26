@@ -11,8 +11,8 @@
   "compatibility_date": "2026-10-12",
   "main": "./worker/index.ts",
   // The Worker runs first for /api/ only. Every other path is the site's own file, or,
-  // with none, reaches the Worker, which hands it back to the assets for their plain 404.
-  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  // with none, the site's 404 page (site/404.html), with a 404 status.
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*"], "not_found_handling": "404-page" },
   "d1_databases": [
     {
       "binding": "DB",

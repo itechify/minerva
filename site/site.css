@@ -1102,8 +1102,8 @@ strong {
   line-height: 30px;
 }
 /* Each group's owl (site/art) stands over its heading, every one the same height whatever
-   its width. A shorter screen gives up some of it, so the heading, what it covers and the
-   topics under them still fit beside the questions; too short to hold them, it goes. */
+   its width. A shorter screen gives up some of it, so the heading and what it covers still
+   fit beside the questions. */
 .faq-art {
   display: block;
   width: auto;
@@ -1119,11 +1119,6 @@ strong {
     margin-bottom: 10px;
   }
 }
-@media screen and (min-width: 961px) and (max-height: 700px) {
-  .faq-art {
-    display: none;
-  }
-}
 .faq-group-head p {
   margin: 0;
   font-size: 15px;
@@ -1133,52 +1128,9 @@ strong {
 .faq-group-body > h3:first-child {
   margin-top: 2px;
 }
-/* The topics under a group's heading (topics.ts), held in sight with it, so the way to
-   another is never back at the top: the nine as quiet rows past a Window Rule, the group
-   you're in the selected one, as the panel marks the shown map's row (Selection Periwinkle,
-   its inset ring and bold Ink). Shown from 961px, where the column has the room, beside the
-   minimap from 1440px (its portals name the topics only under the pointer); on a screen too
-   short to hold them with the heading, or narrower, each group ends on its way back to the
-   owl's list instead. A printed page has no use for either. */
-.faq-topics {
-  display: none;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
-}
-.faq-topics ul {
-  margin: 0 -10px;
-  padding: 0;
-  list-style: none;
-}
-.faq-topics li {
-  margin: 0;
-}
-.faq-topics a {
-  display: block;
-  padding: 4px 10px;
-  border-radius: 3px;
-  color: var(--ink-2);
-  font-size: 14px;
-  line-height: 20px;
-  text-decoration: none;
-}
-.faq-topics a:hover {
-  background: color-mix(in srgb, var(--edit) 8%, transparent);
-  color: var(--ink);
-}
-.faq-topics a:focus-visible {
-  outline-offset: -2px;
-}
-.faq-topics a[aria-current] {
-  background: var(--select);
-  box-shadow: inset 0 0 0 1px var(--select-edge);
-  color: var(--ink);
-  font-weight: 700;
-}
-/* Under the questions, as a feature's questions end on the rest of their group. */
+/* Under the questions, each group ends on its way back to the owl's list, as a feature's
+   questions end on the rest of their group. A printed page has no use for it. */
 .faq-topics-back {
-  display: none;
   grid-column: -2;
   margin: 0;
   font-size: 14px;
@@ -1189,14 +1141,9 @@ strong {
   display: inline-block;
   padding: 11px 0;
 }
-@media screen and (min-width: 961px) and (min-height: 600px) {
-  .faq-topics {
-    display: block;
-  }
-}
-@media screen and (max-width: 960px), screen and (max-height: 599px) {
+@media print {
   .faq-topics-back {
-    display: block;
+    display: none;
   }
 }
 
@@ -1967,9 +1914,9 @@ button.icon-button:active {
   text-align: right;
 }
 /* Latest: each entry two lines beside two right-aligned figures, so the EXP/h read down the
-   list as a column: the Character (bold) and their job and level beside what they got, over
-   the map, its Map Mark before it, and band beside the day. An entry that took a map's top
-   spot says so under them. */
+   list as a column: the Character (bold), then their job (beside its class's icon) and level,
+   beside what they got, over the map, its Map Mark before it, and band beside the day. An
+   entry that took a map's top spot says so under them. */
 .lb-map.lb-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1977,6 +1924,57 @@ button.icon-button:active {
   align-items: start;
   font-size: 13px;
   line-height: 18px;
+}
+/* Wide enough, the rows share three columns (each row a subgrid of the list): the names, which
+   take the longest one's room, then the jobs, so every icon and job starts at one edge down the
+   list, then the figures. A job too long for its column wraps past its icon. On a phone each
+   entry keeps its one line of name and job, as the list is too narrow for the longest name's. */
+@media (min-width: 641px) {
+  .lb-latest {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) auto;
+  }
+  .lb-latest > li {
+    grid-column: 1 / -1;
+  }
+  /* The loading line spans the list, so its words don't set the names' column. */
+  .lb-latest > li:not(.lb-wait) {
+    display: grid;
+    grid-template-columns: subgrid;
+  }
+  .lb-latest .lb-map.lb-entry {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    column-gap: 0;
+  }
+  .lb-latest .lb-entry-who {
+    display: contents;
+  }
+  .lb-latest .lb-entry-name {
+    grid-column: 1;
+    margin-right: 8px;
+  }
+  /* The job's 13px words sit on the name's 15px baseline, 3px down the name's 22px line, the
+     icon centred on their first line. */
+  .lb-latest .lb-entry-job {
+    display: flex;
+    grid-column: 2;
+    align-items: flex-start;
+    padding-top: 3px;
+  }
+  .lb-latest .lb-entry-job .lb-job-icon,
+  .lb-latest .lb-entry-job .lb-job-slot {
+    flex: none;
+    margin-block: -4px 0;
+  }
+  .lb-latest .lb-entry-exp,
+  .lb-latest .lb-entry-date {
+    grid-column: 3;
+    margin-left: 10px;
+  }
+  .lb-latest .lb-entry-where {
+    grid-column: 1 / 3;
+  }
 }
 .lb-entry-job,
 .lb-entry-unit,
@@ -2371,6 +2369,56 @@ html.lb-band .lb-train,
   font-weight: 400;
   color: var(--ink-2);
 }
+/* A Character's name links to their page (ADR 0027), wherever the Map Leaderboards show it.
+   At rest it reads as the words around it, as a map's name in Where to train does; under the
+   pointer it is the Magic Portal Blue link it is. */
+.lb-character {
+  color: inherit;
+  text-decoration: none;
+}
+.lb-character:hover {
+  color: var(--portal);
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+.lb-character:active {
+  color: var(--frame);
+}
+/* Latest: the map's name is the entry's link, stretched over the whole entry, as a card's;
+   the Characters' names sit over it, each its own link. The entry is lit as one under the
+   pointer, the map's name underlined, unless the pointer is on a name. */
+.lb-map.lb-entry {
+  position: relative;
+}
+.lb-entry-map {
+  text-decoration: none;
+}
+.lb-entry-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.lb-entry .lb-character {
+  position: relative;
+  z-index: 1;
+}
+.lb-map.lb-entry:hover .lb-map-name:not(:hover),
+.lb-map.lb-entry:active .lb-map-name:not(:hover) {
+  color: var(--ink);
+  text-decoration: none;
+}
+.lb-map.lb-entry:hover:not(:has(.lb-character:hover)) .lb-entry-map {
+  color: var(--portal);
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+.lb-entry-map:focus-visible {
+  outline: none;
+}
+.lb-map.lb-entry:has(.lb-entry-map:focus-visible) {
+  outline: 2px solid var(--edit);
+  outline-offset: -2px;
+}
 /* Under a long band's first 15 maps, Show all: a row across the table, as a map's page says
    how many entries are between, its words a link's, the whole row to press. */
 .lb-train-table tr.lb-more > td {
@@ -2491,7 +2539,8 @@ html.lb-band .lb-train,
 /* A band's entries: the hotkey table's inset box, rows parted by Window Rules, figures
    right-aligned, the linked character's row selected. As wide as the page's measure. */
 .lb-table,
-.lb-train-table {
+.lb-train-table,
+.ch-table {
   width: 100%;
   border: 1px solid var(--inset-edge);
   border-radius: 4px;
@@ -2504,20 +2553,24 @@ html.lb-band .lb-train,
 .lb-table th,
 .lb-table td,
 .lb-train-table th,
-.lb-train-table td {
+.lb-train-table td,
+.ch-table th,
+.ch-table td {
   padding: 8px 12px;
   text-align: left;
   vertical-align: baseline;
 }
 .lb-table thead th,
-.lb-train-table thead th {
+.lb-train-table thead th,
+.ch-table thead th {
   font-size: 13px;
   font-weight: 400;
   line-height: 18px;
   color: var(--ink-2);
 }
 .lb-table tbody tr > *,
-.lb-train-table tbody tr > * {
+.lb-train-table tbody tr > *,
+.ch-table tbody tr > * {
   border-top: 1px solid var(--rule);
 }
 .lb-table .lb-rank,
@@ -2690,28 +2743,57 @@ html.lb-morph::view-transition-group(lb-head) {
   color: var(--ink-2);
   text-align: center;
 }
-/* Report, quiet on every row: a link's words without the underline, which it takes under
-   the pointer, its own or its row's. */
+/* Report, quiet on every row: a flag drawn in two strokes, as the game's small buttons draw
+   their icons, in Ink Steel at 55% that comes up to Ink Steel under the pointer on its row,
+   and to Portal Blue under the pointer itself. Its name, and its tooltip, say Report. */
 .lb-report-button {
   position: relative;
-  padding: 0;
+  display: inline-flex;
+  padding: 3px;
   border: 0;
+  border-radius: 3px;
   background: none;
-  color: var(--ink-2);
-  font: 13px/18px var(--font);
-  text-decoration: underline 1px transparent;
-  text-underline-offset: 3px;
+  color: color-mix(in srgb, var(--ink-2) 55%, transparent);
+  vertical-align: middle;
   cursor: var(--cursor-link);
 }
+.lb-flag {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .lb-table tbody tr:hover .lb-report-button {
-  text-decoration-color: var(--select-edge);
+  color: var(--ink-2);
 }
 .lb-table tbody tr .lb-report-button:hover {
   color: var(--portal);
-  text-decoration-color: currentColor;
 }
 .lb-report-button:active {
   color: var(--frame);
+}
+/* With a mouse, a table's dates go from sight, each the row's under the pointer ("Set 23
+   Oct"), so the job keeps its line; assistive tech still reads them in their cells. A touch
+   screen, which can't point, keeps them. A card's lane then runs the card's whole width. */
+@media (hover: hover) and (pointer: fine) and (max-width: 640px) {
+  .lb-table tbody tr > .lb-lane {
+    grid-column: 1 / -1;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .lb-table .lb-date,
+  .ch-table .ch-date {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* On a touch screen wider than a phone, the tabs, the questions and Report take a thumb's
@@ -3102,7 +3184,8 @@ button.button {
 }
 
 /* On a phone a tab's name that won't fit on one line takes two; and each entry becomes a card, as the Personal Bests window's rows do: its
-   rank beside its name and EXP/h, over its job, level, date and Report. */
+   rank beside its name, Report's flag and its EXP/h, over its job and level, over its lane and
+   date. */
 @media (max-width: 640px) {
   .tab,
   .tab[aria-current="page"] {
@@ -3124,12 +3207,14 @@ button.button {
   }
   /* The rows as cards, the table's roles kept in the markup; the caption still under them. */
   .lb-table,
-  .lb-train-table {
+  .lb-train-table,
+  .ch-table {
     display: flex;
     flex-direction: column;
   }
   .lb-table tbody,
-  .lb-train-table tbody {
+  .lb-train-table tbody,
+  .ch-table tbody {
     display: block;
   }
   .lb-caption {
@@ -3138,10 +3223,12 @@ button.button {
     padding: 8px 12px;
     border-top: 1px solid var(--rule);
   }
-  /* A map's card: its name and street beside the #1, over its mobs and its entries. */
+  /* A map's card: its name and street beside the #1, over its mobs and its entries. The #1
+     takes at most half the card, its line of who and when wrapping, so the map's name keeps
+     room for its words. */
   .lb-train-table tr {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) fit-content(50%);
     grid-template-areas:
       "map best"
       "mobs entries";
@@ -3191,6 +3278,11 @@ button.button {
     position: absolute;
     inset: 0;
   }
+  /* The #1's name sits over the card's link, its own. */
+  .lb-train-table .lb-character {
+    position: relative;
+    z-index: 1;
+  }
   .lb-train-table tr.lb-more {
     display: block;
     padding: 0;
@@ -3200,7 +3292,8 @@ button.button {
     border-top: 0;
   }
   .lb-train-table thead,
-  .lb-table thead {
+  .lb-table thead,
+  .ch-table thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -3209,12 +3302,14 @@ button.button {
   }
   .lb-table tr {
     display: grid;
-    /* The job gives way (it wraps) before the level or the date, which never break. */
-    grid-template-columns: 2.6em minmax(0, max-content) max-content minmax(max-content, 1fr) auto;
+    /* The figures stand down the card's right edge, the EXP/h over the level over the date
+       (at the lane's end), and Report's flag beside the EXP/h, so the job has its line to
+       itself and wraps only when it can't fit even that. */
+    grid-template-columns: 2.6em minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "rank name name name exp"
-      "rank job level date report"
-      "lane lane lane lane lane";
+      "rank name report exp"
+      "rank job job level"
+      "lane lane lane date";
     column-gap: 10px;
     padding: 8px 12px;
   }
@@ -3261,18 +3356,22 @@ button.button {
   }
   .lb-table .lb-level {
     grid-area: level;
+    justify-self: end;
   }
   .lb-table td.lb-level::before {
     content: "Lv ";
   }
   .lb-table .lb-date {
     grid-area: date;
+    justify-self: end;
+    align-self: center;
   }
   .lb-table .lb-report {
     grid-area: report;
     width: auto;
+    align-self: center;
   }
-  /* The lane under the figures, the card's whole width, still on the band's one scale. */
+  /* The lane under the job, across the card to the date, still on the band's one scale. */
   .lb-table .lb-lane {
     --lane-inset: 0px;
     --lane-end: 0px;
@@ -3280,7 +3379,8 @@ button.button {
     width: auto;
   }
   .lb-table tbody tr > .lb-lane {
-    padding-top: 6px;
+    padding-top: 0;
+    align-self: center;
   }
   .lane-grid {
     display: none;
@@ -3414,5 +3514,319 @@ button.button {
 @media (max-width: 720px) {
   .window-signed-in {
     display: none;
+  }
+}
+
+/* A Character's page (ADR 0027): their name, who their newest entry says they are, and a row
+   of figures, then a table of their entries for each Level Band, as Where to train's table:
+   the map's name its link, over its street, figures right-aligned. One measure with the Map
+   Leaderboards' pages. */
+.ch-board {
+  max-width: 60em;
+}
+/* A name of 16 letters is wider than a phone: it breaks rather than run off the window. */
+.ch-name {
+  overflow-wrap: anywhere;
+}
+.ch-who {
+  min-height: 22px;
+  margin: -8px 0 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+/* The figures, each in the hotkey table's inset box: the figure, over what it counts, over
+   what more it says. */
+.ch-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 60em;
+  margin: 24px 0 0;
+}
+.ch-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--inset-bg);
+}
+.ch-stat dd {
+  margin: 0;
+}
+.ch-stat-value {
+  order: -1;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.ch-stat-label {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+.ch-stat-detail {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.ch-board {
+  padding-top: 40px;
+}
+.ch-board.lb-waiting {
+  min-height: 420px;
+}
+.ch-board > .lb-said {
+  margin: 0;
+}
+.ch-band + .ch-band {
+  padding-top: 40px;
+}
+.ch-band h2 {
+  margin-bottom: 12px;
+  font-size: 23px;
+  line-height: 30px;
+}
+.ch-table .ch-mobs,
+.ch-table .ch-level,
+.ch-table .ch-exp,
+.ch-table .ch-date {
+  text-align: right;
+}
+.ch-table td.ch-mobs,
+.ch-table td.ch-job,
+.ch-table td.ch-date,
+.ch-rank-of {
+  color: var(--ink-2);
+}
+.ch-table td.ch-mobs,
+.ch-table td.ch-date,
+.ch-table td.ch-rank {
+  white-space: nowrap;
+}
+.ch-table th.ch-map {
+  font-weight: 400;
+}
+.ch-table td.ch-rank,
+.ch-table td.ch-exp {
+  font-weight: 700;
+}
+.ch-rank-of {
+  font-weight: 400;
+}
+.ch-table .lb-map-name {
+  display: block;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ch-table .lb-map-name:hover {
+  color: var(--portal);
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+.ch-table .lb-map-street {
+  display: block;
+}
+/* A place in a band's top 3, on a map's page and a Character's: a crown in Crown Gold, Crown
+   Silver or Crown Bronze, each metal lit at its top as a medal is and ringed in a darker edge
+   (its gradient drawn with it, leaderboards/api.ts). Never You Yellow, which marks the
+   player's own best, and only ever this shape, so it reads as neither doubt nor a deal. */
+.lb-crown {
+  width: 14px;
+  height: 14px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+/* A job the site has no icon for (a Pirate's, or one the game doesn't name) keeps the icon's
+   room where jobs stand in a column (a band's table, a Character's, Latest), so its words line
+   up with the rest. */
+.lb-job-slot {
+  display: inline-block;
+  width: 26px;
+  margin-right: 6px;
+}
+/* In a table's job cell, a job too long for its column wraps past its icon, under its first
+   word, the icon (26px and 6px, or its room) hanging before it. */
+.lb-table td.lb-job .lb-job-line,
+.ch-table td.ch-job .lb-job-line {
+  display: inline-block;
+  padding-left: 32px;
+  text-indent: -32px;
+}
+/* On a phone, Latest's name and job are one line, not columns: no room to keep. */
+@media (max-width: 640px) {
+  .lb-latest .lb-job-slot {
+    display: none;
+  }
+}
+/* A job beside its class's icon, the game's own, drawn pixel for pixel at its 26px (27px for
+   the warrior's and the thief's), set on the text's middle and taking 20px of the line, so a
+   table's row is no taller for it and a card's line or Latest's grows by a pixel or two rather
+   than the icon reaching into the lines around it. A long job's name wraps after its first
+   word, never between the icon and it. */
+.lb-job-icon {
+  margin: -3px 6px -3px 0;
+  vertical-align: middle;
+  image-rendering: pixelated;
+}
+/* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
+.ch-board .lb-said.ch-lost-said {
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--ink);
+}
+/* The columns are set by their headers, so every band's table lines up with the next; the
+   map takes what the figures leave. The headers stay under the window's head as a long table
+   goes by, as Where to train's do. */
+@media (min-width: 641px) {
+  .ch-table {
+    table-layout: fixed;
+  }
+  .ch-table th.ch-rank {
+    width: 96px;
+  }
+  .ch-table th.ch-mobs {
+    width: 96px;
+  }
+  .ch-table th.ch-job {
+    width: 104px;
+  }
+  .ch-table th.ch-level {
+    width: 56px;
+  }
+  .ch-table th.ch-exp {
+    width: 104px;
+  }
+  .ch-table th.ch-date {
+    width: 96px;
+  }
+  .ch-table td,
+  .ch-table tbody th {
+    overflow-wrap: anywhere;
+  }
+  .ch-table thead th {
+    position: sticky;
+    top: var(--head);
+    z-index: 1;
+    background: color-mix(in srgb, #fff 55%, var(--body-solid));
+    box-shadow: inset 0 -1px 0 var(--rule);
+  }
+  .ch-table thead th:first-child {
+    border-top-left-radius: 3px;
+  }
+  .ch-table thead th:last-child {
+    border-top-right-radius: 3px;
+  }
+  .ch-table tbody tr:first-child > * {
+    border-top: 0;
+  }
+}
+/* Too narrow for those, the job and mob levels give the map room. */
+@media (min-width: 641px) and (max-width: 899px) {
+  .ch-table th.ch-mobs {
+    width: 72px;
+  }
+  .ch-table th.ch-job {
+    width: 96px;
+  }
+}
+/* On a phone the figures go two by two, and each entry becomes a card, as Where to train's
+   maps do: the map, over its rank and job, over the map's mob levels, and down the right edge
+   the EXP/h over the level over the date, so the job has its line to itself. A long map name wraps rather than push
+   the EXP/h off the card, and the EXP/h and date share the card's right edge. The whole card
+   is the map's link, for a thumb. */
+@media (max-width: 640px) {
+  .ch-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ch-table tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "map map exp"
+      "rank job level"
+      "mobs mobs date";
+    column-gap: 10px;
+    padding: 8px 12px;
+  }
+  .ch-table tbody tr + tr {
+    border-top: 1px solid var(--rule);
+  }
+  .ch-table tbody tr > * {
+    padding: 0;
+    border-top: 0;
+  }
+  .ch-table .ch-map {
+    grid-area: map;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .ch-table .ch-exp {
+    grid-area: exp;
+    justify-self: end;
+  }
+  .ch-table .ch-rank {
+    grid-area: rank;
+  }
+  .ch-table .ch-job {
+    grid-area: job;
+  }
+  .ch-table .ch-level {
+    grid-area: level;
+    justify-self: end;
+  }
+  .ch-table .ch-date {
+    grid-area: date;
+    justify-self: end;
+  }
+  .ch-table .ch-mobs {
+    grid-area: mobs;
+    text-align: left;
+  }
+  .ch-table td.ch-rank,
+  .ch-table td.ch-job,
+  .ch-table td.ch-level,
+  .ch-table td.ch-date,
+  .ch-table td.ch-mobs {
+    font-size: 13px;
+    line-height: 20px;
+  }
+  .ch-table td.ch-level::before {
+    content: "Lv ";
+  }
+  .ch-table td.ch-mobs::before {
+    content: "Mobs at ";
+  }
+  .ch-table td.ch-none {
+    display: none;
+  }
+  .ch-table .lb-map-name::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+}
+
+/* The owl lost, over a page with nothing to show: the site's 404, a link that names no
+   Character or no map, and a Character with no entries. The drawing says "404 Not Found"
+   itself, so no heading repeats it. */
+.lost-art {
+  display: block;
+  width: 440px;
+  max-width: 100%;
+  height: auto;
+}
+.lost {
+  margin-bottom: 16px;
+}
+@media (max-width: 640px) {
+  .lost-art {
+    width: 300px;
   }
 }

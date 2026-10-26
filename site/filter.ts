@@ -79,7 +79,7 @@ if (words && questions.length) {
         : `${found === 1 ? "1 question has" : `${found} questions have`} “${query.trim()}”.`;
   }
 
-  // What's left moves every heading under it: the minimap and the topics list follow.
+  // What's left moves every heading under it: the minimap follows.
   const find = (query: string) => {
     keep(query);
     dispatchEvent(new Event("scroll"));

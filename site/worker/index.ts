@@ -1,5 +1,7 @@
 // The minerva-site Worker: the site's build, and the API under /api/: the Map Leaderboards
-// (ADR 0015, where its routes and their answers are written down) and Accounts (ADR 0023).
+// (ADR 0015, where its routes and their answers are written down), a Character's page
+// (ADR 0027) and Accounts (ADR 0023).
+import { readCharacterPage } from "./character-page";
 import { confirmLinkToken, deleteAccount, linkState, mintLinkToken, readAccount, readLinkToken, unlinkPc } from "./accounts";
 import { callback, start } from "./discord";
 import { type Answer, badRequest, json } from "./http";
@@ -11,8 +13,9 @@ import { deleteEntry, dismissReport, findAccounts, readCharacter, readRemoved, r
 import { endSession, isMaintainerAccount, sameOrigin, sessionAccount } from "./sessions";
 import { readBands, readTraining } from "./where-to-train";
 
-/** The Map Leaderboards' reads, which read no key or cookie. */
-const PUBLIC_READS = ["/api/maps", "/api/bands", "/api/latest"];
+/** The Map Leaderboards' reads, which read no key or cookie, a Character's page's among them
+ *  (the app's writes under /api/characters aren't GETs). */
+const PUBLIC_READS = ["/api/maps", "/api/bands", "/api/latest", "/api/characters"];
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -49,6 +52,8 @@ async function route(request: Request, url: URL, env: Env, ctx: ExecutionContext
       return routeLink(request, url, path.slice(1), env);
   }
   switch (true) {
+    case path.length === 2 && path[0] === "characters" && method === "GET":
+      return readCharacterPage(env, path[1]);
     case path.length === 3 && path[0] === "characters" && path[2] === "entries" && method === "PUT":
       return upload(env, request, path[1], ctx);
     case path.length === 3 && path[0] === "characters" && path[2] === "entries" && method === "DELETE":
