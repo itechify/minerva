@@ -407,3 +407,18 @@ fn the_items_those_lines_name_are_tallied_by_name_and_counted_once() {
         ]
     );
 }
+
+#[test]
+fn a_shadow_that_brightens_around_an_unchanged_line_is_not_a_new_arrival() {
+    let original = image::open(common::samples_in("pickup-log/repeated-mesos").join("00144700.png")).unwrap().to_rgba8();
+    let mut lifted = original.clone();
+    for p in lifted.pixels_mut().filter(|p| p.0[..3].iter().all(|&c| c < 100)) {
+        for c in &mut p.0[..3] {
+            *c += 20;
+        }
+    }
+    let capture = |img: &image::RgbaImage, at_ms| PickupLogCapture { frame: common::frame(img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
+    let mut reader = PickupLogReader::bundled();
+    let captures = [capture(&original, 0), capture(&lifted, 100), capture(&original, 200)];
+    assert_eq!(arrivals(&mut reader, captures), vec![]);
+}

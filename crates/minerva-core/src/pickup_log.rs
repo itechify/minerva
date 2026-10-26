@@ -163,6 +163,9 @@ struct Stack {
 struct Row {
     ink: GrayImage,
     contrast: Vec<f32>,
+    /// Each pixel's own brightness, shadow left out: a background or shadow change moves
+    /// `contrast` but not the glyphs' fill, so only the fill says a line brightened.
+    fill: Vec<f32>,
     shape: Vec<usize>,
     yellow: bool,
     fresh: bool,
@@ -537,6 +540,7 @@ fn read_row(img: &RgbImage, right: u32, top: i32) -> Option<Row> {
     let mut end = 0;
     let mut bright = 0;
     let mut shape = Vec::new();
+    let mut fill = Vec::with_capacity(width as usize * TEXT_HEIGHT as usize);
     for y in top as u32..top as u32 + TEXT_HEIGHT {
         for x in left..=right {
             let (e, is_yellow) = shadow_contrast(img, x, y, 2);
@@ -552,6 +556,7 @@ fn read_row(img: &RgbImage, right: u32, top: i32) -> Option<Row> {
             if r.min(g) > 160 && (r.abs_diff(b) < 35 || b < 90) && e > 80.0 {
                 shape.push(contrast.len() - 1);
             }
+            fill.push(luma([r, g, b]));
             if r.min(g) > 220 && (r.abs_diff(b) < 35 || b < 90) {
                 bright += 1;
             }
@@ -585,7 +590,7 @@ fn read_row(img: &RgbImage, right: u32, top: i32) -> Option<Row> {
         let shadow = shadow_contrast(img, x, y, 1).0.max(shadow_contrast(img, x, y, 2).0);
         ((shadow - INK_SHADOW_FLOOR) / INK_SHADOW_SPAN).clamp(0.0, 1.0) * ((r.min(g) as f32 - 60.0) / 170.0).clamp(0.0, 1.0)
     });
-    Some(Row { ink, contrast, shape, yellow: yellow * 2 > strong, readable, fresh })
+    Some(Row { ink, contrast, fill, shape, yellow: yellow * 2 > strong, readable, fresh })
 }
 
 fn rows_match(old: &Row, new: &Row, tie_break: bool) -> bool {
@@ -606,11 +611,20 @@ fn rows_match(old: &Row, new: &Row, tie_break: bool) -> bool {
     let end_matches = ending.iter().filter(|&&&i| new.contrast[i] > old.contrast[i] * alpha * 0.5).count();
     let tail = old.shape.iter().filter(|&&i| i % width >= width - 45 && old.contrast[i] > 20.0).collect::<Vec<_>>();
     let tail_matches = tail.iter().filter(|&&&i| (new.contrast[i] - alpha * old.contrast[i]).abs() < 35.0).count();
+    // A line only fades: the ratio of its glyphs' own brightness, not of their contrast with a
+    // shadow a different background can lift or sink, says whether it brightened.
+    let mut fills = points_fill(old, new);
+    fills.sort_by(f32::total_cmp);
+    let brightened = fills.get(fills.len() / 2).is_some_and(|&a| a > 1.08);
     alpha > 0.15
-        && (!tie_break || alpha <= 1.08)
+        && (!tie_break || !brightened)
         && matched * 100 >= points.len() * 65
         && end_matches * 2 >= ending.len()
         && tail_matches * 100 >= tail.len() * 80
+}
+
+fn points_fill(old: &Row, new: &Row) -> Vec<f32> {
+    old.shape.iter().map(|&i| new.fill[i] / old.fill[i].max(1.0)).collect()
 }
 
 fn stack_matches_shift(old: &Stack, new: &Stack, shift: usize, tie_break: bool) -> bool {
