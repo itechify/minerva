@@ -66,6 +66,43 @@ const TAIL_AGREES_BLURRED: usize = 65;
 /// The weight above which a pixel of a line's ink is ink in the third read of a line scaled up from a
 /// smaller UI Size: a cut that keeps a digit's body whole, where a higher one reads a "9" as a "0".
 const CUT_INK: f32 = 0.35;
+/// How long a reader may read nothing before a Bug Report keeps a whole capture of its band (ms): a
+/// log that is never found, or an empty one, shows only what the capture itself says (ADR 0020).
+const NOTHING_FOR_MS: u64 = 30_000;
+/// How long after one such capture is kept before another may be (ms).
+const NOTHING_KEEP_AGAIN_MS: u64 = 5 * 60_000;
+
+/// Whether a reader has found nothing for a while, so a Bug Report is to keep a capture of its band
+/// (ADR 0020's last consequence): once the reader has read [`PickupLogSeen::Nothing`] for
+/// [`NOTHING_FOR_MS`], and not within [`NOTHING_KEEP_AGAIN_MS`] of the last one kept.
+#[derive(Debug, Default)]
+pub(crate) struct FindsNothing {
+    since: Option<u64>,
+    kept_at: Option<u64>,
+}
+
+impl FindsNothing {
+    /// Take in a reading: whether its capture is the one to keep.
+    pub fn on_reading(&mut self, reading: &PickupLogReading) -> bool {
+        if reading.seen != PickupLogSeen::Nothing {
+            self.since = None;
+            return false;
+        }
+        let since = *self.since.get_or_insert(reading.at_ms);
+        let waited = reading.at_ms.saturating_sub(since) >= NOTHING_FOR_MS;
+        let due = self.kept_at.is_none_or(|at| reading.at_ms.saturating_sub(at) >= NOTHING_KEEP_AGAIN_MS);
+        if waited && due {
+            self.kept_at = Some(reading.at_ms);
+        }
+        waited && due
+    }
+
+    /// A new stream of captures: the wait starts again.
+    pub fn restart(&mut self) {
+        self.since = None;
+    }
+}
+
 /// The generous discovery band, anchored to the client's bottom-right and sized by the
 /// Status Bar. The reader measures the lines' own UI Size within it.
 pub(crate) fn capture_band(client: ScreenRect, status_bar: ScreenRect) -> ScreenRect {

@@ -126,3 +126,46 @@ fn a_window_before_the_log_is_found_does_not_make_an_empty_capture_interesting()
     let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
     assert!(recording.crops.iter().all(|p| !p.contains("pickup-log")));
 }
+
+/// Feed the core a whole band, once a second, as read by a reader that finds `seen(at_ms)`; the
+/// names of the Pickup Log crops the Bug Report has kept.
+fn kept_log_crops(seconds: std::ops::RangeInclusive<u64>, seen: impl Fn(u64) -> bool) -> Vec<String> {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let img = image::RgbaImage::new(region.width, region.height);
+    for second in seconds {
+        let at_ms = second * 1000;
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
+        let seen = if seen(second) { PickupLogSeen::Clear { area: region } } else { PickupLogSeen::Nothing };
+        minerva.on_pickup_log_read(capture, common::pickup_reading(at_ms, seen, vec![]));
+    }
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+    recording.crops.into_iter().filter(|p| p.contains("pickup-log")).collect()
+}
+
+#[test]
+fn a_reader_that_finds_nothing_for_a_while_keeps_one_whole_band_capture_now_and_then() {
+    // Nothing is read for 31 s: the capture at the 30th second after the first is kept, whole (a
+    // Bug Report 0.15.0 kept none of 6,652, and the log was never found: ADR 0020).
+    assert_eq!(kept_log_crops(1..=40, |_| false), vec!["crops/pickup-log-0000031000.png"]);
+    // And then not again for a while: the next kept 5 minutes after, not 10 per second.
+    assert_eq!(
+        kept_log_crops(1..=340, |_| false),
+        vec!["crops/pickup-log-0000031000.png", "crops/pickup-log-0000331000.png"]
+    );
+    // Not before: 29 s of nothing keeps none.
+    assert_eq!(kept_log_crops(1..=30, |_| false), Vec::<String>::new());
+}
+
+#[test]
+fn seeing_the_log_starts_the_wait_again() {
+    // Seen at the 20th second, then nothing: the lines that vanished keep their capture at once, and
+    // the 30 s are counted from the first reading of nothing after it, not from the first of all.
+    let seen_at_20 = |second: u64| second == 20;
+    assert_eq!(kept_log_crops(1..=50, seen_at_20), vec!["crops/pickup-log-0000021000.png"]);
+    assert_eq!(
+        kept_log_crops(1..=52, seen_at_20),
+        vec!["crops/pickup-log-0000021000.png", "crops/pickup-log-0000051000.png"]
+    );
+}

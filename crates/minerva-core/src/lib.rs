@@ -130,6 +130,7 @@ use shown_map::ShownMap;
 use matcher::{Match, Matcher, Snap};
 use pictures::Pictures;
 use pickup_cover::PickupCover;
+use pickup_log::FindsNothing;
 use panel::Panel;
 use portal_overrides::PORTAL_OVERRIDES;
 use session::Session;
@@ -608,6 +609,8 @@ pub struct Minerva {
     /// Reads captures fed to [`Minerva::on_pickup_log_capture`], in order; made on the first one.
     pickup_log_reader: Option<PickupLogReader>,
     pickup_log_seen: bool,
+    /// How long the reader has found nothing, for the Bug Report to keep a capture of the band.
+    pickup_log_nothing: FindsNothing,
     /// Whether our windows have been over the Pickup Log.
     pickup_cover: PickupCover,
     /// Where the Status Bar's level, job and name were last found, and the game's client
@@ -683,6 +686,7 @@ impl Minerva {
             status_bar_reader: None,
             pickup_log_reader: None,
             pickup_log_seen: false,
+            pickup_log_nothing: FindsNothing::default(),
             pickup_cover: PickupCover::default(),
             status_bar_area: None,
             title_found: None,
@@ -1725,6 +1729,9 @@ impl Minerva {
         let unusual = reading.chose
             || (self.pickup_log_seen && reading.seen == PickupLogSeen::Nothing)
             || reading.arrived.contains(&PickupLine::Unreadable);
+        // A reader that finds nothing for a while keeps one whole band capture, now and then, so a log it
+        // never finds can be looked for in the report (a Bug Report of 0.15.0 had none of 6,652).
+        let unusual = self.pickup_log_nothing.on_reading(&reading) || unusual;
         let crop = unusual.then_some((Region::PickupLog, capture.frame));
         self.record_input(Event::PickupLog { reading: reading.clone(), stale_region: None }, Some(reading.at_ms), crop);
         self.take_pickup_log_reading(reading)
@@ -1746,6 +1753,7 @@ impl Minerva {
     fn reset_pickup_log(&mut self) {
         self.pickup_log_reader = None;
         self.pickup_log_seen = false;
+        self.pickup_log_nothing.restart();
         self.state.pickup_log_generation += 1;
     }
 
