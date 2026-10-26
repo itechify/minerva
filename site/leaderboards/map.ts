@@ -357,6 +357,14 @@ function lane(row: Row, className: string): HTMLSpanElement {
   return track;
 }
 
+/** Report's flag, a 2-stroke line icon as the game's small buttons draw theirs. Report's own
+ *  name says what it is. */
+function flag(): SVGSVGElement {
+  const svg = svgEl("svg", { viewBox: "0 0 16 16", class: "lb-flag", "aria-hidden": "true" });
+  svg.append(svgEl("path", { d: "M4 14.5v-12M4 3h8.5l-2 3.25 2 3.25H4" }));
+  return svg;
+}
+
 /** The You Yellow star, the Personal Bests window's mark for a best of the player's. */
 function star(): SVGSVGElement {
   const svg = svgEl("svg", { viewBox: "0 0 16 16", class: "lb-star", "aria-hidden": "true" });
@@ -374,16 +382,19 @@ interface RowsAt {
 }
 
 /** An entry's row: its rank (crowned in the top 3), name (a link to the Character's page), job
- *  (beside its class's icon), level, EXP/h, lane,
- *  date and report link; or, for the linked Character's, the You Yellow star before the name
- *  and no report link (the player takes their own entries off from Minerva). A row that
- *  slides in a switch takes its Character's name for it. */
+ *  (beside its class's icon), level, EXP/h, lane, date (under the pointer, with a mouse) and
+ *  Report's flag; or, for the linked Character's, the You Yellow star before the name and no
+ *  Report (the player takes their own entries off from Minerva). A row that slides in a
+ *  switch takes its Character's name for it. */
 function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowElement {
   const tr = make("tr", row.you ? "lb-you" : "");
   tr.setAttribute("role", "row");
   tr.dataset.name = row.name;
   tr.style.viewTransitionName = morph?.get(row.name) ?? "";
   if (row.you) tr.setAttribute("aria-current", "true");
+  // With a mouse, the date is the row's under the pointer; its cell is for a touch screen and
+  // assistive tech (site.css).
+  tr.title = `Set ${row.date}`;
   const name = make("th", "lb-name");
   name.scope = "row";
   name.setAttribute("role", "rowheader");
@@ -391,8 +402,10 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   name.append(characterLink(row.name, row.nameHref));
   const reportCell = make("td", "lb-report");
   if (!row.you) {
-    const report = make("button", "lb-report-button", "Report");
+    const report = make("button", "lb-report-button");
     report.type = "button";
+    report.title = "Report";
+    report.append(flag());
     report.setAttribute("aria-label", `Report ${row.name}'s entry`);
     report.setAttribute("aria-describedby", "report-keys");
     report.addEventListener("click", () => openReport(row, place, band));

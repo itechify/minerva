@@ -1952,7 +1952,7 @@ button.icon-button:active {
   }
   .lb-latest .lb-entry-name {
     grid-column: 1;
-    margin-right: 10px;
+    margin-right: 8px;
   }
   /* The job's 13px words sit on the name's 15px baseline, 3px down the name's 22px line, the
      icon centred on their first line. */
@@ -1970,7 +1970,7 @@ button.icon-button:active {
   .lb-latest .lb-entry-exp,
   .lb-latest .lb-entry-date {
     grid-column: 3;
-    margin-left: 14px;
+    margin-left: 10px;
   }
   .lb-latest .lb-entry-where {
     grid-column: 1 / 3;
@@ -2681,28 +2681,57 @@ html.lb-morph::view-transition-group(lb-head) {
   color: var(--ink-2);
   text-align: center;
 }
-/* Report, quiet on every row: a link's words without the underline, which it takes under
-   the pointer, its own or its row's. */
+/* Report, quiet on every row: a flag drawn in two strokes, as the game's small buttons draw
+   their icons, in Ink Steel at 55% that comes up to Ink Steel under the pointer on its row,
+   and to Portal Blue under the pointer itself. Its name, and its tooltip, say Report. */
 .lb-report-button {
   position: relative;
-  padding: 0;
+  display: inline-flex;
+  padding: 3px;
   border: 0;
+  border-radius: 3px;
   background: none;
-  color: var(--ink-2);
-  font: 13px/18px var(--font);
-  text-decoration: underline 1px transparent;
-  text-underline-offset: 3px;
+  color: color-mix(in srgb, var(--ink-2) 55%, transparent);
+  vertical-align: middle;
   cursor: var(--cursor-link);
 }
+.lb-flag {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .lb-table tbody tr:hover .lb-report-button {
-  text-decoration-color: var(--select-edge);
+  color: var(--ink-2);
 }
 .lb-table tbody tr .lb-report-button:hover {
   color: var(--portal);
-  text-decoration-color: currentColor;
 }
 .lb-report-button:active {
   color: var(--frame);
+}
+/* With a mouse, a table's dates go from sight, each the row's under the pointer ("Set 23
+   Oct"), so the job keeps its line; assistive tech still reads them in their cells. A touch
+   screen, which can't point, keeps them. A card's lane then runs the card's whole width. */
+@media (hover: hover) and (pointer: fine) and (max-width: 640px) {
+  .lb-table tbody tr > .lb-lane {
+    grid-column: 1 / -1;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .lb-table .lb-date,
+  .ch-table .ch-date {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* On a touch screen wider than a phone, the tabs, the questions and Report take a thumb's
@@ -3092,7 +3121,8 @@ button.button {
 }
 
 /* On a phone a tab's name that won't fit on one line takes two; and each entry becomes a card, as the Personal Bests window's rows do: its
-   rank beside its name and EXP/h, over its job, level, date and Report. */
+   rank beside its name, Report's flag and its EXP/h, over its job and level, over its lane and
+   date. */
 @media (max-width: 640px) {
   .tab,
   .tab[aria-current="page"] {
@@ -3209,12 +3239,14 @@ button.button {
   }
   .lb-table tr {
     display: grid;
-    /* The job gives way (it wraps) before the level or the date, which never break. */
-    grid-template-columns: 2.6em minmax(0, max-content) max-content minmax(max-content, 1fr) auto;
+    /* The figures stand down the card's right edge, the EXP/h over the level over the date
+       (at the lane's end), and Report's flag beside the EXP/h, so the job has its line to
+       itself and wraps only when it can't fit even that. */
+    grid-template-columns: 2.6em minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "rank name name name exp"
-      "rank job level date report"
-      "lane lane lane lane lane";
+      "rank name report exp"
+      "rank job job level"
+      "lane lane lane date";
     column-gap: 10px;
     padding: 8px 12px;
   }
@@ -3261,18 +3293,22 @@ button.button {
   }
   .lb-table .lb-level {
     grid-area: level;
+    justify-self: end;
   }
   .lb-table td.lb-level::before {
     content: "Lv ";
   }
   .lb-table .lb-date {
     grid-area: date;
+    justify-self: end;
+    align-self: center;
   }
   .lb-table .lb-report {
     grid-area: report;
     width: auto;
+    align-self: center;
   }
-  /* The lane under the figures, the card's whole width, still on the band's one scale. */
+  /* The lane under the job, across the card to the date, still on the band's one scale. */
   .lb-table .lb-lane {
     --lane-inset: 0px;
     --lane-end: 0px;
@@ -3280,7 +3316,8 @@ button.button {
     width: auto;
   }
   .lb-table tbody tr > .lb-lane {
-    padding-top: 6px;
+    padding-top: 0;
+    align-self: center;
   }
   .lane-grid {
     display: none;
@@ -3636,9 +3673,10 @@ button.button {
   }
 }
 /* On a phone the figures go two by two, and each entry becomes a card, as Where to train's
-   maps do: the map beside its EXP/h, over its rank, job and level beside the date, over the
-   map's mob levels. A long map name wraps rather than push the EXP/h off the card, and the
-   EXP/h and date share the card's right edge. The whole card is the map's link, for a thumb. */
+   maps do: the map, over its rank and job, over the map's mob levels, and down the right edge
+   the EXP/h over the level over the date, so the job has its line to itself. A long map name wraps rather than push
+   the EXP/h off the card, and the EXP/h and date share the card's right edge. The whole card
+   is the map's link, for a thumb. */
 @media (max-width: 640px) {
   .ch-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3646,11 +3684,11 @@ button.button {
   .ch-table tr {
     position: relative;
     display: grid;
-    grid-template-columns: auto minmax(min-content, max-content) max-content minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "map map map map exp"
-      "rank job level . date"
-      "mobs mobs mobs mobs mobs";
+      "map map exp"
+      "rank job level"
+      "mobs mobs date";
     column-gap: 10px;
     padding: 8px 12px;
   }
@@ -3678,7 +3716,7 @@ button.button {
   }
   .ch-table .ch-level {
     grid-area: level;
-    text-align: left;
+    justify-self: end;
   }
   .ch-table .ch-date {
     grid-area: date;

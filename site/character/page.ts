@@ -45,6 +45,9 @@ function drawStats(stats: Stat[]) {
 function drawRow(row: CharacterRow): HTMLTableRowElement {
   const tr = make("tr");
   tr.setAttribute("role", "row");
+  // With a mouse, the date is the row's under the pointer; its cell is for a touch screen and
+  // assistive tech (site.css).
+  tr.title = `Set ${row.date}`;
   const cell = (tag: "td" | "th", className: string, ...content: (string | Node)[]) => {
     const el = make(tag, className);
     el.setAttribute("role", tag === "th" ? "rowheader" : "cell");
