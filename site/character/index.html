@@ -1,0 +1,79 @@
+<!doctype html>
+<!-- A Character's page (ADR 0027): every entry of theirs on the Map Leaderboards, a Level Band
+     at a time, highest first, each with its rank there and a link to it on its Map
+     Leaderboard; over them, who they are as their newest entry says, and their #1s, podiums,
+     maps and best EXP/h. Every name the Map Leaderboards show links here:
+     /character/?name=Egbert. It reads the site's API from the browser (page.ts), so without
+     script it says it needs it. A name with no entries shows the owl lost. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Character · Minerva</title>
+    <meta
+      name="description"
+      content="A character's Personal Bests on Minerva's Map Leaderboards: every map they have an entry on, ranked, and the #1s they hold."
+    />
+    <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../../assets/icon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ececec" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Minerva" />
+    <meta property="og:title" content="Character · Minerva" />
+    <meta
+      property="og:description"
+      content="A character's Personal Bests on Minerva's Map Leaderboards: every map they have an entry on, ranked, and the #1s they hold."
+    />
+    <meta property="og:image" content="@CARD_IMAGE@" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Minerva's owl over its name in Minerva's window, beside the words Your guide for MapleStory Classic World, and MapleStory's minimap with the Minerva panel under it showing the same map, every portal ringed."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="@CARD_IMAGE@" />
+    <link rel="preload" href="../fonts/Maplestory-Light.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../fonts/Maplestory-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../../src/theme.css" />
+    <link rel="stylesheet" href="../site.css" />
+    <script type="module" src="../site.ts"></script>
+    <script type="module" src="./page.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the page</a>
+    <div class="window">
+      @WINDOW_HEAD@
+
+      <main class="window-body" id="main">
+        <div class="part" data-street="Character">
+          <header class="lb-head stop" id="top" data-mini="Character">
+            <p class="lb-back"><a href="/leaderboards/">All Map Leaderboards</a></p>
+            <h1 id="name">Character</h1>
+            <p class="ch-who" id="who"></p>
+            <dl class="ch-stats" id="stats" hidden></dl>
+          </header>
+
+          <section class="ch-board stop lb-waiting" id="board" data-mini="Bests" aria-label="Bests">
+            <div class="lost" id="lost" hidden>
+              <img class="lost-art" src="../art/not-found.png" alt="404 Not Found" width="440" height="287" loading="lazy" decoding="async" />
+            </div>
+            <p class="lb-said" id="said" aria-live="polite">Loading their bests…</p>
+            <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
+            <div id="bands"></div>
+          </section>
+
+          <section class="lb-questions stop" id="questions" data-mini="Questions" aria-labelledby="questions-title">
+            <h2 id="questions-title">How they work</h2>
+            <div class="qa-list" data-qa="character-page level-bands leaderboard-exp leaderboard-remove" data-group="leaderboards"></div>
+          </section>
+        </div>
+      </main>
+
+      <footer class="window-foot" id="credits" data-mini="Credits">
+@CREDITS@
+      </footer>
+    </div>
+  </body>
+</html>

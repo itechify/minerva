@@ -6,13 +6,24 @@
 
 import { dayText } from "../../src/dates.ts";
 import { levels, rate, short, whole } from "../../src/figures.ts";
-import { type BandAnswer, type BandsAnswer, isMap, isName, type LatestAnswer, type MapMark, type Ranked, type TrainingAnswer } from "../entries.ts";
+import {
+  type BandAnswer,
+  type BandsAnswer,
+  characterLinkTo,
+  isMap,
+  isName,
+  type LatestAnswer,
+  type MapMark,
+  type Ranked,
+  type TrainingAnswer,
+} from "../entries.ts";
 import { bandOf, levelsOf } from "../level-bands.ts";
 import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts";
 
-// A map's name is worked out in one place for the whole site (map-names.ts), so a page still
-// takes everything it shows from this module.
-export { mapNames, placeOf };
+// A map's name is worked out in one place for the whole site (map-names.ts), and a
+// Character's page's address in another (entries.ts), so a page still takes everything it
+// shows from this module.
+export { characterLinkTo, mapNames, placeOf };
 export type { MapNameRow, MapNames, MapPlace } from "../map-names.ts";
 export type { BandAnswer, BandsAnswer, LatestAnswer, MapMark, Ranked, TrainingAnswer } from "../entries.ts";
 
@@ -184,6 +195,9 @@ export interface MapsAnswer {
   maps: { map: string; characters: number; entries: number }[];
 }
 
+/** Words, some of them links: a Character's name in a line, linking to their page. */
+export type Words = (string | { text: string; href: string })[];
+
 /** What a page says in place of what it can't show, and where to go from there. */
 export interface Said {
   text: string;
@@ -271,6 +285,8 @@ export function mapPage(link: Link, names: MapNames, answer: MapAnswer): MapPage
 export interface Row {
   rank: string;
   name: string;
+  /** The Character's page. */
+  nameHref: string;
   job: string;
   level: string;
   expPerHour: string;
@@ -332,6 +348,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
     return {
       rank: String(entry.rank),
       name: entry.name,
+      nameHref: characterLinkTo(entry.name),
       job: entry.job,
       level: String(entry.level),
       expPerHour: rate(entry.expPerHour),
@@ -470,9 +487,10 @@ export interface TrainingRow {
   /** The levels of the middle half of its spawns: "Lv 22–27"; `null` for a map the
    *  ceilings table doesn't hold. */
   mobs: string | null;
-  /** The band's #1 there: its EXP/h, who set it ("Bea · Magician Lv 25") and when; `null`
-   *  with no entries, its cell left empty, as its entries say there are none. */
-  best: { expPerHour: string; who: string; date: string } | null;
+  /** The band's #1 there: its EXP/h, who set it (their name, linking to their page, and
+   *  "Magician Lv 25") and when; `null` with no entries, its cell left empty, as its entries
+   *  say there are none. */
+  best: { expPerHour: string; name: string; nameHref: string; who: string; date: string } | null;
   /** "3 entries", or "No entries yet"; `null` when none of the maps shown has any, which
    *  the table says once, over them, its cell left empty. */
   entries: string | null;
@@ -561,7 +579,9 @@ export function trainingTable(
           ? null
           : {
               expPerHour: rate(m.best.expPerHour),
-              who: `${m.best.name} · ${m.best.job} Lv ${m.best.level}`,
+              name: m.best.name,
+              nameHref: characterLinkTo(m.best.name),
+              who: `${m.best.job} Lv ${m.best.level}`,
               date: dayText(set, set.getFullYear() !== now.getFullYear()),
             },
       entries: none ? null : m.entries === 0 ? "No entries yet" : entriesCounted(m.entries),
@@ -593,6 +613,8 @@ export const PICK_A_BAND = "Pick a Level Band to see the maps for it, and the be
 /** An entry as Latest lists it. */
 export interface LatestLine {
   name: string;
+  /** The Character's page. */
+  nameHref: string;
   /** "Magician Lv 23". */
   who: string;
   /** "153,000", its EXP/h. */
@@ -604,22 +626,27 @@ export interface LatestLine {
   date: string;
   /** The map's page at the band, with the entry marked. */
   href: string;
-  /** "Took #1, past Egbert's 80,000", or "Took #1, past a best of 80,000" once that
-   *  Character has left the Map Leaderboards; `null` for an entry that took no top spot. */
-  took: string | null;
+  /** "Took #1, past Egbert's 80,000", Egbert linking to their page, or "Took #1, past a best
+   *  of 80,000" once that Character has left the Map Leaderboards; `null` for an entry that
+   *  took no top spot. */
+  took: Words | null;
 }
 
 /** Latest, from GET /api/latest, with dates written as of `now`, or why it lists nothing. */
 export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): { lines: LatestLine[]; empty: Said | null } {
   const lines = answer.entries.map((e): LatestLine => {
     const set = new Date(e.setAt);
-    let took: string | null = null;
+    let took: Words | null = null;
     if (e.took !== null) {
       const past = rate(e.took.fromExpPerHour);
-      took = e.took.from === null ? `Took #1, past a best of ${past}` : `Took #1, past ${e.took.from}'s ${past}`;
+      took =
+        e.took.from === null
+          ? [`Took #1, past a best of ${past}`]
+          : ["Took #1, past ", { text: e.took.from, href: characterLinkTo(e.took.from) }, `'s ${past}`];
     }
     return {
       name: e.name,
+      nameHref: characterLinkTo(e.name),
       who: `${e.job} Lv ${e.level}`,
       expPerHour: rate(e.expPerHour),
       map: placeOf(names, e.map).name,

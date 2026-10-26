@@ -3,7 +3,7 @@
 import fixture from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
 import { make } from "../../src/dom.ts";
 import ceilings from "../worker/osms-ceilings.json";
-import { type MapMarks, mapMarks, mapNames, type MapNames, type Said } from "./leaderboards.ts";
+import { type MapMarks, mapMarks, mapNames, type MapNames, type Said, type Words } from "./leaderboards.ts";
 
 /** The maps the committed map names fixture names, as the panel names them. */
 export const names: MapNames = mapNames(fixture);
@@ -104,6 +104,19 @@ export function markSlot(mark: { name: string; picture: string } | null): HTMLEl
   const slot = make("span", "lb-mark");
   slot.setAttribute("aria-hidden", "true");
   return slot;
+}
+
+/** A Character's name as a link to their page (ADR 0027). At rest it reads as the name around
+ *  it does; under the pointer it is the link it is. */
+export function characterLink(name: string, href: string, className = ""): HTMLAnchorElement {
+  const link = make("a", className ? `lb-character ${className}` : "lb-character", name);
+  link.href = href;
+  return link;
+}
+
+/** `words` drawn, a link for each that has one. */
+export function wordsOf(words: Words): (string | HTMLAnchorElement)[] {
+  return words.map((w) => (typeof w === "string" ? w : characterLink(w.text, w.href)));
 }
 
 /** Put what a page says in `line`: its words, and the link after them, if any. */

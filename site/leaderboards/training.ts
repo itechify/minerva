@@ -4,7 +4,7 @@
 // click on a band or an area switches the table in place and the address with it, so the
 // link still shares and Back comes back. What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
-import { byId, markImage, markSlot, names, read, said as saidWith, unreachable } from "./api.ts";
+import { byId, characterLink, markImage, markSlot, names, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandsAnswer,
   PICK_A_BAND,
@@ -183,8 +183,8 @@ function drawAreas(areas: TrainingArea[], shown: string | null) {
 }
 
 /** A map's row: its Map Mark (or the mark's room, so the names line up) and name (its Map
- *  Leaderboard at the band) over its street, its mob levels, the band's #1 there, and its
- *  entries. A map with no entries leaves its #1's cell empty, as its entries say so; maps
+ *  Leaderboard at the band) over its street, its mob levels, the band's #1 there (their name
+ *  a link to their page), and its entries. A map with no entries leaves its #1's cell empty, as its entries say so; maps
  *  none of which has any leave both empty, as the line over them says so. */
 function drawRow(row: TrainingRow): HTMLTableRowElement {
   const tr = make("tr");
@@ -204,8 +204,8 @@ function drawRow(row: TrainingRow): HTMLTableRowElement {
   cell(row.mobs === null ? "lb-train-mobs lb-train-none" : "lb-train-mobs", row.mobs ?? "—");
   if (row.best === null) cell("lb-train-best lb-train-none");
   else {
-    const who = make("span", "lb-train-who", `${row.best.who} · `);
-    who.append(make("span", "lb-train-date", row.best.date));
+    const who = make("span", "lb-train-who");
+    who.append(characterLink(row.best.name, row.best.nameHref), ` · ${row.best.who} · `, make("span", "lb-train-date", row.best.date));
     cell("lb-train-best", make("span", "lb-train-exp", row.best.expPerHour), who);
   }
   if (row.entries === null) cell("lb-train-entries lb-train-none");

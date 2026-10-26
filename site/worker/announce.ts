@@ -5,6 +5,7 @@
 // someone because an entry was deleted all stay quiet.
 import mapNameRows from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
 import { rate } from "../../src/figures";
+import { characterLinkTo } from "../entries";
 import { levelsOf } from "../level-bands";
 import { type MapNames, mapNames, placeOf } from "../map-names";
 import { markOf } from "./ceilings";
@@ -68,6 +69,13 @@ function linkTo(taken: Taken): string {
   return `https://owlofminerva.app/leaderboards/map/?${query}`;
 }
 
+/** A Character's name in a post: bold if `bold`, and a link to their page (ADR 0027). A masked
+ *  link in an embed's description shows no preview, so a post naming several stays as it is. */
+function nameOf(name: string, bold = false): string {
+  const linked = `[${name}](https://owlofminerva.app${characterLinkTo(name)})`;
+  return bold ? `**${linked}**` : linked;
+}
+
 /** A spot's embed in a post. */
 interface Embed {
   title: string;
@@ -78,19 +86,18 @@ interface Embed {
 }
 
 /** One taken spot as an embed: titled with the map's name, linked to its Map Leaderboard, and
- *  showing its Map Mark when it has one. The link is the title's, never the description's, so
- *  Discord shows no preview under a post that names several. The title isn't markdown, so the
- *  map's name goes in as the site writes it ("G* Coconut Season" is one in the map names
- *  fixture); a Character's name is letters and digits only (ADR 0015), so the description
- *  needs no escaping either. */
+ *  showing its Map Mark when it has one; each Character it names links to their page. The
+ *  title isn't markdown, so the map's name goes in as the site writes it ("G* Coconut Season"
+ *  is one in the map names fixture); a Character's name is letters and digits only
+ *  (ADR 0015), so the description needs no escaping either, in its words or its links. */
 function embedFor(taken: Taken, picture: string | null): Embed {
   const [first, last] = levelsOf(taken.band);
   const embed: Embed = {
     title: placeOf(PLACES, taken.map).name,
     url: linkTo(taken),
     description:
-      `**${taken.name}** took #1, levels ${first}–${last}, ` +
-      `with ${rate(taken.expPerHour)} EXP/h, past ${taken.from}'s ${rate(taken.fromExpPerHour)}.`,
+      `${nameOf(taken.name, true)} took #1, levels ${first}–${last}, ` +
+      `with ${rate(taken.expPerHour)} EXP/h, past ${nameOf(taken.from)}'s ${rate(taken.fromExpPerHour)}.`,
   };
   if (picture !== null) embed.thumbnail = { url: picture };
   return embed;
