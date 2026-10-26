@@ -80,7 +80,12 @@ fn toggle(state: &PanelState, name: &str) -> LeaderboardToggle {
 
 /// An entry on Map Leaderboard `map`, set `days_ago`.
 fn entry(map: &str, level: u32, exp: u64, days_ago: u64) -> LeaderboardEntry {
-    LeaderboardEntry { map: map.to_string(), level, job: "Magician".to_string(), exp_per_hour: exp, set_at: WALL - days_ago * DAY }
+    LeaderboardEntry { map: map.to_string(), level, job: "Magician".to_string(), exp_per_hour: exp, set_at: WALL - days_ago * DAY, party: false }
+}
+
+/// A Party Best's entry on Map Leaderboard `map`, set `days_ago`.
+fn party_entry(map: &str, level: u32, exp: u64, days_ago: u64) -> LeaderboardEntry {
+    LeaderboardEntry { party: true, ..entry(map, level, exp, days_ago) }
 }
 
 /// Egbert's entries, as his bests above make them: the best dated Visit in each Level Band.
@@ -111,13 +116,14 @@ fn turning_a_character_on_uploads_their_best_in_each_level_band() {
 }
 
 #[test]
-fn a_maps_entry_is_the_higher_of_the_solo_best_and_the_party_best() {
+fn a_maps_solo_best_and_party_best_are_entries_of_their_own() {
     let party = |exp, days_ago, level| VisitBest { party: true, ..visit(exp, days_ago, level) };
     let egbert = CharacterBests {
         name: "Egbert".to_string(),
         maps: vec![map(
             SUNSET_SKY_ID,
-            // Level 23: a Party Best over the Solo Best; level 13: a Solo Best over a Party Best.
+            // Levels 20-29: a Party Best over the Solo Best; levels 10-19: a Solo Best over a
+            // Party Best. A band's two bests both go up.
             vec![party(9000, Some(3), 23), visit(8000, Some(2), 25), visit(5000, Some(9), 13), party(4000, Some(8), 13)],
         )],
     };
@@ -127,7 +133,13 @@ fn a_maps_entry_is_the_higher_of_the_solo_best_and_the_party_best() {
     minerva.on_wall_clock(WALL);
     minerva.show_on_leaderboards("Egbert", true);
     let state = minerva.tick(50).clone();
-    let entries = vec![entry(SUNSET_SKY_ID, 13, 5000, 9), entry(SUNSET_SKY_ID, 23, 9000, 3)];
+    // By Level Band, a band's Solo Best before its Party Best.
+    let entries = vec![
+        entry(SUNSET_SKY_ID, 13, 5000, 9),
+        party_entry(SUNSET_SKY_ID, 13, 4000, 8),
+        entry(SUNSET_SKY_ID, 25, 8000, 2),
+        party_entry(SUNSET_SKY_ID, 23, 9000, 3),
+    ];
     assert_eq!(state.leaderboard_uploads, [LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: Some(entries) }]);
 }
 
@@ -166,7 +178,7 @@ fn a_new_best_goes_up_when_its_visit_ends_not_while_it_rises() {
     player.arrive(CONSTRUCTION_SAMPLE);
     let at = player.at;
     let set_at = player.minerva.bests().maps_of(Some("Egbert"))[0].visits[0].set_at_unix_ms.unwrap();
-    let best = LeaderboardEntry { map: SUNSET_SKY_ID.to_string(), level: 13, job: "Magician".to_string(), exp_per_hour: 7200, set_at };
+    let best = LeaderboardEntry { map: SUNSET_SKY_ID.to_string(), level: 13, job: "Magician".to_string(), exp_per_hour: 7200, set_at, party: false };
     assert_eq!(sent(player.minerva.tick(at)), [("Egbert".to_string(), Some(vec![best]))]);
 }
 
@@ -263,18 +275,18 @@ fn turning_it_off_deletes_their_entries_and_the_toggle_says_so_until_the_site_ha
 fn entries_the_site_kept_off_are_listed_but_the_upload_went_through() {
     let (mut minerva, id) = egbert_uploading();
     let rejected = vec![
-        RejectedEntry { map: SUNSET_SKY_ID.to_string(), band: 20, reason: RejectedReason::OverCap { cap: 8000 } },
-        RejectedEntry { map: CONSTRUCTION_SITE_ID.to_string(), band: 30, reason: RejectedReason::Removed {} },
-        RejectedEntry { map: NORTHERN_TOP_ID.to_string(), band: 1, reason: RejectedReason::Removed {} },
+        RejectedEntry { map: SUNSET_SKY_ID.to_string(), band: 20, party: true, reason: RejectedReason::OverCap { cap: 8000 } },
+        RejectedEntry { map: CONSTRUCTION_SITE_ID.to_string(), band: 30, party: false, reason: RejectedReason::Removed {} },
+        RejectedEntry { map: NORTHERN_TOP_ID.to_string(), band: 1, party: false, reason: RejectedReason::Removed {} },
     ];
     let state = minerva.on_leaderboard_answer(id, LeaderboardAnswer::Accepted { rejected }).clone();
     let up = toggle(&state, "Egbert");
     assert_eq!((up.status, up.uploaded_at_unix_ms), (LeaderboardStatus::UpToDate, Some(WALL)));
     // Each with its Level Band's levels, for the window to name.
     let listed = vec![
-        RejectedListing { map: SUNSET_SKY_ID.to_string(), lowest_level: 20, highest_level: 29, reason: RejectedReason::OverCap { cap: 8000 } },
-        RejectedListing { map: CONSTRUCTION_SITE_ID.to_string(), lowest_level: 30, highest_level: 39, reason: RejectedReason::Removed {} },
-        RejectedListing { map: NORTHERN_TOP_ID.to_string(), lowest_level: 1, highest_level: 9, reason: RejectedReason::Removed {} },
+        RejectedListing { map: SUNSET_SKY_ID.to_string(), lowest_level: 20, highest_level: 29, party: true, reason: RejectedReason::OverCap { cap: 8000 } },
+        RejectedListing { map: CONSTRUCTION_SITE_ID.to_string(), lowest_level: 30, highest_level: 39, party: false, reason: RejectedReason::Removed {} },
+        RejectedListing { map: NORTHERN_TOP_ID.to_string(), lowest_level: 1, highest_level: 9, party: false, reason: RejectedReason::Removed {} },
     ];
     assert_eq!(up.rejected, listed);
     // The site says so at every upload: it isn't tried again for it.
@@ -561,6 +573,13 @@ fn an_upload_is_the_apis_put_of_the_whole_set_or_its_delete() {
         { "map": SUNSET_SKY_ID, "level": 23, "job": "Magician", "expPerHour": 9000, "setAt": WALL - 3 * DAY }
     ]});
     assert_eq!(body, expected);
+    // A party entry says so; a solo one says nothing (a site before this reads it as solo).
+    let party = LeaderboardUpload { entries: Some(vec![party_entry(SUNSET_SKY_ID, 23, 9000, 3)]), ..put.clone() };
+    let body: serde_json::Value = serde_json::from_str(&party.body().unwrap()).unwrap();
+    let expected = serde_json::json!({ "entries": [
+        { "map": SUNSET_SKY_ID, "level": 23, "job": "Magician", "expPerHour": 9000, "setAt": WALL - 3 * DAY, "party": true }
+    ]});
+    assert_eq!(body, expected);
     let delete = LeaderboardUpload { entries: None, ..put };
     assert_eq!(delete.body(), None);
 }
@@ -569,12 +588,12 @@ fn an_upload_is_the_apis_put_of_the_whole_set_or_its_delete() {
 fn the_sites_answers_read_as_what_they_mean() {
     let read = minerva_core::read_leaderboard_answer;
     let body = r#"{ "accepted": 1, "rejected": [
-        { "map": "010003070", "band": 20, "reason": "over-cap", "cap": 766080 },
+        { "map": "010003070", "band": 20, "party": true, "reason": "over-cap", "cap": 766080 },
         { "map": "010003080", "band": 30, "reason": "removed" }
     ] }"#;
     let rejected = vec![
-        RejectedEntry { map: SUNSET_SKY_ID.to_string(), band: 20, reason: RejectedReason::OverCap { cap: 766_080 } },
-        RejectedEntry { map: CONSTRUCTION_SITE_ID.to_string(), band: 30, reason: RejectedReason::Removed {} },
+        RejectedEntry { map: SUNSET_SKY_ID.to_string(), band: 20, party: true, reason: RejectedReason::OverCap { cap: 766_080 } },
+        RejectedEntry { map: CONSTRUCTION_SITE_ID.to_string(), band: 30, party: false, reason: RejectedReason::Removed {} },
     ];
     assert_eq!(read(200, None, body), LeaderboardAnswer::Accepted { rejected });
     assert_eq!(read(200, None, r#"{ "accepted": 3, "rejected": [] }"#), taken());
@@ -668,7 +687,7 @@ fn a_best_after_the_bests_were_lost(shown: &[&str]) -> (Player, u64) {
 /// Egbert's one entry, as [`a_best_after_the_bests_were_lost`] sets it.
 fn egberts_new_entry(player: &Player) -> LeaderboardEntry {
     let set_at = player.minerva.bests().maps_of(Some("Egbert"))[0].visits[0].set_at_unix_ms.unwrap();
-    LeaderboardEntry { map: SUNSET_SKY_ID.to_string(), level: 13, job: "Magician".to_string(), exp_per_hour: 7200, set_at }
+    LeaderboardEntry { map: SUNSET_SKY_ID.to_string(), level: 13, job: "Magician".to_string(), exp_per_hour: 7200, set_at, party: false }
 }
 
 #[test]
