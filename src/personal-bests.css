@@ -743,6 +743,36 @@ tbody tr.visit.last td {
   color: var(--ink-2);
 }
 
+/* Which kind of best a Visit is, where it isn't a Solo Best: party gold, as the Grind Tracker's
+   party mark is. */
+.visit-party {
+  display: block;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+  color: var(--party-ink);
+}
+
+/* Under a row's figure, a map's Solo Best and Party Best side by side, once it has a Party
+   Best; the Party Best's in party gold. */
+.kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--ink-2);
+}
+
+.kinds:empty {
+  display: none;
+}
+
+.kinds .party {
+  color: var(--party-ink);
+  font-weight: 700;
+}
+
 /* An Unassigned Visit's Move before its ×, and the Characters to move it to on a line of
    their own under it, at the table's right. */
 .controls .move {
