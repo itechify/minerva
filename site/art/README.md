@@ -34,3 +34,15 @@ Over a page with nothing to show: the site's 404 (`site/404.html`), heading it i
 | File | Shows on | What it shows | Size |
 | --- | --- | --- | --- |
 | `not-found.png` | The 404, a Character's page and a map's page with nothing to show | The owl puzzled, a question mark over it and a torn map with a red cross in its wing, beside a wooden signpost lettered "404" over "Not Found" | 880×574 |
+
+## The job icons
+
+Beside each job the site writes (`site/jobs.ts` gives a job's class, `site/leaderboards/api.ts` draws it): the game's class icons, supplied by the owner (October 2026) as GIFs with white corners, kept here as PNGs with those corners made transparent and nothing else changed. They show pixel for pixel, at their own size. A Pirate has no icon yet, and shows none.
+
+| File | Class | What it shows | Size |
+| --- | --- | --- | --- |
+| `jobs/beginner.png` | Beginner | A figure in white on a teal square, sparkles around it | 26×26 |
+| `jobs/warrior.png` | Warrior | A figure swinging a sword, in white on red to yellow | 27×27 |
+| `jobs/magician.png` | Magician | A figure casting, in white on blue | 26×26 |
+| `jobs/bowman.png` | Bowman | A figure drawing a bow, in white on green | 26×26 |
+| `jobs/thief.png` | Thief | A figure throwing, in white on brown to cream | 27×27 |

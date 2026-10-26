@@ -108,12 +108,13 @@ describe("a Character's page", () => {
       {
         rank: "#1",
         of: "of 12",
-        top: true,
+        medal: 1,
         map: "Pig Field",
         street: "Made-up Road",
         mark: { name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" },
         mobs: "Lv 22–27",
         job: "Magician",
+        jobClass: "magician",
         level: "23",
         expPerHour: "153,000",
         date: "3 Oct",
@@ -122,10 +123,24 @@ describe("a Character's page", () => {
     ]);
   });
 
-  it("crowns only a #1", () => {
-    const page = characterPage(answer(mine("100000000", 20, 2, 12, 90_000)), names, NOW);
+  it("crowns a place in the band's top 3 gold, silver or bronze, and no place past them", () => {
+    const page = characterPage(
+      answer(mine("100000000", 20, 2, 12, 90_000), mine("100000001", 20, 3, 12, 80_000), mine("100000002", 20, 4, 12, 70_000)),
+      names,
+      NOW,
+    );
 
-    expect(page.bands[0].rows[0]).toMatchObject({ rank: "#2", of: "of 12", top: false });
+    expect(page.bands[0].rows.map((r) => [r.rank, r.medal])).toEqual([
+      ["#2", 2],
+      ["#3", 3],
+      ["#4", null],
+    ]);
+  });
+
+  it("names the class of the job their newest entry says they are", () => {
+    const page = characterPage(answer(mine("100000000", 20, 1, 3, 90_000, { job: "Hermit" })), names, NOW);
+
+    expect(page.whoClass).toBe("thief");
   });
 
   it("writes a map the ceilings table and the map list don't hold by its ID, with no mobs or Map Mark", () => {

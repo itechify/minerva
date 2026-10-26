@@ -2,7 +2,7 @@
 // map, each a link to its Map Leaderboard with the entry marked, saying when it took a top
 // spot (ADR 0024). What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
-import { byId, characterLink, markSlot, names, read, said as saidWith, unreachable, wordsOf } from "./api.ts";
+import { byId, characterLink, jobWithIcon, markSlot, names, read, said as saidWith, unreachable, wordsOf } from "./api.ts";
 import { type LatestAnswer, type LatestLine, latestLines } from "./leaderboards.ts";
 
 const said = byId("latest-said");
@@ -10,17 +10,19 @@ const list = byId<HTMLOListElement>("latest-entries");
 /** What the list holds while the entries come: its room kept, as index.html draws it. */
 const waiting = [...list.children];
 
-/** An entry, two lines beside two figures: the Character (a link to their page) and their
- *  job and level beside what they got, over the map (its Map Mark before it, or the mark's
- *  room, so the maps' names line up) and band beside the day; then, if it did, that it took
- *  the map's top spot, and from whom. The map's name is the link to the entry on its Map
+/** An entry, two lines beside two figures: the Character (a link to their page), then their
+ *  job (beside its class's icon) and level, beside what they got, over the map (its Map Mark
+ *  before it, or the mark's room, so the maps' names line up) and band beside the day; then,
+ *  if it did, that it took the map's top spot, and from whom. The name, the job and the figures
+ *  are each a column the list's rows share (site.css), so the icons and jobs line up down it. The map's name is the link to the entry on its Map
  *  Leaderboard, and stretches over the whole entry, as a card's does; the Characters' names
  *  sit over it, so each is its own link. */
 function drawLine(line: LatestLine): HTMLLIElement {
   const item = make("li");
   const entry = make("div", "lb-map lb-entry");
+  // One line on a phone; on a wider page the name and the job are each a column (site.css).
   const who = make("span", "lb-entry-who");
-  who.append(characterLink(line.name, line.nameHref, "lb-map-name"), " ", make("span", "lb-entry-job", line.who));
+  who.append(characterLink(line.name, line.nameHref, "lb-map-name lb-entry-name"), " ", jobWithIcon(line.who, line.jobClass, "lb-entry-job"));
   const exp = make("span", "lb-entry-exp", line.expPerHour);
   exp.append(make("span", "lb-entry-unit", " EXP/h"));
   const where = make("span", "lb-entry-where");

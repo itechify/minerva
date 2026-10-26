@@ -2,8 +2,8 @@
 // says they are, their #1s, podiums, maps and best EXP/h, then a table of their entries for
 // each Level Band, highest first, each row's map a link to the entry on its Map Leaderboard.
 // What it shows is worked out in character.ts.
-import { make, svgEl } from "../../src/dom.ts";
-import { byId, markSlot, names, said as saidWith, unreachable } from "../leaderboards/api.ts";
+import { make } from "../../src/dom.ts";
+import { byId, crown, jobWithIcon, markSlot, names, said as saidWith, unreachable } from "../leaderboards/api.ts";
 import type { Said } from "../leaderboards/leaderboards.ts";
 import { type CharacterAnswer, type CharacterBand, type CharacterRow, characterPage, noCharacter, readName, type Stat } from "./character.ts";
 
@@ -39,20 +39,15 @@ function drawStats(stats: Stat[]) {
   list.hidden = false;
 }
 
-/** A crown, a #1's mark, in Crown Gold (index.html's gradient), never the You Yellow that
- *  marks the player's own. */
-function crown(): SVGSVGElement {
-  const svg = svgEl("svg", { viewBox: "0 0 16 16", class: "ch-crown", "aria-hidden": "true" });
-  svg.append(svgEl("path", { d: "M2 12.5 1 4.5l4 3 3-5 3 5 4-3-1 8Z" }));
-  return svg;
-}
-
-/** An entry's row: its rank of how many (crowned for a #1), its map (a link to the entry on
- *  its Map Leaderboard) over its street, the map's mob levels, the job and level that set it,
- *  its EXP/h and its date. */
+/** An entry's row: its rank of how many (crowned gold, silver or bronze in the top 3), its map
+ *  (a link to the entry on its Map Leaderboard) over its street, the map's mob levels, the job
+ *  (beside its class's icon) and level that set it, its EXP/h and its date. */
 function drawRow(row: CharacterRow): HTMLTableRowElement {
-  const tr = make("tr", row.top ? "ch-top" : "");
+  const tr = make("tr");
   tr.setAttribute("role", "row");
+  // With a mouse, the date is the row's under the pointer; its cell is for a touch screen and
+  // assistive tech (site.css).
+  tr.title = `Set ${row.date}`;
   const cell = (tag: "td" | "th", className: string, ...content: (string | Node)[]) => {
     const el = make(tag, className);
     el.setAttribute("role", tag === "th" ? "rowheader" : "cell");
@@ -61,8 +56,8 @@ function drawRow(row: CharacterRow): HTMLTableRowElement {
     return el;
   };
   const rank = make("span", "ch-rank-of", ` ${row.of}`);
-  const rankCell = cell("td", "ch-rank", ...(row.top ? [crown()] : []), row.rank, rank);
-  if (row.top) rankCell.setAttribute("aria-label", `${row.rank} ${row.of}, the band's top spot`);
+  const rankCell = cell("td", "ch-rank", ...(row.medal === null ? [] : [crown(row.medal)]), row.rank, rank);
+  if (row.medal === 1) rankCell.setAttribute("aria-label", `${row.rank} ${row.of}, the band's top spot`);
   const map = make("a", "lb-map-name", row.map);
   map.href = row.href;
   const title = make("span", "lb-map-title");
@@ -70,7 +65,7 @@ function drawRow(row: CharacterRow): HTMLTableRowElement {
   const mapCell = cell("th", "ch-map", title, make("span", "lb-map-street", row.street));
   (mapCell as HTMLTableCellElement).scope = "row";
   cell("td", row.mobs === null ? "ch-mobs ch-none" : "ch-mobs", row.mobs ?? "—");
-  cell("td", "ch-job", row.job);
+  cell("td", "ch-job", jobWithIcon(row.job, row.jobClass));
   cell("td", "ch-level", row.level);
   cell("td", "ch-exp", row.expPerHour);
   cell("td", "ch-date", row.date);
@@ -152,7 +147,7 @@ async function load() {
   const page = characterPage(answer, names, new Date());
   document.title = `${page.name} · Minerva`;
   byId("name").textContent = page.name;
-  byId("who").textContent = page.who;
+  byId("who").replaceChildren(jobWithIcon(page.who, page.whoClass, "", false));
   drawStats(page.stats);
   said.hidden = true;
   byId("loaded").textContent = `${page.name}: ${page.stats.map((s) => `${s.value} ${s.label}`).join(", ")}.`;

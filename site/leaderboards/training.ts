@@ -4,7 +4,7 @@
 // click on a band or an area switches the table in place and the address with it, so the
 // link still shares and Back comes back. What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
-import { byId, characterLink, markImage, markSlot, names, read, said as saidWith, unreachable } from "./api.ts";
+import { byId, characterLink, jobWithIcon, markImage, markSlot, names, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandsAnswer,
   PICK_A_BAND,
@@ -205,7 +205,7 @@ function drawRow(row: TrainingRow): HTMLTableRowElement {
   if (row.best === null) cell("lb-train-best lb-train-none");
   else {
     const who = make("span", "lb-train-who");
-    who.append(characterLink(row.best.name, row.best.nameHref), ` · ${row.best.who} · `, make("span", "lb-train-date", row.best.date));
+    who.append(characterLink(row.best.name, row.best.nameHref), " · ", jobWithIcon(row.best.who, row.best.jobClass, "", false), " · ", make("span", "lb-train-date", row.best.date));
     cell("lb-train-best", make("span", "lb-train-exp", row.best.expPerHour), who);
   }
   if (row.entries === null) cell("lb-train-entries lb-train-none");
