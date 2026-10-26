@@ -590,6 +590,7 @@ pub struct Minerva {
     status_bar_reader: Option<StatusBarReader>,
     /// Reads captures fed to [`Minerva::on_pickup_log_capture`], in order; made on the first one.
     pickup_log_reader: Option<PickupLogReader>,
+    pickup_log_seen: bool,
     /// Where the Status Bar's level, job and name were last found, and the game's client
     /// area then: our windows keep clear of them while the client area stays where it was.
     status_bar_area: Option<(ScreenRect, ScreenRect)>,
@@ -662,6 +663,7 @@ impl Minerva {
             shop_reader: None,
             status_bar_reader: None,
             pickup_log_reader: None,
+            pickup_log_seen: false,
             status_bar_area: None,
             title_found: None,
             title_locked: false,
@@ -1684,21 +1686,40 @@ impl Minerva {
     /// Read a capture of [`PanelState::pickup_log_capture`] with the core's own
     /// [`PickupLogReader`] and update the panel state, as [`Minerva::on_pickup_log_read`].
     pub fn on_pickup_log_capture(&mut self, capture: PickupLogCapture) -> &PanelState {
-        let reading = self.pickup_log_reader.get_or_insert_with(PickupLogReader::bundled).read(&capture);
+        let reading = self.pickup_log_reader.get_or_insert_with(PickupLogReader::bundled).read_avoiding(&capture, &self.state.our_windows);
         self.on_pickup_log_read(capture, reading)
     }
 
     /// Take in what the shell's [`PickupLogReader`] read in `capture`, a capture of
     /// [`PanelState::pickup_log_capture`].
     pub fn on_pickup_log_read(&mut self, capture: PickupLogCapture, reading: PickupLogReading) -> &PanelState {
-        let _ = capture;
-        self.on_pickup_log_reading(reading)
+        let region = captured(&capture.frame, capture.origin);
+        if self.state.pickup_log_capture != Some(region) {
+            return self.pickup_log_reading_for(reading, Some(region));
+        }
+        let unusual = reading.chose
+            || (self.pickup_log_seen && reading.seen == PickupLogSeen::Nothing)
+            || reading.arrived.contains(&PickupLine::Unreadable);
+        let crop = unusual.then_some((Region::PickupLog, capture.frame));
+        self.record_input(Event::PickupLog { reading: reading.clone(), stale_region: None }, Some(reading.at_ms), crop);
+        self.take_pickup_log_reading(reading)
     }
 
     /// Take in what a Pickup Log capture read as, with no capture: a Bug Report's replay.
     pub fn on_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
-        let _ = reading;
-        &self.state
+        self.pickup_log_reading_for(reading, None)
+    }
+
+    pub(crate) fn pickup_log_reading_for(&mut self, reading: PickupLogReading, stale_region: Option<ScreenRect>) -> &PanelState {
+        let stale_region = stale_region.filter(|&region| self.state.pickup_log_capture != Some(region));
+        self.record_input(Event::PickupLog { reading: reading.clone(), stale_region }, Some(reading.at_ms), None);
+        if stale_region.is_some() { return &self.state; }
+        self.take_pickup_log_reading(reading)
+    }
+
+    fn take_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
+        self.pickup_log_seen = reading.seen != PickupLogSeen::Nothing;
+        self.sync_panel()
     }
 
     /// Read a capture of [`PanelState::status_bar_capture`] and update the panel state: the
@@ -1774,6 +1795,10 @@ impl Minerva {
     }
 
     fn take_status_bar_reading(&mut self, reading: StatusBarReading) -> &PanelState {
+        if self.state.status_bar.as_ref().and_then(|bar|bar.name.as_ref()) != reading.bar.as_ref().and_then(|bar|bar.name.as_ref()) {
+            self.pickup_log_reader = None;
+            self.pickup_log_seen = false;
+        }
         self.session.on_status_bar(reading.bar.as_ref(), reading.at_ms);
         if let (Some(bar), Some(game)) = (&reading.bar, &self.panel.game) {
             self.status_bar_area = Some((game.client, bar.area));
@@ -2366,6 +2391,26 @@ impl Minerva {
             ScreenRect { x: client.x, y: client.y + (client.height - height) as i32, width: client.width, height }
         });
         self.state.character = self.session.character().cloned();
+        let previous_pickup_capture = self.state.pickup_log_capture;
+        self.state.pickup_log_capture = self.panel.game.as_ref()
+            .filter(|_| shows && self.settings.grind_tracker_on)
+            .zip(self.state.status_bar.as_ref().filter(|bar| bar.name.is_some()))
+            .map(|(game, bar)| {
+                // The Status Bar's area is 55 rows at the samples' UI Size (ADR 0020).
+                // Leave room above the six rows and left of a cut-short Item's name.
+                let size = bar.area.height as f32 / 55.0;
+                let width = ((400.0 * size).ceil() as u32).min(game.client.width);
+                let height = ((480.0 * size).ceil() as u32).min(game.client.height);
+                ScreenRect {
+                    x: game.client.x + (game.client.width - width) as i32,
+                    y: game.client.y + (game.client.height - height) as i32,
+                    width, height,
+                }
+            });
+        if previous_pickup_capture != self.state.pickup_log_capture {
+            self.pickup_log_reader = None;
+            self.pickup_log_seen = false;
+        }
     }
 
     /// Where the Minimap Title was last found, inside the game's client area, while the client

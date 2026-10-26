@@ -1,0 +1,16 @@
+{
+  "source": "1007",
+  "baseline": "00011000.png",
+  "arrivals": [
+    {
+      "frame": "00012000.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 6,
+          "party": false
+        }
+      ]
+    }
+  ]
+}

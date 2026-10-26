@@ -1,0 +1,40 @@
+{
+  "source": "1025",
+  "baseline": "00002000.png",
+  "arrivals": [
+    {
+      "frame": "00002900.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Ligator Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        },
+        {
+          "kind": "exp",
+          "amount": 21,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 2
+        },
+        {
+          "kind": "mesos",
+          "amount": 37
+        }
+      ]
+    },
+    {
+      "frame": "00003200.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 26
+        }
+      ]
+    }
+  ]
+}

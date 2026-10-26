@@ -1,0 +1,71 @@
+{
+  "source": "1025",
+  "baseline": "00198000.png",
+  "arrivals": [
+    {
+      "frame": "00198400.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 21,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "frame": "00199000.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 40
+        },
+        {
+          "kind": "item",
+          "name": "Arrows for Cros",
+          "quantity": 21,
+          "tab": "Use",
+          "cut_short": true
+        }
+      ]
+    },
+    {
+      "frame": "00199100.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Ligator Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        }
+      ]
+    },
+    {
+      "frame": "00199400.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 24
+        }
+      ]
+    },
+    {
+      "frame": "00199700.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 33,
+          "party": false
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 3
+        }
+      ]
+    }
+  ]
+}

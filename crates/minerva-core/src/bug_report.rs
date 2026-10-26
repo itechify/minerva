@@ -224,6 +224,12 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         stale_region: Option<ScreenRect>,
     },
+    /// The Pickup Log's observation and arrivals; a stale band is recorded and left.
+    PickupLog {
+        reading: crate::PickupLogReading,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stale_region: Option<ScreenRect>,
+    },
     /// The player chose the Item Card's Market Line `line` as the Deal Line.
     ChooseDealLine { line: String },
     PickItem { id: String },
@@ -580,6 +586,7 @@ pub(crate) enum Region {
     ClientArea { near_miss: bool },
     /// The whole strip, at a Status Bar capture with no bar found (#133).
     StatusBarStrip,
+    PickupLog,
 }
 
 impl Region {
@@ -594,6 +601,7 @@ impl Region {
             Region::StatusBar => format!("crops/status-bar-{at_ms:010}.png"),
             Region::ClientArea { .. } => format!("crops/client-area-{at_ms:010}.png"),
             Region::StatusBarStrip => format!("crops/status-bar-strip-{at_ms:010}.png"),
+            Region::PickupLog => format!("crops/pickup-log-{at_ms:010}.png"),
         }
     }
 }
@@ -1021,6 +1029,8 @@ impl Recorder {
                 let changed = frame.rgba != self.last.exp_bar_rgba;
                 (changed, line.notes.iter().any(Note::is_unusual))
             }
+            // The caller supplies only exceptional Pickup Log crops, never every tick.
+            Region::PickupLog => (true, true),
             Region::Title => {
                 let same = matches!(line.event, Event::Title { same: true, .. });
                 (!same, line.map.is_some())
@@ -1667,6 +1677,9 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
                 let (bar, near_miss) = if stale_region.is_some() { read } else { as_before(&mut status_bar, read, same) };
                 minerva.status_bar_reading_for(StatusBarReading { bar, at_ms, near_miss }, stale_region);
             }
+            Event::PickupLog { reading, stale_region } => {
+                minerva.pickup_log_reading_for(reading, stale_region);
+            }
             Event::ChooseDealLine { line } => {
                 minerva.choose_deal_line(&line);
             }
@@ -2017,6 +2030,9 @@ impl Event {
             Event::StatusBar { at_ms, bar, near_miss, same, stale_region: Some(region) } => {
                 Some((Event::StatusBar { at_ms, bar, near_miss, same, stale_region: None }, region))
             }
+            Event::PickupLog { reading, stale_region: Some(region) } => {
+                Some((Event::PickupLog { reading, stale_region: None }, region))
+            }
             _ => None,
         }
     }
@@ -2029,6 +2045,7 @@ impl Event {
             | Event::PlayerShop { at_ms, .. }
             | Event::StatusBar { at_ms, .. }
             | Event::OpenCardMeowdbPage { at_ms } => Some(*at_ms),
+            Event::PickupLog { reading, .. } => Some(reading.at_ms),
             _ => None,
         }
     }
@@ -2144,6 +2161,7 @@ impl Event {
                 format!("Player Shop read: {}", if rows.is_empty() { "no listings".into() } else { rows.join(", ") })
             }
             Event::StatusBar { same: true, .. } => "Status Bar read as before".to_string(),
+            Event::PickupLog { reading, .. } => format!("Pickup Log: {:?}; rows {:?}, shift {}; arrivals {:?}{}", reading.seen, reading.rows, reading.shift, reading.arrived, if reading.chose { "; chose between shifts" } else { "" }),
             Event::StatusBar { bar: None, near_miss: None, .. } => "no Status Bar".to_string(),
             Event::StatusBar { bar: None, near_miss: Some(near), .. } => {
                 let ScreenRect { x, y, width, height } = near.area;

@@ -153,7 +153,7 @@ impl TitleReader {
 
 /// `img`, captured with its top-left pixel at `origin` on screen, painted black wherever one of
 /// `ours` (our windows, on screen) covers it.
-fn blank(img: &mut RgbImage, origin: ScreenPoint, ours: &[ScreenRect]) {
+pub(crate) fn blank(img: &mut RgbImage, origin: ScreenPoint, ours: &[ScreenRect]) {
     let (w, h) = (img.width() as i64, img.height() as i64);
     for r in ours {
         let (x0, y0) = ((r.x as i64 - origin.x as i64).clamp(0, w), (r.y as i64 - origin.y as i64).clamp(0, h));

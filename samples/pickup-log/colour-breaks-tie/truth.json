@@ -1,0 +1,73 @@
+{
+  "source": "1025",
+  "baseline": "00053500.png",
+  "arrivals": [
+    {
+      "frame": "00054100.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 22,
+          "party": false
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "frame": "00054200.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 21,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 2
+        },
+        {
+          "kind": "exp",
+          "amount": 21,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 2
+        },
+        {
+          "kind": "exp",
+          "amount": 21,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "frame": "00054901.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 33,
+          "party": false
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 3
+        },
+        {
+          "kind": "item",
+          "name": "Ligator Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        }
+      ]
+    }
+  ]
+}

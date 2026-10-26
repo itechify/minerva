@@ -21,3 +21,17 @@ Every file in `samples/player-shop` must read as its readings say (`<name>.json`
 ## `status-bar`
 
 Every file in `samples/status-bar` must read as its name says (`<level>__<job>__<Name>--<what>.png`; `<level>__<job>--<what>.png` for a crop with the name taken out; `no-status-bar--<what>.png`), or as unreadable, never as another level, job or name (`tests/status_bar_samples.rs`). A frame that is ever read wrong becomes a sample there: a Bug Report's `crops/status-bar-<ms>.png` is one already, cut to the level, job and name. Names may only come from the maintainer's own Characters, or from players who agree to it in the Bug Report flow; any other crop is cut down to the level and job before it is committed, its name's line painted over in the bar's plain slate (58,67,72).
+
+## `pickup-log`
+
+Each directory is a short sequence of 10 Hz log-band crops, named by capture milliseconds,
+with `truth.json` listing the arrivals checked by eye, oldest first. Its first frame is a
+baseline: lines already there are not arrivals. `source` identifies the maintainer's
+2026-10-25 party (`1025`) or 2026-10-07 solo (`1007`) recording. Frames are cut to a 325×139
+band: client (1590,830) for 1025 and (1590,830) for 1007. The closing parentheses and six
+22 px slots are kept; no game window size or log position is supplied to the reader.
+Each clip must count its arrivals once, never more, and at other UI Sizes may read fewer,
+never another line (`tests/pickup_log_samples.rs`). The `covered` clip has another player's
+entire name plate painted black in frames 6600–7200, including its border. All other clips
+contain no player names. A Bug Report's `crops/pickup-log-<ms>.png` belongs in a short
+sequence showing the frame before and after the problem, with the same privacy rule.

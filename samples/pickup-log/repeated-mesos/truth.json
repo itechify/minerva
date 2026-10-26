@@ -1,0 +1,38 @@
+{
+  "source": "1025",
+  "baseline": "00143000.png",
+  "arrivals": [
+    {
+      "frame": "00143900.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 26
+        }
+      ]
+    },
+    {
+      "frame": "00144500.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 21,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "frame": "00144700.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 25
+        }
+      ]
+    }
+  ]
+}
