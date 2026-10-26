@@ -41,7 +41,7 @@ const RIGHT_MARGIN: std::ops::RangeInclusive<f32> = 2.0..=16.0;
 /// How far a located layout's size may differ from the UI Size the Status Bar measured, as a
 /// share of it.
 const SIZE_TOLERANCE: f32 = 0.15;
-/// The same, for a parenthesis found in a capture scaled up from a smaller UI Size: the colour mask
+/// The same, for a parenthesis found in a capture at another UI Size than the samples', scaled to theirs: the colour mask
 /// takes a pixel or two off a blurred glyph's tips, and its height reads 0.65 to 1.06 of the true
 /// 17 (the Bug Report of 0.15.0, 2026-10-26 14:41).
 const SIZE_TOLERANCE_BLURRED: f32 = 0.4;
@@ -59,12 +59,12 @@ const RESYNC_MS: u64 = 3000;
 /// How much of the last 45 columns of a line (its parenthesis and its amount) must agree between two
 /// captures for it to be the same line, in per cent.
 const TAIL_AGREES: usize = 80;
-/// The same, for a capture scaled up from a smaller UI Size, whose glyphs are blurred and a pixel
+/// The same, for a capture at another UI Size than the samples', whose glyphs are resampled, blurred when scaled up, and a pixel
 /// off: a line over a moving background agrees in 74 to 79% there (the Bug Report of 0.15.0,
 /// 2026-10-26 14:41).
 const TAIL_AGREES_BLURRED: usize = 65;
-/// The weight above which a pixel of a line's ink is ink in the third read of a line scaled up from a
-/// smaller UI Size: a cut that keeps a digit's body whole, where a higher one reads a "9" as a "0".
+/// The weight above which a pixel of a line's ink is ink in the third read of a line at another UI Size than
+/// the samples': a cut that keeps a digit's body whole, where a higher one reads a "9" as a "0".
 const CUT_INK: f32 = 0.35;
 /// How long a reader may read nothing before a Bug Report keeps a whole capture of its band (ms): a
 /// log that is never found, or an empty one, shows only what the capture itself says (ADR 0020).
@@ -215,7 +215,7 @@ struct Layout {
 
 struct Stack {
     rows: Vec<Option<Row>>,
-    /// Scaled up from a smaller UI Size than the samples' (see [rows_match]).
+    /// At a UI Size other than the samples', scaled to theirs (see [rows_match]); the footage is at a smaller one.
     blurred: bool,
 }
 
@@ -388,11 +388,12 @@ impl PickupLogReader {
     }
 
     /// Read the rows that arrived. At the samples' size a line is read once, and again with its
-    /// ink weighed another way if that read didn't parse. Scaled up from a smaller UI Size the
-    /// glyphs are blurred and a digit slips with the ink (`39` as `30`, in the footage, by what
-    /// the world behind the line adds), so there a line is read three ways (as is, with the ink
-    /// weighed another way, and with it cut at a threshold) and counts only when all three parse and
-    /// agree on its kind and figures, else it is `Unreadable`: fewer, never another.
+    /// ink weighed another way if that read didn't parse. At a UI Size other than the samples' (the
+    /// footage is at a smaller one, scaled up) the glyphs are resampled and a digit slips with the
+    /// ink (`39` as `30`, in the footage, by what the world behind the line adds), so there a line
+    /// is read three ways (as is, with the ink weighed another way, and with it cut at a threshold)
+    /// and counts only when all three parse and agree on its kind and figures, else it is
+    /// `Unreadable`: fewer, never another.
     fn read_arrivals(&mut self, rows: &[Option<Row>], at_samples_size: bool) -> Vec<PickupLine> {
         let new: Vec<_> = rows.iter().flatten().collect();
         let inks = new.iter().map(|r| r.ink.clone()).collect::<Vec<_>>();
@@ -736,7 +737,7 @@ fn stack_matches_shift(old: &Stack, new: &Stack, shift: usize, tie_break: bool) 
         _ => false,
     });
     // A line arrives at full brightness. At the samples' size a readable row beside one that matched
-    // may stand in for it; scaled up, a row is too uncertain (a faded top line that stopped
+    // may stand in for it; at another size a row is too uncertain (a faded top line that stopped
     // reading would put every shift beyond it in reach), so only a full-brightness row is new.
     let stands_in = |r: &Row| anchored && r.readable && !new.blurred;
     if new.rows[ROWS - shift..].iter().any(|r| r.as_ref().is_none_or(|r| !r.fresh && !stands_in(r))) {
@@ -801,7 +802,7 @@ fn parse(text: &str, yellow: bool, blurred: bool) -> Option<PickupLine> {
 /// ")". Each of those marks reads as another one (`*`, `:`, `;`, `?`) or is lost, so up to
 /// `marks` marks of any kind stand in for the "+" and any marks for the ")"; but more marks before
 /// the digits, or a `?` after them, might be a digit the recogniser had no word for, so they make
-/// the line unreadable. One mark is allowed at the samples' size; scaled up, a blurred "+" often
+/// the line unreadable. One mark is allowed at the samples' size; at another size a blurred "+" often
 /// reads as two (`(??58;`), and the three reads that must agree stand guard.
 fn gain_amount(tail: &str, marks: usize) -> Option<u64> {
     let tail = tail.trim();
