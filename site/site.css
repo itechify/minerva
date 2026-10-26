@@ -1102,8 +1102,8 @@ strong {
   line-height: 30px;
 }
 /* Each group's owl (site/art) stands over its heading, every one the same height whatever
-   its width. A shorter screen gives up some of it, so the heading, what it covers and the
-   topics under them still fit beside the questions; too short to hold them, it goes. */
+   its width. A shorter screen gives up some of it, so the heading and what it covers still
+   fit beside the questions. */
 .faq-art {
   display: block;
   width: auto;
@@ -1119,11 +1119,6 @@ strong {
     margin-bottom: 10px;
   }
 }
-@media screen and (min-width: 961px) and (max-height: 700px) {
-  .faq-art {
-    display: none;
-  }
-}
 .faq-group-head p {
   margin: 0;
   font-size: 15px;
@@ -1133,52 +1128,9 @@ strong {
 .faq-group-body > h3:first-child {
   margin-top: 2px;
 }
-/* The topics under a group's heading (topics.ts), held in sight with it, so the way to
-   another is never back at the top: the nine as quiet rows past a Window Rule, the group
-   you're in the selected one, as the panel marks the shown map's row (Selection Periwinkle,
-   its inset ring and bold Ink). Shown from 961px, where the column has the room, beside the
-   minimap from 1440px (its portals name the topics only under the pointer); on a screen too
-   short to hold them with the heading, or narrower, each group ends on its way back to the
-   owl's list instead. A printed page has no use for either. */
-.faq-topics {
-  display: none;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
-}
-.faq-topics ul {
-  margin: 0 -10px;
-  padding: 0;
-  list-style: none;
-}
-.faq-topics li {
-  margin: 0;
-}
-.faq-topics a {
-  display: block;
-  padding: 4px 10px;
-  border-radius: 3px;
-  color: var(--ink-2);
-  font-size: 14px;
-  line-height: 20px;
-  text-decoration: none;
-}
-.faq-topics a:hover {
-  background: color-mix(in srgb, var(--edit) 8%, transparent);
-  color: var(--ink);
-}
-.faq-topics a:focus-visible {
-  outline-offset: -2px;
-}
-.faq-topics a[aria-current] {
-  background: var(--select);
-  box-shadow: inset 0 0 0 1px var(--select-edge);
-  color: var(--ink);
-  font-weight: 700;
-}
-/* Under the questions, as a feature's questions end on the rest of their group. */
+/* Under the questions, each group ends on its way back to the owl's list, as a feature's
+   questions end on the rest of their group. A printed page has no use for it. */
 .faq-topics-back {
-  display: none;
   grid-column: -2;
   margin: 0;
   font-size: 14px;
@@ -1189,14 +1141,9 @@ strong {
   display: inline-block;
   padding: 11px 0;
 }
-@media screen and (min-width: 961px) and (min-height: 600px) {
-  .faq-topics {
-    display: block;
-  }
-}
-@media screen and (max-width: 960px), screen and (max-height: 599px) {
+@media print {
   .faq-topics-back {
-    display: block;
+    display: none;
   }
 }
 
