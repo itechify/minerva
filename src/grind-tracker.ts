@@ -1,6 +1,6 @@
 import "./errors";
 import { byId, span } from "./dom";
-import type { Character, ExpRate, ExpTracking, PacePoint, PaceTrace, Pickups } from "./exp-tracking";
+import type { Character, ExpRate, ExpTracking, Loot, PacePoint, PaceTrace } from "./exp-tracking";
 import { percent, rate, whole } from "./figures";
 import { dragByHandles, followView, heightReporter, pressControls } from "./shell";
 
@@ -15,11 +15,11 @@ type TrackerView = {
   personalBestsOpen: boolean;
   /** One of our windows has been over the Pickup Log for a while. */
   pickupLogCovered: boolean;
-  /** The Pickups header is open, as the player left it. */
-  pickupsOpen: boolean;
+  /** The Loot section is open, as the player left it. */
+  lootOpen: boolean;
 };
 
-/** How many Items the open Pickups list shows before "+N more". */
+/** How many Items the open Loot section lists before "+N more". */
 const TOP_ITEMS = 5;
 
 const panelEl = byId("panel");
@@ -44,7 +44,6 @@ const sessionPercent = byId("session-percent");
 const bestRow = byId("best-row");
 const bestExp = byId("best-exp");
 const bestThisVisit = byId("best-this-visit");
-const mesoRow = byId("meso-row");
 const mesoTotal = byId("meso-total");
 const mesoRate = byId("meso-rate");
 const pickupCovered = byId("tracking-pickup-covered");
@@ -52,14 +51,15 @@ const bestParty = byId("best-party");
 const expSplit = byId("exp-split");
 const splitOwn = byId("split-own");
 const splitParty = byId("split-party");
-const pickups = byId("pickups");
-const pickupsHead = byId("pickups-head");
-const pickupsCount = byId("pickups-count");
-const pickupsItems = byId("pickups-items");
-const pickupsMore = byId("pickups-more");
+const loot = byId("loot");
+const lootHead = byId("loot-head");
+const lootBody = byId("loot-body");
+const lootCount = byId("loot-count");
+const lootItems = byId("loot-items");
+const lootMore = byId("loot-more");
 /** "+N more" opened the rest of the Items: for this window only, not kept. */
 let allItems = false;
-pickupsMore.addEventListener("click", () => {
+lootMore.addEventListener("click", () => {
   allItems = !allItems;
   if (shown) render(shown);
 });
@@ -107,25 +107,39 @@ function noTimeToLevel(rolling: ExpRate | null) {
   return "not yet";
 }
 
-/** The Pickups header under the Meso row, once the Session has started: collapsed, its Items'
- *  count; open, the 5 picked up most with their counts, and "+N more" for the rest. */
-function renderPickups(p: Pickups, open: boolean, started: boolean) {
-  pickups.hidden = !started;
-  pickupsHead.setAttribute("aria-expanded", String(open));
-  pickups.classList.toggle("open", open);
-  pickupsCount.textContent = open ? "" : whole(p.itemsTotal);
-  pickupsItems.hidden = !open || p.items.length === 0;
-  const shownItems = allItems ? p.items : p.items.slice(0, TOP_ITEMS);
-  pickupsItems.replaceChildren(
+/** The Loot section, once the Session has started: collapsed, its totals on the header ("1,593
+ *  mesos 28 items", a part left out while it is none); open, the Mesos row, then the 5 Items
+ *  picked up most with their counts, and "+N more" for the rest. */
+function renderLoot(l: Loot, open: boolean, started: boolean) {
+  loot.hidden = !started;
+  lootHead.setAttribute("aria-expanded", String(open));
+  loot.classList.toggle("open", open);
+  lootBody.hidden = !open;
+  const totals = [total(l.mesos, "meso"), total(l.itemsTotal, "item")].filter((part) => part !== null);
+  lootCount.replaceChildren(...(open ? [] : totals.flatMap((part, i) => (i === 0 ? [part] : [" ", part]))));
+  mesoTotal.textContent = whole(l.mesos);
+  mesoRate.textContent = l.mesosPerHour === null ? "–" : rate(l.mesosPerHour);
+  lootItems.hidden = l.items.length === 0;
+  const shownItems = allItems ? l.items : l.items.slice(0, TOP_ITEMS);
+  lootItems.replaceChildren(
     ...shownItems.map((item) => {
       const row = document.createElement("li");
       row.append(span("name", item.name), span("tally", whole(item.count)));
       return row;
     }),
   );
-  const rest = p.items.length - TOP_ITEMS;
-  pickupsMore.hidden = !open || rest <= 0;
-  pickupsMore.textContent = allItems ? "Show fewer" : `+${rest} more`;
+  const rest = l.items.length - TOP_ITEMS;
+  lootMore.hidden = rest <= 0;
+  lootMore.textContent = allItems ? "Show fewer" : `+${rest} more`;
+}
+
+/** One of the Loot header's totals: its figure in Panel Ink, then its word as the label's; none
+ *  while it is zero. */
+function total(n: number, word: string) {
+  if (n === 0) return null;
+  const part = document.createElement("span");
+  part.append(span("figure", whole(n)), ` ${word}${n === 1 ? "" : "s"}`);
+  return part;
 }
 
 /** The Grind Tracker: a line until the Session starts, then Time to Level over the rates
@@ -197,12 +211,9 @@ function render(view: TrackerView) {
     expSplit.setAttribute("aria-label", shares);
   }
 
-  // The Session's mesos from the Pickup Log, once it has started, even at none; their rate
+  // The Session's Loot from the Pickup Log, once it has started, even at none; the mesos' rate
   // waits for active time.
-  mesoRow.hidden = !started;
-  mesoTotal.textContent = whole(t.pickups.mesos);
-  mesoRate.textContent = t.pickups.mesosPerHour === null ? "–" : rate(t.pickups.mesosPerHour);
-  renderPickups(t.pickups, view.pickupsOpen, started);
+  renderLoot(t.loot, view.lootOpen, started);
   // Said quietly, only while the Session shows figures that a cover would leave low.
   pickupCovered.hidden = !started || !view.pickupLogCovered;
 

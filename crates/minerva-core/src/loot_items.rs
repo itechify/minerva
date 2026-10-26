@@ -16,7 +16,7 @@ use serde::Serialize;
 /// One Item the Session has picked up, and how many.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PickedItem {
+pub struct LootItem {
     pub name: String,
     pub count: u64,
 }
@@ -74,7 +74,7 @@ struct Unmatched {
 /// The Items picked up in a Session.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ItemTally {
-    counts: Vec<PickedItem>,
+    counts: Vec<LootItem>,
     unmatched: Vec<Unmatched>,
 }
 
@@ -112,12 +112,12 @@ impl ItemTally {
     fn count(&mut self, name: String, quantity: u64) {
         match self.counts.iter_mut().find(|item| item.name == name) {
             Some(item) => item.count = item.count.saturating_add(quantity),
-            None => self.counts.push(PickedItem { name, count: quantity }),
+            None => self.counts.push(LootItem { name, count: quantity }),
         }
     }
 
     /// The Items so far, the most picked up first, then by name.
-    pub fn items(&self) -> Vec<PickedItem> {
+    pub fn items(&self) -> Vec<LootItem> {
         let mut items = self.counts.clone();
         items.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
         items

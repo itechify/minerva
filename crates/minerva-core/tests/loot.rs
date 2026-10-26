@@ -1,4 +1,4 @@
-//! Pickups (GLOSSARY): the mesos the Pickup Log says the player picked up in the Session, and
+//! Loot (GLOSSARY): the mesos the Pickup Log says the player picked up in the Session, and
 //! mesos an hour over its active time (ADR 0026, #170). Readings are built by hand; the
 //! Session is the EXP Session, started by the EXP bar's first change.
 //!
@@ -30,12 +30,12 @@ fn a_minute_in() -> Minerva {
 #[test]
 fn the_sessions_mesos_are_the_total_of_the_mesos_lines_that_arrived() {
     let mut minerva = a_minute_in();
-    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 0);
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 0);
 
     picked_up(&mut minerva, 71 * S, vec![mesos(29)]);
     let state = picked_up(&mut minerva, 72 * S, vec![mesos(1_200), mesos(29)]);
 
-    assert_eq!(state.exp_tracking.pickups.mesos, 1_258);
+    assert_eq!(state.exp_tracking.loot.mesos, 1_258);
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn only_mesos_lines_of_a_clean_capture_count() {
     minerva.on_pickup_log_reading(arrived(72 * S, PickupLogSeen::Covered { area: LOG }, vec![mesos(500)]));
     let state = minerva.on_pickup_log_reading(arrived(73 * S, PickupLogSeen::Nothing, vec![mesos(500)])).clone();
 
-    assert_eq!(state.exp_tracking.pickups.mesos, 0);
+    assert_eq!(state.exp_tracking.loot.mesos, 0);
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn mesos_picked_up_before_the_session_starts_are_not_its_own() {
     read(&mut minerva, 10 * S, 266, 633);
     let state = picked_up(&mut minerva, 11 * S, vec![mesos(40)]);
 
-    assert_eq!(state.exp_tracking.pickups.mesos, 40);
+    assert_eq!(state.exp_tracking.loot.mesos, 40);
 }
 
 #[test]
@@ -73,21 +73,21 @@ fn with_the_grind_tracker_off_nothing_is_counted() {
 
     let state = picked_up(&mut minerva, 72 * S, vec![mesos(40)]);
 
-    assert_eq!(state.exp_tracking.pickups.mesos, 40);
+    assert_eq!(state.exp_tracking.loot.mesos, 40);
 }
 
 #[test]
 fn mesos_an_hour_are_over_the_sessions_active_time_and_hold_with_the_other_figures() {
     let mut minerva = a_minute_in();
-    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos_per_hour, Some(0));
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos_per_hour, Some(0));
 
     picked_up(&mut minerva, 71 * S, vec![mesos(1_500)]);
     // The rate holds until the figures are measured afresh, at 90 s.
-    assert_eq!(minerva.tick(80 * S).exp_tracking.pickups.mesos_per_hour, Some(0));
+    assert_eq!(minerva.tick(80 * S).exp_tracking.loot.mesos_per_hour, Some(0));
 
     // 1,500 mesos in 90 s of active play (10 s to 100 s).
     let state = minerva.tick(100 * S).clone();
-    assert_eq!(state.exp_tracking.pickups.mesos_per_hour, Some(60_000));
+    assert_eq!(state.exp_tracking.loot.mesos_per_hour, Some(60_000));
     assert_eq!(state.exp_tracking.active_s, 90);
 }
 
@@ -103,7 +103,7 @@ fn mesos_picked_up_while_no_exp_comes_in_keep_the_session_from_pausing() {
 
     assert_eq!(state.exp_tracking.state, TrackingState::Active);
     assert_eq!(state.exp_tracking.active_s, 290, "10 s to 300 s, no break");
-    assert_eq!(state.exp_tracking.pickups.mesos, 200);
+    assert_eq!(state.exp_tracking.loot.mesos, 200);
 
     // The EXP alone would have been paused, and 2 minutes after the last mesos it is.
     let paused = minerva.tick(341 * S).clone();
@@ -128,11 +128,11 @@ fn a_reset_clears_the_mesos_and_its_undo_brings_them_back() {
     picked_up(&mut minerva, 71 * S, vec![mesos(1_500)]);
 
     let reset = minerva.act(Action::ResetSession).clone();
-    assert_eq!(reset.exp_tracking.pickups.mesos, 0);
-    assert_eq!(reset.exp_tracking.pickups.mesos_per_hour, None);
+    assert_eq!(reset.exp_tracking.loot.mesos, 0);
+    assert_eq!(reset.exp_tracking.loot.mesos_per_hour, None);
 
     let undone = minerva.act(Action::UndoReset).clone();
-    assert_eq!(undone.exp_tracking.pickups.mesos, 1_500);
+    assert_eq!(undone.exp_tracking.loot.mesos, 1_500);
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn the_new_session_after_a_reset_counts_from_zero() {
     read(&mut minerva, 80 * S, 400, 952);
     let state = picked_up(&mut minerva, 81 * S, vec![mesos(40)]);
 
-    assert_eq!(state.exp_tracking.pickups.mesos, 40);
+    assert_eq!(state.exp_tracking.loot.mesos, 40);
     assert!(!state.exp_tracking.reset_undoable);
 }
 
@@ -161,7 +161,7 @@ fn switching_character_clears_the_mesos_with_the_session() {
     }
     common::start_session(&mut minerva, 3 * S, 10 * S);
     let before = picked_up(&mut minerva, 11 * S, vec![mesos(1_500)]);
-    assert_eq!(before.exp_tracking.pickups.mesos, 1_500);
+    assert_eq!(before.exp_tracking.loot.mesos, 1_500);
 
     let mut state = before;
     for at in [12, 13, 14] {
@@ -169,7 +169,7 @@ fn switching_character_clears_the_mesos_with_the_session() {
     }
 
     assert!(state.exp_tracking.character_switched);
-    assert_eq!(state.exp_tracking.pickups.mesos, 0);
+    assert_eq!(state.exp_tracking.loot.mesos, 0);
 }
 
 /// A core with the Grind Tracker's window showing, and where it is on screen.
@@ -248,5 +248,5 @@ fn there_is_no_rate_before_the_session_has_active_time() {
     let mut minerva = tracking();
     let state = common::start_session(&mut minerva, 0, 10 * S);
 
-    assert_eq!(state.exp_tracking.pickups.mesos_per_hour, None);
+    assert_eq!(state.exp_tracking.loot.mesos_per_hour, None);
 }

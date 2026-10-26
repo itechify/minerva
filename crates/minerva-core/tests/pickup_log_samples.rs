@@ -28,23 +28,23 @@ fn clip(name: &str, size: f32) -> Vec<PickupLine> {
         assert!(reading.shift <= 6);
         assert!(reading.rows.iter().all(|&slot| slot < 6));
         let state = minerva.on_pickup_log_reading(reading.clone());
-        assert!(state.exp_tracking.pickups.mesos <= expected_mesos, "{name} ×{size}: mesos exceeded truth");
+        assert!(state.exp_tracking.loot.mesos <= expected_mesos, "{name} ×{size}: mesos exceeded truth");
         arrived.extend(reading.arrived);
     }
     if size == 1.0 {
-        let counted = match name { "empty-to-pickups" => 26, "covered" => 0, _ => expected_mesos };
-        assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, counted, "{name}");
+        let counted = match name { "empty-to-loot" => 26, "covered" => 0, _ => expected_mesos };
+        assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, counted, "{name}");
         let expected_items = match name {
             "cut-short" => vec![
-                minerva_core::PickedItem { name: "Arrows for Crossbow".into(), count: 21 },
-                minerva_core::PickedItem { name: "Ligator Skin".into(), count: 1 },
+                minerva_core::LootItem { name: "Arrows for Crossbow".into(), count: 21 },
+                minerva_core::LootItem { name: "Ligator Skin".into(), count: 1 },
             ],
-            "colour-breaks-tie" => vec![minerva_core::PickedItem { name: "Ligator Skin".into(), count: 1 }],
+            "colour-breaks-tie" => vec![minerva_core::LootItem { name: "Ligator Skin".into(), count: 1 }],
             _ => vec![],
         };
-        let pickups = &minerva.panel_state().exp_tracking.pickups;
-        assert_eq!(pickups.items, expected_items, "{name}");
-        assert_eq!(pickups.items_total, match name { "cut-short" => 22, "colour-breaks-tie" => 1, _ => 0 }, "{name}");
+        let loot = &minerva.panel_state().exp_tracking.loot;
+        assert_eq!(loot.items, expected_items, "{name}");
+        assert_eq!(loot.items_total, match name { "cut-short" => 22, "colour-breaks-tie" => 1, _ => 0 }, "{name}");
     }
     arrived
 }
@@ -60,18 +60,18 @@ fn mesos(lines: &[PickupLine]) -> u64 {
 }
 
 #[test]
-fn a_mob_covering_the_first_capture_after_reset_cannot_recount_pickups() {
+fn a_mob_covering_the_first_capture_after_reset_cannot_recount_loot() {
     let mut minerva = common::tracking();
     common::start_session(&mut minerva, 0, 1000);
     let mut reader = PickupLogReader::bundled();
     let capture = |sample: u64, at_ms| {
-        let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{sample:08}.png"));
+        let path = common::samples_in("pickup-log/empty-to-loot").join(format!("{sample:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
         PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 }
     };
     minerva.on_pickup_log_reading(reader.read(&capture(3000, 3000)));
     minerva.on_pickup_log_reading(reader.read(&capture(3300, 3300)));
-    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 26);
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 26);
 
     reader.reset();
     // An opaque Mob hides every line on the first capture of the new stream.
@@ -80,7 +80,7 @@ fn a_mob_covering_the_first_capture_after_reset_cannot_recount_pickups() {
         frame: common::frame(&mob, 3400), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0,
     }));
     minerva.on_pickup_log_reading(reader.read(&capture(3300, 3500)));
-    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 26);
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 26);
 }
 
 fn truth(name: &str) -> Vec<PickupLine> {
@@ -162,7 +162,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
     let mut reader = PickupLogReader::bundled();
     let mut arrivals = Vec::new();
     for at_ms in [2000, 2800, 2900, 3000, 3100, 3200] {
-        let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{at_ms:08}.png"));
+        let path = common::samples_in("pickup-log/empty-to-loot").join(format!("{at_ms:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
         let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
         let ours = if at_ms == 2900 { vec![ScreenRect { x: 1590, y: 830, width: 325, height: 139 }] } else { vec![] };
@@ -182,7 +182,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
     reader.reset();
     let mut arrivals = Vec::new();
     for at_ms in [3000, 3200, 3300] {
-        let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{at_ms:08}.png"));
+        let path = common::samples_in("pickup-log/empty-to-loot").join(format!("{at_ms:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
         let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
         let ours = if at_ms == 3200 { vec![ScreenRect { x: 1590, y: 830, width: 325, height: 139 }] } else { vec![] };
@@ -200,7 +200,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
 
 #[test]
 fn first_sighting_is_a_baseline_even_after_an_apparently_empty_log() {
-    let path = common::samples_in("pickup-log/empty-to-pickups");
+    let path = common::samples_in("pickup-log/empty-to-loot");
     let frames = common::pngs_in(&path);
     let mut reader = PickupLogReader::bundled();
     let mut arrived = Vec::new();
@@ -222,7 +222,7 @@ fn log_band_captures_count_mesos_on_the_panel_and_replay_without_pixels() {
     }
     common::start_session(&mut minerva, 300, 1300);
     let band = minerva.panel_state().pickup_log_capture.unwrap();
-    let files = common::pngs_in(common::samples_in("pickup-log/empty-to-pickups"));
+    let files = common::pngs_in(common::samples_in("pickup-log/empty-to-loot"));
     for path in files {
         let at_ms = path.file_stem().unwrap().to_str().unwrap().parse().unwrap();
         let img = image::open(path).unwrap().to_rgba8();
@@ -230,10 +230,10 @@ fn log_band_captures_count_mesos_on_the_panel_and_replay_without_pixels() {
         image::imageops::replace(&mut pixels, &img, 1590 - band.x as i64, 830 - band.y as i64);
         let state = minerva
             .on_pickup_log_capture(PickupLogCapture { frame: common::frame(&pixels, at_ms), origin: ScreenPoint { x: band.x, y: band.y }, ui_size: 1.0 });
-        assert!(state.exp_tracking.pickups.mesos <= 26);
+        assert!(state.exp_tracking.loot.mesos <= 26);
     }
     let recording = minerva_core::bug_report::read(&minerva.bug_report(&minerva_core::ReportAbout::default()).zip).unwrap();
-    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 26);
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 26);
     assert_eq!(minerva_core::bug_report::replay(&recording, Some(common::osms::game().files())).divergence, None);
 }
 
@@ -277,11 +277,11 @@ fn a_band_with_no_log_in_it_finds_none() {
     }
 }
 
-/// A `empty-to-pickups` frame (325×139, client (1590,830) in a 1920×1200 client area) placed
+/// A `empty-to-loot` frame (325×139, client (1590,830) in a 1920×1200 client area) placed
 /// where it was in a whole band, `up` px higher, over a band with no log in it.
 fn log_in_band(frame_ms: u64, background: &str, up: i64, at_ms: u64) -> PickupLogCapture {
     let mut band = image::open(common::samples_in("pickup-log-band").join(background)).unwrap().to_rgba8();
-    let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{frame_ms:08}.png"));
+    let path = common::samples_in("pickup-log/empty-to-loot").join(format!("{frame_ms:08}.png"));
     image::imageops::replace(&mut band, &image::open(path).unwrap().to_rgba8(), 70, 110 - up);
     PickupLogCapture { frame: common::frame(&band, at_ms), origin: ScreenPoint { x: 2198, y: 846 }, ui_size: 1.0 }
 }
@@ -346,7 +346,7 @@ fn a_lookalike_that_never_reads_is_dropped_and_the_real_log_is_found() {
     // the first four too, because the real log was followed from before they arrived.
     let still = (0..40).map(|i| log_in_band(2000, "no-log--244695.png", 0, 4000 + i * 100));
     let clip = CLIP_MS.map(|ms| log_in_band(ms, "no-log--244695.png", 0, 8000 + ms));
-    assert_eq!(arrivals(&mut reader, still.chain(clip)), truth("empty-to-pickups"));
+    assert_eq!(arrivals(&mut reader, still.chain(clip)), truth("empty-to-loot"));
 }
 
 /// Bug Report 0.15.0, 2026-10-26 09:03 (Ellinia: bright greens, a white sky). Whole bands, in
@@ -397,13 +397,13 @@ fn the_items_those_lines_name_are_tallied_by_name_and_counted_once() {
     for capture in lines_clip() {
         minerva.on_pickup_log_reading(reader.read(&capture));
     }
-    let pickups = &minerva.panel_state().exp_tracking.pickups;
-    assert_eq!(pickups.mesos, 13);
+    let loot = &minerva.panel_state().exp_tracking.loot;
+    assert_eq!(loot.mesos, 13);
     assert_eq!(
-        pickups.items,
+        loot.items,
         vec![
-            minerva_core::PickedItem { name: "Squishy Liquid".into(), count: 2 },
-            minerva_core::PickedItem { name: "Slime Bubble".into(), count: 1 },
+            minerva_core::LootItem { name: "Squishy Liquid".into(), count: 2 },
+            minerva_core::LootItem { name: "Slime Bubble".into(), count: 1 },
         ]
     );
 }

@@ -1,4 +1,4 @@
-//! Pickups, the Items (GLOSSARY, ADR 0026, #171): the Items the Pickup Log says the player
+//! Loot, the Items (GLOSSARY, ADR 0026, #171): the Items the Pickup Log says the player
 //! picked up in the Session, named from OSMS's item files ([`common::items`], made up in their
 //! shape) and tallied by name. Readings are built by hand and fed in as the reader's public
 //! input; the assertions are on the Grind Tracker's `PanelState`.
@@ -10,7 +10,7 @@ mod common;
 
 use common::items::{ItemWorld, equip, etc, item_world, scroll, setup, use_item, weapon};
 use common::{FakeSource, S, tracking_with};
-use minerva_core::{Action, Minerva, PanelControl, PickedItem, PickupLine, PickupLogSeen};
+use minerva_core::{Action, Minerva, PanelControl, LootItem, PickupLine, PickupLogSeen};
 
 use common::{LOG, picked_up, read};
 
@@ -56,8 +56,8 @@ fn cut(name: &str, quantity: u32, tab: &str) -> PickupLine {
     PickupLine::Item { name: name.into(), quantity, tab: tab.into(), cut_short: true }
 }
 
-fn tally(name: &str, count: u64) -> PickedItem {
-    PickedItem { name: name.into(), count }
+fn tally(name: &str, count: u64) -> LootItem {
+    LootItem { name: name.into(), count }
 }
 
 #[test]
@@ -67,9 +67,9 @@ fn an_item_named_exactly_is_tallied_by_name_and_its_quantities_add_up() {
     picked_up(&mut minerva, 11 * S, vec![item("Orange Mushroom Cap", 1, "Etc")]);
     let state = picked_up(&mut minerva, 12 * S, vec![item("Orange Mushroom Cap", 26, "Etc"), item("Red Potion", 3, "Use")]);
 
-    let pickups = state.exp_tracking.pickups;
-    assert_eq!(pickups.items, vec![tally("Orange Mushroom Cap", 27), tally("Red Potion", 3)]);
-    assert_eq!(pickups.items_total, 30);
+    let loot = state.exp_tracking.loot;
+    assert_eq!(loot.items, vec![tally("Orange Mushroom Cap", 27), tally("Red Potion", 3)]);
+    assert_eq!(loot.items_total, 30);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn a_misread_name_close_enough_to_an_items_is_tallied_as_that_item() {
     // A zero for the O, a capital I for the l: the letters the recogniser confuses.
     let state = picked_up(&mut minerva, 11 * S, vec![item("Orange Mushr0om Cap", 1, "Etc"), item("Red PotIon", 2, "Use")]);
 
-    let items = state.exp_tracking.pickups.items;
+    let items = state.exp_tracking.loot.items;
     assert_eq!(items, vec![tally("Red Potion", 2), tally("Orange Mushroom Cap", 1)]);
 }
 
@@ -92,7 +92,7 @@ fn a_name_read_several_glyphs_wrong_is_the_one_item_of_its_tab_it_is_clearly_clo
     // only Squishy Liquid and Slime Bubble are near.
     let state = picked_up(&mut minerva, 11 * S, vec![item("Equisny Liq?id", 1, "Etc"), item("Slime Bubkile", 2, "Etc")]);
 
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Slime Bubble", 2), tally("Squishy Liquid", 1)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Slime Bubble", 2), tally("Squishy Liquid", 1)]);
 }
 
 #[test]
@@ -101,10 +101,10 @@ fn a_misread_name_is_never_a_guess_between_two_items_of_its_tab() {
 
     // One glyph from Red Slime Orb and from Red Slime Orc: tallied as read, once read twice.
     let state = picked_up(&mut minerva, 11 * S, vec![item("Red Slime Orr", 1, "Etc")]);
-    assert!(state.exp_tracking.pickups.items.is_empty());
+    assert!(state.exp_tracking.loot.items.is_empty());
     let state = picked_up(&mut minerva, 12 * S, vec![item("Red Slime Orr", 1, "Etc")]);
 
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Red Slime Orr", 2)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Slime Orr", 2)]);
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn a_misread_name_is_only_matched_among_the_items_of_the_tab_its_line_says() {
     // Squishy Liquid is an Etc item: filed under Use, this is a misread or something newer.
     let state = picked_up(&mut minerva, 11 * S, vec![item("Equisny Liq?id", 1, "Use")]);
 
-    assert!(state.exp_tracking.pickups.items.is_empty());
+    assert!(state.exp_tracking.loot.items.is_empty());
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn a_name_cut_short_that_starts_one_items_name_is_that_item() {
 
     let state = picked_up(&mut minerva, 11 * S, vec![cut("Arrows for Cros", 21, "Use")]);
 
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Arrows for Crossbow", 21)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Arrows for Crossbow", 21)]);
 }
 
 #[test]
@@ -134,7 +134,7 @@ fn a_name_cut_short_that_starts_several_items_names_is_tallied_as_the_game_shows
     let state = picked_up(&mut minerva, 12 * S, vec![cut("Arrows for", 4, "Use")]);
 
     // Never a guess between Arrows for Bow and Arrows for Crossbow, never dropped.
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Arrows for...", 25)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Arrows for...", 25)]);
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn a_tab_decides_between_two_items_a_name_cut_short_starts() {
     // Pet Food Bar is a Use item, Pet Food Bar Wrapper an Etc one.
     let state = picked_up(&mut minerva, 11 * S, vec![cut("Pet Food Bar", 2, "Use"), cut("Pet Food Bar", 5, "Etc")]);
 
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Pet Food Bar Wrapper", 5), tally("Pet Food Bar", 2)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Pet Food Bar Wrapper", 5), tally("Pet Food Bar", 2)]);
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn equipment_and_scrolls_are_filed_under_the_tabs_the_game_files_them_under() {
         ],
     );
 
-    let names: Vec<_> = state.exp_tracking.pickups.items.iter().map(|item| item.name.as_str()).collect();
+    let names: Vec<_> = state.exp_tracking.loot.items.iter().map(|item| item.name.as_str()).collect();
     assert_eq!(names, ["Maple Lonely Chair", "Maple Lonely Hat", "Maple Lonely Sword", "Scroll for Maple Lonely Sword for ATT"]);
 }
 
@@ -172,10 +172,10 @@ fn a_name_cut_short_in_a_tab_nothing_starting_so_is_filed_under_matches_no_item(
 
     // Arrows are Use items: the tab read says Etc, so it is a misread or something newer.
     let state = picked_up(&mut minerva, 11 * S, vec![cut("Arrows for Cros", 21, "Etc")]);
-    assert!(state.exp_tracking.pickups.items.is_empty());
+    assert!(state.exp_tracking.loot.items.is_empty());
 
     let state = picked_up(&mut minerva, 12 * S, vec![cut("Arrows for Cros", 21, "Etc")]);
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Arrows for Cros...", 42)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Arrows for Cros...", 42)]);
 }
 
 #[test]
@@ -183,16 +183,16 @@ fn a_name_matching_no_item_is_tallied_as_read_once_it_has_been_read_on_two_lines
     let mut minerva = started(world());
 
     let state = picked_up(&mut minerva, 11 * S, vec![item("Zorg Dung", 3, "Etc")]);
-    assert!(state.exp_tracking.pickups.items.is_empty(), "a single misread makes no Item of its own");
+    assert!(state.exp_tracking.loot.items.is_empty(), "a single misread makes no Item of its own");
     let state = picked_up(&mut minerva, 12 * S, vec![item("Zorb Dung", 1, "Etc")]);
-    assert!(state.exp_tracking.pickups.items.is_empty(), "another text is another misread");
+    assert!(state.exp_tracking.loot.items.is_empty(), "another text is another misread");
 
     // The second line of the same text tallies both, the quantity of the first not lost.
     let state = picked_up(&mut minerva, 13 * S, vec![item("Zorg Dung", 2, "Etc")]);
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Zorg Dung", 5)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Zorg Dung", 5)]);
 
     let state = picked_up(&mut minerva, 14 * S, vec![item("Zorg Dung", 1, "Etc")]);
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Zorg Dung", 6)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Zorg Dung", 6)]);
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn two_lines_of_one_unmatched_name_in_one_reading_are_two_lines() {
 
     let state = picked_up(&mut minerva, 11 * S, vec![item("Zorg Dung", 3, "Etc"), item("Zorg Dung", 1, "Etc")]);
 
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Zorg Dung", 4)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Zorg Dung", 4)]);
 }
 
 #[test]
@@ -212,7 +212,7 @@ fn without_item_files_a_name_is_tallied_once_read_on_two_lines() {
     picked_up(&mut minerva, 11 * S, vec![item("Red Potion", 1, "Use")]);
     let state = picked_up(&mut minerva, 12 * S, vec![item("Red Potion", 1, "Use")]);
 
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Red Potion", 2)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Potion", 2)]);
 }
 
 #[test]
@@ -228,8 +228,8 @@ fn only_the_lines_of_a_clean_capture_in_a_started_session_count() {
     minerva.on_pickup_log_reading(covered);
     let state = picked_up(&mut minerva, 12 * S, vec![item("Red Potion", 1, "Use")]);
 
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Red Potion", 1)]);
-    assert_eq!(state.exp_tracking.pickups.items_total, 1);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Potion", 1)]);
+    assert_eq!(state.exp_tracking.loot.items_total, 1);
 }
 
 #[test]
@@ -238,33 +238,33 @@ fn a_reset_clears_the_items_with_the_mesos_and_its_undo_brings_them_back() {
     picked_up(&mut minerva, 11 * S, vec![item("Red Potion", 4, "Use"), item("Zorg Dung", 1, "Etc")]);
 
     let state = minerva.act(Action::ResetSession).clone();
-    assert!(state.exp_tracking.pickups.items.is_empty());
-    assert_eq!(state.exp_tracking.pickups.items_total, 0);
+    assert!(state.exp_tracking.loot.items.is_empty());
+    assert_eq!(state.exp_tracking.loot.items_total, 0);
 
     let state = minerva.act(Action::UndoReset).clone();
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Red Potion", 4)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Potion", 4)]);
 
     // The misread seen once came back with the Session: a second line tallies it.
     let state = picked_up(&mut minerva, 12 * S, vec![item("Zorg Dung", 1, "Etc")]);
-    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Red Potion", 4), tally("Zorg Dung", 2)]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Potion", 4), tally("Zorg Dung", 2)]);
 }
 
 #[test]
-fn the_pickups_header_starts_collapsed_and_a_click_opens_and_closes_it_across_launches() {
+fn the_loot_header_starts_collapsed_and_a_click_opens_and_closes_it_across_launches() {
     let mut minerva = started(world());
-    assert!(!minerva.panel_state().grind_tracker.pickups_open);
-    assert!(!minerva.settings().pickups_open);
+    assert!(!minerva.panel_state().grind_tracker.loot_open);
+    assert!(!minerva.settings().loot_open);
 
-    minerva.press(PanelControl::TogglePickups);
-    assert!(minerva.panel_state().grind_tracker.pickups_open);
+    minerva.press(PanelControl::ToggleLoot);
+    assert!(minerva.panel_state().grind_tracker.loot_open);
 
     // The next launch finds it as the player left it.
     let saved = minerva.settings();
-    assert!(saved.pickups_open);
+    assert!(saved.loot_open);
     let mut next = tracking_with(FakeSource::osms());
-    assert!(next.restore(saved).grind_tracker.pickups_open);
+    assert!(next.restore(saved).grind_tracker.loot_open);
 
-    minerva.press(PanelControl::TogglePickups);
-    assert!(!minerva.panel_state().grind_tracker.pickups_open);
-    assert!(!minerva.settings().pickups_open);
+    minerva.press(PanelControl::ToggleLoot);
+    assert!(!minerva.panel_state().grind_tracker.loot_open);
+    assert!(!minerva.settings().loot_open);
 }
