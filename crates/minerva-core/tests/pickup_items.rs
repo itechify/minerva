@@ -19,6 +19,11 @@ fn world() -> ItemWorld {
     item_world(vec![
         etc(4_000_000, "Orange Mushroom Cap").sells_for(5),
         etc(4_000_001, "Blue Snail Shell").sells_for(7),
+        etc(4_000_002, "Squishy Liquid").sells_for(1),
+        etc(4_000_003, "Slime Bubble").sells_for(1),
+        // Two names a misread can't tell apart.
+        etc(4_000_004, "Red Slime Orb").sells_for(1),
+        etc(4_000_005, "Red Slime Orc").sells_for(1),
         use_item(2_000_000, "Red Potion").sells_for(25),
         // Names the game cuts short: one start with one item, one with several, one that a
         // tab decides.
@@ -76,6 +81,40 @@ fn a_misread_name_close_enough_to_an_items_is_tallied_as_that_item() {
 
     let items = state.exp_tracking.pickups.items;
     assert_eq!(items, vec![tally("Red Potion", 2), tally("Orange Mushroom Cap", 1)]);
+}
+
+#[test]
+fn a_name_read_several_glyphs_wrong_is_the_one_item_of_its_tab_it_is_clearly_closest_to() {
+    let mut minerva = started(world());
+
+    // Bug Report 0.15.0, 2026-10-26 09:03, over bright green: the S read as an E, a glyph lost,
+    // the b as a k. Too far from the name for the whole set to say, but of the Etc tab's names
+    // only Squishy Liquid and Slime Bubble are near.
+    let state = picked_up(&mut minerva, 11 * S, vec![item("Equisny Liq?id", 1, "Etc"), item("Slime Bubkile", 2, "Etc")]);
+
+    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Slime Bubble", 2), tally("Squishy Liquid", 1)]);
+}
+
+#[test]
+fn a_misread_name_is_never_a_guess_between_two_items_of_its_tab() {
+    let mut minerva = started(world());
+
+    // One glyph from Red Slime Orb and from Red Slime Orc: tallied as read, once read twice.
+    let state = picked_up(&mut minerva, 11 * S, vec![item("Red Slime Orr", 1, "Etc")]);
+    assert!(state.exp_tracking.pickups.items.is_empty());
+    let state = picked_up(&mut minerva, 12 * S, vec![item("Red Slime Orr", 1, "Etc")]);
+
+    assert_eq!(state.exp_tracking.pickups.items, vec![tally("Red Slime Orr", 2)]);
+}
+
+#[test]
+fn a_misread_name_is_only_matched_among_the_items_of_the_tab_its_line_says() {
+    let mut minerva = started(world());
+
+    // Squishy Liquid is an Etc item: filed under Use, this is a misread or something newer.
+    let state = picked_up(&mut minerva, 11 * S, vec![item("Equisny Liq?id", 1, "Use")]);
+
+    assert!(state.exp_tracking.pickups.items.is_empty());
 }
 
 #[test]

@@ -38,8 +38,13 @@ pub(crate) fn name(items: Option<&ItemSet>, name: &str, cut_short: bool, tab: &s
     let shown = if cut_short { format!("{}...", name.trim_end()) } else { name.trim().to_string() };
     let Some(items) = items else { return Named::Unmatched(shown) };
     if !cut_short {
-        return match items.named(name).first() {
-            Some(item) => Named::Item(item.name.clone()),
+        if let Some(item) = items.named(name).first() {
+            return Named::Item(item.name.clone());
+        }
+        // A name the whole set can't place may still be the one of its tab's names it is clearly
+        // closest to, never one of two.
+        return match InventoryTab::named_like(tab).and_then(|tab| items.named_in_tab(name, tab)) {
+            Some(name) => Named::Item(name.to_string()),
             None => Named::Unmatched(shown),
         };
     }

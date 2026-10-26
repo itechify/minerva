@@ -349,6 +349,12 @@ fn resolve(read: &str, hits: &[ItemHit]) -> Resolved {
 /// Which of `names` (as [`item_key`] makes them, each once) the name `read` is: the one
 /// it is, or one clearly closer to it than any other. `None` when none is.
 pub(crate) fn closest(read: &[char], names: &[&[char]]) -> Option<usize> {
+    closest_within(read, names, CLOSE_ENOUGH)
+}
+
+/// [`closest`], with the similarity a name needs to count given: for a read that is known to be
+/// one of `names` (an Item line's name, among its own tab's), and so may be further from it.
+pub(crate) fn closest_within(read: &[char], names: &[&[char]], close_enough: f32) -> Option<usize> {
     if let Some(same) = names.iter().position(|name| *name == read) {
         return Some(same);
     }
@@ -356,7 +362,7 @@ pub(crate) fn closest(read: &[char], names: &[&[char]]) -> Option<usize> {
     edits.sort_by_key(|&(_, edits)| edits);
     let &(closest, fewest) = edits.first()?;
     let len = read.len().max(names[closest].len());
-    let similar = len > 0 && 1.0 - fewest as f32 / len as f32 >= CLOSE_ENOUGH;
+    let similar = len > 0 && 1.0 - fewest as f32 / len as f32 >= close_enough;
     let clear = edits.get(1).is_none_or(|&(_, next)| next >= fewest + CLEAR_LEAD);
     (similar && clear).then_some(closest)
 }
