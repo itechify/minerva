@@ -40,6 +40,9 @@ When a change alters something a shot shows, the PR that makes it lists the shot
 
 - `item-lookup.png`: Item Lookup's alert is now the owl saying it in a speech bubble (ADR 0025). Retaken, the table's row and the home page's alt text say the owl in place of the alert.
 
+- `grind-tracker.png`: the Grind Tracker has a Meso row under its rates ("Mesos", the Session's mesos and mesos per hour, with a ? help icon beside the label). Retake it from a Session with some mesos picked up, and add the row to the table's row and the home page's alt text.
+- `game-window.png`: the Grind Tracker in it gains the same Meso row, if its Session has started.
+
 A release may go out without retaking them. Then the page shows `wip.png` in place of each shot too far out of date to show, and the shot stays listed. None does now. Retaking one means pointing its `<img>` back at its own file (a scene from the game, as the Item Card's, on its own stage again: `shot stage scene`, where the sign stood on the panel's), and writing its alt text afresh, from what it shows and the entries below.
 
 - `map.png`: the Mobs section's figures show down the right edge of the card, past the panel's edge beside it ("hare", "2%", "30%"). Retake it with the Mobs section folded, so only the Map section and the card show.

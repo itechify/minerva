@@ -47,7 +47,6 @@
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.3 6.2A5 5 0 1 1 3 9.5M2.8 2.8v3.6h3.6" /></svg>
               </button>
             </div>
-            <!-- Meso and item rows come later, from the Pickup Log. -->
             <!-- The Best row is the map's Personal Best as it stands, from arriving on the
                  map: until the Session starts it is all the figures hold. Once this Visit
                  beats it, it is this Visit's, and says so. The star marks Last 5 min while it
@@ -70,6 +69,16 @@
                 <button type="button" class="icon-button light" data-control="removeBest" aria-label="Remove this best" title="Remove this best: your next best takes its place">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
                 </button>
+              </div>
+              <!-- The mesos the Pickup Log says the Session has picked up, and mesos an hour,
+                   laid out as the rows above are but without their units: the label says what
+                   the first figure is, the "/h" what the second. The help beside the label
+                   (added by the script) says where they are read from and why they can be low.
+                   The Item tally comes later, from the same log. -->
+              <div class="row" id="meso-row" hidden>
+                <span class="period" id="meso-period">Mesos</span>
+                <span class="value" id="meso-total"></span><span class="unit"></span>
+                <span class="value" id="meso-rate"></span><span class="unit per">/h</span>
               </div>
             </div>
             <!-- The Pace Trace: the last 5 minutes of play up to the last EXP gain, raced
@@ -105,6 +114,9 @@
             </svg>
             <p class="line" id="tracking-share" hidden></p>
             <p class="line" id="tracking-deaths" hidden></p>
+            <!-- One of our windows has been over the Pickup Log for a while: said quietly, in the
+                 lines' ink, so a dip in mesos an hour has its reason in sight. -->
+            <p class="line" id="tracking-pickup-covered" hidden>Pickup Log covered: some mesos may be missed.</p>
           </div>
           <!-- The game's own EXP gauge, as its status bar draws it: the last reading. -->
           <div class="exp" id="tracking-exp" hidden>

@@ -104,7 +104,8 @@
                   <summary>Does Minerva read or change the game?</summary>
                   <p>
                     No. Like a screenshot, it captures only what it needs: the minimap title, the bar at the bottom of the
-                    game (your EXP, level and name), the tooltip by the pointer when you press an item hotkey, and, while
+                    game (your EXP, level and name), the log of pickups in the bottom-right corner (while the Grind Tracker
+                    is on), the tooltip by the pointer when you press an item hotkey, and, while
                     the Deal Finder is on, the game window a few times a second to find a Player Shop. It never reads or
                     changes the game's memory or files, never injects anything into it, and never presses keys or clicks
                     for you.
@@ -772,6 +773,7 @@
                     <li>Your EXP per hour over the last 5 minutes and, once you've played longer, over the whole Session.</li>
                     <li>After a minute on a map, how your pace compares with its solo EXP/h ceiling.</li>
                     <li>Your deaths, and what they cost.</li>
+                    <li>The <a href="#mesos">mesos</a> you've picked up this Session, and mesos per hour.</li>
                     <li>
                       Your last 5 minutes, kill by kill, <a href="#pace-trace">raced against the 5 minutes before</a>
                       and, when you come close, your <a href="#personal-bests">Personal Best</a>.
@@ -791,6 +793,23 @@
                     <kbd>Ctrl+Shift+G</kbd> or the panel's button shows or hides it, and its × closes the window while the
                     Session carries on. To turn it off, click the gear at the top of the panel and untick
                     <strong>Grind Tracker</strong>: Minerva then doesn't read your EXP at all, until you tick it again.
+                  </p>
+                </details>
+                <details class="qa" id="mesos">
+                  <summary>Where do the mesos come from, and why can the figure be low?</summary>
+                  <p>
+                    From the game's <strong>Pickup Log</strong>, the lines that fade in the bottom-right corner of the
+                    window ("You have gained mesos (+29)"). Minerva adds up the ones that arrive during the Session, so a
+                    reset or a <a href="#which-character">character switch</a> starts the count again, and shows mesos per
+                    hour over the Session's active time, as it does your EXP. Mesos you pick up while no EXP comes in still
+                    count, and keep the Session from pausing. It reads the log only while the Grind Tracker is on and the
+                    game is in front.
+                  </p>
+                  <p>
+                    The figure can be low, never high. A line Minerva isn't sure of isn't counted: one a monster or a skill
+                    effect covered, or more lines at once than the log can show. Mesos you pick up before your first EXP of the
+                    Session aren't counted either. If one of Minerva's own windows sits over the log for a few seconds, the
+                    Grind Tracker says "Pickup Log covered": move it, and the count carries on.
                   </p>
                 </details>
                 <details class="qa" id="reset-session">

@@ -34,6 +34,7 @@ pub mod osms_items;
 mod pace;
 mod panel;
 mod personal_best;
+mod pickup_cover;
 mod pickup_log;
 mod player_shop;
 mod pictures;
@@ -95,7 +96,7 @@ pub use search::{
     DensityTier, Destination, HuntingTarget, ItemMatch, ItemsMissing, MapMatch, Matches, MobChoice, MobMatch, RouteStop,
     SearchResult, SearchState, SearchView, Trip,
 };
-pub use session::{Character, Deaths, ExpRate, ExpTracking, Forecast, PacePoint, PaceTrace, TrackingState};
+pub use session::{Character, Deaths, ExpRate, ExpTracking, Forecast, PacePoint, PaceTrace, Pickups, TrackingState};
 pub use settings::{Hotkey, Hotkeys, Settings};
 pub use settings_window::SettingsWindow;
 pub use setup::{SetupReason, SetupState};
@@ -124,6 +125,7 @@ use search::{Search, Searched};
 use shown_map::ShownMap;
 use matcher::{Match, Matcher, Snap};
 use pictures::Pictures;
+use pickup_cover::PickupCover;
 use panel::Panel;
 use portal_overrides::PORTAL_OVERRIDES;
 use session::Session;
@@ -300,6 +302,9 @@ pub struct PanelState {
     /// Where on screen to capture for the Pickup Log (physical px), every
     /// [`PICKUP_LOG_CAPTURE_MS`] on a thread of its own (ADR 0026); `None` while it isn't read.
     pub pickup_log_capture: Option<ScreenRect>,
+    /// One of our windows has been over the Pickup Log for more than a few seconds, so it can't
+    /// read the lines under it: the Grind Tracker says so, quietly. While it shows.
+    pub pickup_log_covered: bool,
     /// What the Status Bar showed in the last capture of it; `None` while it isn't found.
     pub status_bar: Option<StatusBar>,
     /// The Character playing, as the Status Bar names them, whom the Session is for; `None`
@@ -590,6 +595,8 @@ pub struct Minerva {
     status_bar_reader: Option<StatusBarReader>,
     /// Reads captures fed to [`Minerva::on_pickup_log_capture`], in order; made on the first one.
     pickup_log_reader: Option<PickupLogReader>,
+    /// Whether our windows have been over the Pickup Log.
+    pickup_cover: PickupCover,
     /// Where the Status Bar's level, job and name were last found, and the game's client
     /// area then: our windows keep clear of them while the client area stays where it was.
     status_bar_area: Option<(ScreenRect, ScreenRect)>,
@@ -662,6 +669,7 @@ impl Minerva {
             shop_reader: None,
             status_bar_reader: None,
             pickup_log_reader: None,
+            pickup_cover: PickupCover::default(),
             status_bar_area: None,
             title_found: None,
             title_locked: false,
@@ -1697,8 +1705,20 @@ impl Minerva {
 
     /// Take in what a Pickup Log capture read as, with no capture: a Bug Report's replay.
     pub fn on_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
-        let _ = reading;
-        &self.state
+        self.take_pickup_log_reading(reading)
+    }
+
+    /// What a Pickup Log reading does, once the input is written down: the Session counts the
+    /// mesos that arrived in a clean capture.
+    fn take_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
+        self.pickup_cover.on_reading(&reading, &self.state.our_windows);
+        if self.tracking_on() {
+            let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });
+            self.session.on_pickups(if clear { &reading.arrived } else { &[] }, reading.at_ms);
+        } else {
+            self.session.tick(reading.at_ms);
+        }
+        self.sync_panel()
     }
 
     /// Read a capture of [`PanelState::status_bar_capture`] and update the panel state: the
@@ -2247,6 +2267,7 @@ impl Minerva {
         .into_iter()
         .flatten()
         .collect();
+        self.state.pickup_log_covered = self.tracking_on() && self.pickup_cover.covered(&self.state.our_windows);
         self.state.hotkeys = self.settings.hotkeys.clone();
         let in_front = self.panel.foreground.is_some_and(|foreground| foreground != Foreground::OtherApp);
         self.state.hotkeys_live = in_front && !self.hotkey_settings.is_rebinding();

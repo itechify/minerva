@@ -60,6 +60,7 @@
 
 use crate::ExpBar;
 use crate::bug_report::{Level, Note};
+use crate::PickupLine;
 use crate::personal_best::{Bests, SavedBests, Stamp, VisitBest};
 use crate::status_bar::StatusBar;
 use serde::{Deserialize, Serialize};
@@ -142,6 +143,20 @@ pub struct ExpTracking {
     /// Unreadable because the EXP figures had nowhere to be read: the Status Bar isn't found,
     /// and wasn't since the client area last changed size (ADR 0017).
     pub no_status_bar: bool,
+    /// What the Pickup Log says the player picked up in the Session.
+    pub pickups: Pickups,
+}
+
+/// The Pickups (GLOSSARY) of the Session so far: read from the Pickup Log, so they may be
+/// fewer than were picked up, never more (ADR 0026). Only mesos for now.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Pickups {
+    /// The mesos picked up since the Session started, as they arrive.
+    pub mesos: u64,
+    /// Mesos an hour over the Session's active time, held with the other figures. `None`
+    /// until the Session has some active time.
+    pub mesos_per_hour: Option<u64>,
 }
 
 /// The Pace Trace: the Session's EXP over the 5 minutes of active play up to its last
@@ -513,9 +528,12 @@ impl Gained {
 /// A started Session's figures.
 #[derive(Debug)]
 struct Figures {
-    /// When the EXP last changed.
-    last_change_at: u64,
-    /// Active time up to `last_change_at`.
+    /// When the player last played: the EXP last changed, or the Pickup Log last said mesos
+    /// were picked up.
+    last_play_at: u64,
+    /// Active time up to `last_play_at`.
+    active_at_play: u64,
+    /// Active time up to the last EXP change, which the Pace Trace ends at: mesos don't move it.
     active_at_change: u64,
     /// Net EXP gained since the start.
     gained: i64,
@@ -534,13 +552,16 @@ struct Figures {
     /// when the player last removed this Visit's best, if later, so the play that set it
     /// isn't counted again.
     best_from: u64,
+    /// The mesos the Pickup Log has said were picked up since the start.
+    mesos: u64,
 }
 
 impl Figures {
     /// A Session started at `at`.
     fn new(at: u64) -> Self {
         Figures {
-            last_change_at: at,
+            last_play_at: at,
+            active_at_play: 0,
             active_at_change: 0,
             gained: 0,
             marks: vec![Mark { active: 0, gained: 0 }],
@@ -548,6 +569,7 @@ impl Figures {
             warmed_up: false,
             visit_from: 0,
             best_from: 0,
+            mesos: 0,
         }
     }
 
@@ -562,9 +584,9 @@ impl Figures {
         self.warmed_up || self.active(now) >= WARM_UP_MS
     }
 
-    /// How long the EXP has gone unchanged at `now`.
+    /// How long the player has gone without playing at `now`: no EXP change, no mesos.
     fn idle(&self, now: u64) -> u64 {
-        now.saturating_sub(self.last_change_at)
+        now.saturating_sub(self.last_play_at)
     }
 
     /// Whether the player is on a break at `now`.
@@ -572,16 +594,22 @@ impl Figures {
         self.idle(now) > IDLE_MS
     }
 
-    /// Active time at `now`: the idle stretch since the last change counts while it is
+    /// Active time at `now`: the idle stretch since the last play counts while it is
     /// a gap in play, and not at all once it is a break.
     fn active(&self, now: u64) -> u64 {
-        self.active_at_change + if self.paused(now) { 0 } else { self.idle(now) }
+        self.active_at_play + if self.paused(now) { 0 } else { self.idle(now) }
+    }
+
+    /// The player played at `at` without the EXP changing (mesos): no break, if there was one.
+    fn play(&mut self, at: u64) {
+        self.active_at_play = self.active(at);
+        self.last_play_at = self.last_play_at.max(at);
     }
 
     /// Count a change of `gain` EXP at `at`.
     fn change(&mut self, gain: i64, at: u64) {
-        self.active_at_change = self.active(at);
-        self.last_change_at = at;
+        self.play(at);
+        self.active_at_change = self.active_at_play;
         self.gained += gain;
         self.marks.push(Mark { active: self.active_at_change, gained: self.gained });
         let from = self.active_at_change.saturating_sub(2 * ROLLING_MS);
@@ -970,6 +998,23 @@ impl Session {
         self.shown = None;
     }
 
+    /// The Pickup Log said `lines` arrived, in a clean capture at `at_ms`. Mesos are counted
+    /// once the Session has started (the first EXP change starts it, from the EXP the bar shows
+    /// then). They are play, so they keep the Session from pausing, as an EXP change does;
+    /// they are not an EXP change, so they leave the Pace Trace alone.
+    pub fn on_pickups(&mut self, lines: &[PickupLine], at_ms: u64) {
+        self.tick(at_ms);
+        let Some(figures) = &mut self.figures else { return };
+        let mut mesos = lines.iter().filter_map(|line| match line {
+            PickupLine::Mesos { amount } => Some(*amount),
+            _ => None,
+        });
+        if let Some(first) = mesos.next() {
+            figures.mesos = mesos.fold(figures.mesos.saturating_add(first), u64::saturating_add);
+            figures.play(at_ms);
+        }
+    }
+
     /// The player removed `map`'s Best row: this Visit's best if the row is it, otherwise the
     /// best from its history. What is shown is measured afresh against the next best, at once.
     pub fn remove_best(&mut self, map: &str) {
@@ -1168,6 +1213,8 @@ impl Session {
             pace: self.pace(held.personal_best),
             forecast: forecast(self.last, held.rolling),
             lost_from_hundredths: self.lost_from.filter(|&p| self.last.is_some_and(|bar| bar.percent_hundredths < p)),
+            // The mesos as they arrive, like the bar; their rate holds with the figures.
+            pickups: Pickups { mesos: self.figures.as_ref().map_or(0, |f| f.mesos), ..held.pickups },
             ..held
         }
     }
@@ -1284,6 +1331,11 @@ impl Session {
             forecast: Vec::new(),
             lost_from_hundredths: None,
             no_status_bar: false,
+            pickups: Pickups {
+                mesos: figures.mesos,
+                mesos_per_hour: (average.over_ms > 0)
+                    .then(|| div_round(i128::from(figures.mesos) * i128::from(HOUR_MS), i128::from(average.over_ms)) as u64),
+            },
         }
     }
 }

@@ -3,7 +3,7 @@ import { byId, span } from "./dom";
 import type { Character, ExpRate, ExpTracking, PacePoint, PaceTrace } from "./exp-tracking";
 import { percent, rate, sharePercent, whole } from "./figures";
 import { dragByHandles, followView, heightReporter, pressControls } from "./shell";
-import { soloExpHelp } from "./solo-exp-help";
+import { helpButton, soloExpHelp } from "./solo-exp-help";
 
 /** What the shell sends: the figures, the Character playing (none until the Status Bar names
  *  one), whether the window shows at all, whether some map has a Personal Best (the Personal
@@ -14,6 +14,8 @@ type TrackerView = {
   character: Character | null;
   personalBests: boolean;
   personalBestsOpen: boolean;
+  /** One of our windows has been over the Pickup Log for a while. */
+  pickupLogCovered: boolean;
 };
 
 const panelEl = byId("panel");
@@ -38,6 +40,19 @@ const sessionPercent = byId("session-percent");
 const bestRow = byId("best-row");
 const bestExp = byId("best-exp");
 const bestThisVisit = byId("best-this-visit");
+const mesoRow = byId("meso-row");
+const mesoPeriod = byId("meso-period");
+const mesoTotal = byId("meso-total");
+const mesoRate = byId("meso-rate");
+// Beside "Mesos": where the figures are read from, and why they can be low.
+mesoPeriod.append(
+  helpButton("Where the mesos are read from", [
+    "Mesos are read from the Pickup Log, the lines in the game's bottom-right corner that announce what you pick up.",
+    "A figure here can be low, never high: a line that something covered, or that came faster than the log could show, may not be counted. Mesos picked up before your first EXP of the Session aren't either.",
+    "Mesos an hour is over the Session's active time, as the EXP rates are.",
+  ]),
+);
+const pickupCovered = byId("tracking-pickup-covered");
 const share = byId("tracking-share");
 const shareText = document.createElement("span");
 share.append(shareText, soloExpHelp());
@@ -140,6 +155,14 @@ function render(view: TrackerView) {
   bestRow.hidden = t.personalBest === null;
   bestExp.textContent = t.personalBest === null ? "" : rate(t.personalBest);
   bestThisVisit.hidden = !t.personalBestThisVisit;
+
+  // The Session's mesos from the Pickup Log, once it has started, even at none; their rate
+  // waits for active time.
+  mesoRow.hidden = !started;
+  mesoTotal.textContent = whole(t.pickups.mesos);
+  mesoRate.textContent = t.pickups.mesosPerHour === null ? "–" : rate(t.pickups.mesosPerHour);
+  // Said quietly, only while the Session shows figures that a cover would leave low.
+  pickupCovered.hidden = !started || !view.pickupLogCovered;
 
   const shareOf = t.ceilingShareHundredths;
   share.hidden = shareOf === null || t.soloExpCeiling === null;
