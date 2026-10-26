@@ -1,6 +1,6 @@
 import "./errors";
 import { byId, span } from "./dom";
-import type { Character, ExpRate, ExpTracking, PacePoint, PaceTrace } from "./exp-tracking";
+import type { Character, ExpRate, ExpTracking, PacePoint, PaceTrace, Pickups } from "./exp-tracking";
 import { percent, rate, sharePercent, whole } from "./figures";
 import { dragByHandles, followView, heightReporter, pressControls } from "./shell";
 import { helpButton, soloExpHelp } from "./solo-exp-help";
@@ -16,7 +16,12 @@ type TrackerView = {
   personalBestsOpen: boolean;
   /** One of our windows has been over the Pickup Log for a while. */
   pickupLogCovered: boolean;
+  /** The Pickups header is open, as the player left it. */
+  pickupsOpen: boolean;
 };
+
+/** How many Items the open Pickups list shows before "+N more". */
+const TOP_ITEMS = 5;
 
 const panelEl = byId("panel");
 const openBests = byId("open-bests");
@@ -53,6 +58,17 @@ mesoPeriod.append(
   ]),
 );
 const pickupCovered = byId("tracking-pickup-covered");
+const pickups = byId("pickups");
+const pickupsHead = byId("pickups-head");
+const pickupsCount = byId("pickups-count");
+const pickupsItems = byId("pickups-items");
+const pickupsMore = byId("pickups-more");
+/** "+N more" opened the rest of the Items: for this window only, not kept. */
+let allItems = false;
+pickupsMore.addEventListener("click", () => {
+  allItems = !allItems;
+  if (shown) render(shown);
+});
 const share = byId("tracking-share");
 const shareText = document.createElement("span");
 share.append(shareText, soloExpHelp());
@@ -98,6 +114,27 @@ function noTimeToLevel(rolling: ExpRate | null) {
   if (rolling && rolling.expPerHour < 0) return "losing EXP";
   if (rolling && rolling.expPerHour === 0) return "no gain yet";
   return "not yet";
+}
+
+/** The Pickups header under the Meso row, once the Session has started: collapsed, its Items'
+ *  count; open, the 5 picked up most with their counts, and "+N more" for the rest. */
+function renderPickups(p: Pickups, open: boolean, started: boolean) {
+  pickups.hidden = !started;
+  pickupsHead.setAttribute("aria-expanded", String(open));
+  pickups.classList.toggle("open", open);
+  pickupsCount.textContent = open ? "" : whole(p.itemsTotal);
+  pickupsItems.hidden = !open || p.items.length === 0;
+  const shownItems = allItems ? p.items : p.items.slice(0, TOP_ITEMS);
+  pickupsItems.replaceChildren(
+    ...shownItems.map((item) => {
+      const row = document.createElement("li");
+      row.append(span("name", item.name), span("tally", whole(item.count)));
+      return row;
+    }),
+  );
+  const rest = p.items.length - TOP_ITEMS;
+  pickupsMore.hidden = !open || rest <= 0;
+  pickupsMore.textContent = allItems ? "Show fewer" : `+${rest} more`;
 }
 
 /** The Grind Tracker: a line until the Session starts, then Time to Level over the rates
@@ -161,6 +198,7 @@ function render(view: TrackerView) {
   mesoRow.hidden = !started;
   mesoTotal.textContent = whole(t.pickups.mesos);
   mesoRate.textContent = t.pickups.mesosPerHour === null ? "–" : rate(t.pickups.mesosPerHour);
+  renderPickups(t.pickups, view.pickupsOpen, started);
   // Said quietly, only while the Session shows figures that a cover would leave low.
   pickupCovered.hidden = !started || !view.pickupLogCovered;
 

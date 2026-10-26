@@ -58,7 +58,14 @@ export type Pickups = {
   /** Mesos an hour over the Session's active time, held with the other figures; none until
    *  the Session has active time. */
   mesosPerHour: number | null;
+  /** The Items picked up, the most picked up first. */
+  items: PickedItem[];
+  /** How many Items in all: the Pickups header's count. */
+  itemsTotal: number;
 };
+
+/** Mirror of `minerva_core::PickedItem`: an Item by name, and how many were picked up. */
+export type PickedItem = { name: string; count: number };
 
 /** Mirror of `minerva_core::PacePoint`: active time before the last EXP change, and the
  *  EXP gained since the trace's first point. */

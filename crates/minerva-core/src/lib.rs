@@ -472,6 +472,9 @@ pub enum PanelControl {
     /// The × on the Grind Tracker's Best row: remove the shown map's Personal Best the row
     /// shows, this Visit's or the best of the earlier Visits.
     RemoveBest,
+    /// The Grind Tracker window's Pickups header: open the Items picked up in the Session, or
+    /// collapse them to the header. Kept across launches.
+    TogglePickups,
     /// The Grind Tracker window's ×: close it.
     CloseGrindTracker,
     /// The Grind Tracker window's Personal Bests button, or its Best row's "Best": open
@@ -1058,6 +1061,7 @@ impl Minerva {
                 // With no best left, there is nothing for the Personal Bests window to show.
                 self.bests_window.open &= self.session.bests().any();
             }
+            Action::TogglePickups => self.settings.pickups_open = !self.settings.pickups_open,
             Action::ToggleGrindTracker => self.grind_tracker.open = !self.grind_tracker.open,
             Action::CloseGrindTracker => self.grind_tracker.open = false,
             Action::GrindTrackerMoved { x, y } => {
@@ -1353,6 +1357,7 @@ impl Minerva {
             PanelControl::ResetSession => Action::ResetSession,
             PanelControl::UndoReset => Action::UndoReset,
             PanelControl::RemoveBest => Action::RemoveBest,
+            PanelControl::TogglePickups => Action::TogglePickups,
             PanelControl::CloseGrindTracker => Action::CloseGrindTracker,
             PanelControl::TogglePersonalBests => Action::TogglePersonalBests,
             PanelControl::ClosePersonalBests => Action::ClosePersonalBests,
@@ -2482,6 +2487,7 @@ impl Minerva {
             open: self.grind_tracker.open,
             placement,
             personal_bests: self.session.bests().any(),
+            pickups_open: self.settings.pickups_open,
         };
     }
 

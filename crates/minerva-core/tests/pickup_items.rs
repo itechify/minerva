@@ -10,7 +10,7 @@ mod common;
 
 use common::items::{ItemWorld, equip, etc, item_world, scroll, setup, use_item, weapon};
 use common::{FakeSource, S, read, tracking_with};
-use minerva_core::{Action, Minerva, PanelState, PickedItem, PickupLine, PickupLogReading, PickupLogSeen, ScreenRect};
+use minerva_core::{Action, Minerva, PanelControl, PanelState, PickedItem, PickupLine, PickupLogReading, PickupLogSeen, ScreenRect};
 
 /// Where the log was seen, in the bottom right of a 1920x1200 client area at the origin.
 const LOG: ScreenRect = ScreenRect { x: 1500, y: 800, width: 408, height: 160 };
@@ -224,4 +224,24 @@ fn a_reset_clears_the_items_with_the_mesos_and_its_undo_brings_them_back() {
     // The misread seen once came back with the Session: a second line tallies it.
     let state = picked_up(&mut minerva, 12 * S, vec![item("Zorg Dung", 1, "Etc")]);
     assert_eq!(state.exp_tracking.pickups.items, vec![tally("Red Potion", 4), tally("Zorg Dung", 2)]);
+}
+
+#[test]
+fn the_pickups_header_starts_collapsed_and_a_click_opens_and_closes_it_across_launches() {
+    let mut minerva = started(world());
+    assert!(!minerva.panel_state().grind_tracker.pickups_open);
+    assert!(!minerva.settings().pickups_open);
+
+    minerva.press(PanelControl::TogglePickups);
+    assert!(minerva.panel_state().grind_tracker.pickups_open);
+
+    // The next launch finds it as the player left it.
+    let saved = minerva.settings();
+    assert!(saved.pickups_open);
+    let mut next = tracking_with(FakeSource::osms());
+    assert!(next.restore(saved).grind_tracker.pickups_open);
+
+    minerva.press(PanelControl::TogglePickups);
+    assert!(!minerva.panel_state().grind_tracker.pickups_open);
+    assert!(!minerva.settings().pickups_open);
 }

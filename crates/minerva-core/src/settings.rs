@@ -87,6 +87,9 @@ pub struct Settings {
     /// The player said not now to the Personal Bests window's prompt to link Discord (#152):
     /// it doesn't ask again.
     pub link_prompt_dismissed: bool,
+    /// The Grind Tracker's Pickups header is open, showing the Items picked up; it starts
+    /// collapsed (#171).
+    pub pickups_open: bool,
 }
 
 impl Default for Settings {
@@ -113,6 +116,7 @@ impl Default for Settings {
             map_leaderboards_met: Some(Vec::new()),
             check_for_updates: true,
             link_prompt_dismissed: false,
+            pickups_open: false,
         }
     }
 }

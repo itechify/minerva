@@ -773,7 +773,11 @@
                     <li>Your EXP per hour over the last 5 minutes and, once you've played longer, over the whole Session.</li>
                     <li>After a minute on a map, how your pace compares with its solo EXP/h ceiling.</li>
                     <li>Your deaths, and what they cost.</li>
-                    <li>The <a href="#mesos">mesos</a> you've picked up this Session, and mesos per hour.</li>
+                    <li>
+                      The <a href="#mesos">mesos</a> you've picked up this Session, and mesos per hour. Under them,
+                      <strong>Pickups</strong>, closed at first with how many items you've picked up, opens to the five you've
+                      picked up most.
+                    </li>
                     <li>
                       Your last 5 minutes, kill by kill, <a href="#pace-trace">raced against the 5 minutes before</a>
                       and, when you come close, your <a href="#personal-bests">Personal Best</a>.
@@ -796,7 +800,7 @@
                   </p>
                 </details>
                 <details class="qa" id="mesos">
-                  <summary>Where do the mesos come from, and why can the figure be low?</summary>
+                  <summary>Where do the mesos and items come from, and why can the figures be low?</summary>
                   <p>
                     From the game's <strong>Pickup Log</strong>, the lines that fade in the bottom-right corner of the
                     window ("You have gained mesos (+29)"). Minerva adds up the ones that arrive during the Session, so a
@@ -806,8 +810,19 @@
                     game is in front.
                   </p>
                   <p>
-                    The figure can be low, never high. A line Minerva isn't sure of isn't counted: one a monster or a skill
-                    effect covered, or more lines at once than the log can show. Mesos you pick up before your first EXP of the
+                    The items you pick up come from the same lines ("Orange Mushroom Cap x26 earned. (Etc)") and are
+                    tallied by name under <strong>Pickups</strong>, under the mesos. Click Pickups to open it: the five
+                    items you've picked up most, each with its count, and "+N more" opens the rest. It stays open or closed
+                    as you leave it, even after you restart Minerva. A reset or a character switch clears the items with the
+                    mesos, and there is no per-hour figure for them. Minerva names an item from the game's item list. When
+                    the game cuts a long name short ("Arrows for Cros...") it goes by the item list and the inventory tab
+                    named in the line; if more than one item fits, it's tallied as the game shows it, never guessed. A name
+                    that matches no item, such as a new one the list doesn't have yet, is tallied as read only once it has
+                    been read on two lines, so one misread never counts as an item.
+                  </p>
+                  <p>
+                    The figures can be low, never high. A line Minerva isn't sure of isn't counted: one a monster or a skill
+                    effect covered, or more lines at once than the log can show. Mesos and items you pick up before your first EXP of the
                     Session aren't counted either. If one of Minerva's own windows sits over the log for a few seconds, the
                     Grind Tracker says "Pickup Log covered": move it, and the count carries on.
                   </p>

@@ -217,6 +217,102 @@
   padding: 0 0 0 1px;
 }
 
+/* The Pickups header under the Meso row: plain at rest, as the Best link is, with a chevron
+   that turns down when it is open and the Items' count after it while it is collapsed. Open,
+   the Items are rows of a name and its tally, the tally in the rates' bold figures, and
+   "+N more" a plain link under them. The rows are as tall as the rates', so the list adds no
+   more height than its Items. */
+.pickups {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ink-2);
+}
+
+.pickups-head,
+.pickups-more {
+  all: unset;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pickups-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.pickups-head:hover .label,
+.pickups-more:hover {
+  color: var(--portal);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.pickups-head:active .label,
+.pickups-more:active {
+  color: var(--frame);
+}
+
+.pickups-head:focus-visible,
+.pickups-more:focus-visible {
+  outline: 2px solid var(--edit);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.pickups .chevron {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  align-self: center;
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pickups.open .chevron {
+  transform: rotate(90deg);
+}
+
+.pickups .count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pickups-items {
+  margin: 0;
+  padding: 0 0 0 13px;
+  list-style: none;
+}
+
+.pickups-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pickups-items .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pickups-items .tally {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pickups-more {
+  display: block;
+  padding-left: 13px;
+}
+
 /* The Pace Trace, under the rates it draws: a race with the 5 minutes before, as split
    times against a ghost. Their pace is the flat Ink Slate line; the trace, Panel Ink, is
    how far ahead of it the player is, the gap shaded faintly either side, the split by the
