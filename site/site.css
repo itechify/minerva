@@ -1914,9 +1914,9 @@ button.icon-button:active {
   text-align: right;
 }
 /* Latest: each entry two lines beside two right-aligned figures, so the EXP/h read down the
-   list as a column: the Character (bold) and their job and level beside what they got, over
-   the map, its Map Mark before it, and band beside the day. An entry that took a map's top
-   spot says so under them. */
+   list as a column: the Character (bold), then their job (beside its class's icon) and level,
+   beside what they got, over the map, its Map Mark before it, and band beside the day. An
+   entry that took a map's top spot says so under them. */
 .lb-map.lb-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1924,6 +1924,56 @@ button.icon-button:active {
   align-items: start;
   font-size: 13px;
   line-height: 18px;
+}
+/* Wide enough, the rows share three columns (each row a subgrid of the list): the names, which
+   take the longest one's room, then the jobs, so every icon and job starts at one edge down the
+   list, then the figures. A job too long for its column wraps past its icon. On a phone each
+   entry keeps its one line of name and job, as the list is too narrow for the longest name's. */
+@media (min-width: 641px) {
+  .lb-latest {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) auto;
+  }
+  .lb-latest > li {
+    grid-column: 1 / -1;
+  }
+  /* The loading line spans the list, so its words don't set the names' column. */
+  .lb-latest > li:not(.lb-wait) {
+    display: grid;
+    grid-template-columns: subgrid;
+  }
+  .lb-latest .lb-map.lb-entry {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    column-gap: 0;
+  }
+  .lb-latest .lb-entry-who {
+    display: contents;
+  }
+  .lb-latest .lb-entry-name {
+    grid-column: 1;
+    margin-right: 10px;
+  }
+  /* The job's 13px words sit on the name's 15px baseline, 3px down the name's 22px line, the
+     icon centred on their first line. */
+  .lb-latest .lb-entry-job {
+    display: flex;
+    grid-column: 2;
+    align-items: flex-start;
+    padding-top: 3px;
+  }
+  .lb-latest .lb-entry-job .lb-job-icon {
+    flex: none;
+    margin-block: -4px 0;
+  }
+  .lb-latest .lb-entry-exp,
+  .lb-latest .lb-entry-date {
+    grid-column: 3;
+    margin-left: 14px;
+  }
+  .lb-latest .lb-entry-where {
+    grid-column: 1 / 3;
+  }
 }
 .lb-entry-job,
 .lb-entry-unit,
