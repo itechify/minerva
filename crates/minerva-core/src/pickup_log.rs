@@ -184,7 +184,8 @@ impl PickupLogReader {
                 // the last clean stack alone without claiming lines were found.
                 return reading;
             }
-            self.previous = Some(Stack { rows: (0..6).map(|_| None).collect() });
+            // Until the log has been located, no lines could equally mean a Mob
+            // covers it. The first clean sighting must establish the baseline.
             return reading;
         };
         // Search the generous capture band once, then scale only the six line slots.

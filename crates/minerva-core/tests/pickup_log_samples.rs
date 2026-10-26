@@ -39,7 +39,8 @@ fn clip(name: &str, size: f32) -> Vec<PickupLine> {
         arrived.extend(reading.arrived);
     }
     if size == 1.0 {
-        assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, expected_mesos, "{name}");
+        let counted = match name { "empty-to-pickups" => 26, "covered" => 0, _ => expected_mesos };
+        assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, counted, "{name}");
     }
     arrived
 }
@@ -52,6 +53,31 @@ fn mesos(lines: &[PickupLine]) -> u64 {
             _ => None,
         })
         .sum()
+}
+
+#[test]
+fn a_mob_covering_the_first_capture_after_reset_cannot_recount_pickups() {
+    let mut minerva = common::tracking();
+    common::read(&mut minerva, 0, 160, 381);
+    common::read(&mut minerva, 1000, 266, 633);
+    let mut reader = PickupLogReader::bundled();
+    let capture = |sample: u64, at_ms| {
+        let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{sample:08}.png"));
+        let img = image::open(path).unwrap().to_rgba8();
+        PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 } }
+    };
+    minerva.on_pickup_log_reading(reader.read(&capture(3000, 3000)));
+    minerva.on_pickup_log_reading(reader.read(&capture(3300, 3300)));
+    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 26);
+
+    reader.reset();
+    // An opaque Mob hides every line on the first capture of the new stream.
+    let mob = image::RgbaImage::from_pixel(325, 139, image::Rgba([80, 60, 40, 255]));
+    minerva.on_pickup_log_reading(reader.read(&PickupLogCapture {
+        frame: common::frame(&mob, 3400), origin: ScreenPoint { x: 1590, y: 830 },
+    }));
+    minerva.on_pickup_log_reading(reader.read(&capture(3300, 3500)));
+    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 26);
 }
 
 fn truth(name: &str) -> Vec<PickupLine> {
@@ -69,8 +95,8 @@ fn truth(name: &str) -> Vec<PickupLine> {
 }
 
 #[test]
-fn repeated_pairs_are_six_arrivals_and_fading_is_not_an_arrival() {
-    assert_eq!(clip("repeated-pairs", 1.0), truth("repeated-pairs"));
+fn a_first_sighting_of_six_repeated_lines_establishes_the_baseline() {
+    assert!(clip("repeated-pairs", 1.0).is_empty());
 }
 
 #[test]
@@ -102,7 +128,7 @@ fn covering_the_stack_does_not_fake_a_burst() {
                 _ => None,
             })
             .sum::<u64>(),
-        37
+        0
     );
 }
 
@@ -146,7 +172,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
         }
         arrivals.extend(reading.arrived);
     }
-    assert_eq!(arrivals, truth("empty-to-pickups"));
+    assert_eq!(arrivals, vec![PickupLine::Mesos { amount: 26 }]);
 
     // With geometry established, the same window is a known cover. A reset also
     // establishes a baseline, so the four lines already present are not recounted.
@@ -170,7 +196,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
 }
 
 #[test]
-fn first_pickups_in_an_empty_log_are_read_once() {
+fn first_sighting_is_a_baseline_even_after_an_apparently_empty_log() {
     let path = common::samples_in("pickup-log/empty-to-pickups");
     let mut frames: Vec<_> =
         std::fs::read_dir(&path).unwrap().map(|e| e.unwrap().path()).filter(|p| p.extension().is_some_and(|e| e == "png")).collect();
@@ -183,16 +209,8 @@ fn first_pickups_in_an_empty_log_are_read_once() {
         let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 } };
         arrived.extend(reader.read(&capture).arrived);
     }
-    assert_eq!(
-        arrived,
-        vec![
-            PickupLine::Item { name: "Ligator Skin".into(), quantity: 1, tab: "Etc".into(), cut_short: false },
-            PickupLine::Exp { amount: 21, party: true },
-            PickupLine::PartyBonus { amount: 2 },
-            PickupLine::Mesos { amount: 37 },
-            PickupLine::Mesos { amount: 26 },
-        ]
-    );
+    // The first four lines cannot be distinguished from a previously covered log.
+    assert_eq!(arrived, vec![PickupLine::Mesos { amount: 26 }]);
 }
 
 #[test]
@@ -227,9 +245,9 @@ fn log_band_captures_count_mesos_on_the_panel_and_replay_without_pixels() {
         image::imageops::replace(&mut pixels, &img, 1590 - band.x as i64, 830 - band.y as i64);
         let state = minerva
             .on_pickup_log_capture(PickupLogCapture { frame: common::frame(&pixels, at_ms), origin: ScreenPoint { x: band.x, y: band.y } });
-        assert!(state.exp_tracking.pickups.mesos <= 63);
+        assert!(state.exp_tracking.pickups.mesos <= 26);
     }
     let recording = minerva_core::bug_report::read(&minerva.bug_report(&minerva_core::ReportAbout::default()).zip).unwrap();
-    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 63);
+    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 26);
     assert_eq!(minerva_core::bug_report::replay(&recording, Some(common::osms::game().files())).divergence, None);
 }

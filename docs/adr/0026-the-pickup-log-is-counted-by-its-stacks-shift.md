@@ -39,9 +39,10 @@ So the reader counts lines by how far the stack moved, not by what they say, and
 
 ## Consequences
 
+- Before the log has been located since a reset, finding no lines cannot prove it is empty: a Mob may cover it. The first clean sighting establishes a baseline, so its lines may be missed rather than counted twice. A Bug Report keeps no crop for an unlocated empty log, a common case; it keeps one when previously seen lines vanish.
 - Mesos come first, on the Grind Tracker's Session: the Session's total and mesos/h, with a ⓘ saying where they come from. The Item tally, under a Pickups header collapsed at first, comes next on the same reader.
 - Party play is known from the log: any 5 minutes with Party EXP in them are party. That lets each map have a Solo Best and a Party Best. ADR 0015 ruled out party tags on the Map Leaderboards because Minerva couldn't tell party play from the screen; it now can, and that decision is reopened in an issue of its own.
 - Our windows over the log hide it from the reader, as from every reader. The player may put one there; while one has covered it for more than a few seconds, the Grind Tracker says the Pickup Log is covered.
-- A Bug Report writes down each capture's reading (the lines found, the shift taken, the lines read, and whether it had to choose between shifts), and keeps a crop of the log only for a capture where it had to choose, found nothing, or read a name it couldn't match. Those become samples.
+- A Bug Report writes down each capture's reading (the lines found, the shift taken, the lines read, and whether it had to choose between shifts), and keeps a crop of the log only for a capture where it had to choose, lost previously seen lines, or read a name it couldn't match. Those become samples.
 - The samples in `samples/pickup-log` are short sequences of 10 Hz crops, each with a list of the lines that arrived, checked by eye: repeated lines, a burst of 6 or more, a covered log, the first lines into an empty one, names cut short, over more than one background. None shows another player's name: a name tag in one is painted out.
 - Not yet covered: another UI Size or window size, and quest Items.
