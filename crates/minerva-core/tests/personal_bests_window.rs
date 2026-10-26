@@ -19,7 +19,7 @@ use common::player::Player;
 use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, osms, sharing_a_title, tracking, tracking_with, SUNSET_SAMPLE, CONSTRUCTION_SAMPLE, KERNING_SAMPLE, S, MIN, GAME, game, rect};
 use minerva_core::{
     Action, BESTS_VERSION, CharacterBests, ClientOffset, Minerva, Foreground, LevelRange, MapBests,
-    PanelControl, PanelSizes, PanelState, PersonalBestsMap, PersonalBestsVisit,
+    PanelControl, PanelSizes, PanelState, PersonalBestsKind, PersonalBestsMap, PersonalBestsVisit,
     PersonalBestsWindow, Request, SavedBests, ScreenRect, Settings, Size, VisitBest, meowdb,
 };
 
@@ -80,7 +80,12 @@ fn saved_best(exp_per_hour: u64) -> VisitBest {
 
 /// One of a map's Visits as the window lists it.
 fn visit(exp_per_hour: u64, set_at_unix_ms: Option<u64>, share: Option<u64>, this_visit: bool) -> PersonalBestsVisit {
-    PersonalBestsVisit { exp_per_hour, set_at_unix_ms, level: None, job: None, ceiling_share_hundredths: share, this_visit }
+    PersonalBestsVisit { exp_per_hour, set_at_unix_ms, level: None, job: None, party: false, ceiling_share_hundredths: share, this_visit }
+}
+
+/// A map's Solo Best as the window gives it.
+fn solo(exp_per_hour: u64, set_at_unix_ms: Option<u64>, share: Option<u64>) -> Option<PersonalBestsKind> {
+    Some(PersonalBestsKind { exp_per_hour, set_at_unix_ms, ceiling_share_hundredths: share })
 }
 
 /// `map`'s Visits in the window as (EXP/h, the Visit under way's), highest first.
@@ -143,6 +148,8 @@ fn a_first_visits_best_is_in_the_window_with_the_maps_names_levels_and_share_mar
             best_of_all: false,
             mob_levels: Some(SUNSET_SKY_LEVELS),
             exp_per_hour: 7200,
+            solo: solo(7200, set, Some(337)),
+            party: None,
             // Of its solo ceiling, 213,571 EXP/h: 3.37%.
             solo_exp_ceiling: Some(213_571),
             ceiling_share_hundredths: Some(337),
@@ -213,6 +220,8 @@ fn a_best_on_a_map_the_player_has_not_been_on_has_its_names_region_levels_and_sh
                 // Blue Snail and Shroom to Green Mushroom.
                 mob_levels: Some(LevelRange { lowest: 2, highest: 14 }),
                 exp_per_hour: 7661,
+                solo: solo(7661, None, Some(500)),
+                party: None,
                 // Of its solo ceiling, 153,216 EXP/h: 5.0%.
                 solo_exp_ceiling: Some(153_216),
                 ceiling_share_hundredths: Some(500),
@@ -231,6 +240,8 @@ fn a_best_on_a_map_the_player_has_not_been_on_has_its_names_region_levels_and_sh
                 best_of_all: false,
                 mob_levels: Some(LevelRange { lowest: 2, highest: 2 }),
                 exp_per_hour: 2857,
+                solo: solo(2857, None, Some(5000)),
+                party: None,
                 // Of its solo ceiling, 4 Blue Snails' 5,714 EXP/h: 50%.
                 solo_exp_ceiling: Some(5714),
                 ceiling_share_hundredths: Some(5000),
@@ -302,6 +313,8 @@ fn a_best_on_a_map_not_in_the_map_list_is_kept_and_goes_by_its_id() {
             best_of_all: false,
             mob_levels: None,
             exp_per_hour: 5000,
+            solo: solo(5000, None, None),
+            party: None,
             solo_exp_ceiling: None,
             ceiling_share_hundredths: None,
             set_at_unix_ms: None,

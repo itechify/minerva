@@ -55,7 +55,7 @@ mod ui_size;
 mod updates;
 mod world;
 
-pub use bests_window::{PersonalBestsCharacter, PersonalBestsMap, PersonalBestsVisit, PersonalBestsWindow};
+pub use bests_window::{PersonalBestsCharacter, PersonalBestsKind, PersonalBestsMap, PersonalBestsVisit, PersonalBestsWindow};
 pub use bug_report::{BugReport, ReportAbout};
 pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Verdict};
 pub use exp_bar::{ExpBar, ExpBarPlace, ExpBarReader, ExpBarReading, ExpFigures};
@@ -96,7 +96,9 @@ pub use search::{
     DensityTier, Destination, HuntingTarget, ItemMatch, ItemsMissing, MapMatch, Matches, MobChoice, MobMatch, RouteStop,
     SearchResult, SearchState, SearchView, Trip,
 };
-pub use session::{Character, Deaths, ExpRate, ExpTracking, Forecast, PacePoint, PaceTrace, Pickups, TrackingState};
+pub use session::{
+    Character, Deaths, ExpRate, ExpSplit, ExpTracking, Forecast, PacePoint, PaceTrace, Pickups, TrackingState,
+};
 pub use settings::{Hotkey, Hotkeys, Settings};
 pub use settings_window::SettingsWindow;
 pub use setup::{SetupReason, SetupState};
@@ -1419,6 +1421,19 @@ impl Minerva {
         self.sync_panel()
     }
 
+    /// The player moved a Visit on `map` of the Character named `character` (`None`: an
+    /// Unassigned one), named by its best as the window lists it, to the Party Bests (`party`)
+    /// or back to the Solo Bests, after confirming: it joins that kind's Visits on the map, as
+    /// any Visit does, and the Best row races the kind being played from its next refresh. The
+    /// Visit under way's best, a Visit no longer there, or one already of that kind, changes
+    /// nothing.
+    pub fn set_visit_party(&mut self, character: Option<&str>, map: &str, visit: &VisitBest, party: bool) -> &PanelState {
+        let event = Event::SetVisitParty { map: map.to_string(), visit: visit.clone(), party, character: character.map(String::from) };
+        self.record(event);
+        self.session.set_visit_party(character, map, visit, party);
+        self.sync_panel()
+    }
+
     /// The player gave the Character named `to` every Unassigned Visit in the Personal Bests
     /// window, after confirming: each joins their Visits on its map, as any Visit does, as if
     /// moved one by one.
@@ -1726,7 +1741,8 @@ impl Minerva {
     }
 
     /// What a Pickup Log reading does, once the input is written down: the Session counts the
-    /// mesos that arrived in a clean capture.
+    /// mesos that arrived in a clean capture, and tells the player's own EXP lines from Party
+    /// EXP (the EXP Split, and a party window from a solo one).
     fn take_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
         self.pickup_log_seen = match reading.seen {
             PickupLogSeen::Clear { .. } => true,
@@ -1737,9 +1753,8 @@ impl Minerva {
         if self.tracking_on() {
             let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });
             self.session.on_pickups(if clear { &reading.arrived } else { &[] }, reading.at_ms);
-        } else {
-            self.session.tick(reading.at_ms);
         }
+        self.session.on_pickup_log(&reading);
         self.sync_panel()
     }
 
@@ -2536,12 +2551,12 @@ impl Minerva {
                 Some((maps.entry(id)?, maps.data(id)?))
             };
             let (saved, this_visit) = self.session.bests().standing();
-            let this_visit = this_visit.as_ref().map(|(whose, map, at)| (whose.as_deref(), map.as_str(), *at));
+            let this_visit: Vec<_> = this_visit.iter().map(|(whose, map, at)| (whose.as_deref(), map.as_str(), *at)).collect();
             let playing = self.session.character();
             let current = (playing.map(|c| c.name.as_str()), playing.and_then(|c| c.level));
             let history = self.session.bests().history();
             let toggle = |name: &str| self.leaderboards.toggle(name, history, self.wall_clock);
-            bests_window::characters(&saved, current, this_visit, map, certain_map(&self.state), toggle)
+            bests_window::characters(&saved, current, &this_visit, map, certain_map(&self.state), toggle)
         } else {
             Vec::new()
         };

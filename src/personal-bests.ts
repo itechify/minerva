@@ -14,11 +14,17 @@ type BestsVisit = {
   /** The level and job that set it, as the Status Bar showed them; `null`: not read. */
   level: number | null;
   job: string | null;
+  /** A Party Best: its 5 minutes had Party EXP in them, or the player moved it to the Party
+   *  Bests. Otherwise a Solo Best. */
+  party: boolean;
   ceilingShareHundredths: number | null;
   /** The Visit under way's best: not in the Visit History until the Visit ends, so it can
    *  be removed but not moved yet. */
   thisVisit: boolean;
 };
+
+/** Mirror of `minerva_core::PersonalBestsKind`: a map's Solo Best or its Party Best. */
+type BestsKind = { expPerHour: number; setAtUnixMs: number | null; ceilingShareHundredths: number | null };
 
 /** Mirror of `minerva_core::PersonalBestsMap`. */
 type BestsMap = {
@@ -35,7 +41,10 @@ type BestsMap = {
   /** The Character's best of all maps, which the star marks. */
   bestOfAll: boolean;
   mobLevels: LevelRange | null;
+  /** Its best: the higher of its Solo Best and its Party Best. */
   expPerHour: number;
+  solo: BestsKind | null;
+  party: BestsKind | null;
   soloExpCeiling: number | null;
   ceilingShareHundredths: number | null;
   setAtUnixMs: number | null;
@@ -337,7 +346,7 @@ function row(m: BestsMap, marks: MapMarks) {
   // Its lane again under the figure, for a window too narrow for the lanes' own column.
   const under = lane(m);
   under.classList.add("under");
-  exp.append(rate(m.expPerHour), under);
+  exp.append(rate(m.expPerHour), kinds(m), under);
   tr.append(exp, laneCell(m));
 
   const share = cell("% of solo");
@@ -369,6 +378,21 @@ function row(m: BestsMap, marks: MapMarks) {
   return tr;
 }
 
+/** Under a row's figure, which of its two bests it is, and the other: a map with both says
+ *  "Solo" and "Party" each with its figure, one with a Party Best alone says "Party", and one
+ *  with a Solo Best alone (as every map was) says nothing. */
+function kinds(m: BestsMap) {
+  const el = span("kinds", "");
+  if (m.party === null) return el;
+  const part = (kind: BestsKind, name: string) => {
+    const one = span(name === "Party" ? "kind party" : "kind", `${name} ${rate(kind.expPerHour)}`);
+    one.title = `${name} Best, ${rate(kind.expPerHour)} EXP/h`;
+    return one;
+  };
+  el.append(...(m.solo ? [part(m.solo, "Solo")] : []), part(m.party, "Party"));
+  return el;
+}
+
 /** The disclosure's chevron: pointing right while the map is closed, down while open. */
 function chevron() {
   const svg = svgEl("svg", { class: "chevron", viewBox: "0 0 8 8", "aria-hidden": "true" });
@@ -382,7 +406,7 @@ function chevron() {
 function visitKeys(m: BestsMap): string[] {
   const seen = new Map<string, number>();
   return m.visits.map((v) => {
-    const best = [shownKey(), m.id, v.expPerHour, v.setAtUnixMs ?? "-", v.level ?? "-", v.job ?? "-"].join(" ");
+    const best = [shownKey(), m.id, v.expPerHour, v.setAtUnixMs ?? "-", v.level ?? "-", v.job ?? "-", v.party].join(" ");
     const n = seen.get(best) ?? 0;
     seen.set(best, n + 1);
     return `${best} ${n}`;
@@ -405,6 +429,8 @@ function visitRow(m: BestsMap, v: BestsVisit, key: string, place: number, last: 
   first.append(span("sr-only", `${mapName(m)}, visit ${place} of ${m.visits.length}`));
   const level = setBy(v);
   if (level) first.append(span("visit-level", level));
+  // Which kind of best it is, said only of a Party Best: a Solo Best is what every best was.
+  if (v.party) first.append(span("visit-party", "Party Best"));
   tr.append(first, cell(null, "blank"));
 
   const exp = cell(null, "visit-exp");
@@ -427,7 +453,7 @@ function visitRow(m: BestsMap, v: BestsVisit, key: string, place: number, last: 
   // Visit under way's can't be moved until it ends: its tag stands in Move's place.
   if (armed !== `remove:${key}`) {
     if (v.thisVisit) controls.append(span("this-visit", "This visit"));
-    else if (moveTargets().length > 0) controls.append(moveButton(key));
+    else controls.append(moveButton(key));
   }
   controls.append(removeButton(key));
   tr.append(controls);
@@ -492,7 +518,7 @@ function removeButton(key: string) {
 
 /** A Visit's Move, which lists the Characters to move it to under its line. */
 function moveButton(key: string) {
-  const button = textButton(`move:${key}`, false, "Move", "Move", "Move this visit to another of your characters");
+  const button = textButton(`move:${key}`, false, "Move", "Move", "Move this visit to the Party Bests or Solo Bests, or to another of your characters");
   button.classList.add("move");
   button.setAttribute("aria-expanded", String(picking("move", key)));
   return button;
@@ -504,8 +530,13 @@ function picking(what: "move" | "merge" | "assign", key: string) {
   return armed === `${what}:${key}` || !!armed?.startsWith(`${what}:${key}>`);
 }
 
-/** Under a Visit whose Move is open: a button for each other Character to move it to, each
- *  asking again once clicked. */
+/** The target of a Move that is the other kind of best, not a Character: no name has a #. */
+const PARTY = "#party";
+const SOLO = "#solo";
+
+/** Under a Visit whose Move is open: a button for the other kind of best (a Solo Best to the
+ *  Party Bests, a Party Best back to the Solo Bests) and for each other Character to move it
+ *  to, each asking again once clicked. */
 function moveRow(key: string) {
   const tr = document.createElement("tr");
   tr.className = "visit move-row";
@@ -514,6 +545,11 @@ function moveRow(key: string) {
   const to = document.createElement("div");
   to.className = "move-to";
   to.append(span("move-label", "Move this visit to"));
+  const visit = listed.get(key)?.visit;
+  if (visit) {
+    const [target, words] = visit.party ? [SOLO, "Solo Bests"] : [PARTY, "Party Bests"];
+    to.append(textButton(`move:${key}>${target}`, true, words, `Move to ${words}?`, `Move this visit to your ${words}`));
+  }
   for (const name of moveTargets()) {
     const arm = `move:${key}>${name}`;
     to.append(textButton(arm, true, name, `Move to ${name}?`, `Move this visit to ${name}'s bests`));
@@ -976,7 +1012,7 @@ dragByHandles();
 
 /** A Visit as the shell takes it back: by its best, with the level and job that set it. */
 function visitArgs(v: BestsVisit) {
-  return { expPerHour: v.expPerHour, setAtUnixMs: v.setAtUnixMs, level: v.level, job: v.job };
+  return { expPerHour: v.expPerHour, setAtUnixMs: v.setAtUnixMs, level: v.level, job: v.job, party: v.party };
 }
 
 /** Do what the armed button `arm` says, through the core, once clicked again. */
@@ -991,7 +1027,10 @@ function act(arm: string) {
     }
   } else if (what === "move") {
     const visit = listed.get(key);
-    if (visit && c && target) {
+    if (visit && c && (target === PARTY || target === SOLO)) {
+      const args = { character: c.name, map: visit.map, visit: visitArgs(visit.visit), party: target === PARTY };
+      invoke("personal_bests_set_visit_party", args);
+    } else if (visit && c && target) {
       invoke("personal_bests_move_visit", { from: c.name, map: visit.map, visit: visitArgs(visit.visit), to: target });
     }
   } else if (what === "assign" && target) {

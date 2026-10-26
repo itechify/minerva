@@ -775,6 +775,10 @@
                     <li>Your deaths, and what they cost.</li>
                     <li>The <a href="#mesos">mesos</a> you've picked up this Session, and mesos per hour.</li>
                     <li>
+                      Once you've shared EXP with a party, a thin bar under your Session rate that
+                      <a href="#exp-split">splits it</a> into yours and the party's.
+                    </li>
+                    <li>
                       Your last 5 minutes, kill by kill, <a href="#pace-trace">raced against the 5 minutes before</a>
                       and, when you come close, your <a href="#personal-bests">Personal Best</a>.
                     </li>
@@ -830,6 +834,21 @@
                     can't read a name, it still tells another character from the EXP bar.
                   </p>
                 </details>
+                <details class="qa" id="exp-split">
+                  <summary>What's the thin bar under my Session rate?</summary>
+                  <p>
+                    The <strong>EXP Split</strong>: how much of your EXP was your own and how much came from your party.
+                    It appears once a partymate's kill has shared EXP with you in this Session, and never when you play
+                    alone. The dark part is your own kills; the gold part is the share of your partymates' kills
+                    and the party bonus together. Hover it to read the two shares. It starts afresh with each
+                    Session.
+                  </p>
+                  <p>
+                    Minerva tells the two apart from the lines the game writes at the bottom right of the screen: a
+                    share of a partymate's kill is yellow, your own is white. They give the shares, not the amounts,
+                    which come from your EXP bar, so the bar shows in proportion what the lines it caught said.
+                  </p>
+                </details>
                 <details class="qa" id="move-tracker">
                   <summary>Can I move the Grind Tracker?</summary>
                   <p>
@@ -850,6 +869,31 @@
                     minutes on a map for the first time, and the row moves up to your new best at once, saying
                     "this visit". A yellow star marks your last 5 minutes while they're that best. When you slow down,
                     the row keeps your best, so you can see where you were.
+                  </p>
+                  <p>
+                    A map has two: a <a href="#party-bests">Solo Best and a Party Best</a>, and the Best row races the
+                    one you're playing.
+                  </p>
+                </details>
+                <details class="qa" id="party-bests">
+                  <summary>What's a Solo Best and a Party Best?</summary>
+                  <p>
+                    Each map keeps your best EXP per hour when you played alone, your <strong>Solo Best</strong>, and when
+                    you played with a party, your <strong>Party Best</strong>, so a party run never hides what you do on
+                    your own. You don't tell Minerva which: any 5 minutes with a partymate's EXP in them count as party,
+                    and 5 minutes with none count as solo. A partymate who leaves, or is on another map, shares no EXP,
+                    so 5 minutes later your play counts as solo again. Your Session carries on through it all.
+                  </p>
+                  <p>
+                    The Best row and the line under your rates race the best of the kind you're playing, and the row
+                    shows two small figures in gold while it's your Party Best. In your Personal Bests, a map with a
+                    Party Best shows both under its figure, and its visits say which kind each is.
+                  </p>
+                  <p>
+                    Bests from before Minerva told them apart are Solo Bests. Moved wrongly, or played with a party
+                    Minerva didn't see? Open a visit's <strong>Move</strong> in your Personal Bests, choose
+                    <strong>Party Bests</strong> (or <strong>Solo Bests</strong>, to move it back) and click again to
+                    confirm.
                   </p>
                 </details>
                 <details class="qa" id="pace-trace">
@@ -895,7 +939,9 @@
                   <p>
                     Click the star on the Grind Tracker's bar to open your Personal Bests. It lists your best on every map
                     for the character you're playing, highest first, with the map's mob levels, how close you came to its
-                    solo EXP/h ceiling (the <strong>?</strong> explains it) and when you set it. Switch to another
+                    solo EXP/h ceiling (the <strong>?</strong> explains it) and when you set it; the higher of its
+                    <a href="#party-bests">Solo Best and Party Best</a>, with both shown under it if it has a Party
+                    Best. Switch to another
                     character, or to Unassigned, at the top. Each best is a bar on the same scale; a notch is another of
                     your visits there, and the dot is the visit you're on, moving as you play. Click a column to sort by
                     it, or a map to open it on MeowDB.
@@ -982,9 +1028,10 @@
                   <summary>What does the EXP per hour on the Map Leaderboards count?</summary>
                   <p>
                     The <a href="#personal-bests">Personal Best</a> as Minerva counted it: everything the EXP bar gained,
-                    at its best over 5 minutes of play on the map. It's raw, so party play, EXP events and buffs aren't
-                    told apart from playing solo. Only a figure over 5 times the map's solo EXP/h ceiling is kept off, as
-                    one no map gives.
+                    at its best over 5 minutes of play on the map. It's raw, so EXP events and buffs aren't told apart.
+                    Nor is party play yet: a map's entry is the higher of your <a href="#party-bests">Solo Best and
+                    Party Best</a>. Only a figure over 5 times the map's solo EXP/h ceiling is kept off, as one no map
+                    gives.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-appear">

@@ -62,9 +62,16 @@
                 <span class="value" id="session-exp"></span><span class="unit">EXP/h</span>
                 <span class="value" id="session-percent"></span><span class="unit per">/h</span>
               </div>
+              <!-- The EXP Split: a thin bar under the Session rate once Party EXP has come in this
+                   Session, the player's own share in Panel Ink and Party EXP's in the game's
+                   party yellow, toned for the light body. Colours alone; hovering gives the
+                   shares. -->
+              <div class="split" id="exp-split" role="img" hidden>
+                <span class="split-own" id="split-own"></span><span class="split-party" id="split-party"></span>
+              </div>
               <div class="row best" id="best-row" hidden>
                 <!-- "Best" opens the Personal Bests window too, where the player meets their bests. -->
-                <span class="period"><button type="button" class="best-link" data-control="togglePersonalBests" title="Your Personal Bests on every map">Best</button> <span class="length" id="best-this-visit" hidden>this visit</span></span>
+                <span class="period"><button type="button" class="best-link" data-control="togglePersonalBests" title="Your Personal Bests on every map">Best</button> <span class="length" id="best-this-visit" hidden>this visit</span><svg class="party-mark" id="best-party" viewBox="0 0 16 16" role="img" aria-label="Your Party Best" hidden><title>Your Party Best: Party EXP is in your last 5 minutes</title><circle cx="5.5" cy="5.5" r="2.2" /><circle cx="11" cy="6.5" r="1.8" /><path d="M1.5 13c0-2.6 1.8-4.3 4-4.3s4 1.7 4 4.3M9.5 12.4c.3-1.7 1.4-2.8 2.9-2.8 1.6 0 2.6 1.1 2.6 2.8" /></svg></span>
                 <span class="value" id="best-exp"></span><span class="unit">EXP/h</span>
                 <button type="button" class="icon-button light" data-control="removeBest" aria-label="Remove this best" title="Remove this best: your next best takes its place">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
