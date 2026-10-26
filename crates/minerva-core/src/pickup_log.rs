@@ -40,6 +40,10 @@ const RIGHT_MARGIN: std::ops::RangeInclusive<f32> = 2.0..=16.0;
 /// How far a located layout's size may differ from the UI Size the Status Bar measured, as a
 /// share of it.
 const SIZE_TOLERANCE: f32 = 0.15;
+/// How much darker the pixel a glyph's shadow falls on must be for the glyph's pixel to be ink, from
+/// none (at the floor) to all of it (a span above it).
+const INK_SHADOW_FLOOR: f32 = 20.0;
+const INK_SHADOW_SPAN: f32 = 30.0;
 /// How long a located layout may go on without one of its rows reading as a known line kind
 /// before it is given up and searched for again (ms).
 const UNCONFIRMED_DROP_MS: u64 = 3000;
@@ -356,14 +360,14 @@ impl PickupLogReader {
 /// other parentheses confirm its 22-row pitch.
 fn locate_log(img: &RgbImage, ui_size: f32) -> Option<Layout> {
     let (mask, ends) = closing_parentheses(img, ui_size);
-    let mut ranked = ends.iter().map(|e| (ends.iter().filter(|other| aligned_with(e, other)).count(), e)).collect::<Vec<_>>();
+    let mut ranked = ends.iter().map(|e| (ends.iter().filter(|other| aligned_with(e, other, ui_size)).count(), e)).collect::<Vec<_>>();
     ranked.sort_by_key(|&(count, e)| std::cmp::Reverse((count, e.right)));
     // Only the strongest alignment hypotheses need scaling. A textured world can
     // contain many narrow components; resampling once for every one is not a 10 Hz reader.
     ranked
         .into_iter()
         .take(4)
-        .filter_map(|(_, e)| refine_layout(img, &mask, &ends, e))
+        .filter_map(|(_, e)| refine_layout(img, &mask, &ends, e, ui_size))
         .filter(|(_, _, l)| fits(img, l, ui_size))
         .max_by_key(|(n, x, _)| (*n, *x))
         .map(|(_, _, l)| l)
@@ -416,24 +420,28 @@ fn closing_parentheses(img: &RgbImage, ui_size: f32) -> (RgbImage, Vec<Layout>) 
     (mask, ends)
 }
 
-fn aligned_with(e: &Layout, other: &Layout) -> bool {
-    let pitch = ROW_PITCH as f32 * e.size;
+fn aligned_with(e: &Layout, other: &Layout, ui_size: f32) -> bool {
+    let pitch = ROW_PITCH as f32 * ui_size;
     let dy = other.bottom.abs_diff(e.bottom) as f32;
     other.right.abs_diff(e.right) <= 2 && (other.size - e.size).abs() < 0.1 && (dy / pitch - (dy / pitch).round()).abs() < 0.1
 }
 
-fn refine_layout(img: &RgbImage, mask: &RgbImage, ends: &[Layout], e: &Layout) -> Option<(usize, u32, Layout)> {
-    let aligned = ends.iter().filter(|other| aligned_with(e, other)).collect::<Vec<_>>();
+/// The layout a parenthesis `e` starts: the log is drawn at `ui_size`, the Status Bar's, to the
+/// pixel; a parenthesis's own height or two rows' pitch is only a pixel or two over a bright
+/// background, and so a few per cent off, which would shrink every line before it is read.
+fn refine_layout(img: &RgbImage, mask: &RgbImage, ends: &[Layout], e: &Layout, ui_size: f32) -> Option<(usize, u32, Layout)> {
+    let aligned = ends.iter().filter(|other| aligned_with(e, other, ui_size)).collect::<Vec<_>>();
     let bottom = aligned.iter().map(|e| e.bottom).max()?;
     let top = aligned.iter().map(|e| e.bottom).min()?;
     let distance = (bottom - top) as f32;
-    let steps = (distance / (ROW_PITCH as f32 * e.size)).round();
-    let mut size = if steps >= 1.0 { distance / (ROW_PITCH as f32 * steps) } else { e.size };
+    let steps = (distance / (ROW_PITCH as f32 * ui_size)).round();
+    let size = ui_size;
+    let measured = if steps >= 1.0 { distance / (ROW_PITCH as f32 * steps) } else { e.size };
     let mut right = e.right;
     let mut bottom = bottom;
     // A parent's antialiasing may join the background at one end. Its straight
     // right stem still repeats at the line pitch, independently of that join.
-    let use_stems = steps < 1.0 && (size - 1.0).abs() > 0.04;
+    let use_stems = steps < 1.0 && (measured - 1.0).abs() > 0.04;
     for x in e.right.saturating_sub(2)..=e.right {
         if !use_stems {
             break;
@@ -451,7 +459,6 @@ fn refine_layout(img: &RgbImage, mask: &RgbImage, ends: &[Layout], e: &Layout) -
             })
             .collect::<Vec<_>>();
         if let Some(pair) = pairs.last() {
-            size = (pair[1].0 - pair[0].0) as f32 / ROW_PITCH as f32;
             right = x;
             bottom = pair[1].0 + (11.0 * size).round() as u32;
         }
@@ -566,10 +573,17 @@ fn read_row(img: &RgbImage, right: u32, top: i32) -> Option<Row> {
         .collect::<Vec<_>>();
     let start = runs(&columns, 20).last().map_or(0, |&(x, _)| x.saturating_sub(1));
     let ink = black_on_white(width - start, TEXT_HEIGHT + 2, 2, |x, y| {
-        let [r, g, b] = img.get_pixel(left + start + x, top as u32 + y - 1).0;
+        let (x, y) = (left + start + x, top as u32 + y - 1);
+        let [r, g, b] = img.get_pixel(x, y).0;
         let white = r.abs_diff(g) < 30 && r.abs_diff(b) < 35;
         let yellow = r.abs_diff(g) < 30 && (b as f32) < r as f32 * 0.6;
-        if white || yellow { ((r.min(g) as f32 - 60.0) / 170.0).clamp(0.0, 1.0) } else { 0.0 }
+        if !(white || yellow) {
+            return 0.0;
+        }
+        // A glyph has its shadow a pixel or two below and right of it: a bright pixel without
+        // one is the world behind the line (a yellow-green leaf, a white sky), not ink.
+        let shadow = shadow_contrast(img, x, y, 1).0.max(shadow_contrast(img, x, y, 2).0);
+        ((shadow - INK_SHADOW_FLOOR) / INK_SHADOW_SPAN).clamp(0.0, 1.0) * ((r.min(g) as f32 - 60.0) / 170.0).clamp(0.0, 1.0)
     });
     Some(Row { ink, contrast, shape, yellow: yellow * 2 > strong, readable, fresh })
 }
@@ -629,26 +643,72 @@ impl GainKind {
     }
 }
 
+/// The letters of `s`, lower case: what the recogniser gets right of a word when it slips on a
+/// glyph or two.
+fn letters(s: &str) -> Vec<char> {
+    s.chars().filter(char::is_ascii_alphabetic).flat_map(char::to_lowercase).collect()
+}
+
+/// Whether `word` is `fixed` as the recogniser usually reads it: a glyph or two off.
+fn reads_as(word: &str, fixed: &str) -> bool {
+    crate::matcher::levenshtein(&letters(word), &letters(fixed)) <= 2
+}
+
 fn parse(text: &str, yellow: bool) -> Option<PickupLine> {
     let text = text.trim();
-    let letters = |s: &str| s.chars().filter(char::is_ascii_alphabetic).flat_map(char::to_lowercase).collect::<Vec<_>>();
     for kind in [GainKind::OwnOrPartyExp, GainKind::PartyBonus, GainKind::Mesos] {
         if let Some((label, tail)) = text.rsplit_once('(')
-            && crate::matcher::levenshtein(&letters(label), &letters(kind.prefix())) <= 2
+            && reads_as(label, kind.prefix())
         {
-            let number = tail.trim().strip_prefix('+')?.strip_suffix(')')?;
+            // The game's "+" reads as "*" too.
+            let number = tail.trim().strip_prefix(['+', '*'])?.strip_suffix(')')?;
             let amount = number.replace(',', "").parse().ok()?;
             return Some(kind.line(amount, yellow));
         }
     }
-    let (before, tab) = text.rsplit_once('.')?;
-    let tab = tab.trim().strip_prefix('(')?.strip_suffix(')')?;
-    let tab = crate::osms_items::InventoryTab::named(tab)?.as_str();
-    let before = before.strip_suffix(" earned")?;
-    let (name, quantity) = before.rsplit_once(' ')?;
-    let quantity = quantity.strip_prefix('x').or_else(|| quantity.strip_prefix('?'))?;
-    let quantity = quantity.parse().ok().filter(|&n| n > 0)?;
+    parse_item(text)
+}
+
+/// "<name> x<quantity> earned. (<tab>)", with the fixed words and the "x" read as the recogniser
+/// usually reads them. The name is as read.
+fn parse_item(text: &str) -> Option<PickupLine> {
+    let (before, tab) = text.rsplit_once('(')?;
+    let tab = crate::osms_items::InventoryTab::named_like(tab.trim().trim_end_matches([')', ']', ':', ';', '.', ' ']))?.as_str();
+    let before = before.trim_end().trim_end_matches('.').trim_end();
+    let (before, earned) = before.rsplit_once(' ')?;
+    if !reads_as(earned, "earned") {
+        return None;
+    }
+    let (name, quantity) = split_quantity(before.trim_end())?;
     let cut_short = name.ends_with("...");
-    let name = name.trim_end_matches("...").to_string();
+    let name = name.trim_end_matches("...").trim_end().to_string();
     (!name.is_empty()).then_some(PickupLine::Item { name, quantity, tab: tab.into(), cut_short })
+}
+
+/// An Item line's text before "earned" as its name and its quantity: the name, then "x" and
+/// the digits. The "x" may read as another mark, or as nothing, and the name and the
+/// quantity may run together (`Liquidx1`); but the quantity is always the last word's digits,
+/// so a name that ends in a digit is never a quantity.
+fn split_quantity(before: &str) -> Option<(&str, u32)> {
+    let (rest, word) = before.rsplit_once(' ').unwrap_or(("", before));
+    let is_x = |c: char| matches!(c, 'x' | 'X' | '\u{d7}');
+    let digits_at = word.find(|c: char| c.is_ascii_digit()).filter(|&at| word[at..].chars().all(|c| c.is_ascii_digit()));
+    let (name_end, quantity) = match digits_at {
+        Some(at) => {
+            let quantity = word[at..].parse().ok()?;
+            match word[..at].chars().next_back() {
+                // Just "1": the "x" was lost.
+                None => (rest.len(), quantity),
+                // "x1", "?1": the mark stands alone as the word.
+                Some(mark) if at == mark.len_utf8() && (is_x(mark) || !mark.is_alphanumeric()) => (rest.len(), quantity),
+                // "Liquidx1", "Liquid?1": the mark is glued to the name.
+                Some(mark) if is_x(mark) || !mark.is_alphanumeric() => (before.len() - word.len() + at - mark.len_utf8(), quantity),
+                Some(_) => return None,
+            }
+        }
+        // "xl": the "1" read as an "l".
+        None if word.chars().count() == 2 && word.starts_with(is_x) && word.ends_with(['l', 'I', '|']) => (rest.len(), 1),
+        None => return None,
+    };
+    (quantity > 0).then_some((before[..name_end].trim_end(), quantity))
 }

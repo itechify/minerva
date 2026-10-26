@@ -348,3 +348,62 @@ fn a_lookalike_that_never_reads_is_dropped_and_the_real_log_is_found() {
     let clip = CLIP_MS.map(|ms| log_in_band(ms, "no-log--244695.png", 0, 8000 + ms));
     assert_eq!(arrivals(&mut reader, still.chain(clip)), truth("empty-to-pickups"));
 }
+
+/// Bug Report 0.15.0, 2026-10-26 09:03 (Ellinia: bright greens, a white sky). Whole bands, in
+/// order, whose lines are plainly legible, white over green: the log fading (182792, 183333);
+/// mesos (+13) and `Squishy Liquid x1 earned. (Etc)` arriving (183631); the same log 0.9 s
+/// later; another `Squishy Liquid x1` (187992; an EXP (+2) line arrived between, in a crop the
+/// report left out); and `Slime Bubble x1 earned. (Etc)` (188167).
+const LINES: [u64; 6] = [182792, 183333, 183631, 184483, 187992, 188167];
+
+fn lines_clip() -> Vec<PickupLogCapture> {
+    LINES.iter().map(|ms| band_capture(&common::samples_in("pickup-log-band").join(format!("lines--{ms}.png")), *ms)).collect()
+}
+
+#[test]
+fn a_log_is_drawn_at_the_ui_size_not_at_the_height_of_one_parenthesis() {
+    // The Status Bar says the UI Size is 1: the located log is 313x130 at it, however many
+    // pixels tall the bright background leaves its closing parentheses.
+    let mut reader = PickupLogReader::bundled();
+    let readings = lines_clip().iter().map(|capture| reader.read(capture)).collect::<Vec<_>>();
+    let Some(PickupLogSeen::Clear { area }) = readings.get(2).map(|reading| reading.seen) else { panic!("{readings:?}") };
+    assert_eq!((area.width, area.height), (313, 130));
+}
+
+#[test]
+fn legible_white_lines_over_bright_green_read_as_their_kinds() {
+    let mut reader = PickupLogReader::bundled();
+    let arrived = arrivals(&mut reader, lines_clip());
+    let is_item = |line: &PickupLine| matches!(line, PickupLine::Item { quantity: 1, tab, .. } if tab == "Etc");
+    // Every line that arrived reads as its kind, none as an Unreadable or twice (an EXP line
+    // that arrived unseen between two crops is missed, never made up).
+    assert!(matches!(arrived.as_slice(), [PickupLine::Mesos { amount: 13 }, a, b, c] if is_item(a) && is_item(b) && is_item(c)), "{arrived:?}");
+}
+
+#[test]
+fn the_items_those_lines_name_are_tallied_by_name_and_counted_once() {
+    let items = common::items::item_world(vec![
+        common::items::etc(4_000_100, "Squishy Liquid"),
+        common::items::etc(4_000_101, "Slime Bubble"),
+        common::items::etc(4_000_102, "Orange Mushroom Cap"),
+    ]);
+    let mut minerva = common::tracking_with(common::FakeSource::osms().with_items(items));
+    minerva.tick(0);
+    for at_ms in [0, 100, 200] {
+        minerva.on_status_bar_reading(common::status_bar_reading(Some("Egbert"), at_ms));
+    }
+    common::start_session(&mut minerva, 300, 1300);
+    let mut reader = PickupLogReader::bundled();
+    for capture in lines_clip() {
+        minerva.on_pickup_log_reading(reader.read(&capture));
+    }
+    let pickups = &minerva.panel_state().exp_tracking.pickups;
+    assert_eq!(pickups.mesos, 13);
+    assert_eq!(
+        pickups.items,
+        vec![
+            minerva_core::PickedItem { name: "Squishy Liquid".into(), count: 2 },
+            minerva_core::PickedItem { name: "Slime Bubble".into(), count: 1 },
+        ]
+    );
+}

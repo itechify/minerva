@@ -45,8 +45,14 @@ sequence showing the frame before and after the problem, with the same privacy r
 Whole 400×480 captures of the Pickup Log's band, as `PanelState::pickup_log_capture` asks for it
 at the samples' UI Size on a 1920×1200 client area, from the Bug Report of 0.15.0 at 2026-10-26
 07:02 (Perion, Deep Valley and Perion Dungeon Entrance: rock, brick and cloud backgrounds, with
-the game's quickslots and Cash Shop button in the band's bottom-left). Named `<kind>--<capture ms>.png`:
-`log--` shows lines of the Pickup Log (fading, covered by Mobs, or fresh), `no-log--` shows none.
+the game's quickslots and Cash Shop button in the band's bottom-left) and the one at 09:03
+(Ellinia: bright greens and a white sky, over which the lines were read wrong). Named
+`<kind>--<capture ms>.png`: `log--` shows lines of the Pickup Log (fading, covered by Mobs, or
+fresh), `no-log--` shows none, and `lines--` are the six frames, in order, of the 09:03 report
+whose lines are plainly legible: mesos (+13) and `Squishy Liquid x1 earned. (Etc)` arrive in
+183631, another `Squishy Liquid x1` in 187992 and `Slime Bubble x1 earned. (Etc)` in 188167
+(an EXP (+2) line arrived unseen between 184483 and 187992, in a crop the report left out).
+A `lines--` clip reads as those lines, whole, in order (`tests/pickup_log_samples.rs`).
 Lines end at band x≈390 and the newest is at band y≈240. A `log--` frame is never found anywhere
 else, and a `no-log--` one finds none (`tests/pickup_log_samples.rs`). The only name in them is the
 maintainer's own Character's, `Egbert`; a fragment of another name above it in `log--238612` is
