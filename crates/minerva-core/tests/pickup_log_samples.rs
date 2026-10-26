@@ -139,11 +139,34 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
         let ours = if at_ms == 2900 { vec![ScreenRect { x: 1590, y: 830, width: 325, height: 139 }] } else { vec![] };
         let reading = reader.read_avoiding(&capture, &ours);
         if at_ms == 2900 {
-            assert!(matches!(reading.seen, PickupLogSeen::Covered { .. }));
+            // Nothing has located the log yet: a window over the search band alone
+            // cannot establish where the log is, or claim its rows were found.
+            assert_eq!(reading.seen, PickupLogSeen::Nothing);
+            assert!(reading.arrived.is_empty());
         }
         arrivals.extend(reading.arrived);
     }
     assert_eq!(arrivals, truth("empty-to-pickups"));
+
+    // With geometry established, the same window is a known cover. A reset also
+    // establishes a baseline, so the four lines already present are not recounted.
+    reader.reset();
+    let mut arrivals = Vec::new();
+    for at_ms in [3000, 3200, 3300] {
+        let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{at_ms:08}.png"));
+        let img = image::open(path).unwrap().to_rgba8();
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 } };
+        let ours = if at_ms == 3200 { vec![ScreenRect { x: 1590, y: 830, width: 325, height: 139 }] } else { vec![] };
+        let reading = reader.read_avoiding(&capture, &ours);
+        if at_ms == 3000 {
+            assert!(reading.arrived.is_empty());
+        }
+        if at_ms == 3200 {
+            assert!(matches!(reading.seen, PickupLogSeen::Covered { .. }));
+        }
+        arrivals.extend(reading.arrived);
+    }
+    assert_eq!(arrivals, vec![PickupLine::Mesos { amount: 26 }]);
 }
 
 #[test]

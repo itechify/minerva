@@ -180,7 +180,8 @@ impl PickupLogReader {
         let Some(layout) = self.layout else {
             let area = ScreenRect { x: capture.origin.x, y: capture.origin.y, width: img.width(), height: img.height() };
             if ours.iter().any(|&r| overlaps(r, area)) {
-                reading.seen = PickupLogSeen::Covered { area };
+                // A covered search band is not evidence of where the log is. Leave
+                // the last clean stack alone without claiming lines were found.
                 return reading;
             }
             self.previous = Some(Stack { rows: (0..6).map(|_| None).collect() });
