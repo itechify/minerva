@@ -1,5 +1,5 @@
 ---
-status: accepted, amended by ADR-0024 (the Map Leaderboards page shows Where to train and Latest in place of the most-uploaded maps, and the ceilings table holds each map's mob levels and Map Mark)
+status: accepted, amended by ADR-0024 (the Map Leaderboards page shows Where to train and Latest in place of the most-uploaded maps, and the ceilings table holds each map's mob levels and Map Mark), and by ADR-0027 (every name links to its Character's page, `GET /api/characters/<name>` reads it, and the site's 404 is a page of its own)
 ---
 
 # Map Leaderboards on the site's Worker

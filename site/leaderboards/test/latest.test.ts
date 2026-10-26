@@ -22,6 +22,7 @@ describe("latest", () => {
       lines: [
         {
           name: "Hakuo",
+          nameHref: "/character/?name=Hakuo",
           who: "Magician Lv 23",
           expPerHour: "153,000",
           map: "Pig Field",
@@ -35,16 +36,16 @@ describe("latest", () => {
     });
   });
 
-  it("says when an entry took a top spot, and from whom", () => {
+  it("says when an entry took a top spot, and from whom, linking to their page", () => {
     const { lines } = latestLines({ entries: [latest({ from: "Egbert", fromExpPerHour: 150_000 })] }, names, NOW);
 
-    expect(lines[0].took).toBe("Took #1, past Egbert's 150,000");
+    expect(lines[0].took).toEqual(["Took #1, past ", { text: "Egbert", href: "/character/?name=Egbert" }, "'s 150,000"]);
   });
 
   it("leaves out the name of a Character who has since left the Map Leaderboards", () => {
     const { lines } = latestLines({ entries: [latest({ from: null, fromExpPerHour: 150_000 })] }, names, NOW);
 
-    expect(lines[0].took).toBe("Took #1, past a best of 150,000");
+    expect(lines[0].took).toEqual(["Took #1, past a best of 150,000"]);
   });
 
   it("writes a map without a Map Mark without one", () => {

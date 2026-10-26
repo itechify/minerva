@@ -179,12 +179,16 @@ A Character's best Visits on a map that have ended (or the Unassigned ones), hig
 _Avoid_: runs, attempts, records
 
 **Map Leaderboard**:
-A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by EXP/h, ties going to whoever set it first. An entry is one Character's best Visit on the map in the band: its name, job, exact level, EXP/h and date. The site mirrors what the player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015). The Map Leaderboards page leads to them through Where to train, a search by name, and Latest, the 20 newest entries on every map (ADR 0024).
+A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by EXP/h, ties going to whoever set it first. An entry is one Character's best Visit on the map in the band: its name, job, exact level, EXP/h and date. The site mirrors what the player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015). The Map Leaderboards page leads to them through Where to train, a search by name, and Latest, the 10 newest entries on every map (ADR 0024). Each name in them opens that Character's page (ADR 0027).
 _Avoid_: leaderboard (alone), ranking, high scores, hiscores
 
 **Where to train**:
 The Map Leaderboards page's table of the maps for one Level Band: each map whose middle half of spawns is at the band's levels, and each map with an entry in it, with its Map Mark, mob levels and the band's #1 there, the maps with entries first, in every area or one picked by its Map Mark (ADR 0024).
 _Avoid_: best maps, recommended maps, map ranking
+
+**Character page**:
+A Character's page on owlofminerva.app (`/character/?name=`), which every name the Map Leaderboards show links to, and a new #1's post on Discord: every entry of theirs a Level Band at a time, highest first, each with its rank there, and over them the job and level of their newest entry, the #1s they hold (one per map and Level Band), their podiums (places in a band's top 3), how many maps they're on and their best EXP/h (ADR 0027). It shows only what their entries show map by map: no ceiling, and nothing that ties one Character to another or to an Account. A name with no entries, whatever the reason, shows the owl lost.
+_Avoid_: profile, player page, Personal Bests page
 
 **Top spot taken**:
 An upload that leaves its Character holding a map and Level Band's #1 that another Character held before: posted to Discord (ADR 0022), and marked "took #1" in Latest while the entry that took it stands (ADR 0024). A first entry in an empty band, or a Character beating their own best, isn't one.

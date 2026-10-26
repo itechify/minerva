@@ -2256,6 +2256,56 @@ html.lb-band .lb-train,
   font-weight: 400;
   color: var(--ink-2);
 }
+/* A Character's name links to their page (ADR 0027), wherever the Map Leaderboards show it.
+   At rest it reads as the words around it, as a map's name in Where to train does; under the
+   pointer it is the Magic Portal Blue link it is. */
+.lb-character {
+  color: inherit;
+  text-decoration: none;
+}
+.lb-character:hover {
+  color: var(--portal);
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+.lb-character:active {
+  color: var(--frame);
+}
+/* Latest: the map's name is the entry's link, stretched over the whole entry, as a card's;
+   the Characters' names sit over it, each its own link. The entry is lit as one under the
+   pointer, the map's name underlined, unless the pointer is on a name. */
+.lb-map.lb-entry {
+  position: relative;
+}
+.lb-entry-map {
+  text-decoration: none;
+}
+.lb-entry-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.lb-entry .lb-character {
+  position: relative;
+  z-index: 1;
+}
+.lb-map.lb-entry:hover .lb-map-name:not(:hover),
+.lb-map.lb-entry:active .lb-map-name:not(:hover) {
+  color: var(--ink);
+  text-decoration: none;
+}
+.lb-map.lb-entry:hover:not(:has(.lb-character:hover)) .lb-entry-map {
+  color: var(--portal);
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+.lb-entry-map:focus-visible {
+  outline: none;
+}
+.lb-map.lb-entry:has(.lb-entry-map:focus-visible) {
+  outline: 2px solid var(--edit);
+  outline-offset: -2px;
+}
 /* Under a long band's first 15 maps, Show all: a row across the table, as a map's page says
    how many entries are between, its words a link's, the whole row to press. */
 .lb-train-table tr.lb-more > td {
@@ -2376,7 +2426,8 @@ html.lb-band .lb-train,
 /* A band's entries: the hotkey table's inset box, rows parted by Window Rules, figures
    right-aligned, the linked character's row selected. As wide as the page's measure. */
 .lb-table,
-.lb-train-table {
+.lb-train-table,
+.ch-table {
   width: 100%;
   border: 1px solid var(--inset-edge);
   border-radius: 4px;
@@ -2389,20 +2440,24 @@ html.lb-band .lb-train,
 .lb-table th,
 .lb-table td,
 .lb-train-table th,
-.lb-train-table td {
+.lb-train-table td,
+.ch-table th,
+.ch-table td {
   padding: 8px 12px;
   text-align: left;
   vertical-align: baseline;
 }
 .lb-table thead th,
-.lb-train-table thead th {
+.lb-train-table thead th,
+.ch-table thead th {
   font-size: 13px;
   font-weight: 400;
   line-height: 18px;
   color: var(--ink-2);
 }
 .lb-table tbody tr > *,
-.lb-train-table tbody tr > * {
+.lb-train-table tbody tr > *,
+.ch-table tbody tr > * {
   border-top: 1px solid var(--rule);
 }
 .lb-table .lb-rank,
@@ -3008,12 +3063,14 @@ button.button {
   }
   /* The rows as cards, the table's roles kept in the markup; the caption still under them. */
   .lb-table,
-  .lb-train-table {
+  .lb-train-table,
+  .ch-table {
     display: flex;
     flex-direction: column;
   }
   .lb-table tbody,
-  .lb-train-table tbody {
+  .lb-train-table tbody,
+  .ch-table tbody {
     display: block;
   }
   .lb-caption {
@@ -3075,6 +3132,11 @@ button.button {
     position: absolute;
     inset: 0;
   }
+  /* The #1's name sits over the card's link, its own. */
+  .lb-train-table .lb-character {
+    position: relative;
+    z-index: 1;
+  }
   .lb-train-table tr.lb-more {
     display: block;
     padding: 0;
@@ -3084,7 +3146,8 @@ button.button {
     border-top: 0;
   }
   .lb-train-table thead,
-  .lb-table thead {
+  .lb-table thead,
+  .ch-table thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -3298,5 +3361,287 @@ button.button {
 @media (max-width: 720px) {
   .window-signed-in {
     display: none;
+  }
+}
+
+/* A Character's page (ADR 0027): their name, who their newest entry says they are, and a row
+   of figures, then a table of their entries for each Level Band, as Where to train's table:
+   the map's name its link, over its street, figures right-aligned. One measure with the Map
+   Leaderboards' pages. */
+.ch-board {
+  max-width: 60em;
+}
+/* A name of 16 letters is wider than a phone: it breaks rather than run off the window. */
+.ch-name {
+  overflow-wrap: anywhere;
+}
+.ch-who {
+  min-height: 22px;
+  margin: -8px 0 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+/* The figures, each in the hotkey table's inset box: the figure, over what it counts, over
+   what more it says. */
+.ch-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 60em;
+  margin: 24px 0 0;
+}
+.ch-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--inset-bg);
+}
+.ch-stat dd {
+  margin: 0;
+}
+.ch-stat-value {
+  order: -1;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.ch-stat-label {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+.ch-stat-detail {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.ch-board {
+  padding-top: 40px;
+}
+.ch-board.lb-waiting {
+  min-height: 420px;
+}
+.ch-board > .lb-said {
+  margin: 0;
+}
+.ch-band + .ch-band {
+  padding-top: 40px;
+}
+.ch-band h2 {
+  margin-bottom: 12px;
+  font-size: 23px;
+  line-height: 30px;
+}
+.ch-table .ch-mobs,
+.ch-table .ch-level,
+.ch-table .ch-exp,
+.ch-table .ch-date {
+  text-align: right;
+}
+.ch-table td.ch-mobs,
+.ch-table td.ch-job,
+.ch-table td.ch-date,
+.ch-rank-of {
+  color: var(--ink-2);
+}
+.ch-table td.ch-mobs,
+.ch-table td.ch-date,
+.ch-table td.ch-rank {
+  white-space: nowrap;
+}
+.ch-table th.ch-map {
+  font-weight: 400;
+}
+.ch-table td.ch-rank,
+.ch-table td.ch-exp {
+  font-weight: 700;
+}
+.ch-rank-of {
+  font-weight: 400;
+}
+.ch-table .lb-map-name {
+  display: block;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ch-table .lb-map-name:hover {
+  color: var(--portal);
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+.ch-table .lb-map-street {
+  display: block;
+}
+/* A #1's crown in Crown Gold: the Map Leaderboards drawing's metal, lit at its top as a medal
+   is, ringed in a dark bronze. Never You Yellow, which marks the player's own best, and only
+   ever this shape, so it reads as neither doubt nor a deal. */
+.ch-crown {
+  width: 14px;
+  height: 14px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  fill: url(#crown-gold);
+  stroke: #6e4a00;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+/* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
+.ch-board .lb-said.ch-lost-said {
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--ink);
+}
+/* The columns are set by their headers, so every band's table lines up with the next; the
+   map takes what the figures leave. The headers stay under the window's head as a long table
+   goes by, as Where to train's do. */
+@media (min-width: 641px) {
+  .ch-table {
+    table-layout: fixed;
+  }
+  .ch-table th.ch-rank {
+    width: 96px;
+  }
+  .ch-table th.ch-mobs {
+    width: 96px;
+  }
+  .ch-table th.ch-job {
+    width: 104px;
+  }
+  .ch-table th.ch-level {
+    width: 56px;
+  }
+  .ch-table th.ch-exp {
+    width: 104px;
+  }
+  .ch-table th.ch-date {
+    width: 96px;
+  }
+  .ch-table td,
+  .ch-table tbody th {
+    overflow-wrap: anywhere;
+  }
+  .ch-table thead th {
+    position: sticky;
+    top: var(--head);
+    z-index: 1;
+    background: color-mix(in srgb, #fff 55%, var(--body-solid));
+    box-shadow: inset 0 -1px 0 var(--rule);
+  }
+  .ch-table thead th:first-child {
+    border-top-left-radius: 3px;
+  }
+  .ch-table thead th:last-child {
+    border-top-right-radius: 3px;
+  }
+  .ch-table tbody tr:first-child > * {
+    border-top: 0;
+  }
+}
+/* Too narrow for those, the job and mob levels give the map room. */
+@media (min-width: 641px) and (max-width: 899px) {
+  .ch-table th.ch-mobs {
+    width: 72px;
+  }
+  .ch-table th.ch-job {
+    width: 96px;
+  }
+}
+/* On a phone the figures go two by two, and each entry becomes a card, as Where to train's
+   maps do: the map beside its EXP/h, over its rank, job and level beside the date, over the
+   map's mob levels. A long map name wraps rather than push the EXP/h off the card, and the
+   EXP/h and date share the card's right edge. The whole card is the map's link, for a thumb. */
+@media (max-width: 640px) {
+  .ch-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ch-table tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "map map map exp"
+      "rank job level date"
+      "mobs mobs mobs mobs";
+    column-gap: 10px;
+    padding: 8px 12px;
+  }
+  .ch-table tbody tr + tr {
+    border-top: 1px solid var(--rule);
+  }
+  .ch-table tbody tr > * {
+    padding: 0;
+    border-top: 0;
+  }
+  .ch-table .ch-map {
+    grid-area: map;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .ch-table .ch-exp {
+    grid-area: exp;
+    justify-self: end;
+  }
+  .ch-table .ch-rank {
+    grid-area: rank;
+  }
+  .ch-table .ch-job {
+    grid-area: job;
+  }
+  .ch-table .ch-level {
+    grid-area: level;
+    text-align: left;
+  }
+  .ch-table .ch-date {
+    grid-area: date;
+    justify-self: end;
+  }
+  .ch-table .ch-mobs {
+    grid-area: mobs;
+    text-align: left;
+  }
+  .ch-table td.ch-rank,
+  .ch-table td.ch-job,
+  .ch-table td.ch-level,
+  .ch-table td.ch-date,
+  .ch-table td.ch-mobs {
+    font-size: 13px;
+    line-height: 20px;
+  }
+  .ch-table td.ch-level::before {
+    content: "Lv ";
+  }
+  .ch-table td.ch-mobs::before {
+    content: "Mobs at ";
+  }
+  .ch-table td.ch-none {
+    display: none;
+  }
+  .ch-table .lb-map-name::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+}
+
+/* The owl lost, over a page with nothing to show: the site's 404, a link that names no
+   Character or no map, and a Character with no entries. The drawing says "404 Not Found"
+   itself, so no heading repeats it. */
+.lost-art {
+  display: block;
+  width: 440px;
+  max-width: 100%;
+  height: auto;
+}
+.lost {
+  margin-bottom: 16px;
+}
+@media (max-width: 640px) {
+  .lost-art {
+    width: 300px;
   }
 }

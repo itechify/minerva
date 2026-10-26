@@ -1,5 +1,5 @@
 ---
-status: accepted, amended by ADR-0024 (a top spot taken is also kept, for Latest to mark, whether or not the webhook is set), and by #165 (each spot named is an embed, with its map's Map Mark)
+status: accepted, amended by ADR-0024 (a top spot taken is also kept, for Latest to mark, whether or not the webhook is set), by #165 (each spot named is an embed, with its map's Map Mark), and by ADR-0027 (each Character it names links to their page)
 ---
 
 # A new #1 on a map is posted to Discord

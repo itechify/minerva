@@ -5,7 +5,7 @@
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import { STAR } from "../star.ts";
-import { byId, names, read, said as saidWith, unreachable } from "./api.ts";
+import { byId, characterLink, names, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
@@ -89,10 +89,12 @@ function drawHead(place: MapPlace) {
   showPicture(place);
 }
 
-/** There's no map to show: the page's title alone, and why, with the way to find one. */
+/** There's no map to show: the page's title alone, the owl lost, and why, with the way to
+ *  find one. */
 function noMap(why: Said) {
   byId("map-street").hidden = true;
   byId("map-picture").hidden = true;
+  byId("lost").hidden = false;
   say(why);
 }
 
@@ -371,10 +373,10 @@ interface RowsAt {
   morph: Map<string, string> | null;
 }
 
-/** An entry's row: its rank, name, job, level, EXP/h, lane, date and report link; or, for
- *  the linked Character's, the You Yellow star before the name and no report link (the
- *  player takes their own entries off from Minerva). A row that slides in a switch takes
- *  its Character's name for it. */
+/** An entry's row: its rank, name (a link to the Character's page), job, level, EXP/h, lane,
+ *  date and report link; or, for the linked Character's, the You Yellow star before the name
+ *  and no report link (the player takes their own entries off from Minerva). A row that
+ *  slides in a switch takes its Character's name for it. */
 function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowElement {
   const tr = make("tr", row.you ? "lb-you" : "");
   tr.setAttribute("role", "row");
@@ -385,7 +387,7 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   name.scope = "row";
   name.setAttribute("role", "rowheader");
   if (row.you) name.append(star());
-  name.append(row.name);
+  name.append(characterLink(row.name, row.nameHref));
   const reportCell = make("td", "lb-report");
   if (!row.you) {
     const report = make("button", "lb-report-button", "Report");

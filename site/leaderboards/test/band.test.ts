@@ -19,8 +19,8 @@ describe("a Level Band", () => {
     );
 
     expect(table.rows).toEqual([
-      { rank: "1", name: "Egbert", job: "Magician", level: "23", expPerHour: "153,000", date: "3 Oct", you: false, lane: expect.any(Number) },
-      { rank: "2", name: "Ada", job: "Bowman", level: "29", expPerHour: "66,600", date: "30 Dec 2025", you: false, lane: expect.any(Number) },
+      { rank: "1", name: "Egbert", nameHref: "/character/?name=Egbert", job: "Magician", level: "23", expPerHour: "153,000", date: "3 Oct", you: false, lane: expect.any(Number) },
+      { rank: "2", name: "Ada", nameHref: "/character/?name=Ada", job: "Bowman", level: "29", expPerHour: "66,600", date: "30 Dec 2025", you: false, lane: expect.any(Number) },
     ]);
     expect(table.yours).toBe(null);
     expect(table.gap).toBe(null);
@@ -58,6 +58,7 @@ describe("a Level Band", () => {
     expect(table.yours).toEqual({
       rank: "57",
       name: "Egbert",
+      nameHref: "/character/?name=Egbert",
       job: "Magician",
       level: "23",
       expPerHour: "1,230",
