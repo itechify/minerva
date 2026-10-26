@@ -57,3 +57,28 @@ Lines end at band x≈390 and the newest is at band y≈240. A `log--` frame is 
 else, and a `no-log--` one finds none (`tests/pickup_log_samples.rs`). The only name in them is the
 maintainer's own Character's, `Egbert`; a fragment of another name above it in `log--238612` is
 painted over.
+
+## `pickup-log-720p`
+
+Short sequences of 10 Hz crops of the Pickup Log at a UI Size of about 0.64 of the samples' (a
+Status Bar 35 px high against 55: a 1280×720 client area), from the maintainer's own 2026-10-26
+recording on The Murky Swamp II, where the Bug Report of 0.15.0 at 14:41 never found the log. Lines
+are 14 px apart and the text 10 px tall, drawn by the game at that size, not scaled from the other
+samples. Each directory is a clip, its frames named by capture milliseconds in the recording, with a
+`truth.json` as in `pickup-log`: `baseline` is the first frame, whose lines are not arrivals, and
+`arrivals` are the lines that came in each later frame, oldest first, checked by eye. `source` is
+`720p`. A recorded crop was 320×250 at client (960,380); these are cut to 208×96 at its (112,100),
+which is client (1072,480): the six line slots and their closing parentheses, the lines ending 7 px
+inside the right edge, which is the client area's (as at the samples' size, 11 to 12 px). The clips
+are fed as the real band is (`tests/pickup_log_720p.rs`): the band `capture_band` makes at a UI Size of
+35/55 from a 1280×720 client area, 255×306 at client (1025,414), black, with the clip pasted in at
+(47,66) in it, and a cold reader read at 0.636 for each clip. Each clip must count only the lines
+that arrived, in the frame that brought them or not at all, and tally no more mesos or Items than
+arrived. At this size it may read fewer, and `Unreadable` stands for a line seen but not read:
+`exp-and-mesos` (EXP, mesos, an Etc Item), `etc-and-use-items` (mesos, Etc and Use Items, a name cut
+short, and a Mob's sprite over the top row for the clip's last second), `skill-effect` (a skill's
+beam over the log's right end for 8 seconds, and four EXP lines arriving at once under it) and
+`burst` (four EXP lines at once, two more one at a time, then a Use Item and mesos together, an Etc
+Item and mesos a frame apart, over a thick, moving grass). No
+clip shows a player's name: its only text besides the log is the world's. Mobs may show their own
+names (the `Ligator` at the left of `etc-and-use-items`).

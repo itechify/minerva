@@ -1,0 +1,74 @@
+{
+  "source": "720p",
+  "baseline": "00010000.png",
+  "arrivals": [
+    {
+      "frame": "00012700.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Fragment of Ma",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": true
+        }
+      ]
+    },
+    {
+      "frame": "00012800.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 47
+        }
+      ]
+    },
+    {
+      "frame": "00013000.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Jr. Necki Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        }
+      ]
+    },
+    {
+      "frame": "00016800.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        },
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        },
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        },
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        }
+      ]
+    },
+    {
+      "frame": "00018300.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 58,
+          "party": false
+        }
+      ]
+    }
+  ]
+}

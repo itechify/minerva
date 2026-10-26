@@ -1,0 +1,41 @@
+{
+  "source": "720p",
+  "baseline": "00042200.png",
+  "arrivals": [
+    {
+      "frame": "00042300.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 58,
+          "party": false
+        }
+      ]
+    },
+    {
+      "frame": "00043000.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 68
+        }
+      ]
+    },
+    {
+      "frame": "00043100.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Ligator Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        },
+        {
+          "kind": "mesos",
+          "amount": 64
+        }
+      ]
+    }
+  ]
+}
