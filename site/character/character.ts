@@ -1,7 +1,7 @@
 // A Character's page (character/index.html, ADR 0027), worked out as plain data: the name its
 // address names, and what the page shows from GET /api/characters/<name>: who they are as
-// their newest entry says, their #1s, podiums, maps and best EXP/h, and every entry of theirs,
-// a Level Band at a time. The page's script (page.ts) only fetches and draws what this gives it.
+// their newest entry says, where they stand (their #1s and other top-3 places, on how many maps
+// in which Level Bands), and every entry of theirs, a Level Band at a time. The page's script (page.ts) only fetches and draws what this gives it.
 
 import { dayText } from "../../src/dates.ts";
 import { levels, rate, whole } from "../../src/figures.ts";
@@ -18,12 +18,17 @@ export function readName(search: string): string | null {
   return name !== null && isName(name) ? name : null;
 }
 
-/** A figure in the row under the Character's name: "5" over "#1s held". `detail` says more,
- *  under it: what a best was set on, or how many Level Bands. */
-export interface Stat {
-  value: string;
-  label: string;
-  detail: string | null;
+/** Words, some of them bold: a figure in a sentence. */
+export type Phrase = (string | { strong: string })[];
+
+/** Where the Character stands, said once under their name, in the map page's voice: "Egbert
+ *  holds 3 #1s and 2 more top-3 places, on 6 maps across 2 Level Bands." Led by the crown
+ *  while they hold a #1; a part that would be none is left out. */
+export interface Standing {
+  crowned: boolean;
+  words: Phrase;
+  /** The same, as plain words, for a line read out when the page has loaded. */
+  text: string;
 }
 
 /** One of the Character's entries as a band's table writes it. */
@@ -58,12 +63,12 @@ export interface CharacterBand {
 }
 
 /** A Character's page: their name as last uploaded, who their newest entry says they are,
- *  the figures under the name, and their Level Bands, highest first. */
+ *  where they stand, and their Level Bands, highest first. */
 export interface CharacterPage {
   name: string;
   /** "Cleric Lv 31 · newest best 22 Oct". */
   who: string;
-  stats: Stat[];
+  standing: Standing;
   bands: CharacterBand[];
 }
 
@@ -83,11 +88,28 @@ function bandLevels(band: number): string {
   return levels({ lowest, highest });
 }
 
+/** Where a Character stands: the #1s they hold (one per map and Level Band, so a Character on
+ *  top of a map in two bands holds two), their other places in a band's top 3, and how many
+ *  maps they're on, in which Level Bands (named, when it's one). */
+function standingOf(name: string, tops: number, podiums: number, maps: number, bands: number[]): Standing {
+  const others = podiums - tops;
+  const held: Phrase = [];
+  if (tops > 0) held.push({ strong: tops === 1 ? "a #1" : `${whole(tops)} #1s` });
+  if (others > 0) {
+    const places = others === 1 ? "top-3 place" : "top-3 places";
+    if (tops === 0) held.push({ strong: others === 1 ? `a ${places}` : `${whole(others)} ${places}` });
+    else held.push(" and ", { strong: others === 1 ? `another ${places}` : `${whole(others)} more ${places}` });
+  }
+  const across = bands.length === 1 ? `at ${bandLevels(bands[0])}` : `across ${whole(bands.length)} Level Bands`;
+  const where = `on ${counted(maps, "map")} ${across}.`;
+  const words: Phrase = held.length === 0 ? [`${name} is ${where}`] : [`${name} holds `, ...held, `, ${where}`];
+  const text = words.map((w) => (typeof w === "string" ? w : w.strong)).join("");
+  return { crowned: tops > 0, words, text };
+}
+
 /** A Character's page from GET /api/characters/<name>, with maps named from `names` and
  *  dates written as of `now`. Their newest entry (by when its Visit set it) says who they are
- *  now, as near as the Map Leaderboards know. Each #1 is a map and Level Band's, so a
- *  Character on top of a map in two bands holds two; a podium is a place in a band's top 3.
- *  Each band's entries go highest EXP/h first. */
+ *  now, as near as the Map Leaderboards know. Each band's entries go highest EXP/h first. */
 export function characterPage(answer: CharacterAnswer, names: MapNames, now: Date): CharacterPage {
   const dated = (setAt: number) => {
     const set = new Date(setAt);
@@ -96,7 +118,6 @@ export function characterPage(answer: CharacterAnswer, names: MapNames, now: Dat
   const entries = answer.entries.map((e) => ({ ...e, place: placeOf(names, e.map) }));
   type Placed = (typeof entries)[number];
   const newest = entries.reduce((a, b) => (b.setAt > a.setAt || (b.setAt === a.setAt && b.level > a.level) ? b : a));
-  const best = entries.reduce((a, b) => (b.expPerHour > a.expPerHour ? b : a));
   const tops = entries.filter((e) => e.rank === 1).length;
   const podiums = entries.filter((e) => e.rank <= 3).length;
   const maps = new Set(entries.map((e) => e.map)).size;
@@ -126,12 +147,7 @@ export function characterPage(answer: CharacterAnswer, names: MapNames, now: Dat
   return {
     name: answer.name,
     who: `${newest.job} Lv ${newest.level} · newest best ${dated(newest.setAt)}`,
-    stats: [
-      { value: whole(tops), label: tops === 1 ? "#1 held" : "#1s held", detail: null },
-      { value: whole(podiums), label: podiums === 1 ? "Podium" : "Podiums", detail: "Top 3 in a band" },
-      { value: whole(maps), label: maps === 1 ? "Map" : "Maps", detail: `in ${counted(bandsHeld.length, "Level Band")}` },
-      { value: rate(best.expPerHour), label: "Best EXP/h", detail: best.place.name },
-    ],
+    standing: standingOf(answer.name, tops, podiums, maps, bandsHeld),
     bands,
   };
 }
@@ -142,7 +158,11 @@ function markOf(mark: MapMark): { name: string; picture: string } {
 
 /** What the page says when it has no Character to show: a link naming none, or a name with no
  *  entries, whether never uploaded, opted out or taken down, which the page never tells
- *  apart. The page's way back to the Map Leaderboards is over it. */
+ *  apart; with a name, where a player's own entry would be, and why it might not be there. */
 export function noCharacter(name: string | null): Said {
-  return { text: name === null ? "This link doesn't name a Character." : `No bests on the Map Leaderboards for ${name}.` };
+  if (name === null) return { text: "This link doesn't name a Character.", link: { text: "Find a map on the Map Leaderboards.", href: "/leaderboards/" } };
+  return {
+    text: `${name} has no bests on the Map Leaderboards.`,
+    link: { text: "Where's my character's entry?", href: "/faq/#leaderboard-link" },
+  };
 }

@@ -1,6 +1,7 @@
-// A Character's page shows who they are as their newest entry says, their #1s, podiums, maps
-// and best EXP/h, and every entry of theirs a Level Band at a time, highest first, each with
-// its rank there and a link to it on its Map Leaderboard (ADR 0027).
+// A Character's page shows who they are as their newest entry says, where they stand (their
+// #1s and other top-3 places, on how many maps in which Level Bands), and every entry of
+// theirs a Level Band at a time, highest first, each with its rank there and a link to it on
+// its Map Leaderboard (ADR 0027).
 import { describe, expect, it } from "vitest";
 import type { CharacterEntry, MapMark } from "../../entries.ts";
 import { mapNames } from "../../leaderboards/leaderboards.ts";
@@ -48,7 +49,7 @@ describe("a Character's page", () => {
     expect(page.who).toBe("Cleric Lv 31 · newest best 12 Oct");
   });
 
-  it("counts each map and Level Band's #1 on its own, and the podiums among them", () => {
+  it("says where they stand, counting each map and Level Band's #1 on its own, crowned", () => {
     const page = characterPage(
       answer(
         mine("100000000", 20, 1, 3, 90_000),
@@ -60,32 +61,29 @@ describe("a Character's page", () => {
       NOW,
     );
 
-    expect(page.stats).toEqual([
-      { value: "2", label: "#1s held", detail: null },
-      { value: "3", label: "Podiums", detail: "Top 3 in a band" },
-      { value: "3", label: "Maps", detail: "in 2 Level Bands" },
-      { value: "90,000", label: "Best EXP/h", detail: "Pig Field" },
-    ]);
+    expect(page.standing).toEqual({
+      crowned: true,
+      words: ["Egbert holds ", { strong: "2 #1s" }, " and ", { strong: "another top-3 place" }, ", on 3 maps across 2 Level Bands."],
+      text: "Egbert holds 2 #1s and another top-3 place, on 3 maps across 2 Level Bands.",
+    });
   });
 
-  it("writes one of each in the singular", () => {
-    const page = characterPage(answer(mine("100000000", 20, 1, 1, 90_000)), names, NOW);
+  it("writes one of each in the singular, and names the one Level Band", () => {
+    const page = characterPage(answer(mine("100000000", 20, 1, 1, 90_000), mine("100000001", 20, 2, 5, 60_000), mine("100000002", 20, 3, 5, 40_000)), names, NOW);
 
-    expect(page.stats.map((s) => [s.value, s.label, s.detail])).toEqual([
-      ["1", "#1 held", null],
-      ["1", "Podium", "Top 3 in a band"],
-      ["1", "Map", "in 1 Level Band"],
-      ["90,000", "Best EXP/h", "Pig Field"],
-    ]);
+    expect(page.standing.text).toBe("Egbert holds a #1 and 2 more top-3 places, on 3 maps at Lv 20–29.");
   });
 
-  it("holds none without a #1 or a podium", () => {
-    const page = characterPage(answer(mine("100000000", 20, 7, 9, 90_000)), names, NOW);
+  it("leaves out a #1 they don't hold", () => {
+    const page = characterPage(answer(mine("100000000", 20, 3, 9, 90_000)), names, NOW);
 
-    expect(page.stats.slice(0, 2).map((s) => [s.value, s.label])).toEqual([
-      ["0", "#1s held"],
-      ["0", "Podiums"],
-    ]);
+    expect(page.standing).toEqual({ crowned: false, words: ["Egbert holds ", { strong: "a top-3 place" }, ", on 1 map at Lv 20–29."], text: "Egbert holds a top-3 place, on 1 map at Lv 20–29." });
+  });
+
+  it("says only where they are without a #1 or a top-3 place", () => {
+    const page = characterPage(answer(mine("100000000", 20, 7, 9, 90_000), mine("100000001", 30, 5, 9, 90_000)), names, NOW);
+
+    expect(page.standing).toEqual({ crowned: false, words: ["Egbert is on 2 maps across 2 Level Bands."], text: "Egbert is on 2 maps across 2 Level Bands." });
   });
 
   it("lists the Level Bands highest first, each band's entries highest EXP/h first", () => {
@@ -141,8 +139,14 @@ describe("a Character's page", () => {
     expect(page.bands[0].rows[0].date).toBe("3 Oct 2025");
   });
 
-  it("says the same for any name with no entries, and for a link naming none", () => {
-    expect(noCharacter("Egbert")).toEqual({ text: "No bests on the Map Leaderboards for Egbert." });
-    expect(noCharacter(null)).toEqual({ text: "This link doesn't name a Character." });
+  it("says the same for any name with no entries, with where a player's own entry would be", () => {
+    expect(noCharacter("Egbert")).toEqual({
+      text: "Egbert has no bests on the Map Leaderboards.",
+      link: { text: "Where's my character's entry?", href: "/faq/#leaderboard-link" },
+    });
+  });
+
+  it("sends a link naming no Character to the Map Leaderboards", () => {
+    expect(noCharacter(null)).toEqual({ text: "This link doesn't name a Character.", link: { text: "Find a map on the Map Leaderboards.", href: "/leaderboards/" } });
   });
 });

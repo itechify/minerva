@@ -3417,13 +3417,16 @@ button.button {
   }
 }
 
-/* A Character's page (ADR 0027): their name, who their newest entry says they are, and a row
-   of figures, then a table of their entries for each Level Band, as Where to train's table:
-   the map's name its link, over its street, figures right-aligned. One measure with the Map
-   Leaderboards' pages. */
-.ch-stats,
+/* A Character's page (ADR 0027): their name, who their newest entry says they are, and where
+   they stand in one sentence, then a table of their entries for each Level Band, as Where to
+   train's table: the map's name its link, over its street, figures right-aligned. One measure
+   with the Map Leaderboards' pages. */
 .ch-board {
   max-width: 60em;
+}
+/* A name of 16 letters is wider than a phone: it breaks rather than run off the window. */
+.ch-name {
+  overflow-wrap: anywhere;
 }
 .ch-who {
   min-height: 22px;
@@ -3432,42 +3435,18 @@ button.button {
   line-height: 22px;
   color: var(--ink-2);
 }
-/* The figures, each in the hotkey table's inset box: the figure, over what it counts, over
-   what more it says. */
-.ch-stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 24px 0 0;
+/* Where they stand, in the lede's size and the map page's voice ("Egbert is #57 of 63…"), the
+   figures bold, led by the crown while they hold a #1. Its line is kept from the first paint. */
+.ch-standing {
+  max-width: 40em;
+  min-height: 28px;
+  margin: 16px 0 0;
+  font-size: 17px;
+  line-height: 28px;
+  text-wrap: pretty;
 }
-.ch-stat {
-  display: flex;
-  flex-direction: column;
-  padding: 10px 14px;
-  border: 1px solid var(--inset-edge);
-  border-radius: 4px;
-  background: var(--inset-bg);
-}
-.ch-stat dd {
-  margin: 0;
-}
-.ch-stat-value {
-  order: -1;
-  font-size: 23px;
+.ch-standing strong {
   font-weight: 700;
-  line-height: 30px;
-  font-variant-numeric: tabular-nums;
-}
-.ch-stat-label {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-}
-.ch-stat-detail {
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--ink-2);
-  overflow-wrap: anywhere;
 }
 .ch-board {
   padding-top: 40px;
@@ -3526,16 +3505,30 @@ button.button {
 .ch-table .lb-map-street {
   display: block;
 }
-/* A #1's crown, in You Yellow, as a map's page stars the player's own entry. */
+/* A #1's crown in Crown Gold: the Map Leaderboards drawing's metal, lit at its top as a medal
+   is, ringed in a dark bronze. Never You Yellow, which marks the player's own best, and only
+   ever this shape, so it reads as neither doubt nor a deal. */
 .ch-crown {
   width: 14px;
   height: 14px;
   margin-right: 5px;
   vertical-align: -1px;
-  fill: var(--you);
-  stroke: var(--you-edge);
+  fill: url(#crown-gold);
+  stroke: #6e4a00;
   stroke-width: 1.1;
   stroke-linejoin: round;
+}
+.ch-crown-lead {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  vertical-align: -3px;
+}
+/* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
+.ch-board .lb-said.ch-lost-said {
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--ink);
 }
 /* The columns are set by their headers, so every band's table lines up with the next; the
    map takes what the figures leave. The headers stay under the window's head as a long table
@@ -3545,13 +3538,13 @@ button.button {
     table-layout: fixed;
   }
   .ch-table th.ch-rank {
-    width: 104px;
+    width: 96px;
   }
   .ch-table th.ch-mobs {
     width: 96px;
   }
   .ch-table th.ch-job {
-    width: 120px;
+    width: 104px;
   }
   .ch-table th.ch-level {
     width: 56px;
@@ -3592,17 +3585,15 @@ button.button {
     width: 96px;
   }
 }
-/* On a phone the figures go two by two, and each entry becomes a card, as Where to train's
-   maps do: the map beside its EXP/h, over its rank, job and level beside the date, over the
-   map's mob levels. The whole card is the map's link, for a thumb. */
+/* On a phone each entry becomes a card, as Where to train's maps do: the map beside its EXP/h,
+   over its rank, job and level beside the date, over the map's mob levels. A long map name
+   wraps rather than push the EXP/h off the card, and the EXP/h and date share the card's right
+   edge. The whole card is the map's link, for a thumb. */
 @media (max-width: 640px) {
-  .ch-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .ch-table tr {
     position: relative;
     display: grid;
-    grid-template-columns: max-content max-content minmax(max-content, 1fr) auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
     grid-template-areas:
       "map map map exp"
       "rank job level date"
@@ -3619,10 +3610,12 @@ button.button {
   }
   .ch-table .ch-map {
     grid-area: map;
+    min-width: 0;
     overflow-wrap: anywhere;
   }
   .ch-table .ch-exp {
     grid-area: exp;
+    justify-self: end;
   }
   .ch-table .ch-rank {
     grid-area: rank;
@@ -3636,6 +3629,7 @@ button.button {
   }
   .ch-table .ch-date {
     grid-area: date;
+    justify-self: end;
   }
   .ch-table .ch-mobs {
     grid-area: mobs;

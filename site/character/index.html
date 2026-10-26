@@ -1,10 +1,11 @@
 <!doctype html>
 <!-- A Character's page (ADR 0027): every entry of theirs on the Map Leaderboards, a Level Band
      at a time, highest first, each with its rank there and a link to it on its Map
-     Leaderboard; over them, who they are as their newest entry says, and their #1s, podiums,
-     maps and best EXP/h. Every name the Map Leaderboards show links here:
-     /character/?name=Egbert. It reads the site's API from the browser (page.ts), so without
-     script it says it needs it. A name with no entries shows the owl lost. -->
+     Leaderboard; over them, who they are as their newest entry says, and where they stand, in
+     a sentence: their #1s and other top-3 places, on how many maps in which Level Bands. Every
+     name the Map Leaderboards show links here: /character/?name=Egbert. It reads the site's
+     API from the browser (page.ts), so without script it says it needs it. A name with no
+     entries shows the owl lost. -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -43,6 +44,16 @@
   </head>
   <body>
     <a class="skip" href="#main">Skip to the page</a>
+    <!-- Crown Gold, the #1 crown's metal, lit at its top as a medal is (DESIGN.md). -->
+    <svg class="sr-only" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="crown-gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffe58a" />
+          <stop offset="0.45" stop-color="#f7c33a" />
+          <stop offset="1" stop-color="#d99a00" />
+        </linearGradient>
+      </defs>
+    </svg>
     <div class="window">
       @WINDOW_HEAD@
 
@@ -50,23 +61,35 @@
         <div class="part" data-street="Character">
           <header class="lb-head stop" id="top" data-mini="Character">
             <p class="lb-back"><a href="/leaderboards/">All Map Leaderboards</a></p>
-            <h1 id="name">Character</h1>
+            <h1 class="ch-name" id="name">Character</h1>
+            <!-- The name the address asks for, before the page's script runs, so the heading
+                 never shows "Character" first. page.ts writes it again as last uploaded. -->
+            <script>
+              (function () {
+                var name = new URLSearchParams(location.search).get("name");
+                if (name && /^[A-Za-z0-9]{1,16}$/.test(name)) document.getElementById("name").textContent = name;
+              })();
+            </script>
             <p class="ch-who" id="who"></p>
-            <dl class="ch-stats" id="stats" hidden></dl>
+            <p class="ch-standing" id="standing"></p>
           </header>
 
           <section class="ch-board stop lb-waiting" id="board" data-mini="Bests" aria-label="Bests">
+            <!-- The owl lost, over the line that says why: the line says it, so the drawing is
+                 decoration here. -->
             <div class="lost" id="lost" hidden>
-              <img class="lost-art" src="../art/not-found.png" alt="404 Not Found" width="440" height="287" loading="lazy" decoding="async" />
+              <img class="lost-art" src="../art/not-found.png" alt="" width="440" height="287" loading="lazy" decoding="async" />
             </div>
             <p class="lb-said" id="said" aria-live="polite">Loading their bests…</p>
+            <!-- Says where they stand once the bests are in, as #said is hidden then. -->
+            <p class="sr-only" id="loaded" aria-live="polite"></p>
             <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
             <div id="bands"></div>
           </section>
 
           <section class="lb-questions stop" id="questions" data-mini="Questions" aria-labelledby="questions-title">
-            <h2 id="questions-title">How they work</h2>
-            <div class="qa-list" data-qa="character-page level-bands leaderboard-exp leaderboard-remove" data-group="leaderboards"></div>
+            <h2 id="questions-title">How the Map Leaderboards work</h2>
+            <div class="qa-list" data-qa="character-page leaderboard-link level-bands leaderboard-exp" data-group="leaderboards"></div>
           </section>
         </div>
       </main>
