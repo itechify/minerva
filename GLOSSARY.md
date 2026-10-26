@@ -227,7 +227,7 @@ The in-game currency; the game itself says "mesos".
 _Avoid_: miso, gold, money
 
 **Pickups**:
-The mesos and Items the Pickup Log says the player picked up in a Session, each Item tallied by name. Read from the Pickup Log, they may be fewer than were picked up, never more (ADR 0025).
+The mesos and Items the Pickup Log says the player picked up in a Session, each Item tallied by name. Read from the Pickup Log, they may be fewer than were picked up, never more (ADR 0026).
 _Avoid_: loot, drops, haul
 
 ### Items
