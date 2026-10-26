@@ -66,7 +66,7 @@ describe("taken top spots", () => {
   });
 
   it("says when the spot was taken with a Party Best", () => {
-    const before = [top(QUIET, 20, "Egbert", 80_000)];
+    const before = [top(QUIET, 20, "Egbert", 80_000, true)];
     const after = [top(QUIET, 20, "Hakuo", 90_000, true)];
 
     expect(takenTops(before, after, "hakuo").map((t) => t.party)).toEqual([true]);
@@ -110,7 +110,7 @@ describe("the post", () => {
     expect(post.embeds).toEqual([
       {
         title: "Henesys Hunting Ground I",
-        url: `https://owlofminerva.app/leaderboards/map/?map=${HUNTING_GROUND}&band=20&name=Hakuo`,
+        url: `https://owlofminerva.app/leaderboards/map/?map=${HUNTING_GROUND}&band=20&name=Hakuo&kind=solo`,
         description: "**Hakuo** took #1, levels 20–29, with 153,000 EXP/h, past Egbert's 80,000.",
       },
     ]);
@@ -189,23 +189,30 @@ describe("an upload", () => {
     expect(posts[0].embeds[0]).not.toHaveProperty("thumbnail");
   });
 
-  it("posts a spot taken with a Party Best as a party's, and nothing for a Solo Best that stays below it", async () => {
-    await upload("Kora", key("kora"), [entry("100000058", 25, 10_000)]);
-    await upload("Lars", key("lars"), [partyEntry("100000058", 25, 90_000)]);
+  it("posts each kind's taken top spot even below the other board's top", async () => {
+    const map = "100000058";
+    await upload("Kora", key("kora"), [entry(map, 25, 10_000), partyEntry(map, 25, 80_000)]);
+    await upload("Lars", key("lars"), [partyEntry(map, 25, 90_000)]);
     await postsSettle(1);
     expect(posts[0].embeds[0].description).toContain("**Lars** took #1");
     expect(posts[0].embeds[0].description).toContain("in a party");
+    expect(posts[0].embeds[0].url).toContain("kind=party");
 
-    // Lars's Solo Best, below the Party Best the board ranks him by, takes nothing.
-    await upload("Lars", key("lars"), [entry("100000058", 25, 20_000), partyEntry("100000058", 25, 90_000)]);
-    // Kora, past her own Solo Best but not past Lars, takes nothing either.
-    await upload("Kora", key("kora"), [entry("100000058", 25, 50_000)]);
-
-    // Kora's Solo Best past a Party Best takes the spot, and is not a party's.
-    await upload("Kora", key("kora"), [entry("100000058", 25, 95_000)]);
+    // His Solo Best takes the solo board, although his Party Best is higher.
+    await upload("Lars", key("lars"), [entry(map, 25, 20_000), partyEntry(map, 25, 90_000)]);
     await postsSettle(2);
-    expect(posts[1].embeds[0].description).toContain("**Kora** took #1");
     expect(posts[1].embeds[0].description).not.toContain("in a party");
+    expect(posts[1].embeds[0].description).toContain("past Kora's 10,000");
+    expect(posts[1].embeds[0].url).toContain("kind=solo");
+
+    await upload("Kora", key("kora"), [entry(map, 25, 50_000), partyEntry(map, 25, 80_000)]);
+    await postsSettle(3);
+    expect(posts[2].embeds[0].description).toContain("**Kora** took #1");
+    // Improving her own solo top, even past the party top, takes no new spot.
+    await upload("Kora", key("kora"), [entry(map, 25, 95_000), partyEntry(map, 25, 80_000)]);
+    await upload("Lars", key("lars"), [entry(map, 25, 96_000), partyEntry(map, 25, 90_000)]);
+    await postsSettle(4);
+    expect(posts[3].embeds[0].description).toContain("past Kora's 95,000");
   });
 
   it("posts nothing for the same set uploaded again", async () => {

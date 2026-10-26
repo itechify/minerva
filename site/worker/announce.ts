@@ -46,11 +46,11 @@ export interface Taken {
  *  held before. A band nobody held before (its first entry) isn't one, nor is a band the
  *  Character already held, so improving its own best says nothing. Best first. */
 export function takenTops(before: Top[], after: Top[], nameKey: string): Taken[] {
-  const held = new Map(before.map((t) => [`${t.map} ${t.band}`, t]));
+  const held = new Map(before.map((t) => [`${t.map} ${t.band} ${t.party}`, t]));
   const taken: Taken[] = [];
   for (const now of after) {
     if (now.nameKey !== nameKey) continue;
-    const was = held.get(`${now.map} ${now.band}`);
+    const was = held.get(`${now.map} ${now.band} ${now.party}`);
     if (was === undefined || was.nameKey === nameKey) continue;
     taken.push({
       map: now.map,
@@ -69,7 +69,7 @@ export function takenTops(before: Top[], after: Top[], nameKey: string): Taken[]
  *  the Character's entry marked, as the app's deep links do (ADR 0015). Two spots never share
  *  one, which matters: Discord folds embeds with the same link into one. */
 function linkTo(taken: Taken): string {
-  const query = new URLSearchParams({ map: taken.map, band: String(taken.band), name: taken.name });
+  const query = new URLSearchParams({ map: taken.map, band: String(taken.band), name: taken.name, kind: taken.party ? "party" : "solo" });
   return `https://owlofminerva.app/leaderboards/map/?${query}`;
 }
 

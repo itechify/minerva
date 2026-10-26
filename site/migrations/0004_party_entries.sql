@@ -44,4 +44,20 @@ ALTER TABLE removed_entries_with_party RENAME TO removed_entries;
 
 -- The kind of the entry a report is against, and of the entry that took a top spot.
 ALTER TABLE reports ADD COLUMN party INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE taken_tops ADD COLUMN party INTEGER NOT NULL DEFAULT 0;
+-- A Character can take both boards' top spots in the same place.
+CREATE TABLE taken_tops_with_party (
+  name_key TEXT NOT NULL,
+  map_id TEXT NOT NULL,
+  band INTEGER NOT NULL,
+  exp_per_hour INTEGER NOT NULL,
+  from_name_key TEXT,
+  from_exp_per_hour INTEGER NOT NULL,
+  taken_at INTEGER NOT NULL,
+  party INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (name_key, map_id, band, party)
+);
+INSERT INTO taken_tops_with_party
+SELECT name_key, map_id, band, exp_per_hour, from_name_key, from_exp_per_hour, taken_at, 0 FROM taken_tops;
+DROP TABLE taken_tops;
+ALTER TABLE taken_tops_with_party RENAME TO taken_tops;
+CREATE INDEX taken_tops_by_from ON taken_tops (from_name_key);

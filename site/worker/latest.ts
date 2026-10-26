@@ -4,6 +4,7 @@
 import type { Kind, LatestEntry } from "../entries";
 import { markOf } from "./ceilings";
 import type { Answer } from "./http";
+import { isParty } from "./kinds";
 
 /** How many entries Latest lists. */
 const LATEST = 10;
@@ -44,7 +45,7 @@ export async function readLatest(env: Env, kind: Kind | null): Promise<Answer> {
     map: r.map_id,
     mark: markOf(env, r.map_id),
     band: r.band,
-    party: r.party === 1,
+    party: isParty(r.party),
     took: r.took ? { from: r.from_name, fromExpPerHour: r.from_exp_per_hour! } : null,
   }));
   return { status: 200, body: { entries } };

@@ -36,3 +36,21 @@ export function kindAsked(url: URL): Kind | null | Answer {
 export function isKind(kind: Kind | null | Answer): kind is Kind | null {
   return kind === null || typeof kind === "string";
 }
+
+/** Validate a route's kind once and pass it to the read or moderation action. */
+export async function withKind(url: URL, action: (kind: Kind | null) => Promise<Answer>): Promise<Answer> {
+  const kind = kindAsked(url);
+  return isKind(kind) ? action(kind) : kind;
+}
+
+/** The database's representation of the existing wire boolean. */
+export function sqlParty(party: boolean): 0 | 1 { return party ? 1 : 0; }
+export function isParty(value: number): boolean { return value === 1; }
+
+/** An absent kind means both; otherwise select just its stored kind. */
+export function sqlKind(kind: Kind | null): number | null {
+  return kind === null ? null : sqlParty(kind === "party");
+}
+export function kindCondition(parameter: string): string {
+  return `(${parameter} IS NULL OR party = ${parameter})`;
+}

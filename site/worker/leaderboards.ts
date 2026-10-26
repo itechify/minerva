@@ -4,7 +4,7 @@ import { type Kind, isMap, isName } from "../entries";
 import { bandFrom, bandOf, levelsOf } from "../level-bands";
 import { type Taken, type Top, takenTops, tell } from "./announce";
 import { type Answer, badRequest, body } from "./http";
-import { boardOf } from "./kinds";
+import { boardOf, isParty, sqlParty } from "./kinds";
 import { accountOfKey, touchKey } from "./accounts";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
@@ -159,9 +159,8 @@ interface Place {
  *  parameters, and a D1 statement takes at most 100. */
 const PLACES_PER_READ = 40;
 
-/** The top entry of each of `places` that has one, on the board that ranks each Character by
- *  their higher entry (the one a Map Leaderboard opens at), with the kind it is. Places with no
- *  entry are left out. */
+/** Each kind's top entry in each place that has one. The Both board remains the default
+ *  read, but a top spot is taken from the board of its kind. */
 async function topsAt(env: Env, places: Place[]): Promise<Top[]> {
   const tops: Top[] = [];
   for (let from = 0; from < places.length; from += PLACES_PER_READ) {
@@ -170,9 +169,9 @@ async function topsAt(env: Env, places: Place[]): Promise<Top[]> {
       `WITH places (map_id, band) AS (VALUES ${asked.map(() => "(?, ?)").join(", ")}),
          ranked AS (
            SELECT e.map_id, e.band, e.name_key, c.name, e.exp_per_hour, e.party,
-                  ROW_NUMBER() OVER (PARTITION BY e.map_id, e.band
+                  ROW_NUMBER() OVER (PARTITION BY e.map_id, e.band, e.party
                                      ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank
-           FROM ${boardOf(null)} e JOIN characters c USING (name_key)
+           FROM entries e JOIN characters c USING (name_key)
            JOIN places p ON p.map_id = e.map_id AND p.band = e.band)
        SELECT map_id, band, name_key, name, exp_per_hour, party FROM ranked WHERE rank = 1`,
     )
@@ -185,7 +184,7 @@ async function topsAt(env: Env, places: Place[]): Promise<Top[]> {
         nameKey: r.name_key,
         name: r.name,
         expPerHour: r.exp_per_hour,
-        party: r.party === 1,
+        party: isParty(r.party),
       });
     }
   }
@@ -208,7 +207,7 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
   ]);
   const wasRemoved = (e: Upload) =>
     removed.results.some(
-      (r) => r.map_id === e.map && r.band === e.band && r.exp_per_hour === e.expPerHour && (r.party === 1) === e.party,
+      (r) => r.map_id === e.map && r.band === e.band && r.exp_per_hour === e.expPerHour && isParty(r.party) === e.party,
     );
   const rejected: Rejected[] = [];
   const accepted = entries.filter((e) => {
@@ -219,19 +218,16 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
     else return true;
     return false;
   });
-  // Only an entry that is new, or higher than the Character's higher one in the place, can take
-  // a top spot (a board ranks a Character by their higher entry), so the top spots are read for
-  // those places alone. `takenTops` would turn the rest down anyway; this is what keeps the
-  // reads off almost every upload, since the app uploads a Character's whole set as each Visit
-  // ends and nearly all of it is unchanged (ADR 0022).
+  // Only a new or improved entry of its kind can take that kind's top spot. Almost
+  // every upload repeats the whole unchanged set, so leave those places unread.
   const held = new Map<string, number>();
   for (const r of had.results) {
-    const place = `${r.map_id} ${r.band}`;
+    const place = `${r.map_id} ${r.band} ${r.party}`;
     held.set(place, Math.max(held.get(place) ?? 0, r.exp_per_hour));
   }
   const improved: Place[] = [];
   for (const e of accepted) {
-    if ((held.get(`${e.map} ${e.band}`) ?? 0) < e.expPerHour && !improved.some((p) => p.map === e.map && p.band === e.band)) {
+    if ((held.get(`${e.map} ${e.band} ${sqlParty(e.party)}`) ?? 0) < e.expPerHour && !improved.some((p) => p.map === e.map && p.band === e.band)) {
       improved.push({ map: e.map, band: e.band });
     }
   }
@@ -243,7 +239,7 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
       env.DB.prepare(
         `INSERT INTO entries (name_key, map_id, band, level, job, exp_per_hour, set_at, party)
          SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8, ?9 WHERE ${HELD}`,
-      ).bind(nameKey, keyHash, e.map, e.band, e.level, e.job, e.expPerHour, e.setAt, e.party ? 1 : 0),
+      ).bind(nameKey, keyHash, e.map, e.band, e.level, e.job, e.expPerHour, e.setAt, sqlParty(e.party)),
     ),
     // A top spot taken stays marked only while the entry that took it stands.
     env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD} AND ${UNMATCHED}`).bind(nameKey, keyHash),
@@ -270,7 +266,7 @@ async function keepTaken(env: Env, nameKey: string, keyHash: string, taken: Take
         `INSERT OR REPLACE INTO taken_tops (name_key, map_id, band, exp_per_hour, from_name_key, from_exp_per_hour, taken_at, party)
          SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8, ?9 WHERE ${HELD}`,
         // A name in lower case is its Character's key, whatever its case (ADR 0015).
-      ).bind(nameKey, keyHash, t.map, t.band, t.expPerHour, t.from.toLowerCase(), t.fromExpPerHour, now, t.party ? 1 : 0),
+      ).bind(nameKey, keyHash, t.map, t.band, t.expPerHour, t.from.toLowerCase(), t.fromExpPerHour, now, sqlParty(t.party)),
     ),
   );
 }
@@ -328,7 +324,7 @@ export async function readBand(env: Env, map: string, first: string, name: strin
     level: r.level,
     expPerHour: r.exp_per_hour,
     setAt: r.set_at,
-    party: r.party === 1,
+    party: isParty(r.party),
   });
   const character = rows.results.find((r) => r.name_key === nameKey);
   return {

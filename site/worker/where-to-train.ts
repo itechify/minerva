@@ -5,7 +5,7 @@ import type { Best, Kind, TrainingMap } from "../entries";
 import { bandFrom, bandOf, levelsOf } from "../level-bands";
 import { type Ceiling, ceilingsOf, markOf } from "./ceilings";
 import { type Answer, badRequest } from "./http";
-import { boardOf } from "./kinds";
+import { boardOf, isParty } from "./kinds";
 
 /** Whether the middle half of a map's spawns is at any of the band's levels. */
 function isFor(row: Ceiling, band: number): boolean {
@@ -77,7 +77,7 @@ export async function readTraining(env: Env, first: string, kind: Kind | null): 
     const best: Best | null =
       top === undefined
         ? null
-        : { name: top.name, job: top.job, level: top.level, expPerHour: top.exp_per_hour, setAt: top.set_at, party: top.party === 1 };
+        : { name: top.name, job: top.job, level: top.level, expPerHour: top.exp_per_hour, setAt: top.set_at, party: isParty(top.party) };
     return { map, mobs: table[map]?.mobs ?? null, mark: markOf(env, map), entries: top?.entries ?? 0, best };
   });
   return { status: 200, body: { band, levels: levelsOf(band), maps } };
