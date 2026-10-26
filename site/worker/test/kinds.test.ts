@@ -224,4 +224,17 @@ describe("the pages' reads", () => {
     expect(party[0]).toMatchObject({ name: "Lou", level: 35 });
     expect((await call("/api/latest?kind=both")).status).toBe(400);
   });
+
+  it("marks the entry of the kind that took a top spot, not the Character's other entry there", async () => {
+    const CROWNED = "100000113";
+    await upload("Mo", key("mo"), [entry(CROWNED, 25, 20_000, START + 20)]);
+    await upload("Nia", key("nia"), [entry(CROWNED, 25, 10_000, START + 21), partyEntry(CROWNED, 25, 90_000, START + 22)]);
+    const took = async (kind: string) =>
+      ((await (await call(`/api/latest?kind=${kind}`)).json()) as { entries: { name: string; took: { from: string } | null }[] }).entries.find(
+        (e) => e.name === "Nia",
+      )?.took;
+
+    expect(await took("party")).toEqual({ from: "Mo", fromExpPerHour: 20_000 });
+    expect(await took("solo")).toBeNull();
+  });
 });

@@ -16,7 +16,7 @@ function search() {
   found.replaceChildren(
     ...result.maps.map((map, i) =>
       mapItem(
-        { name: map.name, street: map.street, href: linkTo({ map: map.id, band: null, name: null }), aside: map.entries, mark: map.mark },
+        { name: map.name, street: map.street, href: linkTo({ map: map.id, band: null, name: null, kind: null }), aside: map.entries, mark: map.mark },
         i === 0,
       ),
     ),

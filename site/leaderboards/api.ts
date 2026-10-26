@@ -3,7 +3,7 @@
 import fixture from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
 import { make } from "../../src/dom.ts";
 import ceilings from "../worker/osms-ceilings.json";
-import { type MapMarks, mapMarks, mapNames, type MapNames, type Said } from "./leaderboards.ts";
+import { type KindChoice, type MapMarks, mapMarks, mapNames, type MapNames, type Said } from "./leaderboards.ts";
 
 /** The maps the committed map names fixture names, as the panel names them. */
 export const names: MapNames = mapNames(fixture);
@@ -104,6 +104,30 @@ export function markSlot(mark: { name: string; picture: string } | null): HTMLEl
   const slot = make("span", "lb-mark");
   slot.setAttribute("aria-hidden", "true");
   return slot;
+}
+
+/** The mark on a Party Best's entry, after its name: the word, so it reads to everyone, and
+ *  the gold of the app's party mark (`--party-ink`). */
+export function partyMark(): HTMLElement {
+  const mark = make("span", "lb-party", "Party");
+  mark.title = "A Party Best: set while playing in a party";
+  return mark;
+}
+
+/** The choices of kind (both, solo, party) as links in `nav`, the one shown marked. The one
+ *  clicked keeps the focus when they are drawn again. */
+export function drawKindLinks(nav: HTMLElement, choices: KindChoice[]) {
+  const focused = nav.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.kind : undefined;
+  nav.replaceChildren(
+    ...choices.map((choice) => {
+      const link = make("a", "lb-kind", choice.label);
+      link.href = choice.href;
+      link.dataset.kind = choice.kind ?? "";
+      if (choice.open) link.setAttribute("aria-current", "page");
+      return link;
+    }),
+  );
+  if (focused !== undefined) nav.querySelector<HTMLElement>(`[data-kind="${focused}"]`)?.focus();
 }
 
 /** Put what a page says in `line`: its words, and the link after them, if any. */

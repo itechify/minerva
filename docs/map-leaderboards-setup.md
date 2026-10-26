@@ -56,7 +56,7 @@ For `wrangler dev`, put `DISCORD_CLIENT_SECRET=...` in `site/.dev.vars`. Sign in
 
 ## 6. Deploy the API before any app that uses it
 
-The API must be live before any Minerva version that uses it is released: one that uploads (#110), or one that links a PC to an Account (#152). Once this is on `main`, publish the site from `main`:
+The API must be live before any Minerva version that uses it is released: one that uploads (#110), one that links a PC to an Account (#152), or one that uploads a Party Best as an entry of its own (#173: an older Worker refuses a set with two entries for one map and Level Band). Migration `0004_party_entries.sql` makes `entries` and `removed_entries` again with the entry's kind in their keys, every entry before it solo; it keeps the Worker before it working until the deploy after. Once this is on `main`, publish the site from `main`:
 
 ```bash
 gh workflow run site.yml -f ref=main
@@ -77,4 +77,4 @@ From then on, **never publish the site from a ref older than the API**: an older
   ```
 
   It moves the name to the last key refused for it and says when that was. Check the time with the player before telling them it's done.
-- **Reports**: at `/admin/`, under **Reports**, each with **Dismiss** (the report goes) and **Take entry down** (the entry goes too, and stays off). An entry taken down by mistake comes back with **Restore** under **Taken down**. Without Discord, `curl -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/reports`, and to delete an entry, `curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/entries/<name>/<map>/<band>`.
+- **Reports**: at `/admin/`, under **Reports**, each with **Dismiss** (the report goes) and **Take entry down** (the entry goes too, and stays off). An entry taken down by mistake comes back with **Restore** under **Taken down**. Without Discord, `curl -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/reports`, and to delete an entry, `curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" "https://owlofminerva.app/api/admin/entries/<name>/<map>/<band>?kind=party"` (`kind` is `solo` or `party`; without it, both of a band's entries go).

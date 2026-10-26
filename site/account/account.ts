@@ -36,6 +36,8 @@ export interface Report {
   expPerHour: number;
   reason: string;
   reportedAt: number;
+  /** It is against a Party Best's entry, not a Solo Best's. */
+  party: boolean;
 }
 
 /** An entry taken down, as GET /api/admin/removed lists it. */
@@ -44,6 +46,8 @@ export interface Removed {
   map: string;
   band: number;
   expPerHour: number;
+  /** It was a Party Best's entry, not a Solo Best's. */
+  party: boolean;
 }
 
 /** GET /api/admin/characters/<name>'s answer. */
@@ -119,7 +123,7 @@ export function linkQuestion(username: string, token: TokenAnswer): { ask: strin
 export function reportLine(report: Report, mapName: string): { what: string; when: string } {
   const [first, last] = levelsOf(report.band);
   return {
-    what: `${report.name} on ${mapName}, levels ${first}–${last}: ${whole(report.expPerHour)} EXP/h`,
+    what: `${report.name} on ${mapName}, levels ${first}–${last}: ${whole(report.expPerHour)} EXP/h${report.party ? " (Party Best)" : ""}`,
     when: `Reported ${day(report.reportedAt)}`,
   };
 }
@@ -127,7 +131,7 @@ export function reportLine(report: Report, mapName: string): { what: string; whe
 /** An entry taken down as the admin page lists it: whose, where, and the Visit kept off. */
 export function removedLine(removed: Removed, mapName: string): string {
   const [first, last] = levelsOf(removed.band);
-  return `${removed.name} on ${mapName}, levels ${first}–${last}: ${whole(removed.expPerHour)} EXP/h`;
+  return `${removed.name} on ${mapName}, levels ${first}–${last}: ${whole(removed.expPerHour)} EXP/h${removed.party ? " (Party Best)" : ""}`;
 }
 
 /** A name as the admin page shows it, looked up: who holds it, and when another key was

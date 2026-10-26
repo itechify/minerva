@@ -4,9 +4,10 @@
 // click on a band or an area switches the table in place and the address with it, so the
 // link still shares and Back comes back. What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
-import { byId, markImage, markSlot, names, read, said as saidWith, unreachable } from "./api.ts";
+import { byId, drawKindLinks, markImage, markSlot, names, partyMark, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandsAnswer,
+  type Kind,
   PICK_A_BAND,
   readTrainingLink,
   type Said,
@@ -15,6 +16,7 @@ import {
   type TrainingLink,
   type TrainingRow,
   trainingBands,
+  trainingKinds,
   trainingLinkTo,
   trainingTable,
 } from "./leaderboards.ts";
@@ -24,6 +26,7 @@ let link = readTrainingLink(location.search);
 const section = byId("where-to-train");
 const said = byId("train-said");
 const bandsNav = byId("train-bands");
+const kindsNav = byId("train-kinds");
 const areasNav = byId("train-areas");
 const table = byId("train-table");
 const rows = byId<HTMLTableSectionElement>("train-rows");
@@ -59,6 +62,7 @@ function down() {
   done();
   table.hidden = true;
   bandsNav.hidden = bands === null;
+  kindsNav.hidden = bands === null;
   areasNav.hidden = true;
   unreachable(said, () => {
     say("Loading the Level Bands…");
@@ -68,12 +72,15 @@ function down() {
   });
 }
 
-/** The bands read so far, so Back, Forward and an area don't wait on the API. */
-const bandsRead = new Map<number, TrainingAnswer>();
+/** The bands read so far (by band and kind), so Back, Forward and an area don't wait on the API. */
+const bandsRead = new Map<string, TrainingAnswer>();
 
-async function readBand(band: number): Promise<TrainingAnswer | null> {
-  const answer = bandsRead.get(band) ?? (await read<TrainingAnswer>(`/api/bands/${band}`));
-  if (answer !== null) bandsRead.set(band, answer);
+const askedFor = (band: number, kind: Kind | null) => `/api/bands/${band}${kind === null ? "" : `?kind=${kind}`}`;
+
+async function readBand(band: number, kind: Kind | null): Promise<TrainingAnswer | null> {
+  const path = askedFor(band, kind);
+  const answer = bandsRead.get(path) ?? (await read<TrainingAnswer>(path));
+  if (answer !== null) bandsRead.set(path, answer);
   return answer;
 }
 
@@ -85,17 +92,18 @@ async function show() {
   const turn = ++draws;
   if (bands === null) return;
   drawBands();
+  drawKinds();
   if (link.band === null) {
     areasNav.hidden = true;
     return say(PICK_A_BAND);
   }
-  if (!bandsRead.has(link.band)) {
+  if (!bandsRead.has(askedFor(link.band, link.kind))) {
     wait();
     // A table already shown stays until the new one comes.
     if (table.hidden) saidWith(said, { text: "Loading the band's maps…" });
   }
   section.setAttribute("aria-busy", "true");
-  const answer = await readBand(link.band);
+  const answer = await readBand(link.band, link.kind);
   if (turn !== draws) return;
   section.removeAttribute("aria-busy");
   if (answer === null) return down();
@@ -163,6 +171,12 @@ function drawBands() {
   if (focused !== undefined) bandsNav.querySelector<HTMLElement>(`[data-band="${focused}"]`)?.focus();
 }
 
+/** The choice of kinds, both, solo or party, as links keeping the band and the area. */
+function drawKinds() {
+  drawKindLinks(kindsNav, trainingKinds(link));
+  kindsNav.hidden = false;
+}
+
 /** The area choices: every area, then each the band's maps are in, by its Map Mark, each a
  *  link to it, the one shown marked. */
 function drawAreas(areas: TrainingArea[], shown: string | null) {
@@ -206,7 +220,9 @@ function drawRow(row: TrainingRow): HTMLTableRowElement {
   else {
     const who = make("span", "lb-train-who", `${row.best.who} · `);
     who.append(make("span", "lb-train-date", row.best.date));
-    cell("lb-train-best", make("span", "lb-train-exp", row.best.expPerHour), who);
+    const exp = make("span", "lb-train-exp", row.best.expPerHour);
+    if (row.best.party) exp.append(partyMark());
+    cell("lb-train-best", exp, who);
   }
   if (row.entries === null) cell("lb-train-entries lb-train-none");
   else cell("lb-train-entries", row.entries);
@@ -231,6 +247,7 @@ function switchOnClick(event: MouseEvent, selector: string) {
   go(readTrainingLink(new URL(choice.href).search));
 }
 bandsNav.addEventListener("click", (event) => switchOnClick(event, "a.lb-band"));
+kindsNav.addEventListener("click", (event) => switchOnClick(event, "a.lb-kind"));
 areasNav.addEventListener("click", (event) => switchOnClick(event, "a.lb-area"));
 addEventListener("popstate", () => {
   link = readTrainingLink(location.search);

@@ -195,7 +195,7 @@ A Character's best Visits on a map that have ended (or the Unassigned ones), hig
 _Avoid_: runs, attempts, records
 
 **Map Leaderboard**:
-A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by EXP/h, ties going to whoever set it first. An entry is one Character's best Visit on the map in the band: its name, job, exact level, EXP/h and date. The site mirrors what the player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015). The Map Leaderboards page leads to them through Where to train, a search by name, and Latest, the 20 newest entries on every map (ADR 0024).
+A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by EXP/h, ties going to whoever set it first. An entry is one Character's best Visit of a kind on the map in the band, their Solo Best or their Party Best: its name, job, exact level, EXP/h, date and whether it is a Party Best. A page ranks each Character once by their higher entry, or only the Solo Bests or only the Party Bests (ADR 0015, amended); an entry from before the site told them apart is a Solo Best. The site mirrors what the player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015). The Map Leaderboards page leads to them through Where to train, a search by name, and Latest, the 20 newest entries on every map (ADR 0024).
 _Avoid_: leaderboard (alone), ranking, high scores, hiscores
 
 **Where to train**:

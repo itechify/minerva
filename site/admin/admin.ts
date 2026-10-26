@@ -55,7 +55,7 @@ async function loadReports() {
       words.append(make("strong", "", what), make("span", "", when));
       if (report.reason !== "") words.append(make("span", "account-reason", `“${report.reason}”`));
       const open = make("a", "button small secondary", "Open");
-      open.href = linkTo({ map: report.map, band: report.band, name: report.name });
+      open.href = linkTo({ map: report.map, band: report.band, name: report.name, kind: report.party ? "party" : "solo" });
       const dismiss = make("button", "button small secondary", "Dismiss");
       dismiss.type = "button";
       dismiss.title = "The report goes; the entry stays on the Map Leaderboard";
@@ -67,7 +67,8 @@ async function loadReports() {
       takeDown.type = "button";
       takeDown.title = "The entry and its reports go, and the same visit stays off until restored under Taken down";
       armed(takeDown, `Take ${report.name}'s entry down? Click again`, async () => {
-        const path = `/api/admin/entries/${encodeURIComponent(report.name)}/${report.map}/${report.band}`;
+        const kind = report.party ? "party" : "solo";
+        const path = `/api/admin/entries/${encodeURIComponent(report.name)}/${report.map}/${report.band}?kind=${kind}`;
         if ((await send(path, "DELETE")).status !== 204) line.textContent = UNREACHABLE;
         else await loadReports();
       });
@@ -100,7 +101,8 @@ async function loadRemoved() {
       restore.type = "button";
       restore.title = `${entry.name}'s next upload of this visit puts it back`;
       restore.addEventListener("click", async () => {
-        const path = `/api/admin/removed/${encodeURIComponent(entry.name)}/${entry.map}/${entry.band}/${entry.expPerHour}`;
+        const kind = entry.party ? "party" : "solo";
+        const path = `/api/admin/removed/${encodeURIComponent(entry.name)}/${entry.map}/${entry.band}/${entry.expPerHour}?kind=${kind}`;
         if ((await send(path, "DELETE")).status !== 204) line.textContent = UNREACHABLE;
         else await loadRemoved();
       });

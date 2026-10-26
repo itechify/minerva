@@ -3,7 +3,15 @@
 // the maps with entries first, in every area or one, by its Map Mark (ADR 0024).
 import { describe, expect, it } from "vitest";
 import type { MapMark, TrainingAnswer, TrainingMap } from "../../entries.ts";
-import { mapNames, readTrainingLink, trainingBands, trainingLinkTo, trainingTable, type TrainingLink } from "../leaderboards.ts";
+import {
+  mapNames,
+  readTrainingLink,
+  trainingBands,
+  trainingKinds,
+  trainingLinkTo,
+  trainingTable,
+  type TrainingLink,
+} from "../leaderboards.ts";
 import { NOW, OCT_3 } from "./common.ts";
 
 // Made-up maps, in the fixture's shape, and an Event map.
@@ -19,13 +27,13 @@ const names = mapNames([
 const HARBOR: MapMark = { id: "Rith", name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" };
 const CITY: MapMark = { id: "KerningCity", name: "Kerning City", picture: "https://osms.invalid/images/map_marks/KerningCity.png" };
 
-function map(id: string, mobs: [number, number] | null, mark: MapMark | null, best: number | null, entries = best === null ? 0 : 1): TrainingMap {
+function map(id: string, mobs: [number, number] | null, mark: MapMark | null, best: number | null, entries = best === null ? 0 : 1, party = false): TrainingMap {
   return {
     map: id,
     mobs,
     mark,
     entries,
-    best: best === null ? null : { name: "Bea", job: "Magician", level: 25, expPerHour: best, setAt: OCT_3 },
+    best: best === null ? null : { name: "Bea", job: "Magician", level: 25, expPerHour: best, setAt: OCT_3, party },
   };
 }
 
@@ -44,7 +52,7 @@ const BAND_20: TrainingAnswer = {
   ],
 };
 
-const LINK: TrainingLink = { band: 20, area: null };
+const LINK: TrainingLink = { band: 20, area: null, kind: null };
 
 function table(link: Partial<TrainingLink> = {}, answer = BAND_20, all = false) {
   return trainingTable(answer, names, { ...LINK, ...link }, NOW, { all });
@@ -58,18 +66,55 @@ function many(count: number): TrainingAnswer {
 
 describe("where to train's address", () => {
   it("names the band and the area, by its Map Mark", () => {
-    expect(readTrainingLink("?band=20&area=KerningCity")).toEqual({ band: 20, area: "KerningCity" });
-    expect(trainingLinkTo({ band: 20, area: "KerningCity" })).toBe("/leaderboards/?band=20&area=KerningCity");
+    expect(readTrainingLink("?band=20&area=KerningCity")).toEqual({ band: 20, area: "KerningCity", kind: null });
+    expect(trainingLinkTo({ band: 20, area: "KerningCity", kind: null })).toBe("/leaderboards/?band=20&area=KerningCity");
   });
 
   it("opens with no band, in every area, when it names neither", () => {
-    expect(readTrainingLink("")).toEqual({ band: null, area: null });
-    expect(trainingLinkTo({ band: null, area: null })).toBe("/leaderboards/");
+    expect(readTrainingLink("")).toEqual({ band: null, area: null, kind: null });
+    expect(trainingLinkTo({ band: null, area: null, kind: null })).toBe("/leaderboards/");
   });
 
   it("reads a level as the band holding it, and drops what can't be one", () => {
-    expect(readTrainingLink("?band=23&area=")).toEqual({ band: 20, area: null });
-    expect(readTrainingLink("?band=999&area=Kerning%20City")).toEqual({ band: null, area: null });
+    expect(readTrainingLink("?band=23&area=")).toEqual({ band: 20, area: null, kind: null });
+    expect(readTrainingLink("?band=999&area=Kerning%20City")).toEqual({ band: null, area: null, kind: null });
+  });
+});
+
+describe("where to train's kind of entries", () => {
+  it("may be named in the address, solo or party, and is kept by the bands' and areas' links", () => {
+    expect(readTrainingLink("?band=20&kind=party")).toEqual({ band: 20, area: null, kind: "party" });
+    expect(readTrainingLink("?band=20&kind=both")).toEqual({ band: 20, area: null, kind: null });
+    expect(trainingLinkTo({ band: 20, area: "Rith", kind: "solo" })).toBe("/leaderboards/?band=20&area=Rith&kind=solo");
+    expect(table({ kind: "party" }).areas[0].href).toBe("/leaderboards/?band=20&area=KerningCity&kind=party");
+    // A map's row opens its Map Leaderboard of the same kind.
+    expect(table({ kind: "party" }).rows[0].href).toBe("/leaderboards/map/?map=100000003&band=20&kind=party");
+  });
+
+  it("offers both, solo or party, each a link keeping the band and the area, the one shown marked", () => {
+    expect(trainingKinds({ band: 20, area: "Rith", kind: "party" })).toEqual([
+      { kind: null, label: "Both", href: "/leaderboards/?band=20&area=Rith", open: false },
+      { kind: "solo", label: "Solo", href: "/leaderboards/?band=20&area=Rith&kind=solo", open: false },
+      { kind: "party", label: "Party", href: "/leaderboards/?band=20&area=Rith&kind=party", open: true },
+    ]);
+  });
+
+  it("marks a #1 that is a Party Best", () => {
+    const answer = { ...BAND_20, maps: [map("100000003", [24, 28], CITY, 600_000, 1, true), map("100000000", [22, 27], HARBOR, 250_000)] };
+
+    expect(table({}, answer).rows.map((r) => [r.name, r.best?.party])).toEqual([
+      ["Party Field", true],
+      ["Pig Field", false],
+    ]);
+  });
+
+  it("says a kind in what it says of a band with no entries of it", () => {
+    const quiet = { ...BAND_20, maps: [map("100000001", [25, 29], HARBOR, null)] };
+
+    expect(table({ kind: "party" }, quiet).none?.text).toBe(
+      "No one at Lv 20–29 has put a party best on this map yet. Its mobs are at your level.",
+    );
+    expect(table({ kind: "solo" }, quiet).none?.text).toMatch(/has put a solo best on this map/);
   });
 });
 
@@ -82,7 +127,7 @@ describe("where to train's Level Bands", () => {
       ],
     };
 
-    expect(trainingBands(answer, { band: 20, area: "Rith" })).toEqual([
+    expect(trainingBands(answer, { band: 20, area: "Rith", kind: null })).toEqual([
       { band: 1, levels: "Lv 1–9", maps: "1 map", href: "/leaderboards/?band=1&area=Rith", open: false },
       { band: 20, levels: "Lv 20–29", maps: "24 maps", href: "/leaderboards/?band=20&area=Rith", open: true },
     ]);
@@ -97,7 +142,7 @@ describe("where to train's table", () => {
       mark: { name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" },
       href: "/leaderboards/map/?map=100000000&band=20",
       mobs: "Lv 22–27",
-      best: { expPerHour: "250,000", who: "Bea · Magician Lv 25", date: "3 Oct" },
+      best: { expPerHour: "250,000", who: "Bea · Magician Lv 25", date: "3 Oct", party: false },
       entries: "3 entries",
     });
   });
