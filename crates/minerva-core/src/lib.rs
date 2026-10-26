@@ -306,6 +306,9 @@ pub struct PanelState {
     /// Where on screen to capture for the Pickup Log (physical px), every
     /// [`PICKUP_LOG_CAPTURE_MS`] on a thread of its own (ADR 0026); `None` while it isn't read.
     pub pickup_log_capture: Option<ScreenRect>,
+    /// The UI Size the Status Bar measured, in thousandths, as the Pickup Log band was made
+    /// (ADR 0026): the log's lines are drawn at it. 0 while [`PanelState::pickup_log_capture`] is `None`.
+    pub pickup_log_ui_size_permille: u32,
     /// Reader stream identity. The capture thread resets its reader when this changes.
     pub pickup_log_generation: u64,
     /// One of our windows has been over the Pickup Log for more than a few seconds, so it can't
@@ -1717,7 +1720,10 @@ impl Minerva {
 
     /// Read a capture of [`PanelState::pickup_log_capture`] with the core's own
     /// [`PickupLogReader`] and update the panel state, as [`Minerva::on_pickup_log_read`].
-    pub fn on_pickup_log_capture(&mut self, capture: PickupLogCapture) -> &PanelState {
+    pub fn on_pickup_log_capture(&mut self, mut capture: PickupLogCapture) -> &PanelState {
+        if self.state.pickup_log_ui_size_permille != 0 {
+            capture.ui_size = self.state.pickup_log_ui_size_permille as f32 / 1000.0;
+        }
         let reading = self.pickup_log_reader.get_or_insert_with(PickupLogReader::bundled).read_avoiding(&capture, &self.state.our_windows);
         self.on_pickup_log_read(capture, reading)
     }
@@ -2454,12 +2460,15 @@ impl Minerva {
             ScreenRect { x: client.x, y: client.y + (client.height - height) as i32, width: client.width, height }
         });
         self.state.character = self.session.character().cloned();
-        let previous_pickup_capture = self.state.pickup_log_capture;
+        let previous_pickup_capture = (self.state.pickup_log_capture, self.state.pickup_log_ui_size_permille);
         self.state.pickup_log_capture = self.panel.game.as_ref()
             .filter(|_| shows && self.settings.grind_tracker_on)
             .zip(self.state.status_bar.as_ref().filter(|bar| bar.name.is_some()))
             .map(|(game, bar)| pickup_log::capture_band(game.client, bar.area));
-        if previous_pickup_capture != self.state.pickup_log_capture {
+        self.state.pickup_log_ui_size_permille = self.state.status_bar.as_ref()
+            .filter(|_| self.state.pickup_log_capture.is_some())
+            .map_or(0, |bar| pickup_log::ui_size_permille(bar.area));
+        if previous_pickup_capture != (self.state.pickup_log_capture, self.state.pickup_log_ui_size_permille) {
             self.reset_pickup_log();
         }
     }

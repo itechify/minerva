@@ -23,7 +23,7 @@ fn clip(name: &str, size: f32) -> Vec<PickupLine> {
         let at_ms = path.file_stem().unwrap().to_str().unwrap().parse().unwrap();
         let img = image::open(path).unwrap().to_rgba8();
         let img = if size == 1.0 { img } else { common::scaled(&img, size) };
-        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 } };
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: size };
         let reading = reader.read(&capture);
         assert!(reading.shift <= 6);
         assert!(reading.rows.iter().all(|&slot| slot < 6));
@@ -67,7 +67,7 @@ fn a_mob_covering_the_first_capture_after_reset_cannot_recount_pickups() {
     let capture = |sample: u64, at_ms| {
         let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{sample:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
-        PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 } }
+        PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 }
     };
     minerva.on_pickup_log_reading(reader.read(&capture(3000, 3000)));
     minerva.on_pickup_log_reading(reader.read(&capture(3300, 3300)));
@@ -77,7 +77,7 @@ fn a_mob_covering_the_first_capture_after_reset_cannot_recount_pickups() {
     // An opaque Mob hides every line on the first capture of the new stream.
     let mob = image::RgbaImage::from_pixel(325, 139, image::Rgba([80, 60, 40, 255]));
     minerva.on_pickup_log_reading(reader.read(&PickupLogCapture {
-        frame: common::frame(&mob, 3400), origin: ScreenPoint { x: 1590, y: 830 },
+        frame: common::frame(&mob, 3400), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0,
     }));
     minerva.on_pickup_log_reading(reader.read(&capture(3300, 3500)));
     assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 26);
@@ -164,7 +164,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
     for at_ms in [2000, 2800, 2900, 3000, 3100, 3200] {
         let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{at_ms:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
-        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 } };
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
         let ours = if at_ms == 2900 { vec![ScreenRect { x: 1590, y: 830, width: 325, height: 139 }] } else { vec![] };
         let reading = reader.read_avoiding(&capture, &ours);
         if at_ms == 2900 {
@@ -184,7 +184,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
     for at_ms in [3000, 3200, 3300] {
         let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{at_ms:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
-        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 } };
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
         let ours = if at_ms == 3200 { vec![ScreenRect { x: 1590, y: 830, width: 325, height: 139 }] } else { vec![] };
         let reading = reader.read_avoiding(&capture, &ours);
         if at_ms == 3000 {
@@ -207,7 +207,7 @@ fn first_sighting_is_a_baseline_even_after_an_apparently_empty_log() {
     for path in frames {
         let at_ms = path.file_stem().unwrap().to_str().unwrap().parse().unwrap();
         let img = image::open(path).unwrap().to_rgba8();
-        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 } };
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
         arrived.extend(reader.read(&capture).arrived);
     }
     // The first four lines cannot be distinguished from a previously covered log.
@@ -229,10 +229,122 @@ fn log_band_captures_count_mesos_on_the_panel_and_replay_without_pixels() {
         let mut pixels = image::RgbaImage::from_pixel(band.width, band.height, image::Rgba([0, 0, 0, 255]));
         image::imageops::replace(&mut pixels, &img, 1590 - band.x as i64, 830 - band.y as i64);
         let state = minerva
-            .on_pickup_log_capture(PickupLogCapture { frame: common::frame(&pixels, at_ms), origin: ScreenPoint { x: band.x, y: band.y } });
+            .on_pickup_log_capture(PickupLogCapture { frame: common::frame(&pixels, at_ms), origin: ScreenPoint { x: band.x, y: band.y }, ui_size: 1.0 });
         assert!(state.exp_tracking.pickups.mesos <= 26);
     }
     let recording = minerva_core::bug_report::read(&minerva.bug_report(&minerva_core::ReportAbout::default()).zip).unwrap();
     assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 26);
     assert_eq!(minerva_core::bug_report::replay(&recording, Some(common::osms::game().files())).divergence, None);
+}
+
+/// A whole 400×480 band at the bottom-right of a 1920×1200 client area (Bug Report 0.15.0,
+/// 2026-10-26 07:02), over rock, brick and cloud backgrounds, with the game's quickslots and Cash
+/// Shop button in its bottom-left. Its lines end at band x≈390 and the newest is at band y≈240.
+fn band_capture(path: &std::path::Path, at_ms: u64) -> PickupLogCapture {
+    let img = image::open(path).unwrap().to_rgba8();
+    assert_eq!(img.dimensions(), (400, 480));
+    PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 2198, y: 846 }, ui_size: 1.0 }
+}
+
+fn band_frames(kind: &str) -> Vec<std::path::PathBuf> {
+    common::pngs_in(common::samples_in("pickup-log-band"))
+        .into_iter()
+        .filter(|p| p.file_name().unwrap().to_str().unwrap().starts_with(kind))
+        .collect()
+}
+
+#[test]
+fn a_log_in_a_whole_band_is_never_found_anywhere_but_where_its_lines_are() {
+    let frames = band_frames("log--");
+    assert!(frames.len() >= 10);
+    for path in frames {
+        let reading = PickupLogReader::bundled().read(&band_capture(&path, 0));
+        // Faded lines on a bright background may not be found at all, but never elsewhere.
+        let (PickupLogSeen::Clear { area } | PickupLogSeen::Covered { area }) = reading.seen else { continue };
+        let (right, bottom) = (area.x + area.width as i32 - 2198, area.y + area.height as i32 - 846);
+        assert!((380..=396).contains(&right), "{path:?}: the log's right edge is at band x {right}");
+        assert!((238..=252).contains(&bottom), "{path:?}: the log's bottom is at band y {bottom}");
+    }
+}
+
+#[test]
+fn a_band_with_no_log_in_it_finds_none() {
+    let frames = band_frames("no-log--");
+    assert!(frames.len() >= 4);
+    for path in frames {
+        let reading = PickupLogReader::bundled().read(&band_capture(&path, 0));
+        assert_eq!(reading.seen, PickupLogSeen::Nothing, "{path:?}");
+    }
+}
+
+/// A `empty-to-pickups` frame (325×139, client (1590,830) in a 1920×1200 client area) placed
+/// where it was in a whole band, `up` px higher, over a band with no log in it.
+fn log_in_band(frame_ms: u64, background: &str, up: i64, at_ms: u64) -> PickupLogCapture {
+    let mut band = image::open(common::samples_in("pickup-log-band").join(background)).unwrap().to_rgba8();
+    let path = common::samples_in("pickup-log/empty-to-pickups").join(format!("{frame_ms:08}.png"));
+    image::imageops::replace(&mut band, &image::open(path).unwrap().to_rgba8(), 70, 110 - up);
+    PickupLogCapture { frame: common::frame(&band, at_ms), origin: ScreenPoint { x: 2198, y: 846 }, ui_size: 1.0 }
+}
+
+fn arrivals(reader: &mut PickupLogReader, captures: impl IntoIterator<Item = PickupLogCapture>) -> Vec<PickupLine> {
+    captures.into_iter().flat_map(|capture| reader.read(&capture).arrived).collect()
+}
+
+const CLIP_MS: [u64; 14] = [2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300];
+
+#[test]
+fn a_log_over_a_band_of_rock_is_found_and_counted() {
+    for background in ["no-log--222954.png", "no-log--224804.png", "no-log--244695.png"] {
+        let mut reader = PickupLogReader::bundled();
+        let captures = CLIP_MS.map(|ms| log_in_band(ms, background, 0, ms));
+        assert_eq!(arrivals(&mut reader, captures), vec![PickupLine::Mesos { amount: 26 }], "{background}");
+    }
+}
+
+#[test]
+fn a_band_that_looked_like_a_log_does_not_keep_the_real_one_from_being_found() {
+    // Bug Report 0.15.0, 2026-10-26: a frame with fading lines in it was read as a log at the
+    // rock's own right edge, and the real log, with fresh lines, was never looked for after.
+    let mut reader = PickupLogReader::bundled();
+    assert!(reader.read(&band_capture(&common::samples_in("pickup-log-band").join("log--229262.png"), 0)).arrived.is_empty());
+    let captures = CLIP_MS.map(|ms| log_in_band(ms, "no-log--244695.png", 0, 100 + ms));
+    assert_eq!(arrivals(&mut reader, captures), vec![PickupLine::Mesos { amount: 26 }]);
+}
+
+/// `capture` with its lines' text wiped but for their last glyphs: closing parentheses in a
+/// stack at the log's pitch, a lookalike with no line to read.
+fn wiped(mut capture: PickupLogCapture) -> PickupLogCapture {
+    let mut img = image::RgbaImage::from_raw(capture.frame.width, capture.frame.height, capture.frame.rgba).unwrap();
+    for y in 40..260 {
+        for x in 0..340 {
+            img.put_pixel(x, y, image::Rgba([150, 110, 60, 255]));
+        }
+    }
+    capture.frame = common::frame(&img, capture.frame.at_ms);
+    capture
+}
+
+#[test]
+fn a_stack_of_closing_parentheses_counts_nothing_until_a_line_in_it_reads() {
+    let mut reader = PickupLogReader::bundled();
+    for ms in CLIP_MS {
+        let reading = reader.read(&wiped(log_in_band(ms, "no-log--244695.png", 0, ms)));
+        assert_eq!(reading.seen, PickupLogSeen::Nothing, "{ms}");
+        assert!(reading.arrived.is_empty(), "{ms}");
+    }
+}
+
+#[test]
+fn a_lookalike_that_never_reads_is_dropped_and_the_real_log_is_found() {
+    let mut reader = PickupLogReader::bundled();
+    // A lookalike two lines higher than the real log, for four seconds.
+    for i in 0..40 {
+        let reading = reader.read(&wiped(log_in_band(CLIP_MS[i % CLIP_MS.len()], "no-log--244695.png", 2 * 22, i as u64 * 100)));
+        assert_eq!(reading.seen, PickupLogSeen::Nothing);
+    }
+    // The real log, still for four seconds, then the clip: its lines, all of them, are counted,
+    // the first four too, because the real log was followed from before they arrived.
+    let still = (0..40).map(|i| log_in_band(2000, "no-log--244695.png", 0, 4000 + i * 100));
+    let clip = CLIP_MS.map(|ms| log_in_band(ms, "no-log--244695.png", 0, 8000 + ms));
+    assert_eq!(arrivals(&mut reader, still.chain(clip)), truth("empty-to-pickups"));
 }

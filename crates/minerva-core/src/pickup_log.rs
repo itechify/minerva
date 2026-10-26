@@ -32,6 +32,17 @@ const CROP_TOP: u32 = STACK_TOP + CROP_MARGIN;
 const SEARCH_WIDTH: f32 = 400.0;
 const SEARCH_HEIGHT: f32 = 480.0;
 const STATUS_BAR_HEIGHT: f32 = 55.0;
+/// How far the lines' last pixel is from the client area's right edge, at the samples' size:
+/// 11 to 12 px in both recordings and the Bug Report that found textures instead (ADR 0026),
+/// and 6 px in the committed crops, which were cut a little inside it. The log is looked for
+/// only this close to the band's right edge, whatever is further left.
+const RIGHT_MARGIN: std::ops::RangeInclusive<f32> = 2.0..=16.0;
+/// How far a located layout's size may differ from the UI Size the Status Bar measured, as a
+/// share of it.
+const SIZE_TOLERANCE: f32 = 0.15;
+/// How long a located layout may go on without one of its rows reading as a known line kind
+/// before it is given up and searched for again (ms).
+const UNCONFIRMED_DROP_MS: u64 = 3000;
 
 /// The generous discovery band, anchored to the client's bottom-right and sized by the
 /// Status Bar. The reader measures the lines' own UI Size within it.
@@ -42,12 +53,22 @@ pub(crate) fn capture_band(client: ScreenRect, status_bar: ScreenRect) -> Screen
     ScreenRect { x: client.x + (client.width - width) as i32, y: client.y + (client.height - height) as i32, width, height }
 }
 
+/// The UI Size the Status Bar measured, in thousandths: what the band is sized by.
+pub(crate) fn ui_size_permille(status_bar: ScreenRect) -> u32 {
+    (status_bar.height as f32 * 1000.0 / STATUS_BAR_HEIGHT).round() as u32
+}
+
 /// A capture of the band of the client area the Pickup Log is looked for in.
 #[derive(Debug, Clone)]
 pub struct PickupLogCapture {
     pub frame: Frame,
     /// Where the frame's top-left pixel is on screen.
     pub origin: ScreenPoint,
+    /// The UI Size the Status Bar measured, as the band was made (ADR 0020): the log's lines
+    /// are drawn at it, and end a fixed small distance from the frame's right edge, which is
+    /// the client area's. It is [`PanelState::pickup_log_ui_size_permille`](crate::PanelState)
+    /// over 1000.
+    pub ui_size: f32,
 }
 
 /// What a Pickup Log capture reads as.
@@ -115,7 +136,13 @@ pub struct PickupLogReader {
     read: RememberedLines,
     previous: Option<Stack>,
     layout: Option<Layout>,
+    /// Whether one of the layout's rows has read as a known line kind: until one has, the layout
+    /// may be a lookalike, and nothing it shows is counted.
+    confirmed: bool,
+    /// When the layout was located, while it is unconfirmed.
+    located_at_ms: Option<u64>,
     dimensions: (u32, u32),
+    ui_size: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -153,7 +180,7 @@ impl std::fmt::Debug for PickupLogReader {
 impl PickupLogReader {
     /// A reader with the bundled recogniser.
     pub fn bundled() -> Self {
-        Self { recogniser: Recogniser::bundled(), read: RememberedLines::default(), previous: None, layout: None, dimensions: (0, 0) }
+        Self { recogniser: Recogniser::bundled(), read: RememberedLines::default(), previous: None, layout: None, confirmed: false, located_at_ms: None, dimensions: (0, 0), ui_size: 0.0 }
     }
 
     /// Read one capture, the next after the last one read.
@@ -164,6 +191,17 @@ impl PickupLogReader {
     /// Read screen pixels, leaving out our windows, as for the Minimap Title. A window
     /// touching the last known log skips the capture, preserving its last clean stack.
     pub fn read_avoiding(&mut self, capture: &PickupLogCapture, ours: &[ScreenRect]) -> PickupLogReading {
+        let reading = self.read_located(capture, ours);
+        // A layout none of whose rows has read as a known line kind may be a lookalike: it
+        // is followed, so its first arrivals are counted once it is confirmed, but it reports
+        // nothing until then, and a miss is dropped ([`Self::confirm`]).
+        if !self.confirmed && reading.seen != PickupLogSeen::Nothing {
+            return PickupLogReading { at_ms: reading.at_ms, seen: PickupLogSeen::Nothing, rows: Vec::new(), shift: 0, arrived: Vec::new(), chose: false, overflowed: false };
+        }
+        reading
+    }
+
+    fn read_located(&mut self, capture: &PickupLogCapture, ours: &[ScreenRect]) -> PickupLogReading {
         let mut reading = PickupLogReading {
             at_ms: capture.frame.at_ms,
             seen: PickupLogSeen::Nothing,
@@ -174,10 +212,10 @@ impl PickupLogReader {
             overflowed: false,
         };
         let Some(mut img) = frame_to_rgb(&capture.frame) else { return reading };
-        if self.dimensions != img.dimensions() {
-            self.previous = None;
-            self.layout = None;
+        if self.dimensions != img.dimensions() || self.ui_size != capture.ui_size {
+            self.reset();
             self.dimensions = img.dimensions();
+            self.ui_size = capture.ui_size;
         }
         if let Some(layout) = self.layout {
             let area = ScreenRect {
@@ -193,7 +231,8 @@ impl PickupLogReader {
         }
         crate::recogniser::blank(&mut img, capture.origin, ours);
         if self.layout.is_none() {
-            self.layout = locate_log(&img);
+            self.layout = locate_log(&img, capture.ui_size);
+            self.located_at_ms = self.layout.map(|_| capture.frame.at_ms);
         }
         let Some(layout) = self.layout else {
             // Until the log has been located, no lines could equally mean a Mob
@@ -216,6 +255,9 @@ impl PickupLogReader {
                 read_row(&at.img, right, top)
             })
             .collect::<Vec<_>>();
+        if !self.confirmed {
+            self.confirm(&rows, capture.frame.at_ms);
+        }
         if rows.iter().all(Option::is_none) {
             return reading;
         }
@@ -248,6 +290,22 @@ impl PickupLogReader {
         }
         self.previous = Some(current);
         reading
+    }
+
+    /// Whether a row of a located layout that isn't yet trusted reads as a known line kind. If
+    /// none has for [`UNCONFIRMED_DROP_MS`], the layout was a miss: it is dropped, to be
+    /// searched for again, so a lookalike is never kept.
+    fn confirm(&mut self, rows: &[Option<Row>], at_ms: u64) {
+        let readable = rows.iter().flatten().filter(|r| r.readable).collect::<Vec<_>>();
+        let inks = readable.iter().map(|r| r.ink.clone()).collect::<Vec<_>>();
+        let known = self.read.read(&self.recogniser, &inks, 3).into_iter().zip(&readable).any(|(text, r)| text.is_some_and(|t| parse(&t, r.yellow).is_some()));
+        if known {
+            self.confirmed = true;
+        } else if self.located_at_ms.is_some_and(|at| at_ms.saturating_sub(at) >= UNCONFIRMED_DROP_MS) {
+            self.previous = None;
+            self.layout = None;
+            self.located_at_ms = None;
+        }
     }
 
     fn read_arrivals(&mut self, rows: &[Option<Row>]) -> Vec<PickupLine> {
@@ -283,14 +341,18 @@ impl PickupLogReader {
     pub fn reset(&mut self) {
         self.previous = None;
         self.layout = None;
+        self.confirmed = false;
+        self.located_at_ms = None;
     }
 }
 
-/// Find the closing parenthesis shared by every right-aligned line. Its 17-row height
-/// measures UI Size even when there is only one line; the other parentheses confirm its
-/// 22-row pitch. No screen coordinate or Status Bar scale is used by the reader.
-fn locate_log(img: &RgbImage) -> Option<Layout> {
-    let (mask, ends) = closing_parentheses(img);
+/// Find the closing parenthesis shared by every right-aligned line, only within
+/// [`RIGHT_MARGIN`] of the frame's right edge and at `ui_size` (the Status Bar's): the log is
+/// drawn there, and a stack of lookalike shapes in the world behind it is not it (ADR 0026).
+/// The parenthesis's 17-row height is checked against that size even with only one line; the
+/// other parentheses confirm its 22-row pitch.
+fn locate_log(img: &RgbImage, ui_size: f32) -> Option<Layout> {
+    let (mask, ends) = closing_parentheses(img, ui_size);
     let mut ranked = ends.iter().map(|e| (ends.iter().filter(|other| aligned_with(e, other)).count(), e)).collect::<Vec<_>>();
     ranked.sort_by_key(|&(count, e)| std::cmp::Reverse((count, e.right)));
     // Only the strongest alignment hypotheses need scaling. A textured world can
@@ -299,13 +361,26 @@ fn locate_log(img: &RgbImage) -> Option<Layout> {
         .into_iter()
         .take(4)
         .filter_map(|(_, e)| refine_layout(img, &mask, &ends, e))
+        .filter(|(_, _, l)| fits(img, l, ui_size))
         .max_by_key(|(n, x, _)| (*n, *x))
         .map(|(_, _, l)| l)
 }
 
-fn closing_parentheses(img: &RgbImage) -> (RgbImage, Vec<Layout>) {
+/// Whether a layout's last pixel is within [`RIGHT_MARGIN`] of the frame's right edge and its
+/// size is near `ui_size`.
+fn fits(img: &RgbImage, layout: &Layout, ui_size: f32) -> bool {
+    let from_edge = (img.width() - 1).saturating_sub(layout.right) as f32 / ui_size;
+    RIGHT_MARGIN.contains(&from_edge) && (layout.size - ui_size).abs() <= SIZE_TOLERANCE * ui_size
+}
+
+fn closing_parentheses(img: &RgbImage, ui_size: f32) -> (RgbImage, Vec<Layout>) {
     let mut mask = RgbImage::new(img.width(), img.height());
+    // Only the columns the log's last glyphs can be in: the rest is the world.
+    let from = img.width().saturating_sub(((RIGHT_MARGIN.end() + 12.0) * ui_size).ceil() as u32);
     for (x, y, p) in img.enumerate_pixels() {
+        if x < from {
+            continue;
+        }
         let [r, g, b] = p.0;
         let neutral = r.abs_diff(g) < 28 && r.abs_diff(b) < 35;
         let yellow = r.abs_diff(g) < 28 && (b as f32) < r as f32 * 0.6;
@@ -313,7 +388,7 @@ fn closing_parentheses(img: &RgbImage) -> (RgbImage, Vec<Layout>) {
             mask.put_pixel(x, y, image::Rgb([255; 3]));
         }
     }
-    let candidates = components(&mask, 0..img.width(), 0..img.height(), |p| (p[0] != 0).then_some(1.0));
+    let candidates = components(&mask, from..img.width(), 0..img.height(), |p| (p[0] != 0).then_some(1.0));
     let mut ends = Vec::new();
     for c in candidates {
         if !(8..=42).contains(&c.h()) || !(0.16..=0.45).contains(&(c.w() as f32 / c.h() as f32)) {
@@ -330,7 +405,10 @@ fn closing_parentheses(img: &RgbImage) -> (RgbImage, Vec<Layout>) {
         if shadow < (c.h() / 4) as usize {
             continue;
         }
-        ends.push(Layout { right: x, bottom: c.y1 - 1, size });
+        let layout = Layout { right: x, bottom: c.y1 - 1, size };
+        if fits(img, &layout, ui_size) {
+            ends.push(layout);
+        }
     }
     (mask, ends)
 }

@@ -59,7 +59,7 @@ fn a_reading_and_a_stale_capture_are_recorded_and_replay_without_pixels() {
     assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 1_234);
     minerva.on_foreground(Foreground::OtherApp);
     let img = image::RgbaImage::new(region.width, region.height);
-    let capture = PickupLogCapture { frame: common::frame(&img, 300), origin: ScreenPoint { x: region.x, y: region.y } };
+    let capture = PickupLogCapture { frame: common::frame(&img, 300), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
     minerva.on_pickup_log_read(capture, PickupLogReading { at_ms: 300, ..reading });
     assert_eq!(minerva.panel_state().pickup_log_capture, None);
     assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 1_234);
@@ -95,7 +95,7 @@ fn reports_keep_only_ambiguous_missing_and_unreadable_log_crops() {
         if at_ms % 100 != 0 {
             continue;
         }
-        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y } };
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
         let seen = if [400, 500].contains(&at_ms) { PickupLogSeen::Nothing } else { PickupLogSeen::Clear { area: region } };
         let arrived = if at_ms == 600 { vec![PickupLine::Unreadable] } else { vec![] };
         minerva.on_pickup_log_read(
@@ -116,7 +116,7 @@ fn a_window_before_the_log_is_found_does_not_make_an_empty_capture_interesting()
     let region = minerva.panel_state().pickup_log_capture.unwrap();
     let img = image::RgbaImage::new(region.width, region.height);
     for (at_ms, seen) in [(200, PickupLogSeen::Covered { area: region }), (300, PickupLogSeen::Nothing)] {
-        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y } };
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
         minerva.on_pickup_log_read(
             capture,
             common::pickup_reading(at_ms, seen, vec![]),

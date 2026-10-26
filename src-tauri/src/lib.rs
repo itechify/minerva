@@ -710,6 +710,7 @@ impl ReaderThread {
 #[derive(Clone, PartialEq, Eq)]
 struct PickupLogTarget {
     region: ScreenRect,
+    ui_size_permille: u32,
     ours: Vec<ScreenRect>,
     generation: u64,
 }
@@ -754,7 +755,11 @@ impl PickupLogThread {
                     Ok(frame) => frame,
                     Err(e) => { error!("Pickup Log capture failed: {e}"); continue; }
                 };
-                let capture = PickupLogCapture { frame, origin: ScreenPoint { x: target.region.x, y: target.region.y } };
+                let capture = PickupLogCapture {
+                    frame,
+                    origin: ScreenPoint { x: target.region.x, y: target.region.y },
+                    ui_size: target.ui_size_permille as f32 / 1000.0,
+                };
                 let reading = reader.read_avoiding(&capture, &target.ours);
                 if commands.send(Command::ReadPickupLog { capture: Box::new(capture), reading }).is_err() { return; }
             }
@@ -764,7 +769,7 @@ impl PickupLogThread {
 
     fn follow(&mut self, state: &PanelState) {
         let target = state.pickup_log_capture.map(|region| PickupLogTarget {
-            region, ours: state.our_windows.clone(),
+            region, ui_size_permille: state.pickup_log_ui_size_permille, ours: state.our_windows.clone(),
             generation: state.pickup_log_generation,
         });
         if target != self.last {

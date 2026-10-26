@@ -32,10 +32,22 @@ band at client (1590,830) in both recordings, checked against the source frames.
 2026-10-25 recording was captured at client (1400,730), 520×260: the committed clips
 start at (190,100) within it. The 2026-10-07 recording was captured at client
 (1560,780), 355×220: the clips start at (30,50) within it. The closing parentheses and six
-22 px slots are kept; no game window size or log position is supplied to the reader.
+22 px slots are kept, and the lines end 6 px inside the clip's right edge (11 to 12 px in the game's); the reader is given the UI Size only, never a log position.
 Each clip must count only its arrivals, never more. An unlocated empty baseline cannot
 prove the log is empty: the first located stack establishes the baseline, so those first
 lines may be missed. At other UI Sizes it may read fewer, never another line (`tests/pickup_log_samples.rs`). The `covered` clip has another player's
 entire name plate painted black in frames 6600–7200, including its border. All other clips
 contain no player names. A Bug Report's `crops/pickup-log-<ms>.png` belongs in a short
 sequence showing the frame before and after the problem, with the same privacy rule.
+
+## `pickup-log-band`
+
+Whole 400×480 captures of the Pickup Log's band, as `PanelState::pickup_log_capture` asks for it
+at the samples' UI Size on a 1920×1200 client area, from the Bug Report of 0.15.0 at 2026-10-26
+07:02 (Perion, Deep Valley and Perion Dungeon Entrance: rock, brick and cloud backgrounds, with
+the game's quickslots and Cash Shop button in the band's bottom-left). Named `<kind>--<capture ms>.png`:
+`log--` shows lines of the Pickup Log (fading, covered by Mobs, or fresh), `no-log--` shows none.
+Lines end at band x≈390 and the newest is at band y≈240. A `log--` frame is never found anywhere
+else, and a `no-log--` one finds none (`tests/pickup_log_samples.rs`). The only name in them is the
+maintainer's own Character's, `Egbert`; a fragment of another name above it in `log--238612` is
+painted over.
