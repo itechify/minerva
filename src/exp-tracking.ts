@@ -46,6 +46,18 @@ export type ExpTracking = {
   /** Unreadable because the game's Status Bar isn't found, so there is nowhere to read the
    *  EXP figures. */
   noStatusBar: boolean;
+  /** What the Pickup Log says the Session picked up. */
+  pickups: Pickups;
+};
+
+/** Mirror of `minerva_core::Pickups`: read from the Pickup Log, so possibly fewer than were
+ *  picked up, never more. */
+export type Pickups = {
+  /** The Session's mesos, as they arrive. */
+  mesos: number;
+  /** Mesos an hour over the Session's active time, held with the other figures; none until
+   *  the Session has active time. */
+  mesosPerHour: number | null;
 };
 
 /** Mirror of `minerva_core::PacePoint`: active time before the last EXP change, and the

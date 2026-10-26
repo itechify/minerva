@@ -642,6 +642,7 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
             "forecast": [],
             "lostFromHundredths": null,
             "noStatusBar": false,
+            "pickups": { "mesos": 0, "mesosPerHour": null },
         })
     );
 
@@ -676,6 +677,7 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
             ],
             "lostFromHundredths": null,
             "noStatusBar": false,
+            "pickups": { "mesos": 0, "mesosPerHour": 0 },
         })
     );
     let died = serde_json::to_value(read(&mut minerva, 75 * S, 266, 633)).unwrap();

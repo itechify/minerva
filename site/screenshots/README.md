@@ -40,7 +40,9 @@ When a change alters something a shot shows, the PR that makes it lists the shot
 
 - `item-lookup.png`: Item Lookup's alert is now the owl saying it in a speech bubble (ADR 0025). Retaken, the table's row and the home page's alt text say the owl in place of the alert.
 
+- `grind-tracker.png`: the Grind Tracker has a Meso row under its rates ("Mesos", the Session's mesos and mesos per hour, with a ? help icon beside the label). Retake it from a Session with some mesos picked up, and add the row to the table's row and the home page's alt text. `game-window.png` shows the Grind Tracker too: retake it with the row there (see below).
+
 A release may go out without retaking them. Then the page shows `wip.png` in place of each shot too far out of date to show, and the shot stays listed. None does now. Retaking one means pointing its `<img>` back at its own file (a scene from the game, as the Item Card's, on its own stage again: `shot stage scene`, where the sign stood on the panel's), and writing its alt text afresh, from what it shows and the entries below.
 
 - `map.png`: the Mobs section's figures show down the right edge of the card, past the panel's edge beside it ("hare", "2%", "30%"). Retake it with the Mobs section folded, so only the Map section and the card show.
-- `game-window.png`: the hero's film (`site/reel.ts`) no longer shows the title being marked: Minerva's box appears around the minimap's title by itself, with no veil. A retake that moves the minimap's title means setting `FOUND` at the top of `site/reel.ts`.
+- `game-window.png`: the hero's film (`site/reel.ts`) no longer shows the title being marked: Minerva's box appears around the minimap's title by itself, with no veil. A retake that moves the minimap's title means setting `FOUND` at the top of `site/reel.ts`. The Grind Tracker in it gains a Meso row once its Session has started, so retake it from a Session with some mesos picked up.

@@ -34,6 +34,8 @@ struct TrackerView<'a> {
     personal_bests: bool,
     /// The Personal Bests window is open: that button shows as on.
     personal_bests_open: bool,
+    /// One of our windows has been over the Pickup Log for a while: the window says so.
+    pickup_log_covered: bool,
 }
 
 /// Show the window where the core says, or nothing; and send its page the Grind Tracker's
@@ -46,6 +48,7 @@ pub fn sync(window: &mut PanelWindow, state: &PanelState) {
         character: state.character.as_ref(),
         personal_bests: state.grind_tracker.personal_bests,
         personal_bests_open: state.personal_bests.open,
+        pickup_log_covered: state.pickup_log_covered,
     };
     window.sync(&view, Shows { placement, clickable: placement.is_some(), takes_keyboard: false });
 }
