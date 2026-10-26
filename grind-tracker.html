@@ -80,13 +80,25 @@
               <!-- The mesos the Pickup Log says the Session has picked up, and mesos an hour,
                    laid out as the rows above are but without their units: the label says what
                    the first figure is, the "/h" what the second. The help beside the label
-                   (added by the script) says where they are read from and why they can be low.
-                   The Item tally comes later, from the same log. -->
+                   (added by the script) says where they are read from and why they can be low. -->
               <div class="row" id="meso-row" hidden>
                 <span class="period" id="meso-period">Mesos</span>
                 <span class="value" id="meso-total"></span><span class="unit"></span>
                 <span class="value" id="meso-rate"></span><span class="unit per">/h</span>
               </div>
+            </div>
+            <!-- The rest of the Pickups, under the Meso row: the Items the Pickup Log says the
+                 Session picked up. Collapsed to its header at first, with the Items' count on
+                 it; open, the 5 picked up most, each with its count, and "+N more" for the rest.
+                 It stays as the player left it across launches. No rate: Items aren't per hour. -->
+            <div class="pickups" id="pickups" hidden>
+              <button type="button" class="pickups-head" id="pickups-head" data-control="togglePickups" aria-expanded="false" aria-controls="pickups-items">
+                <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l5 5-5 5" /></svg>
+                <span class="label">Pickups</span>
+                <span class="count" id="pickups-count"></span>
+              </button>
+              <ul class="pickups-items" id="pickups-items" hidden></ul>
+              <button type="button" class="pickups-more" id="pickups-more" hidden></button>
             </div>
             <!-- The Pace Trace: the last 5 minutes of play up to the last EXP gain, raced
                  against the 5 minutes before them, as split times against a ghost. The flat

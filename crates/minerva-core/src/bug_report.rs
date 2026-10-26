@@ -138,6 +138,12 @@ pub enum Note {
     Unseen,
     /// The panel confirmed another map: a new Visit.
     Visit,
+    /// An Item line's name, cut short by the game, starts more than one Item's name (within
+    /// its tab): tallied as the game shows it, `name`.
+    ItemCutShort { name: String },
+    /// An Item line's name, `name`, matches no Item in OSMS's files, and has been read on
+    /// `lines` lines so far: not tallied before the second.
+    ItemUnmatched { name: String, lines: u32 },
 }
 
 /// An input the core took in, or something written down beside them.
@@ -2013,6 +2019,10 @@ impl Note {
             }
             Note::Unseen => "the bar went unread over 2 minutes: taken without counting the change".to_string(),
             Note::Visit => "a new Visit".to_string(),
+            Note::ItemCutShort { name } => format!("Pickup Log item {name:?} starts more than one item's name: tallied as shown"),
+            Note::ItemUnmatched { name, lines } => {
+                format!("Pickup Log item {name:?} matches no item, read on {lines} line(s): tallied from the second")
+            }
         }
     }
 }

@@ -69,6 +69,7 @@
 
 use crate::ExpBar;
 use crate::bug_report::{Level, Note};
+use crate::pickup_items::{ItemTally, Named, PickedItem};
 use crate::personal_best::{Bests, SavedBests, Stamp, VisitBest};
 use crate::pickup_log::{PickupLine, PickupLogReading};
 use crate::status_bar::StatusBar;
@@ -164,8 +165,8 @@ pub struct ExpTracking {
 }
 
 /// The Pickups (GLOSSARY) of the Session so far: read from the Pickup Log, so they may be
-/// fewer than were picked up, never more (ADR 0026). Only mesos for now.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+/// fewer than were picked up, never more (ADR 0026): the mesos, and the Items by name.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Pickups {
     /// The mesos picked up since the Session started, as they arrive.
@@ -173,6 +174,11 @@ pub struct Pickups {
     /// Mesos an hour over the Session's active time, held with the other figures. `None`
     /// until the Session has some active time.
     pub mesos_per_hour: Option<u64>,
+    /// The Items picked up since the Session started, the most picked up first (#171). No
+    /// per-hour figure for them.
+    pub items: Vec<PickedItem>,
+    /// How many Items in all, whichever they are: the Pickups header's count.
+    pub items_total: u64,
 }
 
 /// The EXP Split (GLOSSARY): the shares of the Session's EXP that were the player's own and
@@ -626,6 +632,8 @@ struct Figures {
     mesos: u64,
     /// The Pickup Log's EXP lines this Session.
     play: PartyPlay,
+    /// The Items it has said were picked up since the start.
+    items: ItemTally,
 }
 
 impl Figures {
@@ -643,6 +651,7 @@ impl Figures {
             best_from: 0,
             mesos: 0,
             play: PartyPlay::default(),
+            items: ItemTally::default(),
         }
     }
 
@@ -1072,11 +1081,12 @@ impl Session {
         self.shown = None;
     }
 
-    /// The Pickup Log said `lines` arrived, in a clean capture at `at_ms`. Mesos are counted
-    /// once the Session has started (the first EXP change starts it, from the EXP the bar shows
-    /// then). They are play, so they keep the Session from pausing, as an EXP change does;
-    /// they are not an EXP change, so they leave the Pace Trace alone.
-    pub fn on_pickups(&mut self, lines: &[PickupLine], at_ms: u64) {
+    /// The Pickup Log said `lines` arrived, in a clean capture at `at_ms`, and `items` are its
+    /// Item lines, named. Mesos and Items are counted once the Session has started (the first
+    /// EXP change starts it, from the EXP the bar shows then). Mesos are play, so they keep the
+    /// Session from pausing, as an EXP change does; they are not an EXP change, so they leave
+    /// the Pace Trace alone. Items are counted with the Session and are not play.
+    pub fn on_pickups(&mut self, lines: &[PickupLine], items: Vec<(Named, u32)>, at_ms: u64) {
         self.tick(at_ms);
         let Some(figures) = &mut self.figures else { return };
         let mut mesos = lines.iter().filter_map(|line| match line {
@@ -1086,6 +1096,9 @@ impl Session {
         if let Some(first) = mesos.next() {
             figures.mesos = mesos.fold(figures.mesos.saturating_add(first), u64::saturating_add);
             figures.play(at_ms);
+        }
+        for (named, quantity) in items {
+            figures.items.add(named, quantity, &mut self.notes);
         }
     }
 
@@ -1333,7 +1346,12 @@ impl Session {
             forecast: forecast(self.last, held.rolling),
             lost_from_hundredths: self.lost_from.filter(|&p| self.last.is_some_and(|bar| bar.percent_hundredths < p)),
             // The mesos as they arrive, like the bar; their rate holds with the figures.
-            pickups: Pickups { mesos: self.figures.as_ref().map_or(0, |f| f.mesos), ..held.pickups },
+            pickups: Pickups {
+                mesos: self.figures.as_ref().map_or(0, |f| f.mesos),
+                items: self.figures.as_ref().map_or_else(Vec::new, |f| f.items.items()),
+                items_total: self.figures.as_ref().map_or(0, |f| f.items.total()),
+                ..held.pickups
+            },
             exp_split: self.exp_split(),
             ..held
         }
@@ -1457,6 +1475,8 @@ impl Session {
                 mesos: figures.mesos,
                 mesos_per_hour: (average.over_ms > 0)
                     .then(|| div_round(i128::from(figures.mesos) * i128::from(HOUR_MS), i128::from(average.over_ms)) as u64),
+                items: figures.items.items(),
+                items_total: figures.items.total(),
             },
             exp_split: None,
         }
