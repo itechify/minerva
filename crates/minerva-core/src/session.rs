@@ -22,10 +22,13 @@
 //!   allows a wide range of totals); when the bar went from near 100% to as near 0%, it
 //!   is a level-up all the same.
 //! - The Session starts on the first EXP change, from the EXP the bar shows then.
-//! - Active time runs while the EXP keeps changing. A gap of up to [`IDLE_MS`] between
-//!   changes counts; a longer one is a break, which pauses the Session and counts for
-//!   nothing, from the last change to the next, so the rates hold while paused. Once
-//!   the Session has warmed up it stays so, breaks or not.
+//! - Active time runs while the player plays: the EXP keeps changing, or the Pickup Log says
+//!   mesos were picked up (they leave the Pace Trace alone). A gap of up to [`IDLE_MS`]
+//!   between one and the next counts; a longer one is a break, which pauses the Session
+//!   and counts for nothing, from the last to the next, so the rates hold while paused.
+//!   Once the Session has warmed up it stays so, breaks or not.
+//! - The Session's mesos are those the Pickup Log says arrived since the Session started
+//!   (not before the first EXP change), cleared with it; mesos an hour is over its active time.
 //! - A bar that can't be read isn't a break: nothing is known of the EXP then. Once it
 //!   has gone [`UNREADABLE_MS`] without reading whole the Session says so, its figures
 //!   held. If it reads again within [`IDLE_MS`] of the last whole reading, the stretch
@@ -239,9 +242,10 @@ pub enum TrackingState {
     Waiting,
     /// The first [`WARM_UP_MS`] of active time: the rates are still jumpy.
     WarmingUp,
-    /// Warmed up (once is enough), and the EXP changed within the last [`IDLE_MS`].
+    /// Warmed up (once is enough), and the EXP changed or mesos were picked up within the last
+    /// [`IDLE_MS`].
     Active,
-    /// No EXP change for more than [`IDLE_MS`]: the rates hold until the next change.
+    /// No EXP change nor mesos for more than [`IDLE_MS`]: the rates hold until the next.
     Paused,
     /// The EXP bar hasn't read whole for [`UNREADABLE_MS`]: something covers it, or the
     /// Status Bar isn't found. Whatever the Session was doing, its figures hold until the
