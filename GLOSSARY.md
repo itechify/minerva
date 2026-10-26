@@ -171,7 +171,7 @@ The EXP the Pickup Log says came from being in a party: a share of a partymate's
 _Avoid_: shared EXP, group EXP, bonus EXP (only part of it)
 
 **EXP Split**:
-How much of the Session's EXP was the player's own and how much was Party EXP, as shares of what the EXP bar gained, drawn in two colours under the Grind Tracker's Session rate once Party EXP has come in.
+How much of the Session's EXP was the player's own and how much was Party EXP, as shares of what the EXP bar gained, given on hovering the Grind Tracker's Session EXP/h once Party EXP has come in.
 _Avoid_: EXP breakdown, EXP sources
 
 **Level Band**:

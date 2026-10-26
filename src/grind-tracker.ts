@@ -48,9 +48,6 @@ const mesoTotal = byId("meso-total");
 const mesoRate = byId("meso-rate");
 const pickupCovered = byId("tracking-pickup-covered");
 const bestParty = byId("best-party");
-const expSplit = byId("exp-split");
-const splitOwn = byId("split-own");
-const splitParty = byId("split-party");
 const loot = byId("loot");
 const lootHead = byId("loot-head");
 const lootBody = byId("loot-body");
@@ -199,16 +196,13 @@ function render(view: TrackerView) {
   bestThisVisit.hidden = !t.personalBestThisVisit;
   // Racing the Party Best, while Party EXP is in the last 5 minutes: a small party mark.
   bestParty.toggleAttribute("hidden", !t.personalBestParty);
-  // The EXP Split, once Party EXP has come in this Session: two colours in proportion, and
-  // the shares on hover.
-  expSplit.hidden = sessionRow.hidden || t.expSplit === null;
+  // The EXP Split, once Party EXP has come in this Session: the shares, on hovering the
+  // Session's EXP/h.
   if (t.expSplit) {
     const { ownHundredths: own, partyHundredths: party } = t.expSplit;
-    splitOwn.style.flexGrow = String(own);
-    splitParty.style.flexGrow = String(party);
-    const shares = `Your own EXP ${percent(own, 0)} of the Session's, Party EXP ${percent(party, 0)}`;
-    expSplit.title = shares;
-    expSplit.setAttribute("aria-label", shares);
+    sessionExp.title = `${percent(party, 0)} of this Session's EXP came from your party, ${percent(own, 0)} from your own kills`;
+  } else {
+    sessionExp.removeAttribute("title");
   }
 
   // The Session's Loot from the Pickup Log, once it has started, even at none; the mesos' rate
