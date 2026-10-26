@@ -200,7 +200,7 @@ function render(view: TrackerView) {
   bestParty.toggleAttribute("hidden", !t.personalBestParty);
   // The EXP Split, once Party EXP has come in this Session: two colours in proportion, and
   // the shares on hover.
-  expSplit.hidden = t.expSplit === null;
+  expSplit.hidden = sessionRow.hidden || t.expSplit === null;
   if (t.expSplit) {
     const { ownHundredths: own, partyHundredths: party } = t.expSplit;
     splitOwn.style.flexGrow = String(own);

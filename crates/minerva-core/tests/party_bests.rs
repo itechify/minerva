@@ -155,6 +155,28 @@ fn the_exp_split_shows_once_party_exp_has_come_in_this_session_with_the_shares()
 }
 
 #[test]
+fn party_exp_before_the_session_starts_waits_to_show_the_split() {
+    let mut minerva = tracking();
+    common::read(&mut minerva, 0, 160, 381);
+    let waiting = minerva.on_pickup_log_reading(reading(100, party_kill(20, 5)));
+    assert_eq!(waiting.exp_tracking.exp_split, None);
+    let started = common::read(&mut minerva, 1000, 266, 633);
+    assert_eq!(started.exp_tracking.exp_split, Some(ExpSplit { own_hundredths: 0, party_hundredths: 10_000 }));
+}
+
+#[test]
+fn removing_the_solo_best_keeps_the_party_window_counting() {
+    let mut player = alone_on_sunset_sky();
+    hunt_partied(&mut player, 6 * MIN, 20);
+    let solo = player.minerva.bests().unassigned[0].visits.iter().find(|v| !v.party).unwrap().clone();
+    player.minerva.remove_visit(None, SUNSET_SKY_ID, &solo);
+    let state = hunt_partied(&mut player, 30 * S, 30);
+    assert_eq!(state.exp_tracking.personal_best, Some(7560));
+    assert!(state.exp_tracking.new_best);
+    assert_eq!(kept(&player.minerva, SUNSET_SKY_ID), [(7560, true)]);
+}
+
+#[test]
 fn a_reading_that_saw_nothing_or_was_covered_changes_nothing() {
     let mut player = Player::clocked(tracking());
     player.arrive(SUNSET_SAMPLE);

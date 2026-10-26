@@ -627,7 +627,7 @@ struct Figures {
     /// Active time from which the Visit's Personal Best counts: when the Visit started, or
     /// when the player last removed this Visit's best, if later, so the play that set it
     /// isn't counted again.
-    best_from: u64,
+    best_from: [u64; 2],
     /// The mesos the Pickup Log has said were picked up since the start.
     mesos: u64,
     /// The Pickup Log's EXP lines this Session.
@@ -648,7 +648,7 @@ impl Figures {
             deaths: Deaths::default(),
             warmed_up: false,
             visit_from: 0,
-            best_from: 0,
+            best_from: [0; 2],
             mesos: 0,
             play: PartyPlay::default(),
             items: ItemTally::default(),
@@ -658,7 +658,7 @@ impl Figures {
     /// A Visit started at active time `at`: its share and its best count from then.
     fn start_visit(&mut self, at: u64) {
         self.visit_from = at;
-        self.best_from = at;
+        self.best_from = [at; 2];
     }
 
     /// Whether the Session has warmed up by `now`.
@@ -1139,7 +1139,7 @@ impl Session {
             let now = self.now;
             let undone = self.undo.as_mut().map(|undo| &mut undo.figures);
             for figures in self.figures.iter_mut().chain(undone) {
-                figures.best_from = figures.active(now);
+                figures.best_from[usize::from(party)] = figures.active(now);
             }
         }
         removed
@@ -1240,7 +1240,7 @@ impl Session {
 
     /// The EXP Split as it stands: `None` until Party EXP has come in this Session.
     fn exp_split(&self) -> Option<ExpSplit> {
-        self.figures.as_ref().map_or(&self.before_start, |figures| &figures.play).split()
+        self.figures.as_ref().and_then(|figures| figures.play.split())
     }
 
     /// Time passed without a reading.
@@ -1319,7 +1319,7 @@ impl Session {
                 if let Some(map) = map {
                     // The Rolling Rate shown over a full 5 minutes of active play here
                     // counts towards this Visit's best, unless nothing is known of the EXP.
-                    let here = self.figures.as_ref().map(|f| f.rolling_since(self.now, f.best_from));
+                    let here = self.figures.as_ref().map(|f| f.rolling_since(self.now, f.best_from[usize::from(party)]));
                     let full = here.filter(|h| h.over_ms >= ROLLING_MS && h.exp > 0);
                     let counted = full.filter(|_| !unreadable).map(|here| here.per_hour(1, 1) as u64);
                     self.bests.on_shown(map, counted, party, now_unix_ms, &self.stamp());
