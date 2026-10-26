@@ -336,9 +336,9 @@ fn closing_parentheses(img: &RgbImage) -> (RgbImage, Vec<Layout>) {
 }
 
 fn aligned_with(e: &Layout, other: &Layout) -> bool {
-        let pitch = ROW_PITCH as f32 * e.size;
-        let dy = other.bottom.abs_diff(e.bottom) as f32;
-        other.right.abs_diff(e.right) <= 2 && (other.size - e.size).abs() < 0.1 && (dy / pitch - (dy / pitch).round()).abs() < 0.1
+    let pitch = ROW_PITCH as f32 * e.size;
+    let dy = other.bottom.abs_diff(e.bottom) as f32;
+    other.right.abs_diff(e.right) <= 2 && (other.size - e.size).abs() < 0.1 && (dy / pitch - (dy / pitch).round()).abs() < 0.1
 }
 
 fn refine_layout(img: &RgbImage, mask: &RgbImage, ends: &[Layout], e: &Layout) -> Option<(usize, u32, Layout)> {

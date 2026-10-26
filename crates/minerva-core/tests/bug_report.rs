@@ -10,7 +10,7 @@ use common::osms;
 use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame, HOUR, S, MIN, percent};
 use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES, MAX_TEXT_AND_CROPS_BYTES};
 use minerva_core::{
-    ListedPrice, ScrollTier, ShopCapture, ShopHover, ShopList, ShopNearMiss, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarNearMiss, StatusBarReading,
+    ListedPrice, ScrollTier, ShopCapture, ShopHover, ShopList, ShopNearMiss, Verdict, ShopReading, ShopRow, StatusBarCapture, StatusBarNearMiss, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, DiscordLinkAnswer, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, STATUS_BAR_STRIP, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,

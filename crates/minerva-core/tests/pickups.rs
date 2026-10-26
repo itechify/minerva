@@ -159,8 +159,7 @@ fn switching_character_clears_the_mesos_with_the_session() {
     for at in [0, 1, 2] {
         named(&mut minerva, at * S, "Egbert");
     }
-    read(&mut minerva, 3 * S, 160, 381);
-    read(&mut minerva, 10 * S, 266, 633);
+    common::start_session(&mut minerva, 3 * S, 10 * S);
     let before = picked_up(&mut minerva, 11 * S, vec![mesos(1_500)]);
     assert_eq!(before.exp_tracking.pickups.mesos, 1_500);
 
@@ -247,8 +246,7 @@ fn the_note_goes_as_soon_as_the_window_is_off_the_log() {
 #[test]
 fn there_is_no_rate_before_the_session_has_active_time() {
     let mut minerva = tracking();
-    read(&mut minerva, 0, 160, 381);
-    let state = read(&mut minerva, 10 * S, 266, 633);
+    let state = common::start_session(&mut minerva, 0, 10 * S);
 
     assert_eq!(state.exp_tracking.pickups.mesos_per_hour, None);
 }

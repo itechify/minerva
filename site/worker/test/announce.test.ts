@@ -76,6 +76,10 @@ describe("taken top spots", () => {
     expect(takenTops([], [top(QUIET, 20, "Hakuo", 90_000)], "hakuo")).toEqual([]);
   });
 
+  it("is not the first Party entry when only the solo board had a holder", () => {
+    expect(takenTops([top(QUIET, 20, "Egbert", 80_000)], [top(QUIET, 20, "Hakuo", 90_000, true)], "hakuo")).toEqual([]);
+  });
+
   it("is not a Character beating its own best", () => {
     const before = [top(QUIET, 20, "Hakuo", 80_000)];
     const after = [top(QUIET, 20, "Hakuo", 90_000)];

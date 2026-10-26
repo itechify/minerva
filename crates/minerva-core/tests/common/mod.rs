@@ -613,9 +613,9 @@ pub fn picked_up(minerva: &mut Minerva, at_ms: u64, lines: Vec<minerva_core::Pic
 }
 
 /// Start the usual made-up Session by changing the EXP bar from 160 to 266.
-pub fn start_session(minerva: &mut Minerva, baseline_ms: u64, started_ms: u64) {
+pub fn start_session(minerva: &mut Minerva, baseline_ms: u64, started_ms: u64) -> PanelState {
     read(minerva, baseline_ms, 160, 381);
-    read(minerva, started_ms, 266, 633);
+    read(minerva, started_ms, 266, 633)
 }
 
 /// The usual Magician Status Bar, with a name if it read.
