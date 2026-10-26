@@ -59,6 +59,8 @@ type Rejected = {
   /** Its Level Band's first level and last: 1 and 9, 10 and 19… */
   lowestLevel: number;
   highestLevel: number;
+  /** It was a Party Best's entry, not a Solo Best's. */
+  party: boolean;
   reason: { overCap: { cap: number } } | { removed: Record<string, never> };
 };
 
@@ -841,13 +843,14 @@ function leaderboardSwitch(name: string, t: Toggle) {
   return button;
 }
 
-/** An entry the site kept off, in words: "Sunset Sky, Lv 20–29: over 5× its solo EXP/h". */
+/** An entry the site kept off, in words: "Sunset Sky, Lv 20–29 (Party Best): above 766,080 EXP/h, 5× its solo EXP/h". */
 function rejectedWords(r: Rejected) {
   const map = maps.find((m) => m.id === r.map);
   // Joined around the dash and after "Lv", so a band never breaks across lines.
   const levels = `Lv ${r.lowestLevel}⁠–⁠${r.highestLevel}`;
   const why = "overCap" in r.reason ? `above ${whole(r.reason.overCap.cap)} EXP/h, 5× its solo EXP/h` : "taken down by the site";
-  return `${map ? mapName(map) : `Map ${r.map}`}, ${levels}: ${why}`;
+  const kind = r.party ? " (Party Best)" : "";
+  return `${map ? mapName(map) : `Map ${r.map}`}, ${levels}${kind}: ${why}`;
 }
 
 /** A problem note, as the window's others: the orange dot, then its words, wrapping. */

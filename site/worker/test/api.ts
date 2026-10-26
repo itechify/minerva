@@ -21,11 +21,18 @@ export interface Entry {
   job: string;
   expPerHour: number;
   setAt: number;
+  /** A Party Best's; left out, a Solo Best's. */
+  party?: boolean;
 }
 
 /** An entry on `map` at `level`, with `expPerHour`, set at `setAt`. */
 export function entry(map: string, level: number, expPerHour: number, setAt = 1_760_000_000_000): Entry {
   return { map, level, job: "Magician", expPerHour, setAt };
+}
+
+/** A Party Best's entry on `map` at `level`, with `expPerHour`, set at `setAt`. */
+export function partyEntry(map: string, level: number, expPerHour: number, setAt = 1_760_000_000_000): Entry {
+  return { ...entry(map, level, expPerHour, setAt), party: true };
 }
 
 export function call(path: string, init: RequestInit = {}): Promise<Response> {
@@ -50,17 +57,20 @@ export function optOut(name: string, withKey: string): Promise<Response> {
   return call(`/api/characters/${encodeURIComponent(name)}/entries`, { method: "DELETE", headers: bearer(withKey) });
 }
 
-/** A map's Level Band, as the site's page reads it, with `name`'s entry if given. */
-export async function band(map: string, first: number, name?: string): Promise<BandAnswer> {
-  const query = name === undefined ? "" : `?name=${encodeURIComponent(name)}`;
-  const response = await call(`/api/maps/${map}/bands/${first}${query}`);
+/** A map's Level Band, as the site's page reads it, with `name`'s entry if given, and only
+ *  the solo or the party entries if `kind` is. */
+export async function band(map: string, first: number, name?: string, kind?: "solo" | "party"): Promise<BandAnswer> {
+  const query = new URLSearchParams();
+  if (name !== undefined) query.set("name", name);
+  if (kind !== undefined) query.set("kind", kind);
+  const response = await call(`/api/maps/${map}/bands/${first}${query.size > 0 ? `?${query}` : ""}`);
   if (response.status !== 200) throw new Error(`band read: ${response.status} ${await response.text()}`);
   return response.json();
 }
 
 /** The names in a band, best first. */
-export async function names(map: string, first: number): Promise<string[]> {
-  return (await band(map, first)).entries.map((e) => e.name);
+export async function names(map: string, first: number, kind?: "solo" | "party"): Promise<string[]> {
+  return (await band(map, first, undefined, kind)).entries.map((e) => e.name);
 }
 
 export function report(body: unknown, from = "203.0.113.7"): Promise<Response> {

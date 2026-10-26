@@ -271,7 +271,7 @@ fn showing_a_character_on_the_map_leaderboards_and_each_answer_replay_and_read_i
     shell.minerva.send_to_leaderboards_again("Egbert");
     shell.play(35 * S, CONSTRUCTION_SITE, grind);
     let id = upload_for(&shell, "Egbert");
-    let rejected = vec![RejectedEntry { map: CONSTRUCTION_SITE_ID.into(), band: 10, reason: RejectedReason::Removed {} }];
+    let rejected = vec![RejectedEntry { map: CONSTRUCTION_SITE_ID.into(), band: 10, party: false, reason: RejectedReason::Removed {} }];
     shell.minerva.on_leaderboard_answer(id, LeaderboardAnswer::Accepted { rejected });
     shell.play(MIN, CONSTRUCTION_SITE, grind);
     shell.minerva.show_on_leaderboards("Egbert", false);

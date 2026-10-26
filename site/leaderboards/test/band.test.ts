@@ -11,16 +11,17 @@ describe("a Level Band", () => {
   it("lists its entries by rank, each EXP/h written as the Grind Tracker writes it", () => {
     const table = bandTable(
       answer([
-        { rank: 1, name: "Egbert", job: "Magician", level: 23, expPerHour: 153_216, setAt: OCT_3 },
-        { rank: 2, name: "Ada", job: "Bowman", level: 29, expPerHour: 66_550, setAt: Date.UTC(2025, 11, 30, 12) },
+        { rank: 1, name: "Egbert", job: "Magician", level: 23, expPerHour: 153_216, setAt: OCT_3, party: true },
+        { rank: 2, name: "Ada", job: "Bowman", level: 29, expPerHour: 66_550, setAt: Date.UTC(2025, 11, 30, 12), party: false },
       ]),
       null,
       NOW,
     );
 
+    // A Party Best's entry carries the party mark.
     expect(table.rows).toEqual([
-      { rank: "1", name: "Egbert", job: "Magician", level: "23", expPerHour: "153,000", date: "3 Oct", you: false, lane: expect.any(Number) },
-      { rank: "2", name: "Ada", job: "Bowman", level: "29", expPerHour: "66,600", date: "30 Dec 2025", you: false, lane: expect.any(Number) },
+      { rank: "1", name: "Egbert", job: "Magician", level: "23", expPerHour: "153,000", date: "3 Oct", you: false, party: true, lane: expect.any(Number) },
+      { rank: "2", name: "Ada", job: "Bowman", level: "29", expPerHour: "66,600", date: "30 Dec 2025", you: false, party: false, lane: expect.any(Number) },
     ]);
     expect(table.yours).toBe(null);
     expect(table.gap).toBe(null);
@@ -32,6 +33,18 @@ describe("a Level Band", () => {
     expect(bandTable(answer(TOP_50, null, 63), null, NOW).caption).toBe("Top 50 of 63 at Lv 20–29");
     expect(bandTable(answer(TOP_50), null, NOW).caption).toBe("50 entries at Lv 20–29");
     expect(bandTable(answer([ranked(1, "Ada", 60_000)]), null, NOW).caption).toBe("1 entry at Lv 20–29");
+  });
+
+  it("names the kind being read in what it says of the table: solo entries, or party entries", () => {
+    const egbert = ranked(2, "Egbert", 50_000, OCT_3, true);
+    const party = bandTable(answer([ranked(1, "Ada", 60_000, OCT_3, true), egbert], egbert), "Egbert", NOW, "party");
+
+    expect(party.caption).toBe("2 party entries at Lv 20–29");
+    expect(party.note).toBe("Egbert is #2 of 2 party entries at Lv 20–29.");
+    expect(bandTable(answer(TOP_50, null, 63), null, NOW, "solo").caption).toBe("Top 50 of 63 solo entries at Lv 20–29");
+    expect(bandTable(answer([ranked(1, "Ada", 60_000)]), null, NOW, "solo").caption).toBe("1 solo entry at Lv 20–29");
+    expect(bandTable(answer([]), "Egbert", NOW, "party").note).toBe("Egbert has no party entry here at Lv 20–29.");
+    expect(bandTable(answer([]), null, NOW, "party").empty?.text).toBe("No one at Lv 20–29 has put a party best on this map yet.");
   });
 
   it("marks the linked Character's entry and says its rank above the table", () => {
@@ -63,6 +76,7 @@ describe("a Level Band", () => {
       expPerHour: "1,230",
       date: "3 Oct",
       you: true,
+      party: false,
       lane: expect.any(Number),
     });
     expect(table.note).toBe("Egbert is #57 of 63 at Lv 20–29.");

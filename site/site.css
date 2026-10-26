@@ -2243,6 +2243,68 @@ html.lb-band .lb-train,
   box-shadow: inset 0 0 0 1px var(--select-edge);
   color: var(--ink);
 }
+/* Solo or party (ADR 0015): both, only the Solo Bests', or only the Party Bests'. A short row
+   of light steel choices as the areas are: links on a Map Leaderboard and in Where to train,
+   buttons in Latest. The one shown is selected. */
+.lb-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.lb-head .lb-kinds {
+  margin-top: 10px;
+}
+.lb-kinds[hidden] {
+  display: none;
+}
+.lb-kind {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px 5px;
+  border: 1px solid var(--select-edge);
+  border-radius: 4px;
+  background: var(--button-light);
+  box-shadow: inset 0 1px 0 #fff;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lb-kind:hover {
+  background: var(--button-light-hover);
+  color: var(--ink);
+}
+.lb-kind:active {
+  background: var(--button-light);
+  box-shadow: var(--pressed-light-steel);
+  color: var(--ink);
+}
+.lb-kind[aria-current],
+.lb-kind[aria-pressed="true"] {
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--select-edge);
+  color: var(--ink);
+}
+/* The party mark, after the name or the EXP/h of a Party Best's entry: the app's party gold,
+   in the small-text ink, as a word so it reads to everyone. */
+.lb-party {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--party);
+  border-radius: 3px;
+  color: var(--party-ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
 /* A Map Mark at half the Mini Map's size, as the app shows it beside a map's name. */
 .lb-mark {
   flex: none;
@@ -2674,7 +2736,8 @@ html.lb-morph::view-transition-group(lb-head) {
 /* The areas take a thumb's tap too, 44px tall with their Map Mark, and Try again a tap past
    its edge. */
 @media (hover: none) and (pointer: coarse) {
-  .lb-area {
+  .lb-area,
+  .lb-kind {
     padding-block: 11px 12px;
   }
   .lb-retry::after {

@@ -3,7 +3,7 @@
 // a top spot (ADR 0024).
 import { describe, expect, it } from "vitest";
 import type { LatestEntry, MapMark } from "../../entries.ts";
-import { latestLines, mapNames } from "../leaderboards.ts";
+import { latestKinds, latestLines, mapNames } from "../leaderboards.ts";
 import { NOW, OCT_3 } from "./common.ts";
 
 const names = mapNames([{ id: 100000000, street_name: "Made-up Road", name: "Pig Field", region: "Victoria Island" }]);
@@ -11,8 +11,8 @@ const names = mapNames([{ id: 100000000, street_name: "Made-up Road", name: "Pig
 /** A made-up Map Mark, in the API's shape. */
 const HARBOR: MapMark = { id: "Rith", name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" };
 
-function latest(took: LatestEntry["took"] = null, setAt = OCT_3, mark: MapMark | null = HARBOR): LatestEntry {
-  return { name: "Hakuo", job: "Magician", level: 23, expPerHour: 153_216, setAt, map: "100000000", mark, band: 20, took };
+function latest(took: LatestEntry["took"] = null, setAt = OCT_3, mark: MapMark | null = HARBOR, party = false): LatestEntry {
+  return { name: "Hakuo", job: "Magician", level: 23, expPerHour: 153_216, setAt, map: "100000000", mark, band: 20, party, took };
 }
 
 describe("latest", () => {
@@ -28,11 +28,27 @@ describe("latest", () => {
           mark: { name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" },
           levels: "Lv 20–29",
           date: "3 Oct",
-          href: "/leaderboards/map/?map=100000000&band=20&name=Hakuo",
+          // The board of the entry's own kind, where it stands as Latest says.
+          href: "/leaderboards/map/?map=100000000&band=20&name=Hakuo&kind=solo",
+          party: false,
           took: null,
         },
       ],
     });
+  });
+
+  it("marks an entry that is a Party Best, and links to the Map Leaderboard of party entries", () => {
+    const { lines } = latestLines({ entries: [latest(null, OCT_3, HARBOR, true)] }, names, NOW);
+
+    expect(lines[0]).toMatchObject({ party: true, href: "/leaderboards/map/?map=100000000&band=20&name=Hakuo&kind=party" });
+  });
+
+  it("offers both, solo or party, the one shown marked", () => {
+    expect(latestKinds("solo")).toEqual([
+      { kind: null, label: "Both", open: false },
+      { kind: "solo", label: "Solo", open: true },
+      { kind: "party", label: "Party", open: false },
+    ]);
   });
 
   it("says when an entry took a top spot, and from whom", () => {
@@ -67,5 +83,6 @@ describe("latest", () => {
         link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
       },
     });
+    expect(latestLines({ entries: [] }, names, NOW, "party").empty?.text).toBe("No one has put a party best on the Map Leaderboards yet.");
   });
 });

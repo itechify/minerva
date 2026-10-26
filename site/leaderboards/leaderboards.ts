@@ -6,7 +6,17 @@
 
 import { dayText } from "../../src/dates.ts";
 import { levels, rate, short, whole } from "../../src/figures.ts";
-import { type BandAnswer, type BandsAnswer, isMap, isName, type LatestAnswer, type MapMark, type Ranked, type TrainingAnswer } from "../entries.ts";
+import {
+  type BandAnswer,
+  type BandsAnswer,
+  isMap,
+  isName,
+  type Kind,
+  type LatestAnswer,
+  type MapMark,
+  type Ranked,
+  type TrainingAnswer,
+} from "../entries.ts";
 import { bandOf, levelsOf } from "../level-bands.ts";
 import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts";
 
@@ -14,9 +24,9 @@ import { type MapNames, type MapPlace, mapNames, placeOf } from "../map-names.ts
 // takes everything it shows from this module.
 export { mapNames, placeOf };
 export type { MapNameRow, MapNames, MapPlace } from "../map-names.ts";
-export type { BandAnswer, BandsAnswer, LatestAnswer, MapMark, Ranked, TrainingAnswer } from "../entries.ts";
+export type { BandAnswer, BandsAnswer, Kind, LatestAnswer, MapMark, Ranked, TrainingAnswer } from "../entries.ts";
 
-/** A map's page as its address names it: `/leaderboards/map/?map=<ID>&band=<first level>&name=<name>`.
+/** A map's page as its address names it: `/leaderboards/map/?map=<ID>&band=<first level>&name=<name>&kind=<kind>`.
  *  Any part may be missing, or dropped for not being one. */
 export interface Link {
   /** The map's 9-digit ID ("010001010"). */
@@ -25,6 +35,40 @@ export interface Link {
   band: number | null;
   /** The Character whose entry the page shows: 1 to 16 letters and digits. */
   name: string | null;
+  /** The entries to rank: only the Solo Bests' or only the Party Bests'; `null`, each
+   *  Character's higher one (ADR 0015, amended). */
+  kind: Kind | null;
+}
+
+/** The kind a link names: `solo` or `party`; anything else is both. */
+function kindIn(value: string | null): Kind | null {
+  return value === "solo" || value === "party" ? value : null;
+}
+
+/** The kinds a page offers to show, in order: both, then each. */
+const KINDS: { kind: Kind | null; label: string }[] = [
+  { kind: null, label: "Both" },
+  { kind: "solo", label: "Solo" },
+  { kind: "party", label: "Party" },
+];
+
+/** A choice of kind, the one shown marked (`open`), `href` being where it goes. */
+export interface KindChoice {
+  kind: Kind | null;
+  label: string;
+  href: string;
+  open: boolean;
+}
+
+/** The map page's choice of kinds: each a link to the page with that kind, the band and the
+ *  Character kept. */
+export function kindChoices(link: Link): KindChoice[] {
+  return KINDS.map(({ kind, label }) => ({ kind, label, href: linkTo({ ...link, kind }), open: kind === link.kind }));
+}
+
+/** The words for a kind of entry, in "a solo entry", "12 party entries": none for both. */
+function kindWord(kind: Kind | null): string {
+  return kind === null ? "" : `${kind} `;
 }
 
 /** The highest level a Character can have. */
@@ -52,7 +96,7 @@ function nameIn(value: string | null): string | null {
 /** Where a map page's address (its `location.search`) opens. */
 export function readLink(search: string): Link {
   const query = new URLSearchParams(search);
-  return { map: mapIn(query.get("map")), band: bandIn(query.get("band")), name: nameIn(query.get("name")) };
+  return { map: mapIn(query.get("map")), band: bandIn(query.get("band")), name: nameIn(query.get("name")), kind: kindIn(query.get("kind")) };
 }
 
 /** The regions of maps the player can't normally enter, which search leaves out, as the
@@ -174,9 +218,10 @@ function counted(count: number, thing: string): string {
   return `${whole(count)} ${thing}${count === 1 ? "" : "s"}`;
 }
 
-/** How many entries, the one word the pages count a Map Leaderboard in: "1 entry", "12 entries". */
-function entriesCounted(count: number): string {
-  return `${whole(count)} ${count === 1 ? "entry" : "entries"}`;
+/** How many entries, the one word the pages count a Map Leaderboard in: "1 entry", "12 entries";
+ *  of one `kind`, "1 solo entry", "12 party entries". */
+function entriesCounted(count: number, kind: Kind | null = null): string {
+  return `${whole(count)} ${kindWord(kind)}${count === 1 ? "entry" : "entries"}`;
 }
 
 /** GET /api/maps: every map with entries, the most first. */
@@ -200,10 +245,11 @@ function bandLevels(band: number): string {
   return levels({ lowest, highest });
 }
 
-/** GET /api/maps/<map>: the map's Level Bands with entries, lowest first. */
+/** GET /api/maps/<map>: the map's Level Bands with entries, lowest first: how many
+ *  Characters are ranked in each (by their higher entry), and how many entries of each kind. */
 export interface MapAnswer {
   map: string;
-  bands: { band: number; levels: [number, number]; entries: number }[];
+  bands: { band: number; levels: [number, number]; entries: number; solo: number; party: number }[];
 }
 
 /** A Level Band as a map's page offers it. */
@@ -245,8 +291,11 @@ export function mapPage(link: Link, names: MapNames, answer: MapAnswer): MapPage
     const empty = { text: `There's no map ${answer.map} in the map list.`, link: FIND_A_MAP };
     return { place, bands: [], open: null, empty, found: false };
   }
-  const open = link.band ?? answer.bands[0]?.band ?? null;
-  const counts = new Map(answer.bands.map((b) => [b.band, b.entries]));
+  // Of the kind the link names, each band's count: only the bands that have some are offered.
+  const counted = (b: MapAnswer["bands"][number]) => (link.kind === null ? b.entries : b[link.kind]);
+  const withEntries = answer.bands.filter((b) => counted(b) > 0);
+  const open = link.band ?? withEntries[0]?.band ?? null;
+  const counts = new Map(withEntries.map((b) => [b.band, counted(b)]));
   if (open !== null && !counts.has(open)) counts.set(open, 0);
   const bands = [...counts]
     .sort(([a], [b]) => a - b)
@@ -254,19 +303,19 @@ export function mapPage(link: Link, names: MapNames, answer: MapAnswer): MapPage
       band,
       levels: bandLevels(band),
       entries: entries === 0 ? "No entries" : entriesCounted(entries),
-      href: linkTo({ map: answer.map, band, name: link.name }),
+      href: linkTo({ map: answer.map, band, name: link.name, kind: link.kind }),
       open: band === open,
     }));
+  const best = link.kind === null ? "a best" : `a ${link.kind} best`;
   return {
     place,
     bands,
     open,
-    empty: open === null ? { text: "No one has a best on this Map Leaderboard yet.", link: PUT_YOURS } : null,
+    empty: open === null ? { text: `No one has ${best} on this Map Leaderboard yet.`, link: PUT_YOURS } : null,
     found: true,
   };
 }
 
-/** An entry as the API ranks it: one Character's best Visit on the map in the band. */
 /** An entry as a band's table writes it. */
 export interface Row {
   rank: string;
@@ -277,6 +326,8 @@ export interface Row {
   date: string;
   /** Whether it's the linked Character's. */
   you: boolean;
+  /** Whether it's a Party Best's: the table marks it. */
+  party: boolean;
   /** How far along its lane the EXP/h runs, from 0 to 1: the band's #1 runs it full. */
   lane: number;
 }
@@ -323,8 +374,9 @@ function rulerTo(top: number): RulerStep[] {
 }
 
 /** A band's table from the API's answer, for the Character `name` the link names (if
- *  any), with dates written as of `now`. */
-export function bandTable(answer: BandAnswer, name: string | null, now: Date): BandTable {
+ *  any), with dates written as of `now`. Of one `kind` of entry, it says so in what it says
+ *  of the table; with none, each Character is ranked by their higher entry. */
+export function bandTable(answer: BandAnswer, name: string | null, now: Date, kind: Kind | null = null): BandTable {
   const yours = answer.character;
   const top = Math.max(1, answer.entries[0]?.expPerHour ?? 1);
   const row = (entry: Ranked): Row => {
@@ -337,6 +389,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
       expPerHour: rate(entry.expPerHour),
       date: dayText(set, set.getFullYear() !== now.getFullYear()),
       you: entry.rank === yours?.rank,
+      party: entry.party,
       lane: Math.min(1, entry.expPerHour / top),
     };
   };
@@ -344,19 +397,23 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
   const at = bandLevels(answer.band);
   const total = whole(answer.total);
   let note: string | null = null;
-  if (yours !== null) note = `${yours.name} is #${yours.rank} of ${total} at ${at}.`;
-  else if (name !== null) note = `${name} has no entry here at ${at}.`;
+  if (yours !== null) note = `${yours.name} is #${yours.rank} of ${total} ${kind === null ? "" : `${kind} entries `}at ${at}.`;
+  else if (name !== null) note = `${name} has no ${kindWord(kind)}entry here at ${at}.`;
   const below = yours !== null && !rows.some((r) => r.you);
   const between = below ? yours.rank - rows.length - 1 : 0;
   const caption =
-    rows.length === 0 ? null : answer.total > rows.length ? `Top ${rows.length} of ${total} at ${at}` : `${entriesCounted(rows.length)} at ${at}`;
+    rows.length === 0
+      ? null
+      : answer.total > rows.length
+        ? `Top ${rows.length} of ${total} ${kind === null ? "" : `${kind} entries `}at ${at}`
+        : `${entriesCounted(rows.length, kind)} at ${at}`;
   return {
     rows,
     gap: between > 0 ? `${whole(between)} more ${between === 1 ? "entry" : "entries"}` : null,
     yours: below ? row(yours) : null,
     note,
     caption,
-    empty: rows.length === 0 ? { text: `No one at ${at} has put a best on this map yet.`, link: PUT_YOURS } : null,
+    empty: rows.length === 0 ? { text: `No one at ${at} has put a ${kindWord(kind)}best on this map yet.`, link: PUT_YOURS } : null,
     ruler: rows.length === 0 ? [] : rulerTo(top),
   };
 }
@@ -401,6 +458,7 @@ export function linkTo(link: Link): string {
   if (link.map !== null) query.set("map", link.map);
   if (link.band !== null) query.set("band", String(link.band));
   if (link.name !== null) query.set("name", link.name);
+  if (link.kind !== null) query.set("kind", link.kind);
   return `/leaderboards/map/?${query}`;
 }
 
@@ -419,13 +477,20 @@ export function mapPicture(manifest: unknown, map: string): string | null {
 export interface TrainingLink {
   band: number | null;
   area: string | null;
+  /** The entries Where to train ranks (`&kind=solo` or `&kind=party`); `null`, each
+   *  Character's higher one. */
+  kind: Kind | null;
 }
 
 /** Where the Map Leaderboards page's address (its `location.search`) opens. */
 export function readTrainingLink(search: string): TrainingLink {
   const query = new URLSearchParams(search);
   const area = query.get("area");
-  return { band: bandIn(query.get("band")), area: area !== null && /^[A-Za-z0-9]{1,32}$/.test(area) ? area : null };
+  return {
+    band: bandIn(query.get("band")),
+    area: area !== null && /^[A-Za-z0-9]{1,32}$/.test(area) ? area : null,
+    kind: kindIn(query.get("kind")),
+  };
 }
 
 /** The address of the Map Leaderboards page, from the site's root. */
@@ -433,8 +498,15 @@ export function trainingLinkTo(link: TrainingLink): string {
   const query = new URLSearchParams();
   if (link.band !== null) query.set("band", String(link.band));
   if (link.area !== null) query.set("area", link.area);
+  if (link.kind !== null) query.set("kind", link.kind);
   const search = String(query);
   return search === "" ? "/leaderboards/" : `/leaderboards/?${search}`;
+}
+
+/** Where to train's choice of kinds: each a link to the page with that kind, the band and the
+ *  area kept. */
+export function trainingKinds(link: TrainingLink): KindChoice[] {
+  return KINDS.map(({ kind, label }) => ({ kind, label, href: trainingLinkTo({ ...link, kind }), open: kind === link.kind }));
 }
 
 /** A Level Band as Where to train offers it. */
@@ -472,7 +544,7 @@ export interface TrainingRow {
   mobs: string | null;
   /** The band's #1 there: its EXP/h, who set it ("Bea · Magician Lv 25") and when; `null`
    *  with no entries, its cell left empty, as its entries say there are none. */
-  best: { expPerHour: string; who: string; date: string } | null;
+  best: { expPerHour: string; who: string; date: string; party: boolean } | null;
   /** "3 entries", or "No entries yet"; `null` when none of the maps shown has any, which
    *  the table says once, over them, its cell left empty. */
   entries: string | null;
@@ -532,7 +604,7 @@ export function trainingTable(
   const area = link.area !== null && marks.has(link.area) ? link.area : null;
   const areas = [...marks.values()]
     .sort((a, b) => byText(a.name, b.name))
-    .map((mark) => ({ ...mark, href: trainingLinkTo({ band: answer.band, area: mark.id }), open: mark.id === area }));
+    .map((mark) => ({ ...mark, href: trainingLinkTo({ band: answer.band, area: mark.id, kind: link.kind }), open: mark.id === area }));
   const shown = maps.filter((m) => area === null || m.mark?.id === area);
   type Shown = (typeof shown)[number];
   const best = (m: Shown) => m.best?.expPerHour ?? -1;
@@ -554,7 +626,7 @@ export function trainingTable(
       name: m.place.name,
       street: m.place.street,
       mark: m.mark === null ? null : { name: m.mark.name, picture: m.mark.picture },
-      href: linkTo({ map: m.map, band: answer.band, name: null }),
+      href: linkTo({ map: m.map, band: answer.band, name: null, kind: link.kind }),
       mobs: m.mobs === null ? null : levels({ lowest: m.mobs[0], highest: m.mobs[1] }),
       best:
         m.best === null || set === null
@@ -563,8 +635,9 @@ export function trainingTable(
               expPerHour: rate(m.best.expPerHour),
               who: `${m.best.name} · ${m.best.job} Lv ${m.best.level}`,
               date: dayText(set, set.getFullYear() !== now.getFullYear()),
+              party: m.best.party,
             },
-      entries: none ? null : m.entries === 0 ? "No entries yet" : entriesCounted(m.entries),
+      entries: none ? null : m.entries === 0 ? "No entries yet" : entriesCounted(m.entries, link.kind),
     };
   });
   const at = bandLevels(answer.band);
@@ -581,9 +654,13 @@ export function trainingTable(
     none: !none
       ? null
       : shown.length === 1
-        ? { text: `No one at ${at} has put a best on this map yet. Its mobs are at your level.`, link: PUT_YOURS }
-        : { text: `No one at ${at} has put a best on these maps yet. They're the maps whose mobs are at your level.`, link: PUT_YOURS },
-    empty: rows.length === 0 ? { text: `No map's mobs are at ${at}, and no one has put a best there yet.`, link: PUT_YOURS } : null,
+        ? { text: `No one at ${at} has put a ${kindWord(link.kind)}best on this map yet. Its mobs are at your level.`, link: PUT_YOURS }
+        : {
+            text: `No one at ${at} has put a ${kindWord(link.kind)}best on these maps yet. They're the maps whose mobs are at your level.`,
+            link: PUT_YOURS,
+          },
+    empty:
+      rows.length === 0 ? { text: `No map's mobs are at ${at}, and no one has put a ${kindWord(link.kind)}best there yet.`, link: PUT_YOURS } : null,
   };
 }
 
@@ -602,15 +679,23 @@ export interface LatestLine {
   mark: { name: string; picture: string } | null;
   levels: string;
   date: string;
-  /** The map's page at the band, with the entry marked. */
+  /** The map's page at the band, with the entry marked, ranking its own kind of entry. */
   href: string;
+  /** Whether it's a Party Best's: Latest marks it. */
+  party: boolean;
   /** "Took #1, past Egbert's 80,000", or "Took #1, past a best of 80,000" once that
    *  Character has left the Map Leaderboards; `null` for an entry that took no top spot. */
   took: string | null;
 }
 
+/** Latest's choice of kinds, the one shown (`shown`) marked: it lists both kinds of entry, or
+ *  only the Solo Bests' or the Party Bests'. */
+export function latestKinds(shown: Kind | null): { kind: Kind | null; label: string; open: boolean }[] {
+  return KINDS.map(({ kind, label }) => ({ kind, label, open: kind === shown }));
+}
+
 /** Latest, from GET /api/latest, with dates written as of `now`, or why it lists nothing. */
-export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): { lines: LatestLine[]; empty: Said | null } {
+export function latestLines(answer: LatestAnswer, names: MapNames, now: Date, kind: Kind | null = null): { lines: LatestLine[]; empty: Said | null } {
   const lines = answer.entries.map((e): LatestLine => {
     const set = new Date(e.setAt);
     let took: string | null = null;
@@ -626,10 +711,11 @@ export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): {
       mark: e.mark === null ? null : { name: e.mark.name, picture: e.mark.picture },
       levels: bandLevels(e.band),
       date: dayText(set, set.getFullYear() !== now.getFullYear()),
-      href: linkTo({ map: e.map, band: e.band, name: e.name }),
+      href: linkTo({ map: e.map, band: e.band, name: e.name, kind: e.party ? "party" : "solo" }),
+      party: e.party,
       took,
     };
   });
-  const empty = { text: "No one has put a best on the Map Leaderboards yet.", link: PUT_YOURS };
+  const empty = { text: `No one has put a ${kindWord(kind)}best on the Map Leaderboards yet.`, link: PUT_YOURS };
   return { lines, empty: lines.length === 0 ? empty : null };
 }

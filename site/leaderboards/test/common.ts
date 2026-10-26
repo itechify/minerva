@@ -7,9 +7,9 @@ import type { BandAnswer, Ranked } from "../leaderboards.ts";
 export const OCT_3 = Date.UTC(2026, 9, 3, 12);
 export const NOW = new Date(Date.UTC(2026, 9, 14, 12));
 
-/** An entry at `rank` by `name`, a Magician at level 23. */
-export function ranked(rank: number, name: string, expPerHour = 100_000 - rank * 1_000, setAt = OCT_3): Ranked {
-  return { rank, name, job: "Magician", level: 23, expPerHour, setAt };
+/** An entry at `rank` by `name`, a Magician at level 23: a Solo Best's, or a Party Best's if `party`. */
+export function ranked(rank: number, name: string, expPerHour = 100_000 - rank * 1_000, setAt = OCT_3, party = false): Ranked {
+  return { rank, name, job: "Magician", level: 23, expPerHour, setAt, party };
 }
 
 /** The API's answer for the Level Band starting at `band`, on map 100000000. */

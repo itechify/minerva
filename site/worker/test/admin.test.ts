@@ -127,7 +127,7 @@ describe("entries taken down", () => {
     await upload("Ines", mine, [entry(FIELD, 107, 300_000)]);
     await admin(`/entries/Ines/${FIELD}/100`, { method: "DELETE" });
     const listed = (await (await admin("/removed")).json()) as { removed: { name: string; map: string; band: number; expPerHour: number }[] };
-    expect(listed.removed).toContainEqual({ name: "Ines", map: FIELD, band: 100, expPerHour: 300_000 });
+    expect(listed.removed).toContainEqual({ name: "Ines", map: FIELD, band: 100, expPerHour: 300_000, party: false });
 
     const response = await admin(`/removed/Ines/${FIELD}/100/300000`, { method: "DELETE" });
     const again = await upload("Ines", mine, [entry(FIELD, 107, 300_000)]);

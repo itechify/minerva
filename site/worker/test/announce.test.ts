@@ -3,7 +3,7 @@
 // own best, a re-upload of the same set and an opt-out that hands the spot on all stay quiet.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MOST_TOLD, type Post, type Taken, type Top, postFor, takenTops, tell } from "../announce";
-import { entry, key, optOut, upload } from "./api";
+import { entry, key, optOut, partyEntry, upload } from "./api";
 
 /** The made-up webhook the test config sets (vitest.config.ts). */
 const WEBHOOK = "https://discord.invalid/api/webhooks/made-up/webhook";
@@ -47,12 +47,12 @@ function postsSettle(count: number): Promise<void> {
   return vi.waitFor(() => expect(posts).toHaveLength(count));
 }
 
-function top(map: string, band: number, name: string, expPerHour: number): Top {
-  return { map, band, nameKey: name.toLowerCase(), name, expPerHour };
+function top(map: string, band: number, name: string, expPerHour: number, party = false): Top {
+  return { map, band, nameKey: name.toLowerCase(), name, expPerHour, party };
 }
 
-function taken(map: string, band: number, expPerHour = 90_000): Taken {
-  return { map, band, name: "Hakuo", expPerHour, from: "Egbert", fromExpPerHour: 80_000 };
+function taken(map: string, band: number, expPerHour = 90_000, party = false): Taken {
+  return { map, band, name: "Hakuo", expPerHour, party, from: "Egbert", fromExpPerHour: 80_000 };
 }
 
 describe("taken top spots", () => {
@@ -61,8 +61,15 @@ describe("taken top spots", () => {
     const after = [top(QUIET, 20, "Hakuo", 90_000)];
 
     expect(takenTops(before, after, "hakuo")).toEqual([
-      { map: QUIET, band: 20, name: "Hakuo", expPerHour: 90_000, from: "Egbert", fromExpPerHour: 80_000 },
+      { map: QUIET, band: 20, name: "Hakuo", expPerHour: 90_000, party: false, from: "Egbert", fromExpPerHour: 80_000 },
     ]);
+  });
+
+  it("says when the spot was taken with a Party Best", () => {
+    const before = [top(QUIET, 20, "Egbert", 80_000)];
+    const after = [top(QUIET, 20, "Hakuo", 90_000, true)];
+
+    expect(takenTops(before, after, "hakuo").map((t) => t.party)).toEqual([true]);
   });
 
   it("is not a band nobody held", () => {
@@ -107,6 +114,14 @@ describe("the post", () => {
         description: "**Hakuo** took #1, levels 20–29, with 153,000 EXP/h, past Egbert's 80,000.",
       },
     ]);
+  });
+
+  it("says when the spot was taken in a party", () => {
+    const post = postFor([taken(HUNTING_GROUND, 20, 153_216, true)], NO_PICTURES)!;
+
+    expect(post.embeds[0].description).toBe(
+      "**Hakuo** took #1, levels 20–29, with 153,000 EXP/h in a party, past Egbert's 80,000.",
+    );
   });
 
   it("shows the map's Map Mark", () => {
@@ -172,6 +187,25 @@ describe("an upload", () => {
     expect(posts[0].embeds[0].url).toContain(`map=${CROWNED}&band=20&name=Hakuo`);
     // CROWNED has no Map Mark in the made-up ceilings.
     expect(posts[0].embeds[0]).not.toHaveProperty("thumbnail");
+  });
+
+  it("posts a spot taken with a Party Best as a party's, and nothing for a Solo Best that stays below it", async () => {
+    await upload("Kora", key("kora"), [entry("100000058", 25, 10_000)]);
+    await upload("Lars", key("lars"), [partyEntry("100000058", 25, 90_000)]);
+    await postsSettle(1);
+    expect(posts[0].embeds[0].description).toContain("**Lars** took #1");
+    expect(posts[0].embeds[0].description).toContain("in a party");
+
+    // Lars's Solo Best, below the Party Best the board ranks him by, takes nothing.
+    await upload("Lars", key("lars"), [entry("100000058", 25, 20_000), partyEntry("100000058", 25, 90_000)]);
+    // Kora, past her own Solo Best but not past Lars, takes nothing either.
+    await upload("Kora", key("kora"), [entry("100000058", 25, 50_000)]);
+
+    // Kora's Solo Best past a Party Best takes the spot, and is not a party's.
+    await upload("Kora", key("kora"), [entry("100000058", 25, 95_000)]);
+    await postsSettle(2);
+    expect(posts[1].embeds[0].description).toContain("**Kora** took #1");
+    expect(posts[1].embeds[0].description).not.toContain("in a party");
   });
 
   it("posts nothing for the same set uploaded again", async () => {

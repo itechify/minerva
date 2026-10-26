@@ -13,6 +13,11 @@ export function isMap(map: string): boolean {
   return /^\d{9}$/.test(map);
 }
 
+/** The kind of an entry: a Character's Solo Best on a map in a Level Band, or its Party Best
+ *  (ADR 0015, amended; ADR 0026). A read asks for one (`?kind=`), or for neither, which ranks
+ *  each Character's higher entry. */
+export type Kind = "solo" | "party";
+
 /** An entry in a Level Band, with its rank there. */
 export interface Ranked {
   rank: number;
@@ -22,10 +27,13 @@ export interface Ranked {
   expPerHour: number;
   /** When the Visit set it, in ms since the Unix epoch. */
   setAt: number;
+  /** It is the Character's Party Best, not its Solo Best. */
+  party: boolean;
 }
 
-/** GET /api/maps/<map>/bands/<band>?name=<name>: the band's top 50, and the named
- *  Character's entry with its rank, wherever it is (`null` with none there). */
+/** GET /api/maps/<map>/bands/<band>?name=<name>&kind=<kind>: the band's top 50, and the named
+ *  Character's entry with its rank, wherever it is (`null` with none there). With a `kind`,
+ *  only the entries of that kind are ranked. */
 export interface BandAnswer {
   map: string;
   band: number;
@@ -43,6 +51,8 @@ export interface Best {
   expPerHour: number;
   /** When the Visit set it, in ms since the Unix epoch. */
   setAt: number;
+  /** It is the Character's Party Best, not its Solo Best. */
+  party: boolean;
 }
 
 /** GET /api/bands: the Level Bands Where to train has maps for, lowest first, each with how

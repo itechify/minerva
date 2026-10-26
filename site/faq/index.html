@@ -1012,9 +1012,13 @@
                     A page on this site for each map, ranking players' Personal Bests from Minerva, so you can see what
                     EXP per hour others at your level get there. Each <a href="#level-bands">Level Band</a> is ranked
                     separately and shows its top 50, with each character's name, job, level, EXP per hour and date, and
-                    a bar showing how far behind #1 they are. On the <a href="/leaderboards/">Map Leaderboards</a>
-                    page, <a href="#where-to-train">Where to train</a> lists the maps for your Level Band, you can find
-                    a map by its name, and <strong>Latest</strong> lists the newest bests on every map.
+                    a bar showing how far behind #1 they are. A <strong>Party</strong> mark in gold is on an entry
+                    that is a <a href="#party-bests">Party Best</a>, and <strong>Both</strong>, <strong>Solo</strong>
+                    and <strong>Party</strong> choose which entries are ranked: both, each character once by their
+                    higher best; or only Solo Bests, or only Party Bests. On the
+                    <a href="/leaderboards/">Map Leaderboards</a> page, <a href="#where-to-train">Where to train</a>
+                    lists the maps for your Level Band, you can find a map by its name, and <strong>Latest</strong>
+                    lists the newest bests on every map.
                   </p>
                 </details>
                 <details class="qa" id="where-to-train">
@@ -1027,15 +1031,18 @@
                     hour there and who set it, and how many entries it has. The maps with entries come first, the best
                     first, and a band with more than 20 maps shows its first 15: <strong>Show all</strong> lists the
                     rest. Pick an area, by the same emblem the game's minimap shows beside the map's name, to see only
-                    its maps.
+                    its maps. <strong>Solo</strong> and <strong>Party</strong> rank only Solo Bests or only Party Bests
+                    (<a href="#party-bests">what those are</a>), and a best set in a party has a gold
+                    <strong>Party</strong> mark.
                   </p>
                 </details>
                 <details class="qa" id="level-bands">
                   <summary>What's a Level Band?</summary>
                   <p>
                     Ten levels of a Map Leaderboard: 1–9, 10–19, 20–29 and on, so you're ranked against players near
-                    your level. An entry is one character's best visit to the map at those levels, so a character that
-                    levels up can have an entry in each band. The highest EXP per hour ranks first; on a tie, whoever
+                    your level. An entry is one character's best visit to the map at those levels, of one kind (their
+                    <a href="#party-bests">Solo Best or Party Best</a>), so a character that levels up can have an entry
+                    in each band, and a character with both kinds has two there. The highest EXP per hour ranks first; on a tie, whoever
                     set it first.
                   </p>
                 </details>
@@ -1043,10 +1050,12 @@
                   <summary>What does the EXP per hour on the Map Leaderboards count?</summary>
                   <p>
                     The <a href="#personal-bests">Personal Best</a> as Minerva counted it: everything the EXP bar gained,
-                    at its best over 5 minutes of play on the map. It's raw, so EXP events and buffs aren't told apart.
-                    Nor is party play yet: a map's entry is the higher of your <a href="#party-bests">Solo Best and
-                    Party Best</a>. Only a figure over 5 times the map's solo EXP/h ceiling is kept off, as one no map
-                    gives.
+                    at its best over 5 minutes of play on the map. It's raw, so EXP events and buffs aren't told apart:
+                    Minerva can't see them, and the site has no tag for you to set. Party play is told apart, since
+                    Minerva sees a partymate's EXP: your <a href="#party-bests">Solo Best and Party Best</a> are entries
+                    of their own, and the Map Leaderboards rank them together (each character by their higher one) or
+                    apart. Only a figure over 5 times the map's solo EXP/h ceiling is kept off, of either kind, as one
+                    no map gives.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-appear">
@@ -1055,8 +1064,8 @@
                     A new character is on them already. <strong>Share</strong>, the switch under their name in your
                     <a href="#every-best">Personal Bests</a>, starts on for every character Minerva meets for the first
                     time. A character Minerva knew before sharing was on by default starts off: pick them and click
-                    <strong>Share</strong> to turn it on. Minerva uploads the character's best visit on each map in each
-                    <a href="#level-bands">Level Band</a>, then each new best when its visit ends. Removing, moving or
+                    <strong>Share</strong> to turn it on. Minerva uploads the character's Solo Best and Party Best on each map in each
+                    <a href="#level-bands">Level Band</a> as entries of their own, then each new best when its visit ends. Removing, moving or
                     merging visits updates the site too.
                   </p>
                   <p>
@@ -1069,8 +1078,8 @@
                 <details class="qa" id="leaderboard-public">
                   <summary>What does the site show of me?</summary>
                   <p>
-                    For each entry: your character's name and job, the exact level they set it at, the EXP per hour, and
-                    the date, for everyone to see. Nothing else about you or your PC goes, and you need no account. Instead Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the
+                    For each entry: your character's name and job, the exact level they set it at, the EXP per hour, the
+                    date, and whether it's a Party Best, for everyone to see. Nothing else about you or your PC goes, and you need no account. Instead Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the
                     first time it uploads, which ties your character's name to it, so no one else can upload under that
                     name. The site keeps only a scrambled form (a hash) of the key, and you never need to see it.
                     The newest bests on every map are also listed in <strong>Latest</strong> on the Map Leaderboards
@@ -1084,7 +1093,7 @@
                     When one of your uploads takes a map's top spot off someone else, Minerva's
                     <a href="https://discord.gg/NnbnVWkRrF">Discord</a> posts it in <strong>#map-leaderboards</strong>:
                     the map, by its name and its Map Mark if it has one, and your character's name, the Level Band, the EXP per hour
-                    and whose spot it was. That's all from the entry itself, so it says nothing the Map Leaderboards
+                    (with "in a party" if the entry is a <a href="#party-bests">Party Best</a>) and whose spot it was. That's all from the entry itself, so it says nothing the Map Leaderboards
                     <a href="#leaderboard-public">don't already show</a>, and it never pings anyone. Only a spot taken
                     is posted: the first entry in a Level Band nobody had one in, and beating your own best, both go
                     unsaid. <a href="#leaderboard-remove">Taking your character off</a> stops it, since a character
