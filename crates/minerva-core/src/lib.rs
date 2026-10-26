@@ -1728,7 +1728,11 @@ impl Minerva {
     /// What a Pickup Log reading does, once the input is written down: the Session counts the
     /// mesos that arrived in a clean capture.
     fn take_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
-        self.pickup_log_seen = reading.seen != PickupLogSeen::Nothing;
+        self.pickup_log_seen = match reading.seen {
+            PickupLogSeen::Clear { .. } => true,
+            PickupLogSeen::Covered { .. } => self.pickup_log_seen || !reading.rows.is_empty(),
+            PickupLogSeen::Nothing => false,
+        };
         self.pickup_cover.on_reading(&reading, &self.state.our_windows);
         if self.tracking_on() {
             let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });

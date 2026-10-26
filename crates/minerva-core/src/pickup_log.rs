@@ -186,9 +186,16 @@ impl PickupLogReader {
             self.previous = Some(Stack { rows: (0..6).map(|_| None).collect() });
             return reading;
         };
-        let at = AtSamplesSize::new(&img, layout.size);
-        let right = (layout.right as f32 / layout.size).round() as u32;
-        let bottom = (layout.bottom as f32 / layout.size).round() as u32;
+        // Search the generous capture band once, then scale only the six line slots.
+        // Scaling the empty space below them at every tick dominates small UI Sizes.
+        let crop_x = layout.right.saturating_sub((314.0 * layout.size).ceil() as u32);
+        let crop_y = layout.bottom.saturating_sub((132.0 * layout.size).ceil() as u32);
+        let crop_right = (layout.right + (6.0 * layout.size).ceil() as u32).min(img.width());
+        let crop_bottom = (layout.bottom + (6.0 * layout.size).ceil() as u32).min(img.height());
+        let cropped = image::imageops::crop_imm(&img, crop_x, crop_y, crop_right - crop_x, crop_bottom - crop_y).to_image();
+        let at = AtSamplesSize::new(&cropped, layout.size);
+        let right = ((layout.right - crop_x) as f32 / layout.size).round() as u32;
+        let bottom = ((layout.bottom - crop_y) as f32 / layout.size).round() as u32;
         let rows = (0..6)
             .map(|slot| {
                 let top = bottom as i32 - 22 * (5 - slot) - 16;
@@ -202,8 +209,8 @@ impl PickupLogReader {
         let (x0, y0) = at.back(right.saturating_sub(310) as f32, bottom.saturating_sub(126) as f32);
         let (x1, y1) = at.back((right + 3) as f32, (bottom + 4) as f32);
         let area = ScreenRect {
-            x: capture.origin.x + x0.round() as i32,
-            y: capture.origin.y + y0.round() as i32,
+            x: capture.origin.x + crop_x as i32 + x0.round() as i32,
+            y: capture.origin.y + crop_y as i32 + y0.round() as i32,
             width: (x1 - x0).round() as u32,
             height: (y1 - y0).round() as u32,
         };
@@ -338,9 +345,21 @@ fn locate(img: &RgbImage) -> Option<Layout> {
                     bottom = pair[1].0 + (11.0 * size).round() as u32;
                 }
             }
-            let at = AtSamplesSize::new(img, size);
-            let scaled_right = (right as f32 / size).round() as u32;
-            let mut scaled_bottom = (bottom as f32 / size).round() as u32;
+            if !(0..6).any(|slot| {
+                bottom
+                    .checked_sub((22.0 * slot as f32 * size).round() as u32)
+                    .is_some_and(|bottom| parenthesis_scaled(img, right, bottom, size))
+            }) {
+                return None;
+            }
+            let crop_x = right.saturating_sub((314.0 * size).ceil() as u32);
+            let crop_y = bottom.saturating_sub((132.0 * size).ceil() as u32);
+            let crop_right = (right + (6.0 * size).ceil() as u32).min(img.width());
+            let crop_bottom = (bottom + (116.0 * size).ceil() as u32).min(img.height());
+            let cropped = image::imageops::crop_imm(img, crop_x, crop_y, crop_right - crop_x, crop_bottom - crop_y).to_image();
+            let at = AtSamplesSize::new(&cropped, size);
+            let scaled_right = ((right - crop_x) as f32 / size).round() as u32;
+            let mut scaled_bottom = ((bottom - crop_y) as f32 / size).round() as u32;
             row(&at.img, scaled_right, scaled_bottom as i32 - 16)?;
             for _ in 0..5 {
                 if row(&at.img, scaled_right, scaled_bottom as i32 + 22 - 16).is_some_and(|r| r.fresh) {
@@ -349,11 +368,34 @@ fn locate(img: &RgbImage) -> Option<Layout> {
                     break;
                 }
             }
-            let bottom = (scaled_bottom as f32 * size).round() as u32;
+            let bottom = crop_y + (scaled_bottom as f32 * size).round() as u32;
+            if !(0..6).any(|slot| scaled_bottom.checked_sub(22 * slot).is_some_and(|bottom| parenthesis(&at.img, scaled_right, bottom))) {
+                return None;
+            }
             Some((aligned.len(), right, Layout { bottom, right, size }))
         })
         .max_by_key(|(n, x, _)| (*n, *x))
         .map(|(_, _, l)| l)
+}
+
+fn parenthesis(img: &RgbImage, right: u32, bottom: u32) -> bool {
+    parenthesis_scaled(img, right, bottom, 1.0)
+}
+
+fn parenthesis_scaled(img: &RgbImage, right: u32, bottom: u32, size: f32) -> bool {
+    let at = |n: f32| (n * size).round() as u32;
+    if right < at(3.0) || bottom < at(16.0) {
+        return false;
+    }
+    let top = bottom - at(16.0);
+    let near = |x: u32, y: u32| {
+        (x.saturating_sub(1)..=x + 1)
+            .flat_map(|x| (y.saturating_sub(1)..=y + 1).map(move |y| edge(img, x, y, at(2.0).max(1)).0))
+            .fold(0.0, f32::max)
+    };
+    let stem = (5..=11).filter(|&y| near(right, top + at(y as f32)) > 35.0).count();
+    let corners = [(right - at(3.0), top), (right - at(2.0), top + at(2.0)), (right - at(2.0), top + at(13.0)), (right - at(3.0), bottom)];
+    stem >= 5 && corners.iter().filter(|&&(x, y)| near(x, y) > 25.0).count() >= 3
 }
 
 fn edge(img: &RgbImage, x: u32, y: u32, distance: u32) -> (f32, bool) {
