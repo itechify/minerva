@@ -3417,10 +3417,10 @@ button.button {
   }
 }
 
-/* A Character's page (ADR 0027): their name, who their newest entry says they are, and where
-   they stand in one sentence, then a table of their entries for each Level Band, as Where to
-   train's table: the map's name its link, over its street, figures right-aligned. One measure
-   with the Map Leaderboards' pages. */
+/* A Character's page (ADR 0027): their name, who their newest entry says they are, and a row
+   of figures, then a table of their entries for each Level Band, as Where to train's table:
+   the map's name its link, over its street, figures right-aligned. One measure with the Map
+   Leaderboards' pages. */
 .ch-board {
   max-width: 60em;
 }
@@ -3435,18 +3435,43 @@ button.button {
   line-height: 22px;
   color: var(--ink-2);
 }
-/* Where they stand, in the lede's size and the map page's voice ("Egbert is #57 of 63…"), the
-   figures bold, led by the crown while they hold a #1. Its line is kept from the first paint. */
-.ch-standing {
-  max-width: 40em;
-  min-height: 28px;
-  margin: 16px 0 0;
-  font-size: 17px;
-  line-height: 28px;
-  text-wrap: pretty;
+/* The figures, each in the hotkey table's inset box: the figure, over what it counts, over
+   what more it says. */
+.ch-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 60em;
+  margin: 24px 0 0;
 }
-.ch-standing strong {
+.ch-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--inset-bg);
+}
+.ch-stat dd {
+  margin: 0;
+}
+.ch-stat-value {
+  order: -1;
+  font-size: 23px;
   font-weight: 700;
+  line-height: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.ch-stat-label {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+.ch-stat-detail {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 .ch-board {
   padding-top: 40px;
@@ -3518,12 +3543,6 @@ button.button {
   stroke-width: 1.1;
   stroke-linejoin: round;
 }
-.ch-crown-lead {
-  width: 20px;
-  height: 20px;
-  margin-right: 8px;
-  vertical-align: -3px;
-}
 /* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
 .ch-board .lb-said.ch-lost-said {
   font-size: 15px;
@@ -3585,11 +3604,14 @@ button.button {
     width: 96px;
   }
 }
-/* On a phone each entry becomes a card, as Where to train's maps do: the map beside its EXP/h,
-   over its rank, job and level beside the date, over the map's mob levels. A long map name
-   wraps rather than push the EXP/h off the card, and the EXP/h and date share the card's right
-   edge. The whole card is the map's link, for a thumb. */
+/* On a phone the figures go two by two, and each entry becomes a card, as Where to train's
+   maps do: the map beside its EXP/h, over its rank, job and level beside the date, over the
+   map's mob levels. A long map name wraps rather than push the EXP/h off the card, and the
+   EXP/h and date share the card's right edge. The whole card is the map's link, for a thumb. */
 @media (max-width: 640px) {
+  .ch-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .ch-table tr {
     position: relative;
     display: grid;

@@ -187,7 +187,7 @@ The Map Leaderboards page's table of the maps for one Level Band: each map whose
 _Avoid_: best maps, recommended maps, map ranking
 
 **Character page**:
-A Character's page on owlofminerva.app (`/character/?name=`), which every name the Map Leaderboards show links to, and a new #1's post on Discord: every entry of theirs a Level Band at a time, highest first, each with its rank there, and over them the job and level of their newest entry and one sentence of where they stand: the #1s they hold (one per map and Level Band), their other top-3 places, and how many maps they're on, in which Level Bands (ADR 0027). It shows only what their entries show map by map: no ceiling, and nothing that ties one Character to another or to an Account. A name with no entries, whatever the reason, shows the owl lost.
+A Character's page on owlofminerva.app (`/character/?name=`), which every name the Map Leaderboards show links to, and a new #1's post on Discord: every entry of theirs a Level Band at a time, highest first, each with its rank there, and over them the job and level of their newest entry, the #1s they hold (one per map and Level Band), their podiums (places in a band's top 3), how many maps they're on and their best EXP/h (ADR 0027). It shows only what their entries show map by map: no ceiling, and nothing that ties one Character to another or to an Account. A name with no entries, whatever the reason, shows the owl lost.
 _Avoid_: profile, player page, Personal Bests page
 
 **Top spot taken**:

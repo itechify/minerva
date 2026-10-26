@@ -1,9 +1,8 @@
 <!doctype html>
 <!-- A Character's page (ADR 0027): every entry of theirs on the Map Leaderboards, a Level Band
      at a time, highest first, each with its rank there and a link to it on its Map
-     Leaderboard; over them, who they are as their newest entry says, and where they stand, in
-     a sentence: their #1s and other top-3 places, on how many maps in which Level Bands. Every
-     name the Map Leaderboards show links here: /character/?name=Egbert. It reads the site's
+     Leaderboard; over them, who they are as their newest entry says, and their #1s, podiums,
+     maps and best EXP/h. Every name the Map Leaderboards show links here: /character/?name=Egbert. It reads the site's
      API from the browser (page.ts), so without script it says it needs it. A name with no
      entries shows the owl lost. -->
 <html lang="en">
@@ -71,7 +70,7 @@
               })();
             </script>
             <p class="ch-who" id="who"></p>
-            <p class="ch-standing" id="standing"></p>
+            <dl class="ch-stats" id="stats" hidden></dl>
           </header>
 
           <section class="ch-board stop lb-waiting" id="board" data-mini="Bests" aria-label="Bests">
@@ -81,7 +80,7 @@
               <img class="lost-art" src="../art/not-found.png" alt="" width="440" height="287" loading="lazy" decoding="async" />
             </div>
             <p class="lb-said" id="said" aria-live="polite">Loading their bests…</p>
-            <!-- Says where they stand once the bests are in, as #said is hidden then. -->
+            <!-- Reads out their figures once the bests are in, as #said is hidden then. -->
             <p class="sr-only" id="loaded" aria-live="polite"></p>
             <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
             <div id="bands"></div>

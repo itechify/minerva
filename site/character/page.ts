@@ -1,11 +1,11 @@
 // A Character's page (character/index.html, ADR 0027): their name, who their newest entry
-// says they are, where they stand in a sentence, then a table of their entries for each Level
-// Band, highest first, each row's map a link to the entry on its Map Leaderboard.
+// says they are, their #1s, podiums, maps and best EXP/h, then a table of their entries for
+// each Level Band, highest first, each row's map a link to the entry on its Map Leaderboard.
 // What it shows is worked out in character.ts.
 import { make, svgEl } from "../../src/dom.ts";
 import { byId, markSlot, names, said as saidWith, unreachable } from "../leaderboards/api.ts";
 import type { Said } from "../leaderboards/leaderboards.ts";
-import { type CharacterAnswer, type CharacterBand, type CharacterRow, characterPage, noCharacter, readName, type Standing } from "./character.ts";
+import { type CharacterAnswer, type CharacterBand, type CharacterRow, characterPage, noCharacter, readName, type Stat } from "./character.ts";
 
 const name = readName(location.search);
 const board = byId("board");
@@ -19,26 +19,32 @@ function say(text: Said, lost: boolean) {
   said.hidden = false;
   said.classList.toggle("ch-lost-said", lost);
   byId("lost").hidden = !lost;
-  // With no Character, their lines' room under the name goes, so the owl sits close under it.
+  // With no Character, their line's room under the name goes, so the owl sits close under it.
   byId("who").hidden = lost;
-  byId("standing").hidden = lost;
+}
+
+/** The figures under the name: each over what it counts, and what more it says under that. */
+function drawStats(stats: Stat[]) {
+  const list = byId("stats");
+  list.replaceChildren(
+    ...stats.map((stat) => {
+      const item = make("div", "ch-stat");
+      const value = make("dd", "ch-stat-value", stat.value);
+      const label = make("dt", "ch-stat-label", stat.label);
+      item.append(label, value);
+      if (stat.detail !== null) item.append(make("dd", "ch-stat-detail", stat.detail));
+      return item;
+    }),
+  );
+  list.hidden = false;
 }
 
 /** A crown, a #1's mark, in Crown Gold (index.html's gradient), never the You Yellow that
  *  marks the player's own. */
-function crown(className = "ch-crown"): SVGSVGElement {
-  const svg = svgEl("svg", { viewBox: "0 0 16 16", class: className, "aria-hidden": "true" });
+function crown(): SVGSVGElement {
+  const svg = svgEl("svg", { viewBox: "0 0 16 16", class: "ch-crown", "aria-hidden": "true" });
   svg.append(svgEl("path", { d: "M2 12.5 1 4.5l4 3 3-5 3 5 4-3-1 8Z" }));
   return svg;
-}
-
-/** Where they stand, under the name: the crown first while they hold a #1, the figures bold. */
-function drawStanding(standing: Standing) {
-  const line = byId("standing");
-  line.replaceChildren(
-    ...(standing.crowned ? [crown("ch-crown ch-crown-lead")] : []),
-    ...standing.words.map((w) => (typeof w === "string" ? w : make("strong", "", w.strong))),
-  );
 }
 
 /** An entry's row: its rank of how many (crowned for a #1), its map (a link to the entry on
@@ -147,9 +153,9 @@ async function load() {
   document.title = `${page.name} · Minerva`;
   byId("name").textContent = page.name;
   byId("who").textContent = page.who;
-  drawStanding(page.standing);
+  drawStats(page.stats);
   said.hidden = true;
-  byId("loaded").textContent = page.standing.text;
+  byId("loaded").textContent = `${page.name}: ${page.stats.map((s) => `${s.value} ${s.label}`).join(", ")}.`;
   byId("bands").replaceChildren(...page.bands.map(drawBand));
   board.classList.remove("lb-waiting");
 }
