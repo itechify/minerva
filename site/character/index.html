@@ -40,6 +40,7 @@
     <link rel="stylesheet" href="../site.css" />
     <script type="module" src="../site.ts"></script>
     <script type="module" src="./page.ts"></script>
+    @SEAMS@
   </head>
   <body>
     <a class="skip" href="#main">Skip to the page</a>
@@ -60,7 +61,7 @@
         <div class="part" data-street="Character">
           <header class="lb-head stop" id="top" data-mini="Character">
             <p class="lb-back"><a href="/leaderboards/">All Map Leaderboards</a></p>
-            <h1 class="ch-name" id="name">Character</h1>
+            <h1 class="ch-name" id="name" data-seam-to="seam-name">Character</h1>
             <!-- The name the address asks for, before the page's script runs, so the heading
                  never shows "Character" first. page.ts writes it again as last uploaded. -->
             <script>

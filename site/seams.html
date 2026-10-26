@@ -1,0 +1,97 @@
+<!-- The seam (@SEAMS@, site/vite.config.ts; DESIGN.md, Motion): the Map Leaderboards' pages and
+     a Character's page as one window. A name clicked on the boards glides into the Character's
+     page as its heading, the rest cross-fading and the window's head settling into place: a
+     cross-document View Transition, answering the click, so it shows where the page came from.
+     Any other way between them (a tab, a map, the way back, Back and Forward) is a plain
+     navigation, and so is all of it without the browser's support or with reduced motion. It
+     is written into each page's head, not its module, so it is in place before the page's
+     first paint, as a View Transition needs. -->
+<style>
+  @view-transition {
+    navigation: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    @view-transition {
+      navigation: none;
+    }
+  }
+  /* A heading the seam lands on is as wide as its words, so they scale as words, not as a
+     page-wide box. */
+  [data-seam-to] {
+    width: fit-content;
+    max-width: 100%;
+  }
+  ::view-transition-group(seam-name),
+  ::view-transition-group(seam-head) {
+    animation-duration: 320ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  ::view-transition-old(seam-name),
+  ::view-transition-new(seam-name) {
+    height: 100%;
+    animation-duration: 320ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  /* The window's head is one over both pages: where the page left was scrolled, it settles from
+     the top to its place on the same curve, never cross-fading with itself. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 200ms;
+  }
+</style>
+<script>
+  (function () {
+    /** The link a click last followed, if it's one the seam starts from. */
+    var clicked = null;
+
+    function name(el, value) {
+      if (el) el.style.viewTransitionName = value;
+    }
+    function head() {
+      return document.querySelector(".window-head");
+    }
+
+    addEventListener(
+      "click",
+      function (event) {
+        var target = event.target;
+        clicked = target instanceof Element ? target.closest("a[data-seam]") : null;
+      },
+      true,
+    );
+
+    // Leaving: the clicked link takes the seam's name, or the transition is skipped.
+    addEventListener("pageswap", function (event) {
+      var transition = event.viewTransition;
+      if (!transition) return;
+      var link = clicked;
+      clicked = null;
+      var to = event.activation && event.activation.entry ? event.activation.entry.url : null;
+      if (!link || (to !== null && to !== link.href)) return transition.skipTransition();
+      name(link, link.dataset.seam);
+      name(head(), "seam-head");
+    });
+
+    // Arriving: the heading the seam lands on takes its name, until the transition is done.
+    addEventListener("pagereveal", function (event) {
+      var transition = event.viewTransition;
+      if (!transition) return;
+      var to = document.querySelector("[data-seam-to]");
+      if (!to || to.textContent.trim() === "") return transition.skipTransition();
+      name(to, to.dataset.seamTo);
+      name(head(), "seam-head");
+      transition.finished.finally(function () {
+        name(to, "");
+        name(head(), "");
+      });
+    });
+
+    // Come back to from the history, a page leaves no name on what it left from.
+    addEventListener("pageshow", function () {
+      document.querySelectorAll("a[data-seam]").forEach(function (link) {
+        name(link, "");
+      });
+      name(head(), "");
+    });
+  })();
+</script>

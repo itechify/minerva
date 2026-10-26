@@ -62,8 +62,10 @@ function fillPlaceholders(): Plugin {
       .digest("hex")
       .slice(0, 10)}`,
   };
-  // The window's head opens every page and the credits close it, each written once.
+  // The window's head opens every page and the credits close it, each written once; the seams
+  // go in the head of the pages they join (site/seams.html).
   const windowHead = fileURLToPath(new URL("./window-head.html", import.meta.url));
+  const seams = fileURLToPath(new URL("./seams.html", import.meta.url));
   const credits = fileURLToPath(new URL("./credits.html", import.meta.url));
   /** The head as `page` shows it: its icon from the repo's root, and its own tab marked open.
    *  A Character's page, the 404 and the account pages have no tab. */
@@ -84,6 +86,7 @@ function fillPlaceholders(): Plugin {
         html
           .replace("@WINDOW_HEAD@", () => headFor(ctx.filename))
           .replace("@CREDITS@", () => readFileSync(credits, "utf8").trim())
+          .replace("@SEAMS@", () => readFileSync(seams, "utf8").replace(/^<!--[\s\S]*?-->\s*/, "").trim())
           .replace(/@[A-Z_]+@/g, (token) => values[token] ?? token),
     },
   };

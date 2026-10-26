@@ -107,10 +107,12 @@ export function markSlot(mark: { name: string; picture: string } | null): HTMLEl
 }
 
 /** A Character's name as a link to their page (ADR 0027). At rest it reads as the name around
- *  it does; under the pointer it is the link it is. */
+ *  it does; under the pointer it is the link it is. Followed, it glides into that page's
+ *  heading (site/seams.html). */
 export function characterLink(name: string, href: string, className = ""): HTMLAnchorElement {
   const link = make("a", className ? `lb-character ${className}` : "lb-character", name);
   link.href = href;
+  link.dataset.seam = "seam-name";
   return link;
 }
 
