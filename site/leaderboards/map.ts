@@ -276,8 +276,23 @@ let moving: ViewTransition | null = null;
  *  for it, sliding the rows when `animate` and the browser can, and motion is welcome. */
 async function switchTo(to: Link, href: string | null, animate: boolean) {
   const turn = ++switches;
-  const open = mapPage(to, names, mapAnswer!).open;
-  if (open === null) return;
+  const page = mapPage(to, names, mapAnswer!);
+  const open = page.open;
+  if (open === null) {
+    // No band to open under this kind: the page still goes where the click asked, and says so.
+    const address = linkTo(to);
+    if (href !== null && address !== location.pathname + location.search) history.pushState(null, "", address);
+    link = to;
+    drawBands(page.bands);
+    drawKinds();
+    shown = [];
+    byId("table").hidden = true;
+    byId("band-title").hidden = true;
+    byId("note").hidden = true;
+    rows.replaceChildren();
+    byId("board").removeAttribute("aria-busy");
+    return say(page.empty!);
+  }
   wanted = open;
   byId("board").setAttribute("aria-busy", "true");
   const band = await readBand(open, to.name, to.kind);
