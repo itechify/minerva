@@ -34,6 +34,7 @@ pub mod osms_items;
 mod pace;
 mod panel;
 mod personal_best;
+mod pickup_log;
 mod player_shop;
 mod pictures;
 mod portal_overrides;
@@ -86,6 +87,7 @@ pub use panel::{
     PlacementMode, ScreenPoint,
     ScreenRect, Section, Size,
 };
+pub use pickup_log::{PICKUP_LOG_CAPTURE_MS, PickupLine, PickupLogCapture, PickupLogReader, PickupLogReading, PickupLogSeen};
 pub use personal_best::{BESTS_VERSION, CharacterBests, MapBests, SavedBests, VisitBest};
 pub use osms_items::ScrollTier;
 pub use player_shop::{ListedPrice, PlayerShopReader, ShopCapture, ShopHover, ShopList, ShopNearMiss, ShopReading, ShopRow};
@@ -295,6 +297,9 @@ pub struct PanelState {
     /// [`STATUS_BAR_STRIP`] rows across the bottom of the game's client area, while there is a
     /// game window and the overlay can show (see [`Layer`]); `None` otherwise.
     pub status_bar_capture: Option<ScreenRect>,
+    /// Where on screen to capture for the Pickup Log (physical px), every
+    /// [`PICKUP_LOG_CAPTURE_MS`] on a thread of its own (ADR 0026); `None` while it isn't read.
+    pub pickup_log_capture: Option<ScreenRect>,
     /// What the Status Bar showed in the last capture of it; `None` while it isn't found.
     pub status_bar: Option<StatusBar>,
     /// The Character playing, as the Status Bar names them, whom the Session is for; `None`
@@ -583,6 +588,8 @@ pub struct Minerva {
     shop_reader: Option<PlayerShopReader>,
     /// Reads captures fed to [`Minerva::on_status_bar_capture`]; loaded on the first one.
     status_bar_reader: Option<StatusBarReader>,
+    /// Reads captures fed to [`Minerva::on_pickup_log_capture`], in order; made on the first one.
+    pickup_log_reader: Option<PickupLogReader>,
     /// Where the Status Bar's level, job and name were last found, and the game's client
     /// area then: our windows keep clear of them while the client area stays where it was.
     status_bar_area: Option<(ScreenRect, ScreenRect)>,
@@ -654,6 +661,7 @@ impl Minerva {
             deal_finder: DealFinder::default(),
             shop_reader: None,
             status_bar_reader: None,
+            pickup_log_reader: None,
             status_bar_area: None,
             title_found: None,
             title_locked: false,
@@ -1671,6 +1679,26 @@ impl Minerva {
         }
         self.deal_finder.read(reading);
         self.sync_panel()
+    }
+
+    /// Read a capture of [`PanelState::pickup_log_capture`] with the core's own
+    /// [`PickupLogReader`] and update the panel state, as [`Minerva::on_pickup_log_read`].
+    pub fn on_pickup_log_capture(&mut self, capture: PickupLogCapture) -> &PanelState {
+        let reading = self.pickup_log_reader.get_or_insert_with(PickupLogReader::bundled).read(&capture);
+        self.on_pickup_log_read(capture, reading)
+    }
+
+    /// Take in what the shell's [`PickupLogReader`] read in `capture`, a capture of
+    /// [`PanelState::pickup_log_capture`].
+    pub fn on_pickup_log_read(&mut self, capture: PickupLogCapture, reading: PickupLogReading) -> &PanelState {
+        let _ = capture;
+        self.on_pickup_log_reading(reading)
+    }
+
+    /// Take in what a Pickup Log capture read as, with no capture: a Bug Report's replay.
+    pub fn on_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
+        let _ = reading;
+        &self.state
     }
 
     /// Read a capture of [`PanelState::status_bar_capture`] and update the panel state: the
