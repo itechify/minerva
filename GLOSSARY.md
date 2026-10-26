@@ -230,15 +230,15 @@ _Avoid_: chat, drop log, kill feed
 The in-game currency; the game itself says "mesos".
 _Avoid_: miso, gold, money
 
-**Pickups**:
-The mesos and Items the Pickup Log says the player picked up in a Session, each Item tallied by name. Read from the Pickup Log, they may be fewer than were picked up, never more (ADR 0026).
-_Avoid_: loot, drops, haul
+**Loot**:
+The mesos and Items the Pickup Log says the player picked up in a Session, each Item tallied by name. Read from the Pickup Log, it may be less than was picked up, never more (ADR 0026). The Grind Tracker shows it as a collapsible section.
+_Avoid_: pickups, drops, haul
 
 ### Items
 
 **Item**:
 Something the player can hold in the inventory: equipment, potions, scrolls, chairs, ores, Cash items. Each has its own MeowDB page.
-_Avoid_: drop, loot (when meaning the item itself)
+_Avoid_: drop, loot (when meaning one item; Loot is the Session's mesos and Items)
 
 **Scroll Tier**:
 Which of the four scrolls that improve the same thing one is: Lesser (100%), Intermediate (60%), Greater (10%) or Chaos, the end of its name ("One-Handed Sword Attack Scroll: Greater"). Every scroll of a tier has the same picture, whatever it improves, coloured by the tier: blue-grey, red, gold or grey.

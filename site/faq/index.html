@@ -103,7 +103,7 @@
                   <summary>Does Minerva read or change the game?</summary>
                   <p>
                     No. Like a screenshot, it captures only what it needs: the minimap title, the bar at the bottom of the
-                    game (your EXP, level and name), the log of pickups in the bottom-right corner (while the Grind Tracker
+                    game (your EXP, level and name), the Pickup Log in the bottom-right corner (while the Grind Tracker
                     is on), the tooltip by the pointer when you press an item hotkey, and, while
                     the Deal Finder is on, the game window a few times a second to find a Player Shop. It never reads or
                     changes the game's memory or files, never injects anything into it, and never presses keys or clicks
@@ -772,9 +772,8 @@
                     <li>Your EXP per hour over the last 5 minutes and, once you've played longer, over the whole Session.</li>
                     <li>Your deaths, and what they cost.</li>
                     <li>
-                      The <a href="#mesos">mesos</a> you've picked up this Session, and mesos per hour. Under them,
-                      <strong>Pickups</strong>, closed at first with how many items you've picked up, opens to the five you've
-                      picked up most.
+                      Your <a href="#loot">Loot</a>, closed at first with the mesos and items you've picked up this Session.
+                      Open, it adds mesos per hour and the five items you've picked up most.
                     </li>
                     <li>
                       Once you've shared EXP with a party, a thin bar under your Session rate that
@@ -801,8 +800,8 @@
                     <strong>Grind Tracker</strong>: Minerva then doesn't read your EXP at all, until you tick it again.
                   </p>
                 </details>
-                <details class="qa" id="mesos">
-                  <summary>Where do the mesos and items come from, and why can the figures be low?</summary>
+                <details class="qa" id="loot">
+                  <summary>Where does the Loot come from, and why can the figures be low?</summary>
                   <p>
                     From the game's <strong>Pickup Log</strong>, the lines that fade in the bottom-right corner of the
                     window ("You have gained mesos (+29)"). Minerva adds up the ones that arrive during the Session, so a
@@ -813,9 +812,10 @@
                   </p>
                   <p>
                     The items you pick up come from the same lines ("Orange Mushroom Cap x26 earned. (Etc)") and are
-                    tallied by name under <strong>Pickups</strong>, under the mesos. Click Pickups to open it: the five
-                    items you've picked up most, each with its count, and "+N more" opens the rest. It stays open or closed
-                    as you leave it, even after you restart Minerva. A reset or a character switch clears the items with the
+                    tallied by name. Closed, the <strong>Loot</strong> header shows the Session's totals ("Loot 1,593 mesos
+                    28 items"). Click Loot to open it: the mesos and mesos per hour, then the five items you've picked up
+                    most, each with its count, and "+N more" opens the rest. It stays open or closed as you leave it, even
+                    after you restart Minerva. A reset or a character switch clears the items with the
                     mesos, and there is no per-hour figure for them. Minerva names an item from the game's item list. When
                     the game cuts a long name short ("Arrows for Cros...") it goes by the item list and the inventory tab
                     named in the line; if more than one item fits, it's tallied as the game shows it, never guessed. A name

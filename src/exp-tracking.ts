@@ -47,31 +47,31 @@ export type ExpTracking = {
    *  EXP figures. */
   noStatusBar: boolean;
   /** What the Pickup Log says the Session picked up. */
-  pickups: Pickups;
+  loot: Loot;
   /** The EXP Split: the shares of the Session's EXP that were the player's own and Party EXP,
    *  in hundredths of a percent, 10,000 together; none until Party EXP has come in. */
   expSplit: ExpSplit | null;
 };
 
-/** Mirror of `minerva_core::Pickups`: read from the Pickup Log, so possibly fewer than were
+/** Mirror of `minerva_core::Loot`: read from the Pickup Log, so possibly fewer than were
  *  picked up, never more. */
-export type Pickups = {
+export type Loot = {
   /** The Session's mesos, as they arrive. */
   mesos: number;
   /** Mesos an hour over the Session's active time, held with the other figures; none until
    *  the Session has active time. */
   mesosPerHour: number | null;
   /** The Items picked up, the most picked up first. */
-  items: PickedItem[];
-  /** How many Items in all: the Pickups header's count. */
+  items: LootItem[];
+  /** How many Items in all: the Loot header's count while it is collapsed. */
   itemsTotal: number;
 };
 
 /** Mirror of `minerva_core::ExpSplit`. */
 export type ExpSplit = { ownHundredths: number; partyHundredths: number };
 
-/** Mirror of `minerva_core::PickedItem`: an Item by name, and how many were picked up. */
-export type PickedItem = { name: string; count: number };
+/** Mirror of `minerva_core::LootItem`: an Item by name, and how many were picked up. */
+export type LootItem = { name: string; count: number };
 
 /** Mirror of `minerva_core::PacePoint`: active time before the last EXP change, and the
  *  EXP gained since the trace's first point. */

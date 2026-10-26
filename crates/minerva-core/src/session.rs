@@ -69,7 +69,7 @@
 
 use crate::ExpBar;
 use crate::bug_report::{Level, Note};
-use crate::pickup_items::{ItemTally, Named, PickedItem};
+use crate::loot_items::{ItemTally, Named, LootItem};
 use crate::personal_best::{BestKind, Bests, SavedBests, Stamp, VisitBest};
 use crate::pickup_log::{PickupLine, PickupLogReading};
 use crate::status_bar::StatusBar;
@@ -157,18 +157,18 @@ pub struct ExpTracking {
     /// and wasn't since the client area last changed size (ADR 0017).
     pub no_status_bar: bool,
     /// What the Pickup Log says the player picked up in the Session.
-    pub pickups: Pickups,
+    pub loot: Loot,
     /// The EXP Split: how much of the Session's EXP was the player's own and how much Party
     /// EXP, as the Pickup Log's lines say. `None` until Party EXP has come in this Session. It
     /// moves with the log, as the bar does, rather than holding with the figures.
     pub exp_split: Option<ExpSplit>,
 }
 
-/// The Pickups (GLOSSARY) of the Session so far: read from the Pickup Log, so they may be
+/// The Loot (GLOSSARY) of the Session so far: read from the Pickup Log, so it may be
 /// fewer than were picked up, never more (ADR 0026): the mesos, and the Items by name.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Pickups {
+pub struct Loot {
     /// The mesos picked up since the Session started, as they arrive.
     pub mesos: u64,
     /// Mesos an hour over the Session's active time, held with the other figures. `None`
@@ -176,8 +176,8 @@ pub struct Pickups {
     pub mesos_per_hour: Option<u64>,
     /// The Items picked up since the Session started, the most picked up first (#171). No
     /// per-hour figure for them.
-    pub items: Vec<PickedItem>,
-    /// How many Items in all, whichever they are: the Pickups header's count.
+    pub items: Vec<LootItem>,
+    /// How many Items in all, whichever they are: the Loot header's count while it is collapsed.
     pub items_total: u64,
 }
 
@@ -1086,7 +1086,7 @@ impl Session {
     /// EXP change starts it, from the EXP the bar shows then). Mesos are play, so they keep the
     /// Session from pausing, as an EXP change does; they are not an EXP change, so they leave
     /// the Pace Trace alone. Items are counted with the Session and are not play.
-    pub fn on_pickups(&mut self, lines: &[PickupLine], items: Vec<(Named, u32)>, at_ms: u64) {
+    pub fn on_loot(&mut self, lines: &[PickupLine], items: Vec<(Named, u32)>, at_ms: u64) {
         self.tick(at_ms);
         let Some(figures) = &mut self.figures else { return };
         let mut mesos = lines.iter().filter_map(|line| match line {
@@ -1337,11 +1337,11 @@ impl Session {
             forecast: forecast(self.last, held.rolling),
             lost_from_hundredths: self.lost_from.filter(|&p| self.last.is_some_and(|bar| bar.percent_hundredths < p)),
             // The mesos as they arrive, like the bar; their rate holds with the figures.
-            pickups: Pickups {
+            loot: Loot {
                 mesos: self.figures.as_ref().map_or(0, |f| f.mesos),
                 items: self.figures.as_ref().map_or_else(Vec::new, |f| f.items.items()),
                 items_total: self.figures.as_ref().map_or(0, |f| f.items.total()),
-                ..held.pickups
+                ..held.loot
             },
             exp_split: self.exp_split(),
             ..held
@@ -1462,7 +1462,7 @@ impl Session {
             forecast: Vec::new(),
             lost_from_hundredths: None,
             no_status_bar: false,
-            pickups: Pickups {
+            loot: Loot {
                 mesos: figures.mesos,
                 mesos_per_hour: (average.over_ms > 0)
                     .then(|| div_round(i128::from(figures.mesos) * i128::from(HOUR_MS), i128::from(average.over_ms)) as u64),

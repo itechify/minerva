@@ -56,13 +56,13 @@ fn a_reading_and_a_stale_capture_are_recorded_and_replay_without_pixels() {
     let reading = PickupLogReading { rows: vec![5], shift: 1,
         ..common::pickup_reading(200, PickupLogSeen::Clear { area: region }, vec![PickupLine::Mesos { amount: 1_234 }]) };
     minerva.on_pickup_log_reading(reading.clone());
-    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 1_234);
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 1_234);
     minerva.on_foreground(Foreground::OtherApp);
     let img = image::RgbaImage::new(region.width, region.height);
     let capture = PickupLogCapture { frame: common::frame(&img, 300), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
     minerva.on_pickup_log_read(capture, PickupLogReading { at_ms: 300, ..reading });
     assert_eq!(minerva.panel_state().pickup_log_capture, None);
-    assert_eq!(minerva.panel_state().exp_tracking.pickups.mesos, 1_234);
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 1_234);
     let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
     let readings: Vec<_> = recording
         .lines

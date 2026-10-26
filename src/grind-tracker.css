@@ -126,7 +126,7 @@
   display: contents;
 }
 
-/* The Meso row's grid takes no room in the box while its row is hidden. */
+/* A grid with no row showing takes no room in the box. */
 .rates:not(:has(> .row:not([hidden]))) {
   display: none;
 }
@@ -266,51 +266,52 @@
   padding: 0 0 0 1px;
 }
 
-/* The Pickups header under the Meso row: plain at rest, as the Best link is, with a chevron
-   that turns down when it is open and the Items' count after it while it is collapsed. Open,
-   the Items are rows of a name and its tally, the tally in the rates' bold figures, and
-   "+N more" a plain link under them. The rows are as tall as the rates', so the list adds no
-   more height than its Items. */
-.pickups {
+/* The Loot section under the Pace Trace: its header plain at rest, as the Best link is, with a
+   chevron that turns down when it is open and the Session's totals after it while it is
+   collapsed, the figures in the rates' bold and their words in the label's. Open, the Mesos
+   row is the rates', and the Items are rows of a name and its tally, the tally in the rates'
+   bold figures, and "+N more" a plain link under them. The rows are as tall as the rates', so
+   the list adds no more height than its Items. */
+.loot {
   font-size: 12px;
   line-height: 17px;
   color: var(--ink-2);
 }
 
-.pickups-head,
-.pickups-more {
+.loot-head,
+.loot-more {
   all: unset;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.pickups-head {
+.loot-head {
   display: flex;
   align-items: baseline;
   gap: 4px;
 }
 
-.pickups-head:hover .label,
-.pickups-more:hover {
+.loot-head:hover .label,
+.loot-more:hover {
   color: var(--portal);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
 
-.pickups-head:active .label,
-.pickups-more:active {
+.loot-head:active .label,
+.loot-more:active {
   color: var(--frame);
 }
 
-.pickups-head:focus-visible,
-.pickups-more:focus-visible {
+.loot-head:focus-visible,
+.loot-more:focus-visible {
   outline: 2px solid var(--edit);
   outline-offset: 2px;
   border-radius: 2px;
 }
 
-.pickups .chevron {
+.loot .chevron {
   width: 9px;
   height: 9px;
   flex: none;
@@ -322,42 +323,46 @@
   stroke-linejoin: round;
 }
 
-.pickups.open .chevron {
+.loot.open .chevron {
   transform: rotate(90deg);
 }
 
-.pickups .count {
+.loot .count .figure {
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
 }
 
-.pickups-items {
+.loot .rates {
+  padding-left: 13px;
+}
+
+.loot-items {
   margin: 0;
   padding: 0 0 0 13px;
   list-style: none;
 }
 
-.pickups-items li {
+.loot-items li {
   display: flex;
   justify-content: space-between;
   gap: 10px;
 }
 
-.pickups-items .name {
+.loot-items .name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pickups-items .tally {
+.loot-items .tally {
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
 }
 
-.pickups-more {
+.loot-more {
   display: block;
   padding-left: 13px;
 }

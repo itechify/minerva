@@ -126,8 +126,8 @@ pub enum Action {
     /// history: one that came from a bug. The map's next-best Visit takes over. There is no
     /// undo.
     RemoveBest,
-    /// The Grind Tracker's Pickups header: open the Items picked up, or collapse them to it.
-    TogglePickups,
+    /// The Grind Tracker's Loot header: open the mesos and Items picked up, or collapse them to it.
+    ToggleLoot,
     /// Open the Grind Tracker's window, or close it (the panel's button, or its hotkey).
     ToggleGrindTracker,
     /// Close the Grind Tracker's window (its ×). The Session carries on.
