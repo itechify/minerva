@@ -112,7 +112,7 @@ use game_data::Refreshes;
 use grind_tracker::GrindTracker;
 use hotkey_settings::HotkeySettings;
 use settings_window::SettingsPlace;
-use item_card::{Editing, ItemCards, MESOWATCH_URL, Pressed};
+use item_card::{Editing, ItemCards, Pressed, market_page};
 use loader::{Held, Load, Loaded, Loader};
 use market_prices::MarketPrices;
 use item_lookup::ItemLookups;
@@ -1803,12 +1803,12 @@ impl Minerva {
         self.sync_panel()
     }
 
-    /// The player clicked the MesoWatch button on the Item Card's market heading: open
-    /// MesoWatch, where they look the item up (it has no page per item). `None` while no
-    /// card shows.
-    pub fn open_card_mesowatch(&self) -> Option<Request> {
-        let Some(ShownItemCard { view: ItemCardView::Card(_), .. }) = &self.state.item_card else { return None };
-        Some(Request::OpenInBrowser { url: MESOWATCH_URL.to_string() })
+    /// The player clicked one of the Item Card's market section's buttons to look the item
+    /// up on maplestory.market: open the card's item's page there. `None` while no card
+    /// shows.
+    pub fn open_card_market(&self) -> Option<Request> {
+        let Some(ShownItemCard { view: ItemCardView::Card(card), .. }) = &self.state.item_card else { return None };
+        Some(Request::OpenInBrowser { url: market_page(&card.id) })
     }
 
     /// The player clicked the price on the Item Card's Market Line `line` (its ID), or its

@@ -2,8 +2,8 @@
 //! Ctrl+Shift+I. The shell captures the game's client area with the pointer, the Item
 //! Tooltip's name is read, and the card shows at the pointer what the game's tooltip
 //! doesn't: what a shop pays for the item, and the market prices the player keeps for it on
-//! their Market Lines (ADR 0011), with links to its MeowDB page and to MesoWatch's market
-//! prices. Failures go to the Owl Bubble.
+//! their Market Lines (ADR 0011), with links to its MeowDB page and to its page on
+//! maplestory.market. Failures go to the Owl Bubble.
 //!
 //! The readings here stand for what the Item Tooltip reader made of a capture. OSMS's item
 //! files are made up in their shapes ([`common::items`]).
@@ -764,21 +764,49 @@ fn of_meowdb_items_sharing_the_name_none_of_the_cards_kind_are_listed_by_the_owl
     assert!(matches!(owl_says(&state), Some((ItemLookup::Choose { .. }, Hotkey::ItemLookup))), "{:?}", state.item_lookup);
 }
 
+/// What the market section's buttons open for the card showing.
+fn market_page(minerva: &Minerva) -> Option<String> {
+    minerva.open_card_market().map(|request| match request {
+        Request::OpenInBrowser { url } => url,
+        other => panic!("{other:?}"),
+    })
+}
+
 #[test]
-fn the_cards_market_line_opens_mesowatch_for_the_player_to_look_the_item_up() {
+fn the_cards_market_section_opens_the_items_page_on_maplestory_market() {
     let mut minerva = started();
-    assert_eq!(minerva.open_card_mesowatch(), None, "no card");
+    assert_eq!(market_page(&minerva), None, "no card");
 
     press_over(&mut minerva, "Bronze Ore", 1_000);
 
-    assert_eq!(minerva.open_card_mesowatch(), Some(Request::OpenInBrowser { url: "https://meso.watch/".into() }));
+    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/4010000"));
+}
+
+#[test]
+fn of_items_that_look_alike_the_market_page_is_the_first_ones_whose_prices_the_card_keeps() {
+    let mut minerva = started_with(FakeSource::osms_offline().with_items(namesakes()));
+
+    press_over(&mut minerva, "Red Potion", 1_000);
+
+    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/2000000"));
+}
+
+#[test]
+fn of_items_sharing_a_name_the_market_page_is_the_picked_ones_and_none_before_the_pick() {
+    let mut minerva = started_with(FakeSource::osms_offline().with_items(namesakes()));
+    press_over(&mut minerva, "Blue Moon", 1_000);
+    assert_eq!(market_page(&minerva), None, "the player hasn't picked one");
+
+    minerva.pick_card_item("01032001");
+
+    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/1032001"));
 }
 
 #[test]
 fn the_card_credits_osms_for_its_data_and_the_sites_it_links_to() {
     let card = card_of(shop(), "Bronze Ore");
 
-    assert_eq!(card.credit, "Data: OSMS Data Explorer · Pages: NiaMeowDB, MesoWatch");
+    assert_eq!(card.credit, "Data: OSMS Data Explorer · Pages: NiaMeowDB, maplestory.market");
 }
 
 #[test]

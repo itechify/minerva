@@ -38,6 +38,7 @@ chrome --headless=new --hide-scrollbars --allow-file-access-from-files --window-
 
 When a change alters something a shot shows, the PR that makes it lists the shot here, with what changed. At release, the smoke test retakes every shot listed (`docs/releasing.md`) and empties the list.
 
+- `item-card.png`: the button by Market opens maplestory.market in place of MesoWatch, and "Look it up on maplestory.market" sits under the market lines. Retaken, the table's row and the home page's alt text say the button opens maplestory.market, and the look-up under the lines.
 - `item-lookup.png`: Item Lookup's alert is now the owl saying it in a speech bubble (ADR 0025). Retaken, the table's row and the home page's alt text say the owl in place of the alert.
 
 A release may go out without retaking them. Then the page shows `wip.png` in place of each shot too far out of date to show, and the shot stays listed. None does now. Retaking one means pointing its `<img>` back at its own file (a scene from the game, as the Item Card's, on its own stage again: `shot stage scene`, where the sign stood on the panel's), and writing its alt text afresh, from what it shows and the entries below.
