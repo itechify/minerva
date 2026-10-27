@@ -71,7 +71,7 @@ use crate::ExpBar;
 use crate::bug_report::{Level, Note};
 use crate::loot_items::{ItemTally, Named, LootItem};
 use crate::personal_best::{BestKind, Bests, SavedBests, Stamp, VisitBest};
-use crate::pickup_log::{PickupLine, PickupLogReading};
+use crate::pickup_log::PickupLine;
 use crate::status_bar::StatusBar;
 use serde::{Deserialize, Serialize};
 
@@ -466,6 +466,10 @@ pub(crate) struct Session {
     /// What the Pickup Log said of the player's kills before the Session started: the first
     /// kill's lines come before the bar changes. They join the Session's when it starts.
     before_start: PartyPlay,
+    /// Lines of the Pickup Log that arrived before this (ms of capture time) are no part of the
+    /// Session: a line is read a few captures after it arrives, so one that arrived before a reset,
+    /// an undo or a Character switch may be read after it.
+    lines_from: u64,
     /// The Visit under way. It outlasts Sessions: a reset or a character switch doesn't
     /// move the player.
     visit: Visit,
@@ -607,6 +611,8 @@ struct Figures {
     /// When the player last played: the EXP last changed, or the Pickup Log last said mesos
     /// were picked up.
     last_play_at: u64,
+    /// When the Session started (ms of capture time): the first EXP change.
+    started_at: u64,
     /// Active time up to `last_play_at`.
     active_at_play: u64,
     /// Active time up to the last EXP change, which the Pace Trace ends at: mesos don't move it.
@@ -640,6 +646,7 @@ impl Figures {
     /// A Session started at `at`.
     fn new(at: u64) -> Self {
         Figures {
+            started_at: at,
             last_play_at: at,
             active_at_play: 0,
             active_at_change: 0,
@@ -1038,6 +1045,7 @@ impl Session {
         self.shown = None;
         self.undo = None;
         self.before_start = PartyPlay::default();
+        self.lines_from = self.now;
     }
 
     /// The Session has started: it has figures, since the first EXP gain.
@@ -1079,6 +1087,23 @@ impl Session {
         self.character_switched = undo.character_switched;
         self.misfits = None;
         self.shown = None;
+        // What arrived while it was set aside is no part of it.
+        self.lines_from = self.now;
+    }
+
+    /// From when the Pickup Log's lines are the Session's own to count, once it has started: a
+    /// line that arrived before the Session started (the first EXP change starts it), or before a
+    /// reset, an undo or a Character switch, is not counted, though it is read after. `None`
+    /// while it is waiting to start.
+    pub fn counts_loot_from(&self) -> Option<u64> {
+        self.figures.as_ref().map(|figures| figures.started_at.max(self.lines_from))
+    }
+
+    /// From when the Pickup Log's EXP lines count: those before the Session starts join it (the
+    /// first kill's lines come before the bar changes), but not those from before a reset or a
+    /// Character switch.
+    pub fn counts_lines_from(&self) -> u64 {
+        self.lines_from
     }
 
     /// The Pickup Log said `lines` arrived, in a clean capture at `at_ms`, and `items` are its
@@ -1205,19 +1230,20 @@ impl Session {
         self.bests.restore(saved);
     }
 
-    /// A Pickup Log capture read as `reading`: its EXP lines tell the player's own EXP from
-    /// Party EXP, for the EXP Split and for telling a party window from a solo one. Nothing
-    /// here is an amount of EXP: that comes from the EXP bar alone (ADR 0005).
-    pub fn on_pickup_log(&mut self, reading: &PickupLogReading) {
-        self.tick(reading.at_ms);
+    /// A Pickup Log capture at `at_ms` read `arrived` as its new lines, those of them that count
+    /// ([`Session::counts_lines_from`]): their EXP lines tell the player's own EXP from Party EXP,
+    /// for the EXP Split and for telling a party window from a solo one. Nothing here is an
+    /// amount of EXP: that comes from the EXP bar alone (ADR 0005).
+    pub fn on_pickup_log(&mut self, at_ms: u64, arrived: &[PickupLine]) {
+        self.tick(at_ms);
         let (play, active) = match &mut self.figures {
             Some(figures) => {
-                let active = figures.active(reading.at_ms);
+                let active = figures.active(at_ms);
                 (&mut figures.play, active)
             }
             None => (&mut self.before_start, 0),
         };
-        play.take(&reading.arrived, active);
+        play.take(arrived, active);
     }
 
     /// Whether the Rolling Rate's window, the last 5 minutes of active play, has Party EXP in

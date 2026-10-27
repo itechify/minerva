@@ -1371,6 +1371,7 @@ fn item_names_cut_short_and_matching_no_item_are_written_down_for_tuning_the_mat
         rows: vec![],
         shift: 0,
         arrived,
+        arrived_at: vec![],
         chose: false,
         guessed: false,
         overflowed: false,

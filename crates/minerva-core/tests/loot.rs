@@ -9,7 +9,7 @@ mod common;
 
 use common::{S, read, tracking};
 use minerva_core::{
-    Action, Minerva, PanelControl, PanelSizes, PanelState, PickupLine, PickupLogSeen, ScreenRect, Size,
+    Action, Minerva, PanelControl, PanelSizes, PanelState, PickupLine, PickupLogReading, PickupLogSeen, ScreenRect, Size,
     StatusBar, StatusBarReading, TrackingState,
 };
 
@@ -62,6 +62,64 @@ fn mesos_picked_up_before_the_session_starts_are_not_its_own() {
     let state = picked_up(&mut minerva, 11 * S, vec![mesos(40)]);
 
     assert_eq!(state.exp_tracking.loot.mesos, 40);
+}
+
+/// A clean reading delivered at `at_ms` of lines that arrived at `arrived_ms` (the captures where
+/// the stack shifted them in; a line is read a few captures after it arrives, and so comes later).
+fn arriving(at_ms: u64, arrived_ms: u64, lines: Vec<PickupLine>) -> PickupLogReading {
+    PickupLogReading { arrived_at: vec![arrived_ms; lines.len()], ..common::clean_pickup_reading(at_ms, lines) }
+}
+
+#[test]
+fn a_line_that_arrived_before_the_session_started_is_not_its_own_though_it_is_read_after() {
+    let mut minerva = tracking();
+    read(&mut minerva, 0, 160, 381);
+    read(&mut minerva, 10 * S, 266, 633);
+
+    minerva.on_pickup_log_reading(arriving(10 * S + 300, 10 * S - 100, vec![mesos(300)]));
+    let state = minerva.on_pickup_log_reading(arriving(10 * S + 400, 10 * S, vec![mesos(40)])).clone();
+
+    assert_eq!(state.exp_tracking.loot.mesos, 40);
+}
+
+#[test]
+fn a_line_that_arrived_before_a_reset_the_player_undid_is_not_counted_after_the_undo() {
+    let mut minerva = a_minute_in();
+    picked_up(&mut minerva, 71 * S, vec![mesos(1_500)]);
+    minerva.tick(80 * S);
+    minerva.act(Action::ResetSession);
+    minerva.tick(85 * S);
+    minerva.act(Action::UndoReset);
+
+    // Arrived while the Session was set aside, read just after it came back.
+    minerva.on_pickup_log_reading(arriving(85 * S + 300, 82 * S, vec![mesos(300)]));
+    let state = minerva.on_pickup_log_reading(arriving(85 * S + 400, 85 * S + 100, vec![mesos(40)])).clone();
+
+    assert_eq!(state.exp_tracking.loot.mesos, 1_540);
+}
+
+#[test]
+fn a_party_line_that_arrived_before_a_reset_does_not_join_the_next_session() {
+    let mut minerva = a_minute_in();
+    minerva.tick(80 * S);
+    minerva.act(Action::ResetSession);
+    let party = PickupLine::Exp { amount: 30, party: true };
+
+    // Read after the reset, but it arrived before.
+    minerva.on_pickup_log_reading(arriving(80 * S + 300, 79 * S + 900, vec![party]));
+    let state = read(&mut minerva, 82 * S, 400, 952);
+
+    assert_eq!(state.exp_tracking.exp_split, None);
+}
+
+#[test]
+fn a_reset_ends_the_log_readers_stream_so_the_lines_it_was_still_reading_are_dropped() {
+    let mut minerva = a_minute_in();
+    let before = minerva.panel_state().pickup_log_generation;
+
+    minerva.act(Action::ResetSession);
+
+    assert!(minerva.panel_state().pickup_log_generation > before);
 }
 
 #[test]

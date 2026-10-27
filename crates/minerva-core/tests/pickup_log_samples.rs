@@ -164,7 +164,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
     let mut reader = PickupLogReader::bundled();
     let mut arrivals = Vec::new();
     // (The line that arrived at 3200 is read again at the captures after it, until they vote.)
-    for at_ms in [2000, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600] {
+    for at_ms in [2000, 2800, 2900].into_iter().chain((3000..=3600).step_by(100)) {
         let path = common::samples_in("pickup-log/empty-to-loot").join(format!("{at_ms:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
         let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
@@ -184,7 +184,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
     // establishes a baseline, so the four lines already present are not recounted.
     reader.reset();
     let mut arrivals = Vec::new();
-    for at_ms in [3000, 3200, 3300, 3400, 3500, 3600, 3700] {
+    for at_ms in std::iter::once(3000).chain((3200..=3700).step_by(100)) {
         let path = common::samples_in("pickup-log/empty-to-loot").join(format!("{at_ms:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
         let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
@@ -293,15 +293,26 @@ fn arrivals(reader: &mut PickupLogReader, captures: impl IntoIterator<Item = Pic
     captures.into_iter().flat_map(|capture| reader.read(&capture).arrived).collect()
 }
 
-/// The clip's frames, to 500 ms after the last line arrived (3200): a line is read again at the
-/// captures after it arrived, and counted when they vote.
-const CLIP_MS: [u64; 18] = [2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600, 3700];
+/// The frame the clip's last line arrived in, and how long after it the line is read again, at the
+/// captures after it arrived, until they vote.
+const LAST_ARRIVAL_MS: u64 = 3200;
+const READ_FOR_MS: u64 = 500;
+
+/// The clip's frames, every 100 ms from 2000 to 500 ms after the last line arrived.
+fn clip_ms() -> impl Iterator<Item = u64> + Clone {
+    (2000..=LAST_ARRIVAL_MS + READ_FOR_MS).step_by(100)
+}
+
+/// The clip proper: its frames up to the last arrival.
+fn clip_proper_ms() -> Vec<u64> {
+    clip_ms().filter(|&ms| ms <= LAST_ARRIVAL_MS).collect()
+}
 
 #[test]
 fn a_log_over_a_band_of_rock_is_found_and_counted() {
     for background in ["no-log--222954.png", "no-log--224804.png", "no-log--244695.png"] {
         let mut reader = PickupLogReader::bundled();
-        let captures = CLIP_MS.map(|ms| log_in_band(ms, background, 0, ms));
+        let captures = clip_ms().map(|ms| log_in_band(ms, background, 0, ms));
         assert_eq!(arrivals(&mut reader, captures), vec![PickupLine::Mesos { amount: 26 }], "{background}");
     }
 }
@@ -312,7 +323,7 @@ fn a_band_that_looked_like_a_log_does_not_keep_the_real_one_from_being_found() {
     // rock's own right edge, and the real log, with fresh lines, was never looked for after.
     let mut reader = PickupLogReader::bundled();
     assert!(reader.read(&band_capture(&common::samples_in("pickup-log-band").join("log--229262.png"), 0)).arrived.is_empty());
-    let captures = CLIP_MS.map(|ms| log_in_band(ms, "no-log--244695.png", 0, 100 + ms));
+    let captures = clip_ms().map(|ms| log_in_band(ms, "no-log--244695.png", 0, 100 + ms));
     assert_eq!(arrivals(&mut reader, captures), vec![PickupLine::Mesos { amount: 26 }]);
 }
 
@@ -332,7 +343,7 @@ fn wiped(mut capture: PickupLogCapture) -> PickupLogCapture {
 #[test]
 fn a_stack_of_closing_parentheses_counts_nothing_until_a_line_in_it_reads() {
     let mut reader = PickupLogReader::bundled();
-    for ms in CLIP_MS {
+    for ms in clip_ms() {
         let reading = reader.read(&wiped(log_in_band(ms, "no-log--244695.png", 0, ms)));
         assert_eq!(reading.seen, PickupLogSeen::Nothing, "{ms}");
         assert!(reading.arrived.is_empty(), "{ms}");
@@ -342,15 +353,19 @@ fn a_stack_of_closing_parentheses_counts_nothing_until_a_line_in_it_reads() {
 #[test]
 fn a_lookalike_that_never_reads_is_dropped_and_the_real_log_is_found() {
     let mut reader = PickupLogReader::bundled();
-    // A lookalike two lines higher than the real log, for four seconds.
+    // A lookalike two lines higher than the real log, for four seconds: the clip proper over and
+    // over (the lookalike's stage ends differently with the frames after the last arrival, and then
+    // the real log's first four lines are not counted, as the reader that read each line once did
+    // not count them either).
+    let proper = clip_proper_ms();
     for i in 0..40 {
-        let reading = reader.read(&wiped(log_in_band(CLIP_MS[i % 14], "no-log--244695.png", 2 * 22, i as u64 * 100)));
+        let reading = reader.read(&wiped(log_in_band(proper[i % proper.len()], "no-log--244695.png", 2 * 22, i as u64 * 100)));
         assert_eq!(reading.seen, PickupLogSeen::Nothing);
     }
     // The real log, still for four seconds, then the clip: its lines, all of them, are counted,
     // the first four too, because the real log was followed from before they arrived.
     let still = (0..40).map(|i| log_in_band(2000, "no-log--244695.png", 0, 4000 + i * 100));
-    let clip = CLIP_MS.map(|ms| log_in_band(ms, "no-log--244695.png", 0, 8000 + ms));
+    let clip = clip_ms().map(|ms| log_in_band(ms, "no-log--244695.png", 0, 8000 + ms));
     assert_eq!(arrivals(&mut reader, still.chain(clip)), truth("empty-to-loot"));
 }
 

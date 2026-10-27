@@ -15,6 +15,23 @@ use minerva_core::{
 /// corner, the lines ending 7 px inside the right edge).
 const CLIP_AT: (i64, i64) = (1072, 480);
 
+const CLIPS: [&str; 4] = ["exp-and-mesos", "etc-and-use-items", "skill-effect", "burst"];
+
+/// How long after the frame that brought a line it may be counted (ms): the line is read again
+/// at the captures after it, and counted where the reads vote.
+const READ_FOR_MS: u64 = 500;
+
+/// The lines the clips' cold reader misses for want of a baseline (`etc-and-use-items`' first two).
+const MISSED_BEFORE_THE_LOG_WAS_FOUND: usize = 2;
+
+/// How many of the clips' lines the reader read whole when it read each line once, as it arrived
+/// (measured with that reader on these clips, before a new line was read again).
+const READ_WHOLE_WHEN_READ_ONCE: usize = 14;
+
+/// How many it reads whole now that a new line is read again and the reads vote (measured; the
+/// rest are the lines under the clips' cover, or too blurred at this size to read).
+const READ_WHOLE_WHEN_THE_READS_VOTE: usize = 19;
+
 /// A 1280x720 game with the Grind Tracker on and a Session started, and the Item files of the
 /// made-up game world the clips' Items are named from.
 fn at_720p() -> Minerva {
@@ -147,7 +164,6 @@ fn a_burst_of_lines_is_read_at_a_1280_by_720_ui_size() {
     found_and_read("burst", 3);
 }
 
-const CLIPS: [&str; 4] = ["exp-and-mesos", "etc-and-use-items", "skill-effect", "burst"];
 #[test]
 fn a_clip_never_counts_a_line_that_did_not_arrive_or_one_it_already_did() {
     for name in CLIPS {
@@ -168,10 +184,6 @@ fn a_clip_never_counts_a_line_that_did_not_arrive_or_one_it_already_did() {
         }
     }
 }
-
-/// How long after the frame that brought a line it may be counted (ms): the line is read again
-/// at the captures after it, and counted where the reads vote.
-const READ_FOR_MS: u64 = 500;
 
 #[test]
 fn a_line_is_counted_when_its_reads_vote_not_before_it_arrived_and_not_after_half_a_second() {
@@ -200,16 +212,16 @@ fn a_line_is_counted_when_its_reads_vote_not_before_it_arrived_and_not_after_hal
     }
 }
 
-/// The lines the clips' cold reader misses for want of a baseline (`etc-and-use-items`' first two).
-const MISSED_BEFORE_THE_LOG_WAS_FOUND: usize = 2;
-
 #[test]
 fn a_new_line_is_read_again_while_it_is_new_and_the_reads_vote() {
     // Read once, as it arrived, 14 of the 30 lines in the clips read whole (the rest were
     // `Unreadable` or missed): the same line is on screen for 1.5 s or more, and a read of it
     // at a later capture, or the agreement of several, is better than any one.
+    let lines: usize = CLIPS.iter().map(|name| truth(name).iter().map(|(_, lines)| lines.len()).sum::<usize>()).sum();
     let right = CLIPS.iter().map(|name| right(name, &clip(name).lines).0).sum::<usize>();
-    assert!(right >= 19, "{right} of the 30 lines read whole");
+    assert_eq!(lines, 30, "the lines in the clips");
+    assert!(right > READ_WHOLE_WHEN_READ_ONCE, "{right} of the {lines} lines read whole, no better than a read of each line as it arrived");
+    assert!(right >= READ_WHOLE_WHEN_THE_READS_VOTE, "{right} of the {lines} lines read whole");
 }
 
 #[test]

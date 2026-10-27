@@ -83,8 +83,17 @@ const CROP_AGAIN_MS: u64 = 10_000;
 const FOLLOW_MS: u64 = 500;
 /// The most reads of one line: at 10 Hz, the first five captures after it arrived.
 const MOST_READS: usize = 5;
-/// How many identical reads settle a line before [`MOST_READS`].
+/// How many reads that agree ([`same_figures`]) settle a line before [`MOST_READS`].
 const READS_AGREE: usize = 3;
+/// Which captures of a Pickup Log reading a Bug Report is to keep a crop of.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Crops {
+    /// The reading's own capture: it guessed, or lost lines it had seen, or found nothing for long.
+    pub current: bool,
+    /// The capture a line that would not read arrived in (its time), not the one where its vote
+    /// ended: by then it may have shifted up or faded.
+    pub arrival: Option<u64>,
+}
 
 /// Why a Pickup Log reading's capture is worth a crop in a Bug Report.
 #[derive(Debug, Default)]
@@ -97,27 +106,29 @@ pub(crate) struct KeepsCrops {
 }
 
 impl KeepsCrops {
-    /// Take in a reading: whether its capture is to be kept. `lost_lines` is whether the log was
+    /// Take in a reading: which of its captures are to be kept. `lost_lines` is whether the log was
     /// seen before and this reading found nothing. A reading with a cause that is due is kept, and
     /// every cause it has is then held back for [`CROP_AGAIN_MS`].
-    pub fn on_reading(&mut self, reading: &PickupLogReading, lost_lines: bool) -> bool {
+    pub fn on_reading(&mut self, reading: &PickupLogReading, lost_lines: bool) -> Crops {
         // Always asked, as it counts the readings of nothing.
         let long_nothing = self.nothing.on_reading(reading);
+        let unreadable = reading.arrived.iter().position(|line| *line == PickupLine::Unreadable);
         let causes = [
             (reading.guessed, &mut self.guessed_at),
-            (reading.arrived.contains(&PickupLine::Unreadable), &mut self.unreadable_at),
+            (unreadable.is_some(), &mut self.unreadable_at),
             (lost_lines || long_nothing, &mut self.nothing_at),
         ];
         let due = |at: &Option<u64>| at.is_none_or(|at| reading.at_ms.saturating_sub(at) >= CROP_AGAIN_MS || reading.at_ms < at);
-        let keep = causes.iter().any(|(has, at)| *has && due(at));
-        if keep {
+        let due_causes = causes.each_ref().map(|(has, at)| *has && due(at));
+        if due_causes.contains(&true) {
             for (has, at) in causes {
                 if has {
                     *at = Some(reading.at_ms);
                 }
             }
         }
-        keep
+        let [guessed, unreadable_due, nothing] = due_causes;
+        Crops { current: guessed || nothing, arrival: unreadable.filter(|_| unreadable_due).map(|i| reading.arrival_ms(i)) }
     }
 
     /// A new stream of captures: the wait for nothing starts again.
@@ -202,6 +213,12 @@ pub struct PickupLogReading {
     /// [`PickupLogSeen::Clear`].
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub arrived: Vec<PickupLine>,
+    /// When each of `arrived` arrived: the capture time of the capture whose stack shifted it in,
+    /// which is before `at_ms` by the few captures its reads took to vote. Empty, or shorter than
+    /// `arrived`, where a reading was made by hand or before this was written down: such a line
+    /// arrived at `at_ms`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub arrived_at: Vec<u64>,
     /// More than one shape shift fitted, before colour and brightness broke ties.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub chose: bool,
@@ -212,6 +229,13 @@ pub struct PickupLogReading {
     /// Every row was new: lines may have come and gone unseen.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub overflowed: bool,
+}
+
+impl PickupLogReading {
+    /// When line `i` of `arrived` arrived (ms of capture time): see [`PickupLogReading::arrived_at`].
+    pub fn arrival_ms(&self, i: usize) -> u64 {
+        self.arrived_at.get(i).copied().unwrap_or(self.at_ms)
+    }
 }
 
 /// Whether a capture showed the Pickup Log.
@@ -337,7 +361,7 @@ impl PickupLogReader {
         // is followed, so its first arrivals are counted once it is confirmed, but it reports
         // nothing until then, and a miss is dropped ([`Self::confirm`]).
         if !self.confirmed && reading.seen != PickupLogSeen::Nothing {
-            return PickupLogReading { at_ms: reading.at_ms, seen: PickupLogSeen::Nothing, rows: Vec::new(), shift: 0, arrived: Vec::new(), chose: false, guessed: false, overflowed: false };
+            return PickupLogReading { at_ms: reading.at_ms, seen: PickupLogSeen::Nothing, rows: Vec::new(), shift: 0, arrived: Vec::new(), arrived_at: Vec::new(), chose: false, guessed: false, overflowed: false };
         }
         reading
     }
@@ -349,6 +373,7 @@ impl PickupLogReader {
             rows: Vec::new(),
             shift: 0,
             arrived: Vec::new(),
+            arrived_at: Vec::new(),
             chose: false,
             guessed: false,
             overflowed: false,
@@ -429,7 +454,7 @@ impl PickupLogReader {
                 // is the new baseline, and what arrived meanwhile is missed, never guessed at.
                 self.unmatched_since = None;
                 self.previous = Some(current);
-                reading.arrived = self.following.drain(..).map(|f| vote(&f.reads)).collect();
+                (reading.arrived, reading.arrived_at) = decide(self.following.drain(..));
                 return reading;
             };
             self.unmatched_since = None;
@@ -440,7 +465,7 @@ impl PickupLogReader {
                     new.shape = old.shape.clone();
                 }
             }
-            reading.arrived = self.follow(&current.rows, shift, capture.frame.at_ms, matches!(at.img, Cow::Borrowed(_)));
+            (reading.arrived, reading.arrived_at) = self.follow(&current.rows, shift, capture.frame.at_ms, matches!(at.img, Cow::Borrowed(_)));
         }
         self.previous = Some(current);
         reading
@@ -465,44 +490,42 @@ impl PickupLogReader {
 
     /// Follow the lines that arrived. The `shift` bottom rows of `rows` are new: each is counted
     /// now, once, and read at this capture and the next few while it is at full brightness (up to
-    /// [`MOST_READS`] reads or [`FOLLOW_MS`], and no more once [`READS_AGREE`] reads are identical).
-    /// A line is decided by [`vote`] when it is done: when it has had its reads, or has faded, been
-    /// shifted out of the stack or run out of time. The lines decided are returned, oldest first, and
-    /// a line waits for the older ones before it.
-    fn follow(&mut self, rows: &[Option<Row>], shift: usize, at_ms: u64, at_samples_size: bool) -> Vec<PickupLine> {
+    /// [`MOST_READS`] reads or [`FOLLOW_MS`], and no more once [`READS_AGREE`] reads agree). A line is
+    /// decided by [`vote`] when it is done: when it has had its reads, or has faded, been shifted out
+    /// of the stack or run out of time. The lines decided are returned, oldest first, with when each
+    /// arrived; a line waits for the older ones before it.
+    fn follow(&mut self, rows: &[Option<Row>], shift: usize, at_ms: u64, at_samples_size: bool) -> (Vec<PickupLine>, Vec<u64>) {
         let mut following = std::mem::take(&mut self.following);
-        for line in following.iter_mut().filter(|f| !f.done) {
-            match line.slot.checked_sub(shift) {
-                Some(slot) => line.slot = slot,
-                None => line.done = true,
-            }
-            let fresh = rows.get(line.slot).and_then(Option::as_ref).is_some_and(|row| row.fresh);
-            line.done |= !fresh || at_ms.saturating_sub(line.since_ms) > FOLLOW_MS;
-        }
+        move_up(&mut following, rows, shift, at_ms);
         for (slot, row) in rows.iter().enumerate().skip(ROWS - shift) {
             following.push(Following { slot, since_ms: at_ms, reads: Vec::new(), done: row.is_none() });
         }
-        let reading = following.iter().enumerate().filter(|(_, f)| !f.done).map(|(i, f)| (i, rows[f.slot].as_ref().unwrap())).collect::<Vec<_>>();
-        let lines = self.read_rows(&reading.iter().map(|&(_, row)| row).collect::<Vec<_>>(), at_samples_size);
-        for (&(i, _), line) in reading.iter().zip(lines) {
-            let f = &mut following[i];
-            f.reads.push(line);
-            f.done = f.reads.len() >= MOST_READS || f.reads.iter().flatten().any(|a| f.reads.iter().flatten().filter(|b| a == *b).count() >= READS_AGREE);
-        }
+        self.read_again(&mut following, rows, at_samples_size);
         let decided = following.iter().take_while(|f| f.done).count();
-        let arrived = following.drain(..decided).map(|f| vote(&f.reads)).collect();
+        let arrived = decide(following.drain(..decided));
         self.following = following;
         arrived
     }
 
+    /// Read each of the `following` lines that isn't done once more, at this capture. By
+    /// [`move_up`] and the arrivals, a line that isn't done is on a row that is there.
+    fn read_again(&mut self, following: &mut [Following], rows: &[Option<Row>], at_samples_size: bool) {
+        let to_read: Vec<(usize, &Row)> =
+            following.iter().enumerate().filter(|(_, f)| !f.done).filter_map(|(i, f)| Some((i, rows.get(f.slot)?.as_ref()?))).collect();
+        let reads = self.read_rows(&to_read.iter().map(|&(_, row)| row).collect::<Vec<_>>(), at_samples_size);
+        for (&(i, _), read) in to_read.iter().zip(reads) {
+            following[i].reads.push(read);
+            following[i].done = following[i].settled();
+        }
+    }
+
     /// Read rows at one capture, each as a line or `None` where it didn't read. At the samples' size
-    /// a line is read once, and again with its ink weighed another way if that read didn't
-    /// parse. At a UI Size other than the samples' (the
-    /// footage is at a smaller one, scaled up) the glyphs are resampled and a digit slips with the
-    /// ink (`39` as `30`, in the footage, by what the world behind the line adds), so there a line
-    /// is read three ways (as is, with the ink weighed another way, and with it cut at a threshold)
-    /// and counts only when all three parse and agree on its kind and figures, else it is
-    /// unread: fewer, never another.
+    /// a line is read once, and again with its ink weighed another way if that read didn't parse. At
+    /// a UI Size other than the samples' (the footage is at a smaller one, scaled up) the glyphs are
+    /// resampled and a digit slips with the ink (`39` as `30`, in the footage, by what the world
+    /// behind the line adds), so there a line is read three ways (as is, with the ink weighed
+    /// another way, and with it cut at a threshold) and counts only when all three parse and agree
+    /// on its kind and figures, else it is unread: fewer, never another.
     fn read_rows(&mut self, new: &[&Row], at_samples_size: bool) -> Vec<Option<PickupLine>> {
         let inks = new.iter().map(|r| r.ink.clone()).collect::<Vec<_>>();
         let texts = self.read.read(&self.recogniser, &inks, 3);
@@ -887,7 +910,10 @@ fn reads_as(word: &str, fixed: &str) -> bool {
 
 /// Whether two reads of one line agree on everything that is counted: its kind and its amount
 /// (or quantity and tab), and for EXP whose it is. The name of an Item is not one of them: it is
-/// matched against the item files, and a misread one is only ever left as read.
+/// matched against the item files afterwards ([`crate::loot_items`]), and a misread one there is
+/// named by the closest Item, or left as read.
+///
+/// This is what "agree" means for a line's reads, both for stopping early and for the vote.
 fn same_figures(a: &PickupLine, b: &PickupLine) -> bool {
     match (a, b) {
         (PickupLine::Item { quantity: qa, tab: ta, .. }, PickupLine::Item { quantity: qb, tab: tb, .. }) => qa == qb && ta == tb,
@@ -895,25 +921,57 @@ fn same_figures(a: &PickupLine, b: &PickupLine) -> bool {
     }
 }
 
+/// The reads that parsed, grouped by what they agree on ([`same_figures`]), in the order each group
+/// was first read. Reads that didn't parse are in none.
+fn agreeing(reads: &[Option<PickupLine>]) -> Vec<Vec<&PickupLine>> {
+    let mut groups: Vec<Vec<&PickupLine>> = Vec::new();
+    for read in reads.iter().flatten() {
+        match groups.iter_mut().find(|group| same_figures(group[0], read)) {
+            Some(group) => group.push(read),
+            None => groups.push(vec![read]),
+        }
+    }
+    groups
+}
+
+impl Following {
+    /// Whether it has had all the reads it is to have: [`MOST_READS`], or [`READS_AGREE`] of them
+    /// agree ([`agreeing`]).
+    fn settled(&self) -> bool {
+        self.reads.len() >= MOST_READS || agreeing(&self.reads).iter().any(|group| group.len() >= READS_AGREE)
+    }
+}
+
+/// Move the followed lines up with the stack's `shift`, and end those that were shifted out, are no
+/// longer at full brightness on their row, or have been followed for [`FOLLOW_MS`].
+fn move_up(following: &mut [Following], rows: &[Option<Row>], shift: usize, at_ms: u64) {
+    for line in following.iter_mut().filter(|f| !f.done) {
+        match line.slot.checked_sub(shift) {
+            Some(slot) => line.slot = slot,
+            None => line.done = true,
+        }
+        let fresh = rows.get(line.slot).and_then(Option::as_ref).is_some_and(|row| row.fresh);
+        line.done |= !fresh || at_ms.saturating_sub(line.since_ms) > FOLLOW_MS;
+    }
+}
+
+/// What each of the followed `lines` is, by [`vote`], with when it arrived, in their order.
+fn decide(lines: impl Iterator<Item = Following>) -> (Vec<PickupLine>, Vec<u64>) {
+    lines.map(|line| (vote(&line.reads), line.since_ms)).unzip()
+}
+
 /// What a line that was read at each of several captures is: the kind and figures most of the
 /// reads that parsed agree on (an Item's name is the one read most often among them, the first on
 /// a tie), `Unreadable` where two kinds or figures are read as often, or none. Reads that didn't
 /// parse are not votes: a read that is the only one that parsed stands, as a line read once does.
 fn vote(reads: &[Option<PickupLine>]) -> PickupLine {
-    let reads = reads.iter().flatten().collect::<Vec<_>>();
-    let mut sets: Vec<Vec<&PickupLine>> = Vec::new();
-    for read in &reads {
-        match sets.iter_mut().find(|set| same_figures(set[0], read)) {
-            Some(set) => set.push(read),
-            None => sets.push(vec![read]),
-        }
-    }
-    let most = sets.iter().map(Vec::len).max().unwrap_or(0);
-    let mut winners = sets.into_iter().filter(|set| set.len() == most);
-    let (Some(set), None) = (winners.next(), winners.next()) else { return PickupLine::Unreadable };
-    let mut named = set[0];
-    for read in &set {
-        if set.iter().filter(|a| *a == read).count() > set.iter().filter(|a| **a == named).count() {
+    let groups = agreeing(reads);
+    let most = groups.iter().map(Vec::len).max().unwrap_or(0);
+    let mut winners = groups.into_iter().filter(|group| group.len() == most);
+    let (Some(group), None) = (winners.next(), winners.next()) else { return PickupLine::Unreadable };
+    let mut named = group[0];
+    for read in &group {
+        if group.iter().filter(|a| *a == read).count() > group.iter().filter(|a| **a == named).count() {
             named = read;
         }
     }

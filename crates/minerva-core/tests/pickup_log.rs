@@ -126,6 +126,31 @@ fn reports_keep_only_guessed_missing_and_unreadable_log_crops() {
 }
 
 #[test]
+fn the_crop_of_a_line_that_would_not_read_is_the_capture_it_arrived_in_not_where_its_vote_ended() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let img = image::RgbaImage::new(region.width, region.height);
+    // The stack shifts a line in at 1.0 s; its reads vote at 1.4 s, and it is Unreadable. By then
+    // it may have shifted up or faded, so the sample it would become is the frame it arrived in.
+    for at_ms in (900..=1_500).step_by(100) {
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
+        let (shift, arrived, arrived_at) = match at_ms {
+            1_000 => (1, vec![], vec![]),
+            1_400 => (0, vec![PickupLine::Unreadable], vec![1_000]),
+            _ => (0, vec![], vec![]),
+        };
+        let reading = PickupLogReading { shift, arrived_at, ..common::pickup_reading(at_ms, PickupLogSeen::Clear { area: region }, arrived) };
+        minerva.on_pickup_log_read(capture, reading);
+    }
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+
+    let crops: Vec<_> = recording.crops.iter().filter(|p| p.contains("pickup-log")).cloned().collect();
+    assert_eq!(crops, vec!["crops/pickup-log-0000001000.png"]);
+    assert_eq!(bug_report::replay(&recording, Some(common::osms::game().files())).divergence, None);
+}
+
+#[test]
 fn a_window_before_the_log_is_found_does_not_make_an_empty_capture_interesting() {
     let mut minerva = common::tracking();
     character(&mut minerva, 1.0);

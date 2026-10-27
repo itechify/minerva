@@ -515,6 +515,10 @@ pub enum PanelControl {
 const MAX_DEAL_MARGIN: u32 = 99;
 
 /// The region on screen a capture of `frame` from `origin` (its top-left pixel) was of.
+/// How many of the captures where the Pickup Log's stack shifted lines in are held (10 captures a
+/// second; a line's reads vote within half a second, or a second under a cover).
+const MOST_ARRIVALS_HELD: usize = 12;
+
 fn captured(frame: &Frame, origin: ScreenPoint) -> ScreenRect {
     ScreenRect { x: origin.x, y: origin.y, width: frame.width, height: frame.height }
 }
@@ -612,6 +616,9 @@ pub struct Minerva {
     pickup_log_seen: bool,
     /// How long the reader has found nothing, for the Bug Report to keep a capture of the band.
     pickup_log_crops: KeepsCrops,
+    /// The captures where the stack shifted lines in, the latest few: a Bug Report keeps the one a
+    /// line that would not read arrived in, which is a few captures before its vote ends.
+    pickup_log_arrivals: VecDeque<Frame>,
     /// Whether our windows have been over the Pickup Log.
     pickup_cover: PickupCover,
     /// Where the Status Bar's level, job and name were last found, and the game's client
@@ -688,6 +695,7 @@ impl Minerva {
             pickup_log_reader: None,
             pickup_log_seen: false,
             pickup_log_crops: KeepsCrops::default(),
+            pickup_log_arrivals: VecDeque::new(),
             pickup_cover: PickupCover::default(),
             status_bar_area: None,
             title_found: None,
@@ -1066,7 +1074,11 @@ impl Minerva {
                 self.state.quit |= self.setup.needed() == Some(SetupReason::FirstRun);
                 self.setup.cancel();
             }
-            Action::ResetSession => self.session.reset_by_player(),
+            Action::ResetSession => {
+                self.session.reset_by_player();
+                // The lines the Pickup Log reader was still reading arrived in the Session just ended.
+                self.reset_pickup_log();
+            }
             Action::UndoReset => self.session.undo_reset(),
             Action::RemoveBest => {
                 if let Some(map) = bests_map(&self.state) {
@@ -1732,9 +1744,21 @@ impl Minerva {
         // that finds nothing for a while, one whole band capture now and then, so a log it never
         // finds can be looked for in the report (a Bug Report of 0.15.0 had none of 6,652).
         let lost_lines = self.pickup_log_seen && reading.seen == PickupLogSeen::Nothing;
-        let unusual = self.pickup_log_crops.on_reading(&reading, lost_lines);
-        let crop = unusual.then_some((Region::PickupLog, capture.frame));
-        self.record_input(Event::PickupLog { reading: reading.clone(), stale_region: None }, Some(reading.at_ms), crop);
+        let crops = self.pickup_log_crops.on_reading(&reading, lost_lines);
+        // A line that would not read is kept as the capture it arrived in, where it is whole; a
+        // capture where the stack shifted a line in is held a little in case it is.
+        if reading.shift > 0 && matches!(reading.seen, PickupLogSeen::Clear { .. }) {
+            if self.pickup_log_arrivals.len() == MOST_ARRIVALS_HELD {
+                self.pickup_log_arrivals.pop_front();
+            }
+            self.pickup_log_arrivals.push_back(capture.frame.clone());
+        }
+        let arrival = crops.arrival.and_then(|at_ms| self.pickup_log_arrivals.iter().find(|frame| frame.at_ms == at_ms));
+        let mut frames: Vec<(Region, Frame)> = arrival.into_iter().map(|frame| (Region::PickupLog, frame.clone())).collect();
+        if (crops.current || (crops.arrival.is_some() && frames.is_empty())) && frames.iter().all(|(_, frame)| frame.at_ms != capture.frame.at_ms) {
+            frames.push((Region::PickupLog, capture.frame));
+        }
+        self.record_inputs(Event::PickupLog { reading: reading.clone(), stale_region: None }, Some(reading.at_ms), frames);
         self.take_pickup_log_reading(reading)
     }
 
@@ -1755,6 +1779,7 @@ impl Minerva {
         self.pickup_log_reader = None;
         self.pickup_log_seen = false;
         self.pickup_log_crops.restart();
+        self.pickup_log_arrivals.clear();
         self.state.pickup_log_generation += 1;
     }
 
@@ -1768,9 +1793,17 @@ impl Minerva {
             PickupLogSeen::Nothing => false,
         };
         self.pickup_cover.on_reading(&reading, &self.state.our_windows);
-        if self.tracking_on() {
-            let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });
-            let lines = if clear { &reading.arrived[..] } else { &[] };
+        let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });
+        // A line is read a few captures after it arrives: one that arrived before the Session
+        // started, or before a reset, an undo or a Character switch, is not its own.
+        let arrived_from = |from: u64| -> Vec<PickupLine> {
+            let lines = reading.arrived.iter().enumerate();
+            lines.filter(|&(i, _)| clear && reading.arrival_ms(i) >= from).map(|(_, line)| line.clone()).collect()
+        };
+        if self.tracking_on()
+            && let Some(from) = self.session.counts_loot_from()
+        {
+            let lines = arrived_from(from);
             let set = self.items.items().ok();
             let items = lines
                 .iter()
@@ -1781,9 +1814,10 @@ impl Minerva {
                     _ => None,
                 })
                 .collect();
-            self.session.on_loot(lines, items, reading.at_ms);
+            self.session.on_loot(&lines, items, reading.at_ms);
         }
-        self.session.on_pickup_log(&reading);
+        let lines = arrived_from(self.session.counts_lines_from());
+        self.session.on_pickup_log(reading.at_ms, &lines);
         self.sync_panel()
     }
 
