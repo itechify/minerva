@@ -3656,12 +3656,17 @@ button.button {
   object-fit: scale-down;
   vertical-align: middle;
 }
+.lb-portrait {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--frame) 4%, transparent);
+}
 .lb-portrait-photo {
   image-rendering: pixelated;
 }
-span.lb-portrait {
-  width: var(--size);
-  height: var(--size);
+/* The question-mark figure stands back from the photos: a character, not a hole, but never the
+   heaviest thing on the board. */
+.lb-portrait-none {
+  opacity: 0.4;
 }
 /* In a band's table, a column of its own before the names, 96px, the photos' own size: each row
    is as tall as a portrait, its words set on the row's middle. Without portraits, no column. */
@@ -3671,14 +3676,45 @@ span.lb-portrait {
 .lb-table.lb-faces .lb-face {
   display: table-cell;
   width: 96px;
-  padding-block: 4px;
+  padding: 4px 4px 4px 0;
   line-height: 0;
+}
+/* Rows a portrait tall make a long band long, so its headers and the lanes' ruler stay under
+   the window's head as it goes by, as Where to train's do. */
+@media (min-width: 641px) {
+  .lb-table.lb-faces thead th:not(.lb-date) {
+    position: sticky;
+    top: var(--head);
+    z-index: 1;
+    background: color-mix(in srgb, #fff 55%, var(--body-solid));
+    box-shadow: inset 0 -1px 0 var(--rule);
+  }
+  .lb-table.lb-faces thead th:first-child {
+    border-top-left-radius: 3px;
+  }
+  .lb-table.lb-faces thead th:last-child {
+    border-top-right-radius: 3px;
+  }
+  .lb-table.lb-faces tbody tr:first-child > * {
+    border-top: 0;
+  }
+}
+/* The Date header too, where a touch screen keeps its column (with a mouse it is out of
+   sight). */
+@media (min-width: 641px) and (not ((hover: hover) and (pointer: fine))) {
+  .lb-table.lb-faces thead th.lb-date {
+    position: sticky;
+    top: var(--head);
+    z-index: 1;
+    background: color-mix(in srgb, #fff 55%, var(--body-solid));
+    box-shadow: inset 0 -1px 0 var(--rule);
+  }
 }
 .lb-table.lb-faces tbody tr > * {
   vertical-align: middle;
 }
-/* A row's job and level under the name, and "/ Job" in the column's header, for a phone
-   (below). */
+/* A row's job and level under the name, and "Job" under "Character" in the column's header,
+   for a phone (below). */
 .lb-name-job,
 .lb-name-and-job {
   display: none;
@@ -3704,20 +3740,32 @@ span.lb-portrait {
   }
   .lb-table.lb-faces th,
   .lb-table.lb-faces td {
-    padding-inline: 4px;
+    padding-inline: 3px;
   }
   .lb-table.lb-faces .lb-rank {
     width: auto;
   }
+  /* A name breaks only where it must, so a whole one stays whole; the table scrolls in its
+     box before one is split. */
   .lb-table.lb-faces tbody .lb-name {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+  }
+  .lb-table.lb-faces tbody .lb-name,
+  .lb-table.lb-faces td.lb-exp {
+    font-size: 14px;
+  }
+  .lb-table.lb-faces .lb-rank {
+    padding-right: 0;
+  }
+  .lb-table.lb-faces .lb-face {
+    padding-inline: 0;
   }
   .lb-table.lb-faces .lb-job,
   .lb-table.lb-faces .lb-level {
     display: none;
   }
   .lb-table.lb-faces .lb-name-and-job {
-    display: inline;
+    display: block;
   }
   .lb-table.lb-faces .lb-name-job {
     display: block;
@@ -3727,7 +3775,14 @@ span.lb-portrait {
     line-height: 20px;
     color: var(--ink-2);
   }
+  .lb-table.lb-faces .lb-name-job .lb-job-line,
+  .lb-name-level {
+    white-space: nowrap;
+  }
+  /* What's out of sight in it (the dates, Report's name) is held in it too, so only the box
+     scrolls, never the page. */
   .lb-table-box {
+    position: relative;
     overflow-x: auto;
   }
 }
@@ -3737,6 +3792,11 @@ span.lb-portrait {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-2);
+}
+/* Under a band's table, in line with its caption. */
+.lb-table-box + .lb-credit {
+  margin-top: 4px;
+  padding-left: 12px;
 }
 /* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
 .ch-board .lb-said.ch-lost-said {

@@ -6,7 +6,7 @@ import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CharacterAnswer, LatestAnswer, PortraitAnswer } from "../../entries";
 import worker from "../index";
-import { band, call, entry, FIELD, key, optOut, upload } from "./api";
+import { admin, band, call, entry, FIELD, key, optOut, upload } from "./api";
 import { asked, classicRank, knownOnClassicRank, photoOf, profileOf } from "./classicrank";
 
 beforeEach(() => {
@@ -146,6 +146,21 @@ describe("a portrait", () => {
 });
 
 describe("the daily refresh", () => {
+  it("runs at once when the maintainer asks, as after the deploy that sets the key", async () => {
+    await upload("Odin", key("odin"), [entry(FIELD, 151, 10_000)]);
+    await askedAbout("Odin");
+    knownOnClassicRank("Odin");
+
+    const response = await admin("/portraits", { method: "POST" });
+
+    expect(response.status).toBe(204);
+    expect(await portraitOf("Odin")).toEqual(SHOWN("Odin"));
+  });
+
+  it("is the maintainer's alone to run at once", async () => {
+    expect((await admin("/portraits", { method: "POST" }, "not-the-token")).status).toBe(401);
+  });
+
   it("asks about every Character with entries, 300 names at a time", { timeout: 60_000 }, async () => {
     classicRank.busy = true;
     const names = Array.from({ length: 301 }, (_, i) => `Many${i}`);

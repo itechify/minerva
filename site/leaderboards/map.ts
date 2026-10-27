@@ -405,8 +405,13 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   if (row.you) name.append(star());
   name.append(characterLink(row.name, row.nameHref));
   // On a phone, a band with portraits writes the job and level under the name, in place of
-  // their columns.
-  if (row.portrait !== null) name.append(jobWithIcon(`${row.job} Lv ${row.level}`, row.jobClass, "lb-name-job", false));
+  // their columns: the class's icon kept with the job's first word, and the level whole.
+  if (row.portrait !== null) {
+    const [first, ...rest] = row.job.split(" ");
+    const job = make("span", "lb-name-job");
+    job.append(jobWithIcon(first, row.jobClass, "", false), ...rest.map((word) => ` ${word}`), " ", make("span", "lb-name-level", `Lv ${row.level}`));
+    name.append(job);
+  }
   const reportCell = make("td", "lb-report");
   if (!row.you) {
     const report = make("button", "lb-report-button");
@@ -432,8 +437,10 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   tr.append(cells[0]);
   // The portrait has a column of its own, before the name, as long as the band shows them.
   if (row.portrait !== null) {
+    // Decoration, as its header is: assistive tech counts no cell for it, so each figure
+    // stays under its own header.
     const face = make("td", "lb-face");
-    face.setAttribute("role", "cell");
+    face.setAttribute("aria-hidden", "true");
     face.append(portraitImage(row.portrait, BAND_PORTRAIT));
     tr.append(face);
   }

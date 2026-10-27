@@ -34,8 +34,8 @@ export type Medal = 1 | 2 | 3;
 
 /** A Character's portrait as the pages show it beside their name (ADR 0029): their photo on
  *  ClassicRank; `"none"`, the question-mark figure, once ClassicRank has been asked and has no
- *  photo of them or doesn't show them; or `"waiting"`, the portrait's room, empty, until it's
- *  been asked. */
+ *  photo of them or doesn't show them; or `"waiting"`, the same figure, until it's been
+ *  asked. */
 export type PortraitSlot = { photo: string } | "none" | "waiting";
 
 /** A Character's portrait from the API's answer; `null`, none at all, while the API gives

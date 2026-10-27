@@ -42,7 +42,8 @@ function drawPortrait(page: CharacterPage) {
   slot.hidden = !shown;
   byId("portrait-credit").hidden = !shown;
   if (page.portrait === null) return slot.replaceChildren();
-  const portrait = portraitImage(page.portrait, 96);
+  // At the top of the page, so it loads at once.
+  const portrait = portraitImage(page.portrait, 96, true);
   if (page.profile === null) return slot.replaceChildren(portrait);
   const link = make("a", "ch-portrait-link");
   link.href = page.profile;

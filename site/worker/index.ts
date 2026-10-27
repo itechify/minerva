@@ -165,6 +165,11 @@ async function routeAdmin(request: Request, url: URL, path: string[], env: Env):
       return reassign(env, request, path[1]);
     case path.length === 1 && path[0] === "accounts" && method === "GET":
       return findAccounts(env, url.searchParams.get("username"));
+    // The daily refresh of portraits, at once: after the deploy that sets the ClassicRank key,
+    // so the boards don't wait for the next morning's (ADR 0029).
+    case path.length === 1 && path[0] === "portraits" && method === "POST":
+      await refreshPortraits(env, Date.now());
+      return { status: 204 };
     default:
       return NOT_FOUND;
   }
