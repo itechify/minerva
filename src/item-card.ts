@@ -303,8 +303,10 @@ function marketSection(card: ItemCard): HTMLElement {
   }
   if (edit?.field === "name" && edit.line === null) section.append(...nameField(null, edit.problem));
   else if (card.market.length === 0) section.append(hint(null, "No market lines. + adds one to every card."));
-  const foot = link(MARKET_LOOK_UP, "Open the item's page on maplestory.market", openMarket);
+  // One link, the site's name in it blue.
+  const foot = link("Look it up on ", "Open the item's page on maplestory.market", openMarket);
   foot.classList.add("item-card-market-foot");
+  foot.append(span("site", "maplestory.market"));
   section.append(foot);
   return section;
 }

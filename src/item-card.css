@@ -331,14 +331,23 @@
   color: var(--ink-2);
 }
 
-/* The look-up at the market section's foot: set as a hint, in Portal Blue at rest so it
-   reads as a link (it will carry maplestory.market's credit), underlined under the pointer. */
+/* The look-up at the market section's foot: set as a hint, one link, the site's name in
+   Portal Blue at rest so it reads as one (it will carry maplestory.market's credit). Under
+   the pointer it is all Portal Blue and underlined; pressed, all Frame Navy. */
 .item-card-market-foot {
   align-self: flex-start;
   margin-top: 2px;
   font-size: 11px;
   line-height: 14px;
+  color: var(--ink-2);
+}
+
+.item-card-market-foot .site {
   color: var(--portal);
+}
+
+.item-card-market-foot:active .site {
+  color: inherit;
 }
 
 .item-card-choices {
