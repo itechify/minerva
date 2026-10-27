@@ -426,7 +426,7 @@ fn a_shadow_that_brightens_around_an_unchanged_line_is_not_a_new_arrival() {
 /// The readings of a clip, read as the band is, at the samples' size.
 fn readings(name: &str) -> Vec<minerva_core::PickupLogReading> {
     let mut reader = PickupLogReader::bundled();
-    common::pngs_in(&common::samples_in("pickup-log").join(name))
+    common::pngs_in(common::samples_in("pickup-log").join(name))
         .into_iter()
         .map(|path| {
             let at_ms = path.file_stem().unwrap().to_str().unwrap().parse().unwrap();
