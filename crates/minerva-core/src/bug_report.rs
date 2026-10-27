@@ -26,8 +26,9 @@
 //!   reader saw a near miss, else the latest; and the Status Bar's strip, the latest. It is held
 //!   as captured, and made a PNG only when a report is saved.
 //! - The text and the ordinary crops are at most [`MAX_TEXT_AND_CROPS_BYTES`]: crops are left
-//!   out to keep it so, the oldest ordinary ones first, then the oldest kept for the run. The
-//!   text never is. The whole captures come on top, while the report stays under
+//!   out to keep it so, the oldest of the kind that takes the most first (the ordinary ones before
+//!   those kept for the run), and the latest few of every kind last, so no one reader's crops
+//!   crowd out another's. The text never is. The whole captures come on top, while the report stays under
 //!   [`MAX_REPORT_BYTES`]; one that won't fit is left out, and `summary.txt` says so.
 //! - OSMS's file set isn't in a report (ADR 0008), only its fingerprint: a replay is given
 //!   the set to replay with, and a set that has changed since replays differently. The
@@ -64,8 +65,11 @@ use std::task::Poll;
 const TRACE_MS: u64 = 24 * 60 * 60 * 1000;
 /// How long a crop that isn't kept for the run is kept.
 pub const RECENT_CROPS_MS: u64 = 10 * 60_000;
-/// The most the crops kept for the run take; beyond it the oldest go.
+/// The most the crops kept for the run take; beyond it the oldest of the kind with the most go.
 const KEPT_CROPS_BYTES: usize = 8 * 1024 * 1024;
+/// How many of each kind of crop, the latest, are the last to go when the crops are too many for
+/// the budget: one reader that crops often can't take every other reader's out of a report.
+const LATEST_CROPS_PER_KIND: usize = 3;
 /// The most a Bug Report's text and its ordinary crops take...
 pub const MAX_TEXT_AND_CROPS_BYTES: usize = 5 * 1024 * 1024;
 /// ...and the biggest it gets, with the captures where a reader found nothing: under 10 MB, in
@@ -596,6 +600,20 @@ pub(crate) enum Region {
 }
 
 impl Region {
+    /// What kind of crop it makes, as its name begins: the budget shares out between kinds.
+    fn kind(self) -> &'static str {
+        match self {
+            Region::Title => "minimap-title",
+            Region::ExpBar => "exp-bar",
+            Region::ItemTooltip { .. } => "item-tooltip",
+            Region::PlayerShop => "player-shop",
+            Region::StatusBar => "status-bar",
+            Region::ClientArea { .. } => "client-area",
+            Region::StatusBarStrip => "status-bar-strip",
+            Region::PickupLog => "pickup-log",
+        }
+    }
+
     /// What its crop of a frame captured at `at_ms` is named in a report.
     fn crop_name(self, at_ms: u64) -> String {
         match self {
@@ -717,6 +735,8 @@ pub(crate) fn status_bar_crop(capture: StatusBarCapture, bar: Option<&StatusBar>
 struct Crop {
     /// Its name in the report: `crops/exp-bar-<capture ms>.png`.
     name: String,
+    /// What kind of crop: [`Region::kind`].
+    kind: &'static str,
     /// The capture time.
     at_ms: u64,
     /// Kept for the run: behind a reading the core found unusual, or one that changed
@@ -818,6 +838,31 @@ struct Last {
     update_check: u64,
     /// The last step of updating written down as asked for.
     update_job: Option<UpdateJob>,
+}
+
+/// A crop in the running for being left out of a report that is over its budget.
+struct Held {
+    kind: &'static str,
+    bytes: usize,
+    /// Kept for the run, not only for the last [`RECENT_CROPS_MS`].
+    kept: bool,
+}
+
+/// Which of `crops`, oldest first, goes first when they take too much: the oldest of the kind that
+/// takes the most, the ordinary ones before those kept for the run, and not one of the latest
+/// [`LATEST_CROPS_PER_KIND`] of its kind unless every crop is one. So a kind that crops often gives
+/// way before the others do, and every kind leaves its latest crops. `None` with no crops.
+fn first_to_go(crops: &[Held]) -> Option<usize> {
+    let latest = |i: usize| crops[i + 1..].iter().filter(|other| other.kind == crops[i].kind).count() < LATEST_CROPS_PER_KIND;
+    let mut candidates: Vec<usize> = (0..crops.len()).filter(|&i| !latest(i)).collect();
+    if candidates.is_empty() {
+        candidates = (0..crops.len()).collect();
+    }
+    let total = |kind: &str| crops.iter().filter(|crop| crop.kind == kind).map(|crop| crop.bytes).sum::<usize>();
+    let kind = candidates.iter().map(|&i| crops[i].kind).max_by_key(|kind| total(kind))?;
+    let mut of_kind = candidates.into_iter().filter(|&i| crops[i].kind == kind);
+    let first = of_kind.clone().find(|&i| !crops[i].kept);
+    first.or_else(|| of_kind.next())
 }
 
 /// Writes the trace down as the core takes its inputs in, and keeps the crops.
@@ -1097,7 +1142,7 @@ impl Recorder {
             if let Some(png) = png(&frame) {
                 let shop_tooltip = matches!(region, Region::ItemTooltip { .. }) && matches!(line.event, Event::PlayerShop { .. });
                 *(if shop_tooltip { &mut line.tooltip_crop } else { &mut line.crop }) = Some(name.clone());
-                self.crops.push_back(Crop { name, at_ms: frame.at_ms, kept, png });
+                self.crops.push_back(Crop { name, kind: region.kind(), at_ms: frame.at_ms, kept, png });
             }
         }
         if region == Region::ExpBar {
@@ -1106,10 +1151,14 @@ impl Recorder {
         self.client_area.expire(since);
         self.status_bar_strip.expire(since);
         self.crops.retain(|crop| crop.kept || crop.at_ms >= since);
-        let mut kept_bytes: usize = self.crops.iter().filter(|crop| crop.kept).map(|crop| crop.png.len()).sum();
-        while kept_bytes > KEPT_CROPS_BYTES {
-            let Some(oldest) = self.crops.iter().position(|crop| crop.kept) else { break };
-            kept_bytes -= self.crops.remove(oldest).map_or(0, |crop| crop.png.len());
+        loop {
+            let kept: Vec<usize> = (0..self.crops.len()).filter(|&i| self.crops[i].kept).collect();
+            let held: Vec<Held> = kept.iter().map(|&i| Held { kind: self.crops[i].kind, bytes: self.crops[i].png.len(), kept: true }).collect();
+            if held.iter().map(|crop| crop.bytes).sum::<usize>() <= KEPT_CROPS_BYTES {
+                break;
+            }
+            let Some(first) = first_to_go(&held) else { break };
+            self.crops.remove(kept[first]);
         }
     }
 
@@ -1224,15 +1273,16 @@ impl Recorder {
         // longer ago than that goes even when no crop has come since.
         let since = self.now.saturating_sub(RECENT_CROPS_MS);
         let mut crops: Vec<&Crop> = self.crops.iter().filter(|crop| crop.kept || crop.at_ms >= since).collect();
-        // The text alone, then as many crops as fit beside it: the oldest ordinary ones
-        // go first, then the oldest kept for the run.
+        // The text alone, then as many crops as fit beside it: the oldest of the kind with the most
+        // go first, the ordinary ones before those kept for the run, and the latest of every kind last.
         let text_bytes = zip(&texts(&file(crops.len(), 0, Vec::new())), &[]).len();
         let size = |name: &str, png: &[u8]| png.len() + 2 * name.len() + 100;
         crops.sort_by_key(|crop| crop.at_ms);
         let mut crop_bytes: usize = crops.iter().map(|crop| size(&crop.name, &crop.png)).sum();
         let mut left_out = 0;
         while text_bytes + crop_bytes > MAX_TEXT_AND_CROPS_BYTES - MARGIN_BYTES && !crops.is_empty() {
-            let oldest = crops.iter().position(|crop| !crop.kept).unwrap_or(0);
+            let held: Vec<Held> = crops.iter().map(|crop| Held { kind: crop.kind, bytes: size(&crop.name, &crop.png), kept: crop.kept }).collect();
+            let oldest = first_to_go(&held).unwrap_or(0);
             let crop = crops.remove(oldest);
             crop_bytes -= size(&crop.name, &crop.png);
             left_out += 1;

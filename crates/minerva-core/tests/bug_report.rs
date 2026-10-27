@@ -665,6 +665,11 @@ fn the_exp_bars_crops_are_kept_where_they_changed_for_10_minutes_and_for_the_run
 /// A frame of noise as big as the Status Bar strip, which no PNG compresses: about 980 KB.
 fn noise_frame(seed: u64, at_ms: u64) -> Frame {
     let ScreenRect { width, height, .. } = status_bar_strip();
+    noise(width, height, seed, at_ms)
+}
+
+/// A frame of noise `width` by `height`, which no PNG compresses.
+fn noise(width: u32, height: u32, seed: u64, at_ms: u64) -> Frame {
     let mut state = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
     let rgba = (0..width * height * 4)
         .map(|_| {
@@ -733,6 +738,51 @@ fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
     assert_eq!(recording.report.crops + recording.report.crops_left_out, 13, "the last 10 minutes and the kept ones");
     assert!(recording.crops.contains(&format!("crops/exp-bar-{:010}.png", MIN)), "the kept one stays");
     assert!(recording.crops.contains(&format!("crops/exp-bar-{:010}.png", 20 * MIN)), "the newest stays");
+}
+
+/// 20 minutes of a Pickup Log that guesses every 10 s, each a whole band of noise (over 8 MB of
+/// crops kept for the run, and more than a report keeps), and the EXP figures read once a minute
+/// as noise too, the first a misread: the Bug Report of 0.15.0, 2026-10-26 17:24, kept 13 crops, all
+/// of the log's, and none of the figures'.
+fn log_floods_the_figures() -> (minerva_core::BugReport, Recording) {
+    let mut shell = Shell::new(FakeSource::osms());
+    let first = ExpBar { exp: 1000, percent_hundredths: 500 };
+    shell.at = 30 * S;
+    let figures = noise(224, 32, 999, shell.at);
+    read_figures(&mut shell, figures, first);
+    shell.step();
+    let band = shell.minerva.panel_state().pickup_log_capture.expect("the log is looked for");
+    for n in 0..120u64 {
+        shell.at += 10 * S;
+        let log = noise(band.width, band.height, n, shell.at);
+        let capture = minerva_core::PickupLogCapture { frame: log, origin: ScreenPoint { x: band.x, y: band.y }, ui_size: 1.0 };
+        let reading = common::pickup_reading(shell.at, minerva_core::PickupLogSeen::Clear { area: band }, vec![]);
+        shell.minerva.on_pickup_log_read(capture, minerva_core::PickupLogReading { guessed: true, ..reading });
+        if n % 6 == 5 {
+            let m = n / 6;
+            let bar = if m == 0 { ExpBar { exp: 84_350, percent_hundredths: 4172 } } else { ExpBar { exp: 1000 + m, percent_hundredths: percent(1000 + m, 20_000) } };
+            let figures = noise(224, 32, 1000 + n, shell.at);
+            read_figures(&mut shell, figures, bar);
+        }
+        shell.step();
+    }
+    shell.report()
+}
+
+#[test]
+fn a_flood_of_pickup_log_crops_does_not_crowd_the_exp_figures_out_of_the_report() {
+    let (report, recording) = log_floods_the_figures();
+    let figures: Vec<&String> = recording.crops.iter().filter(|name| name.starts_with("crops/exp-bar-")).collect();
+    let log: Vec<&String> = recording.crops.iter().filter(|name| name.starts_with("crops/pickup-log-")).collect();
+    assert!(report.zip.len() <= MAX_TEXT_AND_CROPS_BYTES, "{} bytes", report.zip.len());
+    assert!(recording.report.crops_left_out > 0, "the report is over budget");
+    // The figures' last 10 minutes (a crop a minute, that changed) and the misread kept for the run.
+    assert!(figures.len() >= 10, "{figures:?}");
+    assert!(figures.contains(&&format!("crops/exp-bar-{:010}.png", 90 * S)), "the misread, kept for the run");
+    assert!(figures.contains(&&format!("crops/exp-bar-{:010}.png", 20 * MIN + 30 * S)), "the latest");
+    // The log gives way, oldest first, but its latest stay.
+    assert!(!log.is_empty() && log.len() < 120, "{} crops", log.len());
+    assert!(log.contains(&&format!("crops/pickup-log-{:010}.png", 20 * MIN + 30 * S)), "the latest");
 }
 
 #[test]
