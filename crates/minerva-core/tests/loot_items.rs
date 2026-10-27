@@ -268,3 +268,86 @@ fn the_loot_header_starts_collapsed_and_a_click_opens_and_closes_it_across_launc
     assert!(!minerva.panel_state().grind_tracker.loot_open);
     assert!(!minerva.settings().loot_open);
 }
+
+/// The Etc tab of a map where a quest hands out Very Dry Branches and Tree Branches drop, with
+/// a pair of names one letter apart.
+fn branches() -> ItemWorld {
+    item_world(vec![
+        etc(4_000_100, "Very Dry Branch").sells_for(1),
+        etc(4_000_101, "Tree Branch").sells_for(1),
+        etc(4_000_102, "Pine Cone").sells_for(1),
+        etc(4_000_103, "Fine Cone").sells_for(1),
+        use_item(2_000_100, "Red Potion").sells_for(25),
+    ])
+}
+
+#[test]
+fn a_name_misread_the_games_usual_ways_is_the_item_it_is_closest_to_on_its_first_line() {
+    // Bug Report 0.15.0, 2026-10-26 23:05: 100 Very Dry Branches picked up, 57 lines read as one,
+    // 10 of them as names no Item has. The D read as Ci, Li or [i, the B as Bl or El, the V
+    // lost or read as ( * " \ M W, the y as v, a glyph lost as a "?".
+    let misreads = [
+        "Very Cir Aranch",
+        "(ery [Ciry Elranch",
+        "Very Ciry Elrarich",
+        "Mery Ciry Blranch",
+        "Very Liry Blraneh",
+        "Very Cir: Blranch",
+        "verv [\"? Branch.",
+        "veryDr? Brarch",
+    ];
+    for misread in misreads {
+        let mut minerva = started(branches());
+        let state = picked_up(&mut minerva, 11 * S, vec![item(misread, 1, "Etc")]);
+        assert_eq!(state.exp_tracking.loot.items, vec![tally("Very Dry Branch", 1)], "{misread:?}");
+    }
+}
+
+#[test]
+fn a_misread_nearer_the_other_of_two_alike_items_is_that_one() {
+    let mut minerva = started(branches());
+
+    let state = picked_up(&mut minerva, 11 * S, vec![item("Tie? Branih", 1, "Etc"), item("Tree Eranch", 2, "Etc")]);
+
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Tree Branch", 3)]);
+}
+
+#[test]
+fn an_exact_name_is_its_item_whatever_the_slips_would_make_of_it() {
+    let mut minerva = started(branches());
+
+    let state = picked_up(&mut minerva, 11 * S, vec![item("Tree Branch", 1, "Etc"), item("Very Dry Branch", 2, "Etc")]);
+
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Very Dry Branch", 2), tally("Tree Branch", 1)]);
+}
+
+#[test]
+fn a_read_equally_close_to_two_items_stays_as_read() {
+    let mut minerva = started(branches());
+
+    // A "?" is any one letter: P or F.
+    let state = picked_up(&mut minerva, 11 * S, vec![item("?ine Cone", 1, "Etc")]);
+    assert!(state.exp_tracking.loot.items.is_empty());
+    let state = picked_up(&mut minerva, 12 * S, vec![item("?ine Cone", 1, "Etc")]);
+
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("?ine Cone", 2)]);
+}
+
+#[test]
+fn a_misread_is_never_the_name_of_an_item_of_another_tab() {
+    let mut minerva = started(branches());
+
+    // Very Dry Branch is an Etc item; this line says Use.
+    let state = picked_up(&mut minerva, 11 * S, vec![item("Very Ciry Elrarich", 1, "Use")]);
+
+    assert!(state.exp_tracking.loot.items.is_empty());
+}
+
+#[test]
+fn a_read_too_far_from_every_item_for_its_slips_to_explain_stays_as_read() {
+    let mut minerva = started(branches());
+
+    let state = picked_up(&mut minerva, 11 * S, vec![item("Cran Brach", 1, "Etc")]);
+
+    assert!(state.exp_tracking.loot.items.is_empty());
+}

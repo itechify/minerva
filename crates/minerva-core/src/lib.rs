@@ -37,6 +37,7 @@ mod personal_best;
 mod pickup_cover;
 mod loot_items;
 mod pickup_log;
+mod pickup_slips;
 mod player_shop;
 mod pictures;
 mod portal_overrides;
