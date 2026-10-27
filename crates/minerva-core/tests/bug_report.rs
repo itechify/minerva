@@ -1322,6 +1322,7 @@ fn item_names_cut_short_and_matching_no_item_are_written_down_for_tuning_the_mat
         shift: 0,
         arrived,
         chose: false,
+        guessed: false,
         overflowed: false,
     });
     shell.play(13 * S, CONSTRUCTION_SITE, grind);

@@ -422,3 +422,29 @@ fn a_shadow_that_brightens_around_an_unchanged_line_is_not_a_new_arrival() {
     let captures = [capture(&original, 0), capture(&lifted, 100), capture(&original, 200)];
     assert_eq!(arrivals(&mut reader, captures), vec![]);
 }
+
+/// The readings of a clip, read as the band is, at the samples' size.
+fn readings(name: &str) -> Vec<minerva_core::PickupLogReading> {
+    let mut reader = PickupLogReader::bundled();
+    common::pngs_in(&common::samples_in("pickup-log").join(name))
+        .into_iter()
+        .map(|path| {
+            let at_ms = path.file_stem().unwrap().to_str().unwrap().parse().unwrap();
+            let img = image::open(path).unwrap().to_rgba8();
+            reader.read(&PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 })
+        })
+        .collect()
+}
+
+#[test]
+fn a_reading_guessed_only_where_colour_and_brightness_left_more_than_one_shift() {
+    for name in ["colour-breaks-tie", "repeated-mesos", "repeated-pairs", "solo-repeated", "cut-short", "empty-to-loot", "covered"] {
+        let readings = readings(name);
+        assert!(readings.iter().all(|r| !r.guessed || r.chose), "{name}: a guess is a choice between shapes' shifts");
+    }
+    // Colour settles 1 of the 10 times that shapes alone fitted several shifts here: not a guess.
+    let colour = readings("colour-breaks-tie");
+    assert_eq!(colour.iter().filter(|r| r.chose).count(), 10);
+    assert_eq!(colour.iter().filter(|r| r.guessed).count(), 9);
+    assert!(readings("repeated-mesos").iter().any(|r| r.guessed), "identical lines leave the smallest shift to be taken");
+}

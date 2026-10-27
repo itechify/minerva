@@ -130,7 +130,7 @@ use shown_map::ShownMap;
 use matcher::{Match, Matcher, Snap};
 use pictures::Pictures;
 use pickup_cover::PickupCover;
-use pickup_log::FindsNothing;
+use pickup_log::KeepsCrops;
 use panel::Panel;
 use portal_overrides::PORTAL_OVERRIDES;
 use session::Session;
@@ -610,7 +610,7 @@ pub struct Minerva {
     pickup_log_reader: Option<PickupLogReader>,
     pickup_log_seen: bool,
     /// How long the reader has found nothing, for the Bug Report to keep a capture of the band.
-    pickup_log_nothing: FindsNothing,
+    pickup_log_crops: KeepsCrops,
     /// Whether our windows have been over the Pickup Log.
     pickup_cover: PickupCover,
     /// Where the Status Bar's level, job and name were last found, and the game's client
@@ -686,7 +686,7 @@ impl Minerva {
             status_bar_reader: None,
             pickup_log_reader: None,
             pickup_log_seen: false,
-            pickup_log_nothing: FindsNothing::default(),
+            pickup_log_crops: KeepsCrops::default(),
             pickup_cover: PickupCover::default(),
             status_bar_area: None,
             title_found: None,
@@ -1726,12 +1726,12 @@ impl Minerva {
         if self.state.pickup_log_capture != Some(region) {
             return self.pickup_log_reading_for(reading, Some(region));
         }
-        let unusual = reading.chose
-            || (self.pickup_log_seen && reading.seen == PickupLogSeen::Nothing)
-            || reading.arrived.contains(&PickupLine::Unreadable);
-        // A reader that finds nothing for a while keeps one whole band capture, now and then, so a log it
-        // never finds can be looked for in the report (a Bug Report of 0.15.0 had none of 6,652).
-        let unusual = self.pickup_log_nothing.on_reading(&reading) || unusual;
+        // A crop of the capture only for a reading that really guessed, lost lines it had seen, or
+        // read a line it couldn't, and not more than one in 10 s for each cause; and, from a reader
+        // that finds nothing for a while, one whole band capture now and then, so a log it never
+        // finds can be looked for in the report (a Bug Report of 0.15.0 had none of 6,652).
+        let lost_lines = self.pickup_log_seen && reading.seen == PickupLogSeen::Nothing;
+        let unusual = self.pickup_log_crops.on_reading(&reading, lost_lines);
         let crop = unusual.then_some((Region::PickupLog, capture.frame));
         self.record_input(Event::PickupLog { reading: reading.clone(), stale_region: None }, Some(reading.at_ms), crop);
         self.take_pickup_log_reading(reading)
@@ -1753,7 +1753,7 @@ impl Minerva {
     fn reset_pickup_log(&mut self) {
         self.pickup_log_reader = None;
         self.pickup_log_seen = false;
-        self.pickup_log_nothing.restart();
+        self.pickup_log_crops.restart();
         self.state.pickup_log_generation += 1;
     }
 

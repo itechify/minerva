@@ -2171,7 +2171,7 @@ impl Event {
                 format!("Player Shop read: {}", if rows.is_empty() { "no listings".into() } else { rows.join(", ") })
             }
             Event::StatusBar { same: true, .. } => "Status Bar read as before".to_string(),
-            Event::PickupLog { reading, .. } => format!("Pickup Log: {:?}; rows {:?}, shift {}; arrivals {:?}{}", reading.seen, reading.rows, reading.shift, reading.arrived, if reading.chose { "; chose between shifts" } else { "" }),
+            Event::PickupLog { reading, .. } => format!("Pickup Log: {:?}; rows {:?}, shift {}; arrivals {:?}{}", reading.seen, reading.rows, reading.shift, reading.arrived, if reading.guessed { "; guessed between shifts" } else if reading.chose { "; chose between shifts" } else { "" }),
             Event::StatusBar { bar: None, near_miss: None, .. } => "no Status Bar".to_string(),
             Event::StatusBar { bar: None, near_miss: Some(near), .. } => {
                 let ScreenRect { x, y, width, height } = near.area;

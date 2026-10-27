@@ -600,7 +600,7 @@ pub const LOG: ScreenRect = ScreenRect { x: 1500, y: 800, width: 408, height: 16
 
 /// A Pickup Log reading, as the capture thread hands it to the core.
 pub fn pickup_reading(at_ms: u64, seen: minerva_core::PickupLogSeen, lines: Vec<minerva_core::PickupLine>) -> minerva_core::PickupLogReading {
-    minerva_core::PickupLogReading { at_ms, seen, rows: vec![], shift: 0, arrived: lines, chose: false, overflowed: false }
+    minerva_core::PickupLogReading { at_ms, seen, rows: vec![], shift: 0, arrived: lines, chose: false, guessed: false, overflowed: false }
 }
 
 /// A clean reading of lines that arrived at `at_ms`.

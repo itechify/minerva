@@ -72,6 +72,52 @@ const NOTHING_FOR_MS: u64 = 30_000;
 /// How long after one such capture is kept before another may be (ms).
 const NOTHING_KEEP_AGAIN_MS: u64 = 5 * 60_000;
 
+/// How long after a Pickup Log crop of one cause is kept before another of that cause may be (ms of
+/// capture time): a burst of captures that guess, or lose the log, is a handful of crops, not
+/// thousands that crowd the other readers' out of a Bug Report (the one of 0.15.0, 2026-10-26 17:24,
+/// kept 3,850).
+const CROP_AGAIN_MS: u64 = 10_000;
+
+/// Why a Pickup Log reading's capture is worth a crop in a Bug Report.
+#[derive(Debug, Default)]
+pub(crate) struct KeepsCrops {
+    nothing: FindsNothing,
+    /// When a crop was last kept for each cause: guessing, an unreadable arrival, finding nothing.
+    guessed_at: Option<u64>,
+    unreadable_at: Option<u64>,
+    nothing_at: Option<u64>,
+}
+
+impl KeepsCrops {
+    /// Take in a reading: whether its capture is to be kept. `lost_lines` is whether the log was
+    /// seen before and this reading found nothing. A reading with a cause that is due is kept, and
+    /// every cause it has is then held back for [`CROP_AGAIN_MS`].
+    pub fn on_reading(&mut self, reading: &PickupLogReading, lost_lines: bool) -> bool {
+        // Always asked, as it counts the readings of nothing.
+        let long_nothing = self.nothing.on_reading(reading);
+        let causes = [
+            (reading.guessed, &mut self.guessed_at),
+            (reading.arrived.contains(&PickupLine::Unreadable), &mut self.unreadable_at),
+            (lost_lines || long_nothing, &mut self.nothing_at),
+        ];
+        let due = |at: &Option<u64>| at.is_none_or(|at| reading.at_ms.saturating_sub(at) >= CROP_AGAIN_MS || reading.at_ms < at);
+        let keep = causes.iter().any(|(has, at)| *has && due(at));
+        if keep {
+            for (has, at) in causes {
+                if has {
+                    *at = Some(reading.at_ms);
+                }
+            }
+        }
+        keep
+    }
+
+    /// A new stream of captures: the wait for nothing starts again.
+    pub fn restart(&mut self) {
+        self.nothing.restart();
+    }
+}
+
 /// Whether a reader has found nothing for a while, so a Bug Report is to keep a capture of its band
 /// (ADR 0020's last consequence): once the reader has read [`PickupLogSeen::Nothing`] for
 /// [`NOTHING_FOR_MS`], and not within [`NOTHING_KEEP_AGAIN_MS`] of the last one kept.
@@ -151,6 +197,10 @@ pub struct PickupLogReading {
     /// More than one shape shift fitted, before colour and brightness broke ties.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub chose: bool,
+    /// More than one shift fitted even after colour and brightness broke ties, and the smallest
+    /// was taken: the one reading that really guessed, and so the one a Bug Report keeps a crop of.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub guessed: bool,
     /// Every row was new: lines may have come and gone unseen.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub overflowed: bool,
@@ -265,7 +315,7 @@ impl PickupLogReader {
         // is followed, so its first arrivals are counted once it is confirmed, but it reports
         // nothing until then, and a miss is dropped ([`Self::confirm`]).
         if !self.confirmed && reading.seen != PickupLogSeen::Nothing {
-            return PickupLogReading { at_ms: reading.at_ms, seen: PickupLogSeen::Nothing, rows: Vec::new(), shift: 0, arrived: Vec::new(), chose: false, overflowed: false };
+            return PickupLogReading { at_ms: reading.at_ms, seen: PickupLogSeen::Nothing, rows: Vec::new(), shift: 0, arrived: Vec::new(), chose: false, guessed: false, overflowed: false };
         }
         reading
     }
@@ -278,6 +328,7 @@ impl PickupLogReader {
             shift: 0,
             arrived: Vec::new(),
             chose: false,
+            guessed: false,
             overflowed: false,
         };
         let Some(mut img) = frame_to_rgb(&capture.frame) else { return reading };
@@ -344,6 +395,7 @@ impl PickupLogReader {
         if let Some(previous) = self.previous.take() {
             reading.chose = (0..=ROWS).filter(|&s| stack_matches_shift(&previous, &current, s, false)).count() > 1;
             let shifts = (0..=ROWS).filter(|&s| stack_matches_shift(&previous, &current, s, true)).collect::<Vec<_>>();
+            reading.guessed = shifts.len() > 1;
             let Some(&shift) = shifts.first() else {
                 let since = *self.unmatched_since.get_or_insert(capture.frame.at_ms);
                 if capture.frame.at_ms.saturating_sub(since) < RESYNC_MS {
