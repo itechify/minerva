@@ -3472,6 +3472,29 @@ button.button {
   line-height: 22px;
   color: var(--ink-2);
 }
+/* Their portrait from ClassicRank (ADR 0028), 96px, beside their name and who they are, the
+   line crediting ClassicRank under those. With no portraits, the name stands as before. */
+.ch-identity.ch-with-portrait {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: center;
+}
+.ch-identity.ch-with-portrait .ch-portrait {
+  grid-row: 1 / span 3;
+  align-self: center;
+}
+.ch-identity.ch-with-portrait > :not(.ch-portrait) {
+  grid-column: 2;
+}
+.ch-portrait-link {
+  display: block;
+  width: 96px;
+  height: 96px;
+}
+.ch-credit {
+  margin-top: 4px;
+}
 /* The figures, each in the hotkey table's inset box: the figure, over what it counts, over
    what more it says. */
 .ch-stats {
@@ -3610,6 +3633,53 @@ button.button {
   margin: -3px 6px -3px 0;
   vertical-align: middle;
   image-rendering: pixelated;
+}
+/* A Character's portrait from ClassicRank beside their name (ADR 0028): their photo drawn pixel
+   for pixel, fitted to its square whatever its own size, or the question-mark figure, or until
+   ClassicRank has been asked, the square kept empty. In a band's table or Latest it is 32px,
+   reaching 6px into the lines around it, so a row grows by only a little for it. */
+.lb-portrait {
+  display: inline-block;
+  flex: none;
+  object-fit: contain;
+  vertical-align: middle;
+}
+.lb-portrait-photo {
+  image-rendering: pixelated;
+}
+.lb-table .lb-name .lb-portrait {
+  margin: -6px 8px -6px 0;
+}
+/* On a phone, where the band's rows are cards, a card's name line grows to its portrait, as
+   there is no room for it to reach into the job's line under it. */
+@media (max-width: 640px) {
+  .lb-table .lb-name .lb-portrait {
+    margin-block: 0;
+  }
+}
+.lb-entry-character {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lb-entry-character .lb-portrait {
+  margin-block: -6px;
+}
+@media (min-width: 641px) {
+  .lb-latest .lb-entry-character {
+    grid-column: 1;
+    margin-right: 8px;
+  }
+  .lb-latest .lb-entry-character .lb-entry-name {
+    margin-right: 0;
+  }
+}
+/* Under what shows portraits: the visible link to ClassicRank it asks for. */
+.lb-credit {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
 }
 /* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
 .ch-board .lb-said.ch-lost-said {

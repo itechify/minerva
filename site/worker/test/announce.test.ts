@@ -2,8 +2,9 @@
 // the spot from another (ADR 0022): a first entry in an empty band, a Character beating its
 // own best, a re-upload of the same set and an opt-out that hands the spot on all stay quiet.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MOST_TOLD, type Post, type Taken, type Top, postFor, takenTops, tell } from "../announce";
+import { MOST_TOLD, PORTRAIT_CREDIT, type Post, type PostedMark, type Taken, type Top, postFor, takenTops, tell } from "../announce";
 import { entry, key, optOut, upload } from "./api";
+import { classicRank, knownOnClassicRank, photoOf } from "./classicrank";
 
 /** The made-up webhook the test config sets (vitest.config.ts). */
 const WEBHOOK = "https://discord.invalid/api/webhooks/made-up/webhook";
@@ -19,8 +20,11 @@ const MARKED = "100000060";
 /** The made-up Map Mark's picture (vitest.config.ts). */
 const MADE_UP_TOWN = "https://osms.invalid/images/map_marks/MadeUpTown.png";
 
+/** The made-up Map Mark, as a post shows it. */
+const MADE_UP_MARK: PostedMark = { name: "Made-up Town", picture: MADE_UP_TOWN };
+
 /** No map has a Map Mark. */
-const NO_PICTURES = (): string | null => null;
+const NO_PICTURES = (): PostedMark | null => null;
 
 /** A Character's name as a post writes it: a link to their page (ADR 0027). */
 function linked(name: string): string {
@@ -117,12 +121,29 @@ describe("the post", () => {
   });
 
   it("shows the map's Map Mark", () => {
-    const pictureOf = (map: string) => (map === MARKED ? MADE_UP_TOWN : null);
+    const markOf = (map: string) => (map === MARKED ? MADE_UP_MARK : null);
 
-    const [marked, unmarked] = postFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], pictureOf)!.embeds;
+    const [marked, unmarked] = postFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], markOf)!.embeds;
 
     expect(marked.thumbnail).toEqual({ url: MADE_UP_TOWN });
+    expect(marked).not.toHaveProperty("footer");
     expect(unmarked).not.toHaveProperty("thumbnail");
+  });
+
+  it("shows the Character's portrait, the Map Mark under it beside its area, and credits ClassicRank", () => {
+    const markOf = (map: string) => (map === MARKED ? MADE_UP_MARK : null);
+
+    const [marked, unmarked] = postFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], markOf, photoOf("Hakuo"))!.embeds;
+
+    expect(marked.thumbnail).toEqual({ url: photoOf("Hakuo") });
+    expect(marked.footer).toEqual({ text: "Made-up Town", icon_url: MADE_UP_TOWN });
+    expect(marked.description.endsWith(" · Portrait: [ClassicRank](https://classicrank.com)")).toBe(true);
+    expect(unmarked.thumbnail).toEqual({ url: photoOf("Hakuo") });
+    expect(unmarked).not.toHaveProperty("footer");
+  });
+
+  it("says nothing of ClassicRank with no portrait", () => {
+    expect(postFor([taken(QUIET, 20)], NO_PICTURES)!.embeds[0].description).not.toContain(PORTRAIT_CREDIT);
   });
 
   it("names a map the fixture doesn't by its ID", () => {
@@ -258,5 +279,19 @@ describe("an upload", () => {
 
     await postsSettle(1);
     expect(posts[0].embeds[0].thumbnail).toEqual({ url: MADE_UP_TOWN });
+  });
+
+  it("shows the portrait ClassicRank gives the Character that took the spot", async () => {
+    knownOnClassicRank("Xena");
+    try {
+      await upload("Yuri", key("yuri"), [entry(MARKED, 35, 10_000)]);
+      await upload("Xena", key("xena"), [entry(MARKED, 35, 20_000)]);
+
+      await postsSettle(1);
+      expect(posts[0].embeds[0].thumbnail).toEqual({ url: photoOf("Xena") });
+      expect(posts[0].embeds[0].footer).toEqual({ text: "Made-up Town", icon_url: MADE_UP_TOWN });
+    } finally {
+      classicRank.known.clear();
+    }
   });
 });

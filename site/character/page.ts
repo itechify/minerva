@@ -3,9 +3,18 @@
 // each Level Band, highest first, each row's map a link to the entry on its Map Leaderboard.
 // What it shows is worked out in character.ts.
 import { make } from "../../src/dom.ts";
-import { byId, crown, jobWithIcon, markSlot, names, said as saidWith, unreachable } from "../leaderboards/api.ts";
+import { byId, crown, jobWithIcon, markSlot, names, portraitImage, said as saidWith, unreachable } from "../leaderboards/api.ts";
 import type { Said } from "../leaderboards/leaderboards.ts";
-import { type CharacterAnswer, type CharacterBand, type CharacterRow, characterPage, noCharacter, readName, type Stat } from "./character.ts";
+import {
+  type CharacterAnswer,
+  type CharacterBand,
+  type CharacterPage,
+  type CharacterRow,
+  characterPage,
+  noCharacter,
+  readName,
+  type Stat,
+} from "./character.ts";
 
 const name = readName(location.search);
 const board = byId("board");
@@ -21,6 +30,26 @@ function say(text: Said, lost: boolean) {
   byId("lost").hidden = !lost;
   // With no Character, their line's room under the name goes, so the owl sits close under it.
   byId("who").hidden = lost;
+}
+
+/** Their portrait beside their name (ADR 0028), a link to their ClassicRank profile when it
+ *  has one, and the line crediting ClassicRank under it; none of it while the API gives no
+ *  portraits. */
+function drawPortrait(page: CharacterPage) {
+  const slot = byId("portrait");
+  const shown = page.portrait !== null;
+  byId("identity").classList.toggle("ch-with-portrait", shown);
+  slot.hidden = !shown;
+  byId("portrait-credit").hidden = !shown;
+  if (page.portrait === null) return slot.replaceChildren();
+  const portrait = portraitImage(page.portrait, 96);
+  if (page.profile === null) return slot.replaceChildren(portrait);
+  const link = make("a", "ch-portrait-link");
+  link.href = page.profile;
+  link.rel = "noopener";
+  link.setAttribute("aria-label", `${page.name} on ClassicRank`);
+  link.append(portrait);
+  slot.replaceChildren(link);
 }
 
 /** The figures under the name: each over what it counts, and what more it says under that. */
@@ -148,6 +177,7 @@ async function load() {
   document.title = `${page.name} · Minerva`;
   byId("name").textContent = page.name;
   byId("who").replaceChildren(jobWithIcon(page.who, page.whoClass, "", false));
+  drawPortrait(page);
   drawStats(page.stats);
   said.hidden = true;
   byId("loaded").textContent = `${page.name}: ${page.stats.map((s) => `${s.value} ${s.label}`).join(", ")}.`;

@@ -35,6 +35,14 @@ Over a page with nothing to show: the site's 404 (`site/404.html`), heading it i
 | --- | --- | --- | --- |
 | `not-found.png` | The 404, a Character's page and a map's page with nothing to show | The owl puzzled, a question mark over it and a torn map with a red cross in its wing, beside a wooden signpost lettered "404" over "Not Found" | 880×574 |
 
+## The missing portrait
+
+Beside a Character's name where ClassicRank has no photo of them, or one that won't load (ADR 0028, `site/leaderboards/api.ts` draws it): a black figure with a white question mark for a face, in a white outline, supplied by the owner (October 2026), trimmed to the figure on its transparent ground and scaled to ClassicRank's photos' 96×96. It shows 96px on a Character's page and 32px in a band's table and in Latest, smoothly, unlike the photos, as it isn't pixel art. Decoration: the name beside it says whose it is.
+
+| File | Shows | What it shows | Size |
+| --- | --- | --- | --- |
+| `portrait-none.png` | A Character with no portrait | A black figure, a white question mark for its face, outlined in white | 96×96 |
+
 ## The job icons
 
 Beside each job the site writes (`site/jobs.ts` gives a job's class, `site/leaderboards/api.ts` draws it): the game's class icons, supplied by the owner (October 2026) as GIFs with white corners, kept here as PNGs with those corners made transparent and nothing else changed. They show pixel for pixel, at their own size. A Pirate has no icon yet, and shows none.

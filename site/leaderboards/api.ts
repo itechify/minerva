@@ -3,7 +3,17 @@
 import fixture from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
 import { make, svgEl } from "../../src/dom.ts";
 import ceilings from "../worker/osms-ceilings.json";
-import { type JobClass, type MapMarks, mapMarks, mapNames, type MapNames, type Medal, type Said, type Words } from "./leaderboards.ts";
+import {
+  type JobClass,
+  type MapMarks,
+  mapMarks,
+  mapNames,
+  type MapNames,
+  type Medal,
+  type PortraitSlot,
+  type Said,
+  type Words,
+} from "./leaderboards.ts";
 
 /** The maps the committed map names fixture names, as the panel names them. */
 export const names: MapNames = mapNames(fixture);
@@ -114,6 +124,42 @@ export function characterLink(name: string, href: string, className = ""): HTMLA
   link.href = href;
   link.dataset.seam = "seam-name";
   return link;
+}
+
+/** The question-mark figure (site/art), for a Character ClassicRank has no photo of. */
+const NO_PORTRAIT = new URL("../art/portrait-none.png", import.meta.url).href;
+
+/** A Character's portrait (ADR 0028), `size` pixels square: their photo, loaded from
+ *  classicrank.com and drawn pixel for pixel, fitted to the square whatever its own size; the
+ *  question-mark figure for none, or for a photo that won't load; or, until ClassicRank has
+ *  been asked, the square, empty. Decoration: the name beside it says whose it is. */
+export function portraitImage(slot: PortraitSlot, size: number): HTMLElement {
+  if (slot === "waiting") {
+    const room = make("span", "lb-portrait");
+    room.setAttribute("aria-hidden", "true");
+    room.style.width = room.style.height = `${size}px`;
+    return room;
+  }
+  const img = make("img", "lb-portrait");
+  img.alt = "";
+  img.width = size;
+  img.height = size;
+  img.decoding = "async";
+  img.loading = "lazy";
+  const none = () => {
+    img.src = NO_PORTRAIT;
+    img.classList.remove("lb-portrait-photo");
+    img.classList.add("lb-portrait-none");
+  };
+  if (slot === "none") {
+    none();
+  } else {
+    img.src = slot.photo;
+    img.classList.add("lb-portrait-photo");
+    img.referrerPolicy = "no-referrer";
+    img.addEventListener("error", none, { once: true });
+  }
+  return img;
 }
 
 /** Each class's icon (site/art/jobs), drawn pixel for pixel, and its size. A pirate's has none

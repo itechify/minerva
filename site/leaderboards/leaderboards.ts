@@ -14,6 +14,7 @@ import {
   isName,
   type LatestAnswer,
   type MapMark,
+  type PortraitAnswer,
   type Ranked,
   type TrainingAnswer,
 } from "../entries.ts";
@@ -30,6 +31,20 @@ export type { JobClass } from "../jobs.ts";
 
 /** A place in a band's top 3, crowned in gold, silver or bronze. */
 export type Medal = 1 | 2 | 3;
+
+/** A Character's portrait as the pages show it beside their name (ADR 0028): their photo on
+ *  ClassicRank; `"none"`, the question-mark figure, once ClassicRank has been asked and has no
+ *  photo of them or doesn't show them; or `"waiting"`, the portrait's room, empty, until it's
+ *  been asked. */
+export type PortraitSlot = { photo: string } | "none" | "waiting";
+
+/** A Character's portrait from the API's answer; `null`, none at all, while the API gives
+ *  none (the Worker has no ClassicRank key). */
+export function portraitSlot(answer: PortraitAnswer | undefined): PortraitSlot | null {
+  if (answer === undefined) return null;
+  if (answer === null) return "waiting";
+  return answer.photo === null ? "none" : { photo: answer.photo };
+}
 
 /** The crown an entry at `rank` wears: gold for #1, silver for #2, bronze for #3; none
  *  past them. */
@@ -310,6 +325,8 @@ export interface Row {
   you: boolean;
   /** How far along its lane the EXP/h runs, from 0 to 1: the band's #1 runs it full. */
   lane: number;
+  /** The Character's portrait, before their name; `null` for none at all. */
+  portrait: PortraitSlot | null;
 }
 
 /** A band's table: its rows, the linked Character's under them when it's outside them (after
@@ -327,6 +344,8 @@ export interface BandTable {
   empty: Said | null;
   /** The lanes' ruler: 0, then each round step up to #1's EXP/h; none with no rows. */
   ruler: RulerStep[];
+  /** Whether its rows show portraits, so the page credits ClassicRank under the table. */
+  portraits: boolean;
 }
 
 /** A step on a band's ruler: how far along the lanes it falls, and its figure ("50k"). */
@@ -372,6 +391,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
       date: dayText(set, set.getFullYear() !== now.getFullYear()),
       you: entry.rank === yours?.rank,
       lane: Math.min(1, entry.expPerHour / top),
+      portrait: portraitSlot(entry.portrait),
     };
   };
   const rows = answer.entries.map(row);
@@ -392,6 +412,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
     caption,
     empty: rows.length === 0 ? { text: `No one at ${at} has put a best on this map yet.`, link: PUT_YOURS } : null,
     ruler: rows.length === 0 ? [] : rulerTo(top),
+    portraits: [...rows, ...(yours === null ? [] : [row(yours)])].some((r) => r.portrait !== null),
   };
 }
 
@@ -650,10 +671,13 @@ export interface LatestLine {
    *  of 80,000" once that Character has left the Map Leaderboards; `null` for an entry that
    *  took no top spot. */
   took: Words | null;
+  /** The Character's portrait, before their name; `null` for none at all. */
+  portrait: PortraitSlot | null;
 }
 
-/** Latest, from GET /api/latest, with dates written as of `now`, or why it lists nothing. */
-export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): { lines: LatestLine[]; empty: Said | null } {
+/** Latest, from GET /api/latest, with dates written as of `now`, or why it lists nothing, and
+ *  whether its lines show portraits, so the page credits ClassicRank under them. */
+export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): { lines: LatestLine[]; empty: Said | null; portraits: boolean } {
   const lines = answer.entries.map((e): LatestLine => {
     const set = new Date(e.setAt);
     let took: Words | null = null;
@@ -676,8 +700,9 @@ export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): {
       date: dayText(set, set.getFullYear() !== now.getFullYear()),
       href: linkTo({ map: e.map, band: e.band, name: e.name }),
       took,
+      portrait: portraitSlot(e.portrait),
     };
   });
   const empty = { text: "No one has put a best on the Map Leaderboards yet.", link: PUT_YOURS };
-  return { lines, empty: lines.length === 0 ? empty : null };
+  return { lines, empty: lines.length === 0 ? empty : null, portraits: lines.some((l) => l.portrait !== null) };
 }

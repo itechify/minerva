@@ -1,6 +1,7 @@
 // The minerva-site Worker: the site's build, and the API under /api/: the Map Leaderboards
 // (ADR 0015, where its routes and their answers are written down), a Character's page
-// (ADR 0027) and Accounts (ADR 0023).
+// (ADR 0027) and Accounts (ADR 0023); and once a day, Characters' portraits from ClassicRank
+// (ADR 0028).
 import { readCharacterPage } from "./character-page";
 import { confirmLinkToken, deleteAccount, linkState, mintLinkToken, readAccount, readLinkToken, unlinkPc } from "./accounts";
 import { callback, start } from "./discord";
@@ -9,6 +10,7 @@ import { isMaintainerToken } from "./keys";
 import { readLatest } from "./latest";
 import { optOut, readBand, readMap, readMaps, upload } from "./leaderboards";
 import { deleteEntry, dismissReport, findAccounts, readCharacter, readRemoved, readReports, reassign, report, restoreEntry } from "./moderation";
+import { refreshPortraits } from "./portraits";
 import { endSession, isMaintainerAccount, sameOrigin, sessionAccount } from "./sessions";
 import { readBands, readTraining } from "./where-to-train";
 
@@ -25,6 +27,11 @@ export default {
     // reads a key or a cookie.
     const isPublicRead = request.method === "GET" && PUBLIC_READS.some((path) => url.pathname.startsWith(path));
     return json(answer, isPublicRead ? "public, max-age=60" : "no-store");
+  },
+  // The daily cron trigger (site/wrangler.jsonc): every Character's portrait, asked for again
+  // (ADR 0028).
+  async scheduled(controller, env, ctx): Promise<void> {
+    ctx.waitUntil(refreshPortraits(env, controller.scheduledTime));
   },
 } satisfies ExportedHandler<Env>;
 

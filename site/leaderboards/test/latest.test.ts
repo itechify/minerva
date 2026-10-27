@@ -32,8 +32,10 @@ describe("latest", () => {
           date: "3 Oct",
           href: "/leaderboards/map/?map=100000000&band=20&name=Hakuo",
           took: null,
+          portrait: null,
         },
       ],
+      portraits: false,
     });
   });
 
@@ -68,6 +70,7 @@ describe("latest", () => {
         text: "No one has put a best on the Map Leaderboards yet.",
         link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
       },
+      portraits: false,
     });
   });
 });

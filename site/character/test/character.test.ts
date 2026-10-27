@@ -156,6 +156,32 @@ describe("a Character's page", () => {
     expect(page.bands[0].rows[0].date).toBe("3 Oct 2025");
   });
 
+  it("shows their portrait from ClassicRank, linked to their profile there (ADR 0028)", () => {
+    const photo = "https://classicrank.com/api/avatar/Egbert?v=2026-10-26%2007%3A41%3A13";
+    const profile = "https://classicrank.com/user/Egbert";
+    const page = characterPage({ ...answer(mine("100000000", 20, 1, 1, 90_000)), portrait: { photo, profile } }, names, NOW);
+
+    expect(page.portrait).toEqual({ photo });
+    expect(page.profile).toBe(profile);
+  });
+
+  it("shows the question-mark figure for a Character ClassicRank has no photo of, still linked to a profile it has", () => {
+    const profile = "https://classicrank.com/user/Egbert";
+    const known = characterPage({ ...answer(mine("100000000", 20, 1, 1, 90_000)), portrait: { photo: null, profile } }, names, NOW);
+    const unknown = characterPage({ ...answer(mine("100000000", 20, 1, 1, 90_000)), portrait: { photo: null, profile: null } }, names, NOW);
+
+    expect([known.portrait, known.profile]).toEqual(["none", profile]);
+    expect([unknown.portrait, unknown.profile]).toEqual(["none", null]);
+  });
+
+  it("keeps the portrait's room until ClassicRank has been asked, and has none while the API gives none", () => {
+    const asking = characterPage({ ...answer(mine("100000000", 20, 1, 1, 90_000)), portrait: null }, names, NOW);
+    const off = characterPage(answer(mine("100000000", 20, 1, 1, 90_000)), names, NOW);
+
+    expect([asking.portrait, asking.profile]).toEqual(["waiting", null]);
+    expect([off.portrait, off.profile]).toEqual([null, null]);
+  });
+
   it("says the same for any name with no entries, with where a player's own entry would be", () => {
     expect(noCharacter("Egbert")).toEqual({
       text: "Egbert has no bests on the Map Leaderboards.",

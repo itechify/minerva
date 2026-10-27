@@ -28,6 +28,10 @@
   // is secret; the application's secret is the DISCORD_CLIENT_SECRET Worker secret. With
   // the ID or the secret unset, signing in is off.
   "vars": { "DISCORD_CLIENT_ID": "1563331160736661564", "MAINTAINER_DISCORD_IDS": "108388027469979648" },
+  // Once a day, every Character's portrait is asked of ClassicRank again (ADR 0028), with the
+  // CLASSICRANK_KEY Worker secret (docs/map-leaderboards-setup.md). Without it, the run asks
+  // nothing.
+  "triggers": { "crons": ["17 5 * * *"] },
   "routes": [
     { "pattern": "owlofminerva.app", "custom_domain": true },
     { "pattern": "www.owlofminerva.app", "custom_domain": true }

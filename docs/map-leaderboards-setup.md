@@ -54,7 +54,17 @@ Accounts (ADR 0023) sign in with Discord: players to link their PCs, the maintai
 
 For `wrangler dev`, put `DISCORD_CLIENT_SECRET=...` in `site/.dev.vars`. Sign in at `http://localhost:5173/admin/` with `pnpm site:dev` and `wrangler dev` both running.
 
-## 6. Deploy the API before any app that uses it
+## 6. Set the ClassicRank key (optional)
+
+Characters' portraits come from ClassicRank's API (ADR 0028), which the Worker asks with a key: a Partner read key, applied for at [classicrank.com/api-access](https://classicrank.com/api-access) (sign in with Discord) and shown once on [classicrank.com/me](https://classicrank.com/me). It is optional: with no secret set, the Worker never asks ClassicRank, and the site shows no portraits. The key is a secret, so it is never committed; keep it in the password manager beside `ADMIN_TOKEN`.
+
+```bash
+pnpm exec wrangler secret put CLASSICRANK_KEY --config site/wrangler.jsonc
+```
+
+Paste the key. Check it with `curl -i -H "Authorization: Bearer <key>" https://classicrank.com/api/v1`: the `X-Read-Key` header says `accepted`, and the answer's `your_key` gives its tier. Portraits show from each Character's next upload, and for everyone at the next daily run (the cron trigger in `site/wrangler.jsonc`, 05:17 UTC). For `wrangler dev`, put `CLASSICRANK_KEY=...` in `site/.dev.vars`; an unknown key there is served as ClassicRank's keyless tier, which is enough to try it. To stop the portraits, `pnpm exec wrangler secret delete CLASSICRANK_KEY --config site/wrangler.jsonc`: from then on the answers carry none, and the pages show none.
+
+## 7. Deploy the API before any app that uses it
 
 The API must be live before any Minerva version that uses it is released: one that uploads (#110), or one that links a PC to an Account (#152). Once this is on `main`, publish the site from `main`:
 

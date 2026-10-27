@@ -41,7 +41,8 @@ describe("latest", () => {
       ["Bea", 15],
       ["Ada", 25],
     ]);
-    expect(entries[1]).toEqual({
+    // Its portrait from ClassicRank comes after the upload (test/portraits.test.ts).
+    expect(entries[1]).toMatchObject({
       name: "Bea",
       job: "Magician",
       level: 15,

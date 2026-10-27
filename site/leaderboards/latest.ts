@@ -2,10 +2,11 @@
 // map, each a link to its Map Leaderboard with the entry marked, saying when it took a top
 // spot (ADR 0024). What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
-import { byId, characterLink, jobWithIcon, markSlot, names, read, said as saidWith, unreachable, wordsOf } from "./api.ts";
+import { byId, characterLink, jobWithIcon, markSlot, names, portraitImage, read, said as saidWith, unreachable, wordsOf } from "./api.ts";
 import { type LatestAnswer, type LatestLine, latestLines } from "./leaderboards.ts";
 
 const said = byId("latest-said");
+const credit = byId("latest-credit");
 const list = byId<HTMLOListElement>("latest-entries");
 /** What the list holds while the entries come: its room kept, as index.html draws it. */
 const waiting = [...list.children];
@@ -22,7 +23,14 @@ function drawLine(line: LatestLine): HTMLLIElement {
   const entry = make("div", "lb-map lb-entry");
   // One line on a phone; on a wider page the name and the job are each a column (site.css).
   const who = make("span", "lb-entry-who");
-  who.append(characterLink(line.name, line.nameHref, "lb-map-name lb-entry-name"), " ", jobWithIcon(line.who, line.jobClass, "lb-entry-job"));
+  const name = characterLink(line.name, line.nameHref, "lb-map-name lb-entry-name");
+  // With a portrait (ADR 0028), it and the name share the names' column.
+  let character: HTMLElement = name;
+  if (line.portrait !== null) {
+    character = make("span", "lb-entry-character");
+    character.append(portraitImage(line.portrait, 32), name);
+  }
+  who.append(character, " ", jobWithIcon(line.who, line.jobClass, "lb-entry-job"));
   const exp = make("span", "lb-entry-exp", line.expPerHour);
   exp.append(make("span", "lb-entry-unit", " EXP/h"));
   const where = make("span", "lb-entry-where");
@@ -59,6 +67,7 @@ function load() {
     said.hidden = shown.empty === null;
     list.replaceChildren(...shown.lines.map(drawLine));
     list.hidden = shown.lines.length === 0;
+    credit.hidden = !shown.portraits;
   });
 }
 load();

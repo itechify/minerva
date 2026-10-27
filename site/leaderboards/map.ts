@@ -5,7 +5,7 @@
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import { STAR } from "../star.ts";
-import { byId, characterLink, crown, jobWithIcon, names, read, said as saidWith, unreachable } from "./api.ts";
+import { byId, characterLink, crown, jobWithIcon, names, portraitImage, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
@@ -173,6 +173,7 @@ function drawBand(band: BandAnswer, morph: Map<string, string> | null, grow: boo
   shown = table.yours === null ? table.rows : [...table.rows, table.yours];
   if (table.empty !== null) {
     byId("table").hidden = true;
+    byId("credit").hidden = true;
     rows.replaceChildren();
     return say(table.empty);
   }
@@ -189,6 +190,7 @@ function drawBand(band: BandAnswer, morph: Map<string, string> | null, grow: boo
   rows.classList.toggle("lb-grow", grow);
   rovingReports(rows);
   byId("table").hidden = false;
+  byId("credit").hidden = !table.portraits;
 }
 
 /** The band choices, each a link to its band on the page, the open one marked. The links
@@ -386,6 +388,9 @@ interface RowsAt {
  *  Report's flag; or, for the linked Character's, the You Yellow star before the name and no
  *  Report (the player takes their own entries off from Minerva). A row that slides in a
  *  switch takes its Character's name for it. */
+/** How big a portrait is beside a name in a band's table (ADR 0028). */
+const PORTRAIT_SIZE = 32;
+
 function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowElement {
   const tr = make("tr", row.you ? "lb-you" : "");
   tr.setAttribute("role", "row");
@@ -399,6 +404,7 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   name.scope = "row";
   name.setAttribute("role", "rowheader");
   if (row.you) name.append(star());
+  if (row.portrait !== null) name.append(portraitImage(row.portrait, PORTRAIT_SIZE));
   name.append(characterLink(row.name, row.nameHref));
   const reportCell = make("td", "lb-report");
   if (!row.you) {

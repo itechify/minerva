@@ -51,16 +51,23 @@
         <div class="part" data-street="Character">
           <header class="lb-head stop" id="top" data-mini="Character">
             <p class="lb-back"><a href="/leaderboards/">All Map Leaderboards</a></p>
-            <h1 class="ch-name" id="name" data-seam-to="seam-name">Character</h1>
-            <!-- The name the address asks for, before the page's script runs, so the heading
-                 never shows "Character" first. page.ts writes it again as last uploaded. -->
-            <script>
-              (function () {
-                var name = new URLSearchParams(location.search).get("name");
-                if (name && /^[A-Za-z0-9]{1,16}$/.test(name)) document.getElementById("name").textContent = name;
-              })();
-            </script>
-            <p class="ch-who" id="who"></p>
+            <!-- Their portrait from ClassicRank beside their name and who they are, with the
+                 visible link ClassicRank asks for under it (ADR 0028); none while the API gives
+                 no portraits. -->
+            <div class="ch-identity" id="identity">
+              <div class="ch-portrait" id="portrait" hidden></div>
+              <h1 class="ch-name" id="name" data-seam-to="seam-name">Character</h1>
+              <!-- The name the address asks for, before the page's script runs, so the heading
+                   never shows "Character" first. page.ts writes it again as last uploaded. -->
+              <script>
+                (function () {
+                  var name = new URLSearchParams(location.search).get("name");
+                  if (name && /^[A-Za-z0-9]{1,16}$/.test(name)) document.getElementById("name").textContent = name;
+                })();
+              </script>
+              <p class="ch-who" id="who"></p>
+              <p class="lb-credit ch-credit" id="portrait-credit" hidden>Portrait from <a href="https://classicrank.com">ClassicRank</a></p>
+            </div>
             <dl class="ch-stats" id="stats" hidden></dl>
           </header>
 
