@@ -95,8 +95,8 @@ function noTimeToLevel(rolling: ExpRate | null) {
   return "not yet";
 }
 
-/** The Loot section, once the Session has started: collapsed, its totals on the header ("~1,593
- *  mesos ~28 items", a part left out while it is none); open, "(Estimate)" by the label, the
+/** The Loot section, once the Session has started: collapsed, its totals on the header ("1,593+
+ *  mesos 28+ items", a part left out while it is none); open, "(Estimate)" by the label, the
  *  Mesos row, then every Item with its count, the most picked up first, in a list that scrolls. */
 function renderLoot(l: Loot, open: boolean, started: boolean) {
   loot.hidden = !started;
@@ -122,8 +122,9 @@ function renderLoot(l: Loot, open: boolean, started: boolean) {
 function total(n: number, word: string) {
   if (n === 0) return null;
   const part = document.createElement("span");
-  // "~": the header has no "(Estimate)", and the Pickup Log can miss a pickup.
-  part.append(span("figure", `~${whole(n)}`), ` ${word}${n === 1 ? "" : "s"}`);
+  // "+", in the words' weight: the header has no "(Estimate)", and the Pickup Log can miss a
+  // pickup but never adds one, so the figure is at least what was picked up.
+  part.append(span("figure", whole(n)), `+ ${word}${n === 1 ? "" : "s"}`);
   return part;
 }
 
