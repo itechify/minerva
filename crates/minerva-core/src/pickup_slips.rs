@@ -111,8 +111,13 @@ fn cost(read: &[char], name: &[char]) -> u32 {
 /// is close enough and clearly leads the next, or else the one that plain edits make it (within
 /// 75%, two edits nearer than any other), as before slips were known: the slips only add to what
 /// is named. `None` when none is, and so when two are as near.
-pub(crate) fn closest(read: &[char], names: &[&[char]]) -> Option<usize> {
-    by_slips(read, names).or_else(|| closest_within(read, names, CLOSE_ENOUGH))
+pub(crate) fn closest_by_slips(read: &[char], names: &[&[char]]) -> Option<usize> {
+    by_slips(read, names).or_else(|| closest_plain(read, names))
+}
+
+/// The same, by plain edits alone.
+pub(crate) fn closest_plain(read: &[char], names: &[&[char]]) -> Option<usize> {
+    closest_within(read, names, CLOSE_ENOUGH)
 }
 
 fn by_slips(read: &[char], names: &[&[char]]) -> Option<usize> {

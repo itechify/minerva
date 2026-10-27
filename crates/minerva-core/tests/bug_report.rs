@@ -1635,3 +1635,41 @@ fn a_capture_with_no_shop_found_that_wont_fit_is_left_out_and_the_summary_says_s
     let says = format!("Left out: {name}, a whole capture where nothing was found, 9.2 MB as a PNG: too big for the report");
     assert!(summary.contains(&says), "{summary}");
 }
+
+#[test]
+fn a_reports_item_lines_replay_as_loot_through_the_current_item_naming_over_a_window() {
+    use minerva_core::{LootItem, PickupLine, PickupLogSeen};
+    let files = item_world(vec![common::items::etc(4_000_000, "Very Dry Branch"), common::items::etc(4_000_001, "Tree Branch")]).files();
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(12 * S, CONSTRUCTION_SITE, grind);
+    let line = |name: &str, quantity| PickupLine::Item { name: name.into(), quantity, tab: "Etc".into(), cut_short: false };
+    let feed = |shell: &mut Shell, at_ms, seen, arrived| {
+        shell.minerva.on_pickup_log_reading(common::pickup_reading(at_ms, seen, arrived));
+    };
+    let area = common::LOG;
+    feed(&mut shell, 12 * S + 100, PickupLogSeen::Clear { area }, vec![line("Very Dry Branch", 1), line("Very Cir Aranch", 1), PickupLine::Mesos { amount: 5 }]);
+    shell.play(14 * S, CONSTRUCTION_SITE, grind);
+    feed(&mut shell, 14 * S + 100, PickupLogSeen::Clear { area }, vec![line("Zorg Dung", 2)]);
+    shell.play(15 * S, CONSTRUCTION_SITE, grind);
+    // Under a cover nothing arrives, whatever the reading carries.
+    feed(&mut shell, 15 * S + 100, PickupLogSeen::Covered { area }, vec![line("Tree Branch", 9)]);
+    shell.play(20 * S, CONSTRUCTION_SITE, grind);
+    feed(&mut shell, 20 * S + 100, PickupLogSeen::Clear { area }, vec![line("Tree Branch", 1)]);
+    let (_, recording) = shell.report();
+
+    let all = bug_report::loot_of(&recording, Some(&files), 0, u64::MAX);
+    assert_eq!((all.item_lines, all.exact), (4, 2));
+    assert_eq!(all.items, vec![LootItem { name: "Very Dry Branch".into(), count: 2 }, LootItem { name: "Tree Branch".into(), count: 1 }]);
+    assert_eq!(all.items_total, 3);
+    let [corrected] = &all.corrected[..] else { panic!("{:?}", all.corrected) };
+    assert_eq!((corrected.read.as_str(), corrected.item.as_deref(), corrected.lines), ("Very Cir Aranch", Some("Very Dry Branch"), 1));
+    assert_eq!(corrected.plain, None, "the plain edits alone would not have named it");
+    assert_eq!(all.as_read.iter().map(|read| (read.read.as_str(), read.lines)).collect::<Vec<_>>(), vec![("Zorg Dung", 1)]);
+
+    let window = bug_report::loot_of(&recording, Some(&files), 14 * S, 16 * S);
+    assert_eq!((window.item_lines, window.exact, window.corrected.len(), window.as_read.len()), (1, 0, 0, 1));
+    assert_eq!(window.items, vec![]);
+
+    let none = bug_report::loot_of(&recording, None, 0, u64::MAX);
+    assert_eq!(none.exact, 0, "with no item files nothing is named");
+}

@@ -1643,6 +1643,86 @@ pub fn replay(recording: &Recording, osms: Option<OsmsFiles>) -> Replay {
     replay_with(recording, ReplayData { osms, ..ReplayData::default() })
 }
 
+/// One Item line's read, as the Pickup Log read it, and what the current naming makes of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LootRead {
+    pub read: String,
+    pub tab: String,
+    /// The Item it is named, as OSMS spells it; `None` where it stays as read.
+    pub item: Option<String>,
+    /// The Item plain edits alone would name it, as before the recogniser's slips were known.
+    pub plain: Option<String>,
+    /// On how many lines it was read.
+    pub lines: u64,
+}
+
+/// What the Item lines of a Bug Report's Pickup Log readings come to as Loot.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LootOfReport {
+    /// The Item lines that arrived in clean readings.
+    pub item_lines: u64,
+    /// Those read as the Item's own name, or cut short by the game and started by one Item's.
+    pub exact: u64,
+    /// Those named an Item that is not what they read, each distinct read once.
+    pub corrected: Vec<LootRead>,
+    /// Those that stay as read, each distinct read once.
+    pub as_read: Vec<LootRead>,
+    /// The Items tallied, as the Session tallies them, the most picked up first.
+    pub items: Vec<crate::LootItem>,
+    pub items_total: u64,
+}
+
+impl LootOfReport {
+    /// The lines named an Item that plain edits alone would not have named, or not as it.
+    pub fn changed(&self) -> u64 {
+        self.corrected.iter().filter(|read| read.item != read.plain).map(|read| read.lines).sum()
+    }
+}
+
+/// Replay a Bug Report's Pickup Log readings, those whose line was written between `from_ms` and
+/// `to_ms` of the trace (capture time, ms since launch), through the current Item naming against
+/// `items`, and tally the Items as the Session does. The report holds no item files; with none
+/// given every Item stays as read.
+pub fn loot_of(recording: &Recording, items: Option<&ItemFiles>, from_ms: u64, to_ms: u64) -> LootOfReport {
+    use crate::item_lookup::item_key;
+    use crate::loot_items::{ItemTally, Named, name, name_plain};
+    use crate::pickup_log::{PickupLine, PickupLogSeen};
+    let set = items.and_then(|files| crate::osms_items::read(files).ok());
+    let mut loot = LootOfReport::default();
+    let mut tally = ItemTally::default();
+    let mut notes = Vec::new();
+    for line in recording.lines.iter().filter(|line| (from_ms..=to_ms).contains(&line.t)) {
+        let Event::PickupLog { reading, stale_region: None } = &line.event else { continue };
+        if !matches!(reading.seen, PickupLogSeen::Clear { .. }) {
+            continue;
+        }
+        for arrived in &reading.arrived {
+            let PickupLine::Item { name: read, quantity, tab, cut_short } = arrived else { continue };
+            loot.item_lines += 1;
+            let named = name(set.as_ref(), read, *cut_short, tab);
+            let item = match &named {
+                Named::Item(item) => Some(item.clone()),
+                _ => None,
+            };
+            let exact = *cut_short && item.is_some() || item.as_ref().is_some_and(|item| item_key(item) == item_key(read));
+            if exact {
+                loot.exact += 1;
+            } else {
+                let plain = set.as_ref().filter(|_| !cut_short).and_then(|set| name_plain(set, read, tab));
+                let into = if item.is_some() { &mut loot.corrected } else { &mut loot.as_read };
+                match into.iter_mut().find(|seen| seen.read == *read && seen.tab == *tab) {
+                    Some(seen) => seen.lines += 1,
+                    None => into.push(LootRead { read: read.clone(), tab: tab.clone(), item, plain, lines: 1 }),
+                }
+            }
+            tally.add(named, *quantity, &mut notes);
+        }
+    }
+    loot.items = tally.items();
+    loot.items_total = tally.total();
+    loot
+}
+
 /// Feed a Bug Report's inputs to a new core, with what `with` holds where the report had
 /// it, and compare what it writes down with the report's trace. A set's fingerprint isn't compared, but what the core makes of it is:
 /// a set other than the run's makes it diverge where that shows, as do a trace that

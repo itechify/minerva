@@ -63,6 +63,17 @@ pub(crate) fn name(items: Option<&ItemSet>, name: &str, cut_short: bool, tab: &s
     }
 }
 
+/// What an Item line's name came to by plain edits alone, as it was before the recogniser's slips
+/// were known ([`ItemSet::named_in_tab_plain`]): the Item it names, if any. The Bug Report probe
+/// compares it with [`name`].
+pub(crate) fn name_plain(items: &ItemSet, name: &str, tab: &str) -> Option<String> {
+    if let Some(item) = items.named(name).first() {
+        return Some(item.name.clone());
+    }
+    let tab = InventoryTab::named_like(tab)?;
+    items.named_in_tab_plain(name, tab).map(String::from)
+}
+
 /// A name that matched no Item, with the lines it was read on.
 #[derive(Debug, Clone)]
 struct Unmatched {

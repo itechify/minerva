@@ -185,9 +185,19 @@ impl ItemSet {
     /// ([`crate::pickup_slips`]), though further from it than [`ItemSet::named`] asks for, because
     /// the tab says which names it can be. `None` when none is.
     pub(crate) fn named_in_tab(&self, read: &str, tab: InventoryTab) -> Option<&str> {
+        self.in_tab(read, tab, crate::pickup_slips::closest_by_slips)
+    }
+
+    /// [`ItemSet::named_in_tab`] by plain edits alone, as it was before the recogniser's slips were
+    /// known: what the Bug Report probe compares the slips with.
+    pub(crate) fn named_in_tab_plain(&self, read: &str, tab: InventoryTab) -> Option<&str> {
+        self.in_tab(read, tab, crate::pickup_slips::closest_plain)
+    }
+
+    fn in_tab(&self, read: &str, tab: InventoryTab, closest: fn(&[char], &[&[char]]) -> Option<usize>) -> Option<&str> {
         let names: Vec<_> = self.names.iter().filter(|(_, items)| items.iter().any(|&item| self.items[item].inventory_tab() == tab)).collect();
         let keys: Vec<&[char]> = names.iter().map(|(name, _)| &name[..]).collect();
-        let name = crate::pickup_slips::closest(&item_key(read), &keys)?;
+        let name = closest(&item_key(read), &keys)?;
         Some(&self.items[names[name].1[0]].name)
     }
 

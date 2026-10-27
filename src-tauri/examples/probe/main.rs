@@ -49,6 +49,15 @@
 //! fetched live only if the run had them, or read from the `osms-items.json` given. No game
 //! window is needed.
 //!
+//! `cargo run -p minerva --example probe loot <report.zip> [--items <osms-items.json>] [--from-ms <ms>] [--to-ms <ms>]`
+//! Loot mode, for the Pickup Log's Item naming (ADR 0026): replay a Bug Report's Pickup Log
+//! readings through the core's current naming of an Item line, against OSMS's item files
+//! (fetched live, or the `osms-items.json` given: the app keeps one in its cache folder), and
+//! print the Loot tally, how many Item lines were read as an Item's own name, which were named
+//! another Item than they read (and what plain edits alone would have named them) and which
+//! stay as read. `--from-ms`/`--to-ms` keep the lines written in that window of the trace
+//! (capture time, ms since launch, as the timeline gives). No game window is needed.
+//!
 //! `cargo run -p minerva --example probe update-manifest <out> [--bundle-dir <dir>] [--base-url <url>]`
 //! Update manifest mode, for releasing (`docs/releasing.md`): write the updater's
 //! `latest.json` to `out` for the version in `src-tauri/tauri.conf.json`, published now,
@@ -70,7 +79,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 /// none, and its failing is no misuse).
 type Mode = (&'static str, fn(&[String]) -> Result<(), String>, Option<&'static str>);
 
-const MODES: [Mode; 6] = [
+const MODES: [Mode; 7] = [
+    ("loot", loot, Some("probe loot <report.zip> [--items <osms-items.json>] [--from-ms <ms>] [--to-ms <ms>]")),
     ("record", record, Some("probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>]")),
     ("osms", |_| osms(), None),
     ("ceilings", ceilings, Some("probe ceilings <out.json> [--osms <osms-set.json>]")),
@@ -362,6 +372,48 @@ fn replay(args: &[String]) -> Result<(), String> {
             println!("  recorded: {}", divergence.recorded.as_deref().unwrap_or("(past the end)"));
             println!("  replayed: {}", divergence.replayed.as_deref().unwrap_or("(past the end)"));
         }
+    }
+    Ok(())
+}
+
+/// `<report.zip> [--items <osms-items.json>] [--from-ms <ms>] [--to-ms <ms>]`
+fn loot(args: &[String]) -> Result<(), String> {
+    use minerva_core::bug_report;
+    let mut rest = args.iter();
+    let path = rest.next().ok_or("no Bug Report")?;
+    let (mut items_file, mut from_ms, mut to_ms) = (None, 0, u64::MAX);
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            "--items" => items_file = Some(rest.next().ok_or("--items needs a file")?),
+            "--from-ms" => from_ms = rest.next().and_then(|s| s.parse().ok()).ok_or("--from-ms needs milliseconds")?,
+            "--to-ms" => to_ms = rest.next().and_then(|s| s.parse().ok()).ok_or("--to-ms needs milliseconds")?,
+            other => return Err(format!("unknown argument {other:?}")),
+        }
+    }
+    let zip = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+    let recording = bug_report::read(&zip)?;
+    let files = match items_file {
+        Some(file) => {
+            let json = std::fs::read(file).map_err(|e| format!("{file}: {e}"))?;
+            serde_json::from_slice::<minerva_core::osms_items::ItemFiles>(&json).map_err(|e| format!("{file}: {e}"))?
+        }
+        None => minerva_lib::osms::fetch_live::<minerva_core::osms_items::ItemFiles>().map_err(|e| format!("OSMS's item files couldn't be fetched: {e}"))?,
+    };
+    let loot = bug_report::loot_of(&recording, Some(&files), from_ms, to_ms);
+    let window = if to_ms == u64::MAX { format!("from {from_ms} ms") } else { format!("{from_ms} to {to_ms} ms") };
+    println!("Minerva {}: Item lines written {window} of the trace: {}", recording.report.version, loot.item_lines);
+    println!("  read as an Item's own name (or cut short and started by one): {}", loot.exact);
+    println!("  named another Item than they read: {} lines, {} of them plain edits alone would not have named so", loot.corrected.iter().map(|r| r.lines).sum::<u64>(), loot.changed());
+    for read in &loot.corrected {
+        println!("    {:>3} × {:?} ({}) -> {:?}; plain edits: {:?}", read.lines, read.read, read.tab, read.item.as_deref().unwrap_or(""), read.plain);
+    }
+    println!("  staying as read: {} lines", loot.as_read.iter().map(|r| r.lines).sum::<u64>());
+    for read in &loot.as_read {
+        println!("    {:>3} × {:?} ({})", read.lines, read.read, read.tab);
+    }
+    println!("Loot tally ({} Items in all):", loot.items_total);
+    for item in &loot.items {
+        println!("  {:>5}  {}", item.count, item.name);
     }
     Ok(())
 }
