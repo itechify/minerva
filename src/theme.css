@@ -27,6 +27,9 @@
   --minimap-paper: rgba(238, 243, 251, 0.45);
   --mob: #d8342a;
   --mob-edge: #8e1c15;
+  /* The minimap's NPC dot: the Destination's NPC, marked where it stands on the Map Preview. */
+  --npc: #3fc43a;
+  --npc-edge: #1d6b1a;
   /* The player's own dot on the minimap: where you are. */
   --you: #ffd21f;
   --you-light: #fff6c2;

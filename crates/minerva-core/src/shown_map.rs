@@ -187,7 +187,7 @@ impl ShownMap {
         let data = set.data(&self.map()?.id)?;
         let picture = data.picture.clone()?;
         let image = PreviewImage::of(&picture, pictures);
-        Some(MapPreview { picture, image, marks: data.marks.clone(), spawns: data.spawns.clone() })
+        Some(MapPreview { picture, image, marks: data.marks.clone(), spawns: data.spawns.clone(), npc_spots: Vec::new() })
     }
 
     pub fn candidates(&self, set: &MapSet) -> Option<Candidates> {

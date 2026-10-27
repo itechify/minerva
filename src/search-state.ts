@@ -12,6 +12,13 @@ export type MobMatch = MobChoice & { image: string | null };
 /** Mirror of `minerva_core::MapMatch`: picked, it becomes the Destination. */
 export type MapMatch = { mapId: string; streetName: string; mapName: string; mark: string | null };
 
+/** Mirror of `minerva_core::NpcChoice`: `image` is where its OSMS picture loads from, once it's in. */
+export type NpcChoice = { id: string; name: string; image: string | null };
+
+/** Mirror of `minerva_core::NpcMatch`: picked, its one map becomes the Destination, or its
+ *  maps are listed to pick from. */
+export type NpcMatch = NpcChoice & { maps: MapMatch[] };
+
 /** Mirror of `minerva_core::ItemMatch`: items that look alike, under the first's ID; picked,
  *  their Item Card shows. `icon` is where its picture loads from, once it's in. */
 export type ItemMatch = { id: string; name: string; kind: string; icon: string | null };
@@ -50,8 +57,19 @@ export type SearchResult = {
 /** Mirror of `minerva_core::Travel`: taxi rides between towns, and Teleport Scrolls to towns. */
 export type Travel = { taxis: boolean; teleportScrolls: boolean };
 
+/** Mirror of `minerva_core::NpcMap`: a map in the picked NPC's map list. */
+export type NpcMap = {
+  mapId: string;
+  streetName: string;
+  mapName: string;
+  mark: string | null;
+  distance: Distance;
+  /** The kinds of travel besides portals the route there takes. */
+  travel: Step[];
+};
+
 /** Mirror of `minerva_core::SearchView`: the search view's open step. */
-export type SearchView = "matches" | "maps";
+export type SearchView = "matches" | "maps" | "npcMaps";
 
 /** Mirror of `minerva_core::Trip`: the way to a Hunting Target or a Destination as it stood
  *  when picked. */
@@ -72,7 +90,8 @@ export type HuntingTarget = {
 
 /**
  * Mirror of `minerva_core::Destination`: the map picked to go to, with the way there; once
- * the player is there (or picked it there), that they've arrived.
+ * the player is there (or picked it there), that they've arrived. `npc` is the NPC it was
+ * picked for, who stands on it.
  */
 export type Destination = {
   mapId: string;
@@ -84,6 +103,9 @@ export type Destination = {
   travel: Step[];
   arrived: boolean;
   trip: Trip | null;
+  npc: NpcChoice | null;
+  /** The Map Preview marks where the NPC stands: you're on its map, and OSMS says where. */
+  npcMarked: boolean;
 };
 
 /** An arrival's trip: "2 map changes from Sunset Sky, by teleport scroll". */
@@ -100,10 +122,11 @@ export type SearchState = {
   query: string;
   mobs: Matches<MobMatch>;
   maps: Matches<MapMatch>;
+  npcs: Matches<NpcMatch>;
   items: Matches<ItemMatch>;
   /** Why no items are matched while something is typed: OSMS's item files aren't in. */
   itemsMissing: ItemsMissing | null;
-  /** The match Enter picks, counting through the mobs shown, then the maps, then the items. */
+  /** The match Enter picks, counting through the mobs shown, then the maps, the NPCs, the items. */
   highlighted: number | null;
   /** The mob whose map list the search view shows. */
   picked: MobChoice | null;
@@ -111,7 +134,11 @@ export type SearchState = {
   results: SearchResult[];
   /** The picked mob spawns only on Event maps, which search leaves out. */
   onlyOnEventMaps: boolean;
-  /** The map Enter would make the Hunting Target. */
+  /** The NPC whose map list the search view shows. */
+  pickedNpc: NpcChoice | null;
+  /** The picked NPC's maps, nearest first. */
+  npcMaps: NpcMap[];
+  /** The map Enter would pick from the mob's map list (the Hunting Target) or the NPC's (the Destination). */
   highlightedResult: number | null;
   /** Which result is the nearest with a route. */
   nearest: number | null;
@@ -168,7 +195,7 @@ const STEP_TITLES: Record<Step, string> = {
 type Way = { distance: Distance; route: RouteStop[]; travel: Step[] };
 
 /** A way's travel marker: "ship", "taxi, ship", or "" for portals alone. */
-const travelMarker = (way: Way) => way.travel.map((step) => STEP_NAMES[step]).join(", ");
+const travelMarker = (way: Pick<Way, "travel">) => way.travel.map((step) => STEP_NAMES[step]).join(", ");
 
 /** The headline: "Nearest: Mushroom Field, 2 map changes away", or "" with none. */
 export function nearestLine(search: SearchState): string {
@@ -201,8 +228,8 @@ export function resultsHead(): HTMLTableSectionElement {
   return head;
 }
 
-/** A way's Distance as the map list and the Navigation section read it ("5 · ship"), with why. */
-export function distanceWithTravel(way: Way): { text: string; title: string } {
+/** A way's Distance as the map lists and the Navigation section read it ("5 · ship"), with why. */
+export function distanceWithTravel(way: Pick<Way, "distance" | "travel">): { text: string; title: string } {
   const distance = distanceText(way.distance);
   const travel = travelMarker(way);
   const travelTitle = way.travel.map((step) => STEP_TITLES[step]).join(", ");
@@ -242,6 +269,42 @@ export function resultGroup(result: SearchResult, marks: MapMarks): HTMLTableSec
     cell(`${result.spawnSharePercent}%`),
     cell(TIER_NAMES[result.tier], `tier ${result.tier}`),
   );
+  return group;
+}
+
+/** The NPC's map list's header row: Map, Distance. */
+export function npcMapsHead(): HTMLTableSectionElement {
+  const head = document.createElement("thead");
+  const row = head.insertRow();
+  const map = document.createElement("th");
+  map.textContent = "Map";
+  const distance = document.createElement("th");
+  distance.textContent = "Distance";
+  distance.title = "Map changes from the map you're on";
+  row.append(map, distance);
+  return head;
+}
+
+/** A map in the NPC's map list as its own row group: its name with its Distance at the right, then its street. */
+export function npcMapGroup(map: NpcMap, marks: MapMarks): HTMLTableSectionElement {
+  const group = document.createElement("tbody");
+  group.id = `npc-map-${map.mapId}`;
+  group.dataset.id = map.mapId;
+  const cell = (text: string, className: string) => {
+    const td = document.createElement("td");
+    td.textContent = text;
+    td.className = className;
+    return td;
+  };
+  const name = cell(map.mapName, "result-map");
+  name.prepend(mapMark(marks, map.mark));
+  name.title = map.mapName;
+  const distance = distanceWithTravel(map);
+  const distanceCell = cell(distance.text, typeof map.distance === "string" ? "distance none" : "distance");
+  distanceCell.title = distance.title;
+  distanceCell.rowSpan = 2;
+  group.insertRow().append(name, distanceCell);
+  group.insertRow().append(cell(map.streetName, "result-street"));
   return group;
 }
 

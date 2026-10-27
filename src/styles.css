@@ -910,6 +910,31 @@ td:first-child {
   pointer-events: all;
 }
 
+/* The NPC the Destination was picked for: the minimap's green NPC dot, ringed in Route
+   Magenta as the Destination is at the end of its route, on a white halo, over every other
+   mark. */
+.npc-spots circle {
+  pointer-events: none;
+}
+
+.npc-spots .npc-halo {
+  fill: rgba(255, 255, 255, 0.85);
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 4.5;
+}
+
+.npc-spots .npc-ring {
+  fill: none;
+  stroke: var(--route);
+  stroke-width: 2;
+}
+
+.npc-spots .npc-dot {
+  fill: var(--npc);
+  stroke: var(--npc-edge);
+  stroke-width: 0.75;
+}
+
 /* A teleport within the map: a dashed green arrow from its ring to where it lands, over a
    white under-stroke; heads at both ends for a pair. */
 .arrow line {
@@ -1614,6 +1639,34 @@ td:first-child {
   line-height: 17px;
 }
 
+/* The NPC whose maps are listed, as the Navigation section leads with a target. */
+.npc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.npc-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+.npc-head-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--ink);
+}
+
+.panel .arrival-npc,
 .panel .arrival-trip {
   grid-column: 2;
   font-size: 12px;
@@ -1773,7 +1826,8 @@ td:first-child {
   margin: -1px 8px -1px 0;
 }
 
-.matches-mob .match-picture {
+.matches-mob .match-picture,
+.matches-npc .match-picture {
   place-items: end center;
 }
 

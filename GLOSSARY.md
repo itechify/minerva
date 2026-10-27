@@ -65,7 +65,7 @@ A hidden portal that only works while the player meets a quest condition.
 _Avoid_: script portal
 
 **Map Preview**:
-A picture of the whole of the shown map, with every portal marked where it is, its hidden portals set apart, and every Spawn Point dotted.
+A picture of the whole of the shown map, with every portal marked where it is, its hidden portals set apart, and every Spawn Point dotted; and, on the map of a Destination picked through an NPC, that NPC marked in green where it stands.
 _Avoid_: minimap (the game's own), map image
 
 ### Hunting
@@ -103,7 +103,7 @@ The fewest map changes it takes to get from the player's current map to another 
 _Avoid_: position, proximity
 
 **Search**:
-The search view the 🔍 or the search hotkey (Ctrl+Shift+F by default) opens over the panel: the mobs, maps and items whose name holds what the player types, a section for each, with each kind's best five. A mob leads to the maps it spawns on, to pick a Hunting Target; a map becomes the Destination; an item shows its Item Card.
+The search view the 🔍 or the search hotkey (Ctrl+Shift+F by default) opens over the panel: the mobs, maps, NPCs and items whose name holds what the player types, a section for each, with each kind's best five. A mob leads to the maps it spawns on, to pick a Hunting Target; a map becomes the Destination; an NPC leads to its map, or to a list of its maps when it stands on several, to pick the Destination; an item shows its Item Card.
 _Avoid_: mob search, item search
 
 **Hunting Target**:
@@ -111,7 +111,7 @@ The mob and map the player picked in Search (the mob, then one of its maps) to g
 _Avoid_: waypoint, goal
 
 **Destination**:
-A map the player picked in Search to go to, with no mob in mind. Minerva shows the way there as for a Hunting Target, in its place: there is one or the other, whichever the player picked last. Picked on the map the player is on, it says they are there at once.
+A map the player picked in Search to go to, with no mob in mind: the map itself, or the map of an NPC they picked, which the Navigation section then shows with the map. Minerva shows the way there as for a Hunting Target, in its place: there is one or the other, whichever the player picked last. Picked on the map the player is on, it says they are there at once.
 _Avoid_: waypoint, goal, target (alone)
 
 **Ship**:

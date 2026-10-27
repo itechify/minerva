@@ -26,6 +26,33 @@ pub struct Map {
     pub portals: Vec<Portal>,
     /// `map_mark`; written as `"None"` when `None`, as OSMS writes a map without one.
     pub mark: Option<String>,
+    /// `npc_positions`: each NPC standing on the map, by its ID, and where in the map's
+    /// picture (`None`: nowhere, so `npcs` lists it and `npc_positions` doesn't). `npcs`
+    /// lists their IDs, each once.
+    pub npcs: Vec<(u64, Option<(i64, i64)>)>,
+}
+
+/// An NPC, as `maps.json`'s `npc_lookup` holds it.
+#[derive(Debug, Clone)]
+pub struct Npc {
+    pub id: u64,
+    pub name: String,
+    /// `thumbnail`, its picture's path below the data set (`"images/npcs/0000001.png"`);
+    /// `None` is written as `null`, as OSMS writes an NPC without one.
+    pub thumbnail: Option<String>,
+}
+
+/// An NPC with its picture where OSMS keeps them (`images/npcs/<id, 7 digits>.png`).
+pub fn npc(id: u64, name: &str) -> Npc {
+    Npc { id, name: name.into(), thumbnail: Some(format!("images/npcs/{id:07}.png")) }
+}
+
+impl Npc {
+    /// No picture: `thumbnail` is `null`.
+    pub fn without_picture(mut self) -> Self {
+        self.thumbnail = None;
+        self
+    }
 }
 
 /// Some of a mob's spawn points on a map.
@@ -104,6 +131,7 @@ pub fn map(id: u64, street_name: &str, name: &str) -> Map {
         spawns: Vec::new(),
         portals: Vec::new(),
         mark: None,
+        npcs: Vec::new(),
     }
 }
 
@@ -271,6 +299,19 @@ impl Map {
         self
     }
 
+    /// NPC `id` standing at (`x`, `y`) in the map's picture.
+    pub fn npc_at(mut self, id: u64, x: i64, y: i64) -> Self {
+        self.npcs.push((id, Some((x, y))));
+        self
+    }
+
+    /// NPC `id` standing on the map, with no position: `npcs` lists it, `npc_positions`
+    /// doesn't.
+    pub fn npc_unplaced(mut self, id: u64) -> Self {
+        self.npcs.push((id, None));
+        self
+    }
+
     /// `exits` as given, whatever its portals.
     pub fn exits(mut self, exits: &[u64]) -> Self {
         self.exits = Some(exits.to_vec());
@@ -307,10 +348,12 @@ pub struct World {
     pub folded: Vec<(u64, u64)>,
     /// `map_mark_icons`, each mark's name and its picture's path; `None` leaves it out.
     pub mark_icons: Option<Vec<(String, String)>>,
+    /// `npc_lookup`: every NPC, whether or not it stands on a map.
+    pub npcs: Vec<Npc>,
 }
 
 pub fn world(maps: Vec<Map>, mobs: Vec<Mob>) -> World {
-    World { maps, mobs, other_maps: Vec::new(), folded: Vec::new(), mark_icons: Some(Vec::new()) }
+    World { maps, mobs, other_maps: Vec::new(), folded: Vec::new(), mark_icons: Some(Vec::new()), npcs: Vec::new() }
 }
 
 impl World {
@@ -386,6 +429,15 @@ impl World {
         self
     }
 
+    /// The same world with `npc` in place of the NPC with its ID, or added.
+    pub fn with_npc(mut self, npc: Npc) -> Self {
+        match self.npcs.iter_mut().find(|n| n.id == npc.id) {
+            Some(old) => *old = npc,
+            None => self.npcs.push(npc),
+        }
+        self
+    }
+
     /// The same world, with `lookups.json` naming map `id`, which isn't in it.
     pub fn naming(mut self, id: u64, name: &str) -> Self {
         self.other_maps.push((id, name.into()));
@@ -441,6 +493,21 @@ impl World {
                 m.insert("mob_capacity".into(), json!(positions.len()));
                 m.insert("mob_positions".into(), Value::Array(positions));
             }
+            if !map.npcs.is_empty() {
+                let mut ids: Vec<u64> = Vec::new();
+                for &(id, _) in &map.npcs {
+                    if !ids.contains(&id) {
+                        ids.push(id);
+                    }
+                }
+                let positions: Vec<Value> = map
+                    .npcs
+                    .iter()
+                    .filter_map(|&(id, at)| at.map(|(x, y)| json!({ "id": id, "x": x, "y": y })))
+                    .collect();
+                m.insert("npcs".into(), json!(ids));
+                m.insert("npc_positions".into(), Value::Array(positions));
+            }
             match regions.iter_mut().find(|(region, _)| *region == map.region) {
                 Some((_, maps)) => maps.push(Value::Object(m)),
                 None => regions.push((map.region.clone(), vec![Value::Object(m)])),
@@ -450,7 +517,12 @@ impl World {
             .into_iter()
             .map(|(region, maps)| json!({ "region": region, "count": maps.len(), "maps": maps }))
             .collect();
-        let mut file = json!({ "regions": regions, "total": self.maps.len(), "npc_lookup": {} });
+        let npcs: Object<String, Value> = self
+            .npcs
+            .iter()
+            .map(|npc| (npc.id.to_string(), json!({ "name": npc.name, "thumbnail": npc.thumbnail })))
+            .collect();
+        let mut file = json!({ "regions": regions, "total": self.maps.len(), "npc_lookup": npcs });
         if let Some(icons) = &self.mark_icons {
             file["map_mark_icons"] = Value::Object(icons.iter().map(|(mark, path)| (mark.clone(), json!(path))).collect());
         }
@@ -572,7 +644,8 @@ impl World {
             .iter()
             .map(|mob| (mob.id.to_string(), json!(mob.name)))
             .chain(self.folded.iter().filter_map(|&(id, into)| Some((id.to_string(), name(into)?))));
-        json!({ "item_names": {}, "npc_names": {}, "mob_names": Object::from_iter(mob_names), "map_names": Object::from_iter(names) })
+        let npc_names: Object<String, Value> = self.npcs.iter().map(|npc| (npc.id.to_string(), json!(npc.name))).collect();
+        json!({ "item_names": {}, "npc_names": npc_names, "mob_names": Object::from_iter(mob_names), "map_names": Object::from_iter(names) })
     }
 }
 
