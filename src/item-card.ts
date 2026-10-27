@@ -107,11 +107,10 @@ function iconButton(path: string, label: string, onClick: () => void): HTMLButto
   return button;
 }
 
-/** MesoWatch, which has no page per item: the player looks the item up there. */
-const mesoWatchButton = () =>
-  iconButton("M9 3h4v4M13 3L7.5 8.5M11.5 9.5V13h-8.5V4.5H6.5", "Look it up on MesoWatch", () =>
-    invoke("item_card_open_mesowatch"),
-  );
+/** What opens the item's page on maplestory.market, where its listings and prices are. */
+const MARKET_LOOK_UP = "Look it up on maplestory.market";
+const openMarket = () => invoke("item_card_open_market");
+const marketButton = () => iconButton("M9 3h4v4M13 3L7.5 8.5M11.5 9.5V13h-8.5V4.5H6.5", MARKET_LOOK_UP, openMarket);
 
 /** A field in the market section, open: what is there selected, Enter to keep what is
  * typed, Esc to leave everything as it was. Leaving it keeps what is typed, unless `onLeave`
@@ -283,8 +282,8 @@ function removeQuestion(line: MarketLine, prices: number): HTMLElement {
 }
 
 /** The Market Lines under a rule: the heading, with the buttons that add a line and look
- * the item up on MesoWatch, then each line, or what the market section has open in its
- * place. */
+ * the item up on maplestory.market, then each line, or what the market section has open in
+ * its place, and at the foot the look-up again, in words. */
 function marketSection(card: ItemCard): HTMLElement {
   const section = document.createElement("div");
   section.className = "item-card-market";
@@ -293,7 +292,7 @@ function marketSection(card: ItemCard): HTMLElement {
   const add = iconButton("M8 3.5v9M3.5 8h9", "Add a market line to every card", () =>
     invoke("act", { action: "addCardMarketLine" }),
   );
-  head.append(span("label", "Market"), add, mesoWatchButton());
+  head.append(span("label", "Market"), add, marketButton());
   section.append(head);
   const edit = card.marketEdit;
   for (const line of card.market) {
@@ -304,6 +303,11 @@ function marketSection(card: ItemCard): HTMLElement {
   }
   if (edit?.field === "name" && edit.line === null) section.append(...nameField(null, edit.problem));
   else if (card.market.length === 0) section.append(hint(null, "No market lines. + adds one to every card."));
+  // One link, the site's name in it blue.
+  const foot = link("Look it up on ", "Open the item's page on maplestory.market", openMarket);
+  foot.classList.add("item-card-market-foot");
+  foot.append(span("site", "maplestory.market"));
+  section.append(foot);
   return section;
 }
 

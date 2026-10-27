@@ -76,10 +76,10 @@ pub fn item_card_open_meowdb(commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::OpenCardMeowdbPage);
 }
 
-/// The player clicked the card's MesoWatch button.
+/// The player clicked one of the card's buttons that look the item up on maplestory.market.
 #[tauri::command]
-pub fn item_card_open_mesowatch(commands: State<'_, Sender<Command>>) {
-    let _ = commands.send(Command::OpenCardMesowatch);
+pub fn item_card_open_market(commands: State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::OpenCardMarket);
 }
 
 /// The player clicked the price on the Market Line with this ID, to type one.

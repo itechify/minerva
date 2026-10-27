@@ -49,7 +49,7 @@ When play shows a portal the Map Preview's rule gets wrong, add it to the overri
 
 ## Credits
 
-Map, mob and item data, map pictures, Map Marks, mob animations and item pictures come from [OSMS Data Explorer](https://osmsdataexplorer.com), fetched as it runs and never bundled. Map, mob and item links open [NiaMeowDB](https://meowdb.com)'s pages, and Item Lookup uses its search ([ADR 0007](docs/adr/0007-item-lookup-on-a-hotkey-through-meowdb-search.md)); the Item Card's market line opens [MesoWatch](https://meso.watch) ([ADR 0010](docs/adr/0010-item-card-from-osms-item-files.md)). The Map Summary is worked out as NiaMeowDB works it out.
+Map, mob and item data, map pictures, Map Marks, mob animations and item pictures come from [OSMS Data Explorer](https://osmsdataexplorer.com), fetched as it runs and never bundled. Map, mob and item links open [NiaMeowDB](https://meowdb.com)'s pages, and Item Lookup uses its search ([ADR 0007](docs/adr/0007-item-lookup-on-a-hotkey-through-meowdb-search.md)); the Item Card's market section opens the item's page on [maplestory.market](https://maplestory.market) ([ADR 0010](docs/adr/0010-item-card-from-osms-item-files.md)). The Map Summary is worked out as NiaMeowDB works it out.
 
 The windows are set in NEXON's Maplestory typeface; see `assets/fonts/NOTICE.md`.
 
