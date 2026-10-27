@@ -1,7 +1,7 @@
 // The minerva-site Worker: the site's build, and the API under /api/: the Map Leaderboards
 // (ADR 0015, where its routes and their answers are written down), a Character's page
 // (ADR 0027) and Accounts (ADR 0023); and once a day, Characters' portraits from ClassicRank
-// (ADR 0028).
+// (ADR 0029).
 import { readCharacterPage } from "./character-page";
 import { confirmLinkToken, deleteAccount, linkState, mintLinkToken, readAccount, readLinkToken, unlinkPc } from "./accounts";
 import { callback, start } from "./discord";
@@ -29,7 +29,7 @@ export default {
     return json(answer, isPublicRead ? "public, max-age=60" : "no-store");
   },
   // The daily cron trigger (site/wrangler.jsonc): every Character's portrait, asked for again
-  // (ADR 0028).
+  // (ADR 0029).
   async scheduled(controller, env, ctx): Promise<void> {
     ctx.waitUntil(refreshPortraits(env, controller.scheduledTime));
   },

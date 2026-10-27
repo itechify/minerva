@@ -1,4 +1,4 @@
--- Characters' portraits from ClassicRank (ADR 0028). Additive only: the Worker before this
+-- Characters' portraits from ClassicRank (ADR 0029). Additive only: the Worker before this
 -- keeps working until the deploy after.
 
 -- Each Character's portrait as ClassicRank last gave it: asked for when they upload and every

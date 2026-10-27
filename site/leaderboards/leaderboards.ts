@@ -32,7 +32,7 @@ export type { JobClass } from "../jobs.ts";
 /** A place in a band's top 3, crowned in gold, silver or bronze. */
 export type Medal = 1 | 2 | 3;
 
-/** A Character's portrait as the pages show it beside their name (ADR 0028): their photo on
+/** A Character's portrait as the pages show it beside their name (ADR 0029): their photo on
  *  ClassicRank; `"none"`, the question-mark figure, once ClassicRank has been asked and has no
  *  photo of them or doesn't show them; or `"waiting"`, the portrait's room, empty, until it's
  *  been asked. */

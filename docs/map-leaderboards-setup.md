@@ -56,7 +56,7 @@ For `wrangler dev`, put `DISCORD_CLIENT_SECRET=...` in `site/.dev.vars`. Sign in
 
 ## 6. Set the ClassicRank key (optional)
 
-Characters' portraits come from ClassicRank's API (ADR 0028), which the Worker asks with a key: a Partner read key, applied for at [classicrank.com/api-access](https://classicrank.com/api-access) (sign in with Discord) and shown once on [classicrank.com/me](https://classicrank.com/me). It is optional: with no secret set, the Worker never asks ClassicRank, and the site shows no portraits. The key is a secret, so it is never committed; keep it in the password manager beside `ADMIN_TOKEN`.
+Characters' portraits come from ClassicRank's API (ADR 0029), which the Worker asks with a key: a Partner read key, applied for at [classicrank.com/api-access](https://classicrank.com/api-access) (sign in with Discord) and shown once on [classicrank.com/me](https://classicrank.com/me). It is optional: with no secret set, the Worker never asks ClassicRank, and the site shows no portraits. The key is a secret, so it is never committed; keep it in the password manager beside `ADMIN_TOKEN`.
 
 ```bash
 pnpm exec wrangler secret put CLASSICRANK_KEY --config site/wrangler.jsonc

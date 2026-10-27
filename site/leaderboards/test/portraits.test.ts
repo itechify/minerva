@@ -1,5 +1,5 @@
 // A Character's portrait from ClassicRank beside their name in a Level Band and in Latest
-// (ADR 0028): their photo, the question-mark figure once ClassicRank has none, or the
+// (ADR 0029): their photo, the question-mark figure once ClassicRank has none, or the
 // portrait's room, empty, until it's been asked; and none at all while the API gives none,
 // when nothing credits ClassicRank either.
 import { describe, expect, it } from "vitest";

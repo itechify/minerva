@@ -1,4 +1,4 @@
-// A Character's portrait from ClassicRank (ADR 0028): asked for when they upload and every
+// A Character's portrait from ClassicRank (ADR 0029): asked for when they upload and every
 // day after, kept with their entries and shown wherever they are, until ClassicRank stops
 // showing them or they opt out.
 import { createExecutionContext, createScheduledController, waitOnExecutionContext } from "cloudflare:test";

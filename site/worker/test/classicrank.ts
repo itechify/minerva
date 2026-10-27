@@ -1,4 +1,4 @@
-// A made-up ClassicRank (ADR 0028), set up before every test file (vitest.config.ts): the
+// A made-up ClassicRank (ADR 0029), set up before every test file (vitest.config.ts): the
 // Worker's asks of ClassicRank's API are taken off the global fetch and answered in its
 // `names=` shape from the Characters a test makes up here. It knows nobody until a test says
 // so, so an upload in any other test finds no portrait. Nothing real from ClassicRank is in

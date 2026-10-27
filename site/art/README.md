@@ -37,7 +37,7 @@ Over a page with nothing to show: the site's 404 (`site/404.html`), heading it i
 
 ## The missing portrait
 
-Beside a Character's name where ClassicRank has no photo of them, or one that won't load (ADR 0028, `site/leaderboards/api.ts` draws it): a black figure with a white question mark for a face, in a white outline, supplied by the owner (October 2026), trimmed to the figure on its transparent ground and scaled to ClassicRank's photos' 96×96. It shows 96px on a Character's page and 32px in a band's table and in Latest, smoothly, unlike the photos, as it isn't pixel art. Decoration: the name beside it says whose it is.
+Beside a Character's name where ClassicRank has no photo of them, or one that won't load (ADR 0029, `site/leaderboards/api.ts` draws it): a black figure with a white question mark for a face, in a white outline, supplied by the owner (October 2026), trimmed to the figure on its transparent ground and scaled to ClassicRank's photos' 96×96. It shows 96px on a Character's page and 32px in a band's table and in Latest, smoothly, unlike the photos, as it isn't pixel art. Decoration: the name beside it says whose it is.
 
 | File | Shows | What it shows | Size |
 | --- | --- | --- | --- |

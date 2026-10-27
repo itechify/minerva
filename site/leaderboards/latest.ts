@@ -24,7 +24,7 @@ function drawLine(line: LatestLine): HTMLLIElement {
   // One line on a phone; on a wider page the name and the job are each a column (site.css).
   const who = make("span", "lb-entry-who");
   const name = characterLink(line.name, line.nameHref, "lb-map-name lb-entry-name");
-  // With a portrait (ADR 0028), it and the name share the names' column.
+  // With a portrait (ADR 0029), it and the name share the names' column.
   let character: HTMLElement = name;
   if (line.portrait !== null) {
     character = make("span", "lb-entry-character");

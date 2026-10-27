@@ -156,7 +156,7 @@ describe("a Character's page", () => {
     expect(page.bands[0].rows[0].date).toBe("3 Oct 2025");
   });
 
-  it("shows their portrait from ClassicRank, linked to their profile there (ADR 0028)", () => {
+  it("shows their portrait from ClassicRank, linked to their profile there (ADR 0029)", () => {
     const photo = "https://classicrank.com/api/avatar/Egbert?v=2026-10-26%2007%3A41%3A13";
     const profile = "https://classicrank.com/user/Egbert";
     const page = characterPage({ ...answer(mine("100000000", 20, 1, 1, 90_000)), portrait: { photo, profile } }, names, NOW);

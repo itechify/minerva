@@ -385,7 +385,7 @@ interface RowsAt {
 
 /** An entry's row: its rank (crowned in the top 3), name (a link to the Character's page), job
  *  (beside its class's icon), level, EXP/h, lane, date (under the pointer, with a mouse) and
- *  Report's flag, the Character's portrait before their name (ADR 0028); or, for the linked Character's, the You Yellow star before the name and no
+ *  Report's flag, the Character's portrait before their name (ADR 0029); or, for the linked Character's, the You Yellow star before the name and no
  *  Report (the player takes their own entries off from Minerva). A row that slides in a
  *  switch takes its Character's name for it. */
 function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowElement {

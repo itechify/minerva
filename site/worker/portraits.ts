@@ -1,4 +1,4 @@
-// Characters' portraits from ClassicRank (ADR 0028): the Worker asks ClassicRank's API for a
+// Characters' portraits from ClassicRank (ADR 0029): the Worker asks ClassicRank's API for a
 // Character's when they upload, and for every Character with entries once a day (the cron
 // trigger in site/wrangler.jsonc), and keeps what it answers for the API's reads to give
 // beside their name. Only the Worker asks, with its key (the CLASSICRANK_KEY secret); without

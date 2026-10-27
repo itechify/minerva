@@ -1,7 +1,7 @@
 // A new #1 on a Map Leaderboard, told to Discord (ADR 0022): when an upload takes a map and
 // Level Band's top spot from another Character, the Worker posts it to a Discord webhook, an
 // embed for each spot showing the map's Map Mark, and the Character's portrait from
-// ClassicRank when they have one (ADR 0028). Only a spot *taken* is told, so a first
+// ClassicRank when they have one (ADR 0029). Only a spot *taken* is told, so a first
 // entry in an empty band, a Character beating its own best, and a top spot that fell to
 // someone because an entry was deleted all stay quiet.
 import mapNameRows from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";

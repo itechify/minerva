@@ -126,13 +126,13 @@ export function characterLink(name: string, href: string, className = ""): HTMLA
   return link;
 }
 
-/** How big a portrait is beside a name in a band's table and in Latest (ADR 0028). */
+/** How big a portrait is beside a name in a band's table and in Latest (ADR 0029). */
 export const ROW_PORTRAIT = 32;
 
 /** The question-mark figure (site/art), for a Character ClassicRank has no photo of. */
 const NO_PORTRAIT = new URL("../art/portrait-none.png", import.meta.url).href;
 
-/** A Character's portrait (ADR 0028), `size` pixels square: their photo, loaded from
+/** A Character's portrait (ADR 0029), `size` pixels square: their photo, loaded from
  *  classicrank.com and drawn pixel for pixel, fitted to the square whatever its own size; the
  *  question-mark figure for none, or for a photo that won't load; or, until ClassicRank has
  *  been asked, the square, empty. Decoration: the name beside it says whose it is. */

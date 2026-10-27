@@ -80,7 +80,7 @@ export interface CharacterPage {
   whoClass: JobClass | null;
   stats: Stat[];
   bands: CharacterBand[];
-  /** Their portrait from ClassicRank, beside their name (ADR 0028); `null` for none at all. */
+  /** Their portrait from ClassicRank, beside their name (ADR 0029); `null` for none at all. */
   portrait: PortraitSlot | null;
   /** Their profile on ClassicRank, which the portrait links to; `null` for none. */
   profile: string | null;

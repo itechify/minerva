@@ -13,7 +13,7 @@ export function isMap(map: string): boolean {
   return /^\d{9}$/.test(map);
 }
 
-/** A Character's portrait from ClassicRank (ADR 0028), as the Worker last found it there: its
+/** A Character's portrait from ClassicRank (ADR 0029), as the Worker last found it there: its
  *  photo (a PNG on classicrank.com) and its ClassicRank profile, each `null` when ClassicRank
  *  has none. Both `null`, ClassicRank doesn't know the Character, or hides them. */
 export interface Portrait {

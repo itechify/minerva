@@ -225,7 +225,7 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
     taken = takenTops(before, await topsAt(env, improved), nameKey);
     await keepTaken(env, nameKey, keyHash, taken, now);
   }
-  // The Character's portrait is asked for (ADR 0028), then any top spot taken is told with it.
+  // The Character's portrait is asked for (ADR 0029), then any top spot taken is told with it.
   const after = askOnUpload(env, name, now).then((portrait) => tell(env, taken, portrait?.photo ?? null));
   // The upload is answered without waiting for ClassicRank or Discord; with no context to hand
   // them to (a direct call), they are waited for, so nothing is left running after the answer.
@@ -260,7 +260,7 @@ export async function optOut(env: Env, request: Request, name: string): Promise<
     // The spots it took go with its entries, and its name from the spots taken off it.
     env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD}`).bind(...at),
     env.DB.prepare(`UPDATE taken_tops SET from_name_key = NULL WHERE from_name_key = ?1 AND ${HELD}`).bind(...at),
-    // Their portrait goes too (ADR 0028).
+    // Their portrait goes too (ADR 0029).
     forgetPortrait(env, claimed.nameKey),
   ]);
   return { status: 204 };

@@ -3483,7 +3483,7 @@ button.button {
   line-height: 22px;
   color: var(--ink-2);
 }
-/* Their portrait from ClassicRank (ADR 0028), 96px, beside their name and who they are, the
+/* Their portrait from ClassicRank (ADR 0029), 96px, beside their name and who they are, the
    line crediting ClassicRank under those. With no portraits, the name stands as before. */
 .ch-identity.ch-with-portrait {
   display: grid;
@@ -3645,7 +3645,7 @@ button.button {
   vertical-align: middle;
   image-rendering: pixelated;
 }
-/* A Character's portrait from ClassicRank beside their name (ADR 0028): their photo drawn pixel
+/* A Character's portrait from ClassicRank beside their name (ADR 0029): their photo drawn pixel
    for pixel, fitted to its square whatever its own size, or the question-mark figure, or until
    ClassicRank has been asked, the square kept empty. In a band's table or Latest it is 32px,
    reaching 6px into the lines around it, so a row grows by only a little for it. */

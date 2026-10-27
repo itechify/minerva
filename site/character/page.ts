@@ -32,7 +32,7 @@ function say(text: Said, lost: boolean) {
   byId("who").hidden = lost;
 }
 
-/** Their portrait beside their name (ADR 0028), a link to their ClassicRank profile when it
+/** Their portrait beside their name (ADR 0029), a link to their ClassicRank profile when it
  *  has one, and the line crediting ClassicRank under it; none of it while the API gives no
  *  portraits. */
 function drawPortrait(page: CharacterPage) {
