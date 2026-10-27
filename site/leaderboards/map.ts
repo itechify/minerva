@@ -5,7 +5,7 @@
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import { STAR } from "../star.ts";
-import { byId, characterLink, crown, jobWithIcon, names, portraitImage, read, ROW_PORTRAIT, said as saidWith, unreachable } from "./api.ts";
+import { BAND_PORTRAIT, byId, characterLink, crown, jobWithIcon, names, portraitImage, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
@@ -178,6 +178,7 @@ function drawBand(band: BandAnswer, morph: Map<string, string> | null, grow: boo
     return say(table.empty);
   }
   said.hidden = true;
+  byId("table").classList.toggle("lb-faces", table.portraits);
   byId("caption").textContent = table.caption ?? "";
   drawRuler(table.ruler);
   const at = { place: place!, band: band.band, ruler: table.ruler, morph };
@@ -329,7 +330,8 @@ function lineRow(className: string, text: string): HTMLTableRowElement {
   tr.setAttribute("role", "row");
   const cell = make("td", "", text);
   cell.setAttribute("role", "cell");
-  cell.colSpan = 8;
+  // Across the portraits' column too, while the band has one.
+  cell.colSpan = byId("table").classList.contains("lb-faces") ? 9 : 8;
   tr.append(cell);
   return tr;
 }
@@ -383,11 +385,11 @@ interface RowsAt {
   morph: Map<string, string> | null;
 }
 
-/** An entry's row: its rank (crowned in the top 3), name (a link to the Character's page), job
- *  (beside its class's icon), level, EXP/h, lane, date (under the pointer, with a mouse) and
- *  Report's flag, the Character's portrait before their name (ADR 0029); or, for the linked Character's, the You Yellow star before the name and no
- *  Report (the player takes their own entries off from Minerva). A row that slides in a
- *  switch takes its Character's name for it. */
+/** An entry's row: its rank (crowned in the top 3), the Character's portrait (ADR 0029), name
+ *  (a link to the Character's page), job (beside its class's icon), level, EXP/h, lane, date
+ *  (under the pointer, with a mouse) and Report's flag; or, for the linked Character's, the
+ *  You Yellow star before the name and no Report (the player takes their own entries off from
+ *  Minerva). A row that slides in a switch takes its Character's name for it. */
 function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowElement {
   const tr = make("tr", row.you ? "lb-you" : "");
   tr.setAttribute("role", "row");
@@ -401,7 +403,6 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   name.scope = "row";
   name.setAttribute("role", "rowheader");
   if (row.you) name.append(star());
-  if (row.portrait !== null) name.append(portraitImage(row.portrait, ROW_PORTRAIT));
   name.append(characterLink(row.name, row.nameHref));
   const reportCell = make("td", "lb-report");
   if (!row.you) {
@@ -425,7 +426,15 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   exp.append(lane(row, "lb-lane-track lb-under"));
   const figures = [exp, make("td", "lb-date", row.date), reportCell];
   for (const cell of [...cells, ...figures]) cell.setAttribute("role", "cell");
-  tr.append(cells[0], name, cells[1], cells[2], figures[0], laneCell(row, ruler), figures[1], figures[2]);
+  tr.append(cells[0]);
+  // The portrait has a column of its own, before the name, as long as the band shows them.
+  if (row.portrait !== null) {
+    const face = make("td", "lb-face");
+    face.setAttribute("role", "cell");
+    face.append(portraitImage(row.portrait, BAND_PORTRAIT));
+    tr.append(face);
+  }
+  tr.append(name, cells[1], cells[2], figures[0], laneCell(row, ruler), figures[1], figures[2]);
   return tr;
 }
 

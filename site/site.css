@@ -3645,27 +3645,56 @@ button.button {
   vertical-align: middle;
   image-rendering: pixelated;
 }
-/* A Character's portrait from ClassicRank beside their name (ADR 0029): their photo drawn pixel
-   for pixel, fitted to its square whatever its own size, or the question-mark figure, or until
-   ClassicRank has been asked, the square kept empty. In a band's table or Latest it is 32px,
-   reaching 6px into the lines around it, so a row grows by only a little for it. */
+/* A Character's portrait from ClassicRank (ADR 0029): their photo drawn pixel for pixel, at its
+   own size in its square, or shrunk to fit one smaller; or the question-mark figure; or until
+   ClassicRank has been asked, the square kept empty. In Latest it is 32px, reaching 6px into
+   the lines around it, so a row grows by only a little for it. */
 .lb-portrait {
   display: inline-block;
   flex: none;
-  object-fit: contain;
+  object-fit: scale-down;
   vertical-align: middle;
 }
 .lb-portrait-photo {
   image-rendering: pixelated;
 }
-.lb-table .lb-name .lb-portrait {
-  margin: -6px 8px -6px 0;
+/* In a band's table, a column of its own before the names, 96px, the photos' own size: each row
+   is as tall as a portrait, its words set on the row's middle. Without portraits, no column. */
+.lb-table .lb-face {
+  display: none;
 }
-/* On a phone, where the band's rows are cards, a card's name line grows to its portrait, as
-   there is no room for it to reach into the job's line under it. */
+.lb-table.lb-faces .lb-face {
+  display: table-cell;
+  width: 96px;
+  padding-block: 4px;
+  line-height: 0;
+}
+.lb-table.lb-faces tbody tr > * {
+  vertical-align: middle;
+}
+/* On a phone, where the band's rows are cards, the portrait stands at the card's left, beside the
+   rank, name, job and figures, and the card has no lane: the portrait is what it shows. */
 @media (max-width: 640px) {
-  .lb-table .lb-name .lb-portrait {
-    margin-block: 0;
+  .lb-table.lb-faces tr {
+    grid-template-columns: 2.6em 96px minmax(0, 1fr) auto auto;
+    /* The words take only their lines, on the portrait's middle. */
+    grid-template-rows: 1fr auto auto auto 1fr;
+    grid-template-areas:
+      "rank face . . ."
+      "rank face name report exp"
+      "rank face job job level"
+      "rank face . . date"
+      "rank face . . .";
+    align-items: center;
+    padding-block: 4px;
+  }
+  .lb-table.lb-faces .lb-face {
+    display: block;
+    grid-area: face;
+    padding: 0;
+  }
+  .lb-table.lb-faces .lb-lane {
+    display: none;
   }
 }
 .lb-entry-character {
