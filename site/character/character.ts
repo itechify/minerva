@@ -7,7 +7,17 @@ import { dayText } from "../../src/dates.ts";
 import { levels, rate, whole } from "../../src/figures.ts";
 import { type CharacterAnswer, isName, type MapMark } from "../entries.ts";
 import { levelsOf } from "../level-bands.ts";
-import { type JobClass, linkTo, type MapNames, type Medal, medalOf, placeOf, type Said } from "../leaderboards/leaderboards.ts";
+import {
+  type JobClass,
+  linkTo,
+  type MapNames,
+  type Medal,
+  medalOf,
+  placeOf,
+  type PortraitSlot,
+  portraitSlot,
+  type Said,
+} from "../leaderboards/leaderboards.ts";
 import { classOf } from "../jobs.ts";
 
 export type { CharacterAnswer } from "../entries.ts";
@@ -70,6 +80,10 @@ export interface CharacterPage {
   whoClass: JobClass | null;
   stats: Stat[];
   bands: CharacterBand[];
+  /** Their portrait from ClassicRank, beside their name (ADR 0029); `null` for none at all. */
+  portrait: PortraitSlot | null;
+  /** Their profile on ClassicRank, which the portrait links to; `null` for none. */
+  profile: string | null;
 }
 
 /** `count` of `thing`, plural when it isn't 1: "1 map", "12 maps". */
@@ -140,6 +154,8 @@ export function characterPage(answer: CharacterAnswer, names: MapNames, now: Dat
       { value: rate(best.expPerHour), label: "Best EXP/h", detail: best.place.name },
     ],
     bands,
+    portrait: portraitSlot(answer.portrait),
+    profile: answer.portrait?.profile ?? null,
   };
 }
 

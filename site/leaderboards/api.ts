@@ -3,7 +3,17 @@
 import fixture from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
 import { make, svgEl } from "../../src/dom.ts";
 import ceilings from "../worker/osms-ceilings.json";
-import { type JobClass, type MapMarks, mapMarks, mapNames, type MapNames, type Medal, type Said, type Words } from "./leaderboards.ts";
+import {
+  type JobClass,
+  type MapMarks,
+  mapMarks,
+  mapNames,
+  type MapNames,
+  type Medal,
+  type PortraitSlot,
+  type Said,
+  type Words,
+} from "./leaderboards.ts";
 
 /** The maps the committed map names fixture names, as the panel names them. */
 export const names: MapNames = mapNames(fixture);
@@ -114,6 +124,49 @@ export function characterLink(name: string, href: string, className = ""): HTMLA
   link.href = href;
   link.dataset.seam = "seam-name";
   return link;
+}
+
+/** How big a portrait is in a band's table (ADR 0029): ClassicRank's photos' own size, so
+ *  each shows pixel for pixel. */
+export const BAND_PORTRAIT = 96;
+
+/** The question-mark figure (site/art), for a Character ClassicRank has no photo of. */
+const NO_PORTRAIT = new URL("../art/portrait-none.png", import.meta.url).href;
+
+/** What the question-mark figure says under the pointer, for each reason it stands in. */
+const NO_PORTRAIT_SAYS = {
+  none: "No photo on ClassicRank",
+  waiting: "Not looked up on ClassicRank yet",
+  failed: "The photo didn't load",
+} as const;
+
+/** A Character's portrait (ADR 0029), `size` pixels square: their photo, loaded from
+ *  classicrank.com and drawn pixel for pixel, fitted to the square whatever its own size; or
+ *  the question-mark figure, quieter than a photo, for none, for a photo that won't load, and
+ *  until ClassicRank has been asked, its tooltip saying which. Decoration: the name beside it
+ *  says whose it is. `eager` loads it at once, for one at the top of a page. */
+export function portraitImage(slot: PortraitSlot, size: number, eager = false): HTMLImageElement {
+  const img = make("img", "lb-portrait");
+  img.alt = "";
+  img.width = size;
+  img.height = size;
+  img.decoding = "async";
+  img.loading = eager ? "eager" : "lazy";
+  const figure = (why: keyof typeof NO_PORTRAIT_SAYS) => {
+    img.src = NO_PORTRAIT;
+    img.title = NO_PORTRAIT_SAYS[why];
+    img.classList.remove("lb-portrait-photo");
+    img.classList.add("lb-portrait-none");
+  };
+  if (typeof slot === "string") {
+    figure(slot);
+  } else {
+    img.src = slot.photo;
+    img.classList.add("lb-portrait-photo");
+    img.referrerPolicy = "no-referrer";
+    img.addEventListener("error", () => figure("failed"), { once: true });
+  }
+  return img;
 }
 
 /** Each class's icon (site/art/jobs), drawn pixel for pixel, and its size. A pirate's has none

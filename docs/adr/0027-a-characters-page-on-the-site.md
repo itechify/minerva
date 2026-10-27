@@ -1,5 +1,5 @@
 ---
-status: accepted, amended (the top 3 of a band are crowned gold, silver and bronze, on a map's page as on a Character's, and each job shows its class's icon)
+status: accepted, amended (the top 3 of a band are crowned gold, silver and bronze, on a map's page as on a Character's, and each job shows its class's icon), and by ADR-0029 (the page shows the Character's portrait from ClassicRank, linked to their profile there)
 ---
 
 # A Character's page on the site

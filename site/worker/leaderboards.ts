@@ -1,6 +1,6 @@
 // The Map Leaderboards: each Character's entries, mirrored whole from the app, and each
 // map's Level Bands ranked from them.
-import { isMap, isName } from "../entries";
+import { isMap, isName, type Ranked } from "../entries";
 import { bandFrom, bandOf, levelsOf } from "../level-bands";
 import { type Taken, type Top, takenTops, tell } from "./announce";
 import { type Answer, badRequest, body } from "./http";
@@ -8,6 +8,7 @@ import { accountOfKey, touchKey } from "./accounts";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
 import { ceilingsOf } from "./ceilings";
+import { askOnUpload, forgetPortrait, PORTRAIT_COLUMNS, PORTRAIT_JOIN, type PortraitColumns, portraitIn } from "./portraits";
 
 /** How many entries a band's read lists. */
 const TOP = 50;
@@ -219,15 +220,17 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
     // A top spot taken stays marked only while the entry that took it stands.
     env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD} AND ${UNMATCHED}`).bind(nameKey, keyHash),
   ]);
+  let taken: Taken[] = [];
   if (improved.length > 0) {
-    const taken = takenTops(before, await topsAt(env, improved), nameKey);
+    taken = takenTops(before, await topsAt(env, improved), nameKey);
     await keepTaken(env, nameKey, keyHash, taken, now);
-    const told = tell(env, taken);
-    // The upload is answered without waiting for Discord; with no context to hand it to
-    // (a direct call), it is waited for, so nothing is left running after the answer.
-    if (ctx === undefined) await told;
-    else ctx.waitUntil(told);
   }
+  // The Character's portrait is asked for (ADR 0029), then any top spot taken is told with it.
+  const after = askOnUpload(env, name, now).then((portrait) => tell(env, taken, portrait?.photo ?? null));
+  // The upload is answered without waiting for ClassicRank or Discord; with no context to hand
+  // them to (a direct call), they are waited for, so nothing is left running after the answer.
+  if (ctx === undefined) await after;
+  else ctx.waitUntil(after);
   return { status: 200, body: { accepted: accepted.length, rejected } };
 }
 
@@ -257,11 +260,13 @@ export async function optOut(env: Env, request: Request, name: string): Promise<
     // The spots it took go with its entries, and its name from the spots taken off it.
     env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD}`).bind(...at),
     env.DB.prepare(`UPDATE taken_tops SET from_name_key = NULL WHERE from_name_key = ?1 AND ${HELD}`).bind(...at),
+    // Their portrait goes too (ADR 0029).
+    forgetPortrait(env, claimed.nameKey),
   ]);
   return { status: 204 };
 }
 
-interface Row {
+interface Row extends PortraitColumns {
   name_key: string;
   name: string;
   job: string;
@@ -281,16 +286,24 @@ export async function readBand(env: Env, map: string, first: string, name: strin
   const nameKey = name?.toLowerCase() ?? null;
   const rows = await env.DB.prepare(
     `WITH ranked AS (
-       SELECT e.name_key, c.name, e.job, e.level, e.exp_per_hour, e.set_at,
+       SELECT e.name_key, c.name, e.job, e.level, e.exp_per_hour, e.set_at, ${PORTRAIT_COLUMNS},
               ROW_NUMBER() OVER (ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank,
               COUNT(*) OVER () AS total
-       FROM entries e JOIN characters c USING (name_key)
+       FROM entries e JOIN characters c USING (name_key) ${PORTRAIT_JOIN}
        WHERE e.map_id = ?1 AND e.band = ?2)
      SELECT * FROM ranked WHERE rank <= ?3 OR name_key = ?4 ORDER BY rank`,
   )
     .bind(map, band, TOP, nameKey)
     .all<Row>();
-  const ranked = (r: Row) => ({ rank: r.rank, name: r.name, job: r.job, level: r.level, expPerHour: r.exp_per_hour, setAt: r.set_at });
+  const ranked = (r: Row): Ranked => ({
+    rank: r.rank,
+    name: r.name,
+    job: r.job,
+    level: r.level,
+    expPerHour: r.exp_per_hour,
+    setAt: r.set_at,
+    ...portraitIn(env, r),
+  });
   const character = rows.results.find((r) => r.name_key === nameKey);
   return {
     status: 200,

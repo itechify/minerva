@@ -20,6 +20,9 @@ declare namespace Cloudflare {
     /** The maintainers' Discord user IDs, comma-separated, a variable (site/wrangler.jsonc):
      *  signed in with one, the maintainer's routes and /admin/ are theirs. */
     MAINTAINER_DISCORD_IDS?: string;
+    /** ClassicRank's API key, a Worker secret (docs/map-leaderboards-setup.md, ADR 0029).
+     *  Without it, the Worker never asks ClassicRank, and its answers carry no portraits. */
+    CLASSICRANK_KEY?: string;
     /** The tests' made-up ceilings table, in place of osms-ceilings.json. */
     TEST_CEILINGS?: import("./ceilings").CeilingsTable;
   }
