@@ -1,5 +1,5 @@
 ---
-status: accepted, amended by ADR-0024 (the Map Leaderboards page shows Where to train and Latest in place of the most-uploaded maps, and the ceilings table holds each map's mob levels and Map Mark), and by ADR-0027 (every name links to its Character's page, `GET /api/characters/<name>` reads it, and the site's 404 is a page of its own)
+status: accepted, amended by ADR-0024 (the Map Leaderboards page shows Where to train and Latest in place of the most-uploaded maps, and the ceilings table holds each map's mob levels and Map Mark), and by ADR-0027 (every name links to its Character's page, `GET /api/characters/<name>` reads it, and the site's 404 is a page of its own), and by ADR-0028 (the reads that give a Character give their portrait from ClassicRank, while the Worker has its key)
 ---
 
 # Map Leaderboards on the site's Worker

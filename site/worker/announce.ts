@@ -99,13 +99,13 @@ export interface PostedMark {
 export const PORTRAIT_CREDIT = " · Portrait: [ClassicRank](https://classicrank.com)";
 
 /** One taken spot as an embed: titled with the map's name, linked to its Map Leaderboard, and
- *  showing the Character's portrait (`portrait`, the photo's address) as its thumbnail, with
+ *  showing the Character's portrait (`photo`, its address) as its thumbnail, with
  *  the map's Map Mark under it; with no portrait, the Map Mark is the thumbnail, as before
  *  portraits. Each Character it names links to their page. The title isn't markdown, so the
  *  map's name goes in as the site writes it ("G* Coconut Season" is one in the map names
  *  fixture); a Character's name is letters and digits only (ADR 0015), so the description
  *  needs no escaping either, in its words or its links. */
-function embedFor(taken: Taken, mark: PostedMark | null, portrait: string | null): Embed {
+function embedFor(taken: Taken, mark: PostedMark | null, photo: string | null): Embed {
   const [first, last] = levelsOf(taken.band);
   const embed: Embed = {
     title: placeOf(PLACES, taken.map).name,
@@ -114,9 +114,9 @@ function embedFor(taken: Taken, mark: PostedMark | null, portrait: string | null
       `${nameOf(taken.name, true)} took #1, levels ${first}–${last}, ` +
       `with ${rate(taken.expPerHour)} EXP/h, past ${nameOf(taken.from)}'s ${rate(taken.fromExpPerHour)}.`,
   };
-  if (portrait !== null) {
+  if (photo !== null) {
     embed.description += PORTRAIT_CREDIT;
-    embed.thumbnail = { url: portrait };
+    embed.thumbnail = { url: photo };
     if (mark !== null) embed.footer = { text: mark.name, icon_url: mark.picture };
   } else if (mark !== null) {
     embed.thumbnail = { url: mark.picture };
@@ -134,25 +134,26 @@ export interface Post {
 }
 
 /** The post for the spots an upload took, or `null` with none, with `markOf` giving a map's
- *  Map Mark (`null` for a map without one), and `portrait` the address of the photo of the
+ *  Map Mark (`null` for a map without one), and `photo` the address of the portrait of the
  *  Character that took them (`null` for none). */
-export function postFor(taken: Taken[], markOf: (map: string) => PostedMark | null, portrait: string | null = null): Post | null {
+export function postFor(taken: Taken[], markOf: (map: string) => PostedMark | null, photo: string | null = null): Post | null {
   if (taken.length === 0) return null;
   const told = taken.slice(0, MOST_TOLD);
-  const post: Post = { embeds: told.map((t) => embedFor(t, markOf(t.map), portrait)), allowed_mentions: { parse: [] } };
+  const post: Post = { embeds: told.map((t) => embedFor(t, markOf(t.map), photo)), allowed_mentions: { parse: [] } };
   const rest = taken.length - told.length;
   if (rest > 0) post.content = `…and ${rest} more top ${rest === 1 ? "spot" : "spots"} in the same upload.`;
   return post;
 }
 
 /** Post the taken spots to the Discord webhook, if one is set up (the DISCORD_WEBHOOK_URL
- *  secret), with the photo of the Character that took them (`portrait`, `null` for none).
+ *  secret), with the portrait of the Character that took them (`photo`, its address, `null`
+ *  for none).
  *  Nothing is retried and no failure reaches the upload: the Map Leaderboards are the record,
  *  and a post is only a nicety. */
-export async function tell(env: Env, taken: Taken[], portrait: string | null = null): Promise<void> {
+export async function tell(env: Env, taken: Taken[], photo: string | null = null): Promise<void> {
   const url = env.DISCORD_WEBHOOK_URL;
   if (!url) return;
-  const post = postFor(taken, (map) => markOf(env, map), portrait);
+  const post = postFor(taken, (map) => markOf(env, map), photo);
   if (post === null) return;
   try {
     await fetch(url, {

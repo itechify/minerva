@@ -5,7 +5,7 @@
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import { STAR } from "../star.ts";
-import { byId, characterLink, crown, jobWithIcon, names, portraitImage, read, said as saidWith, unreachable } from "./api.ts";
+import { byId, characterLink, crown, jobWithIcon, names, portraitImage, read, ROW_PORTRAIT, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
@@ -385,12 +385,9 @@ interface RowsAt {
 
 /** An entry's row: its rank (crowned in the top 3), name (a link to the Character's page), job
  *  (beside its class's icon), level, EXP/h, lane, date (under the pointer, with a mouse) and
- *  Report's flag; or, for the linked Character's, the You Yellow star before the name and no
+ *  Report's flag, the Character's portrait before their name (ADR 0028); or, for the linked Character's, the You Yellow star before the name and no
  *  Report (the player takes their own entries off from Minerva). A row that slides in a
  *  switch takes its Character's name for it. */
-/** How big a portrait is beside a name in a band's table (ADR 0028). */
-const PORTRAIT_SIZE = 32;
-
 function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowElement {
   const tr = make("tr", row.you ? "lb-you" : "");
   tr.setAttribute("role", "row");
@@ -404,7 +401,7 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   name.scope = "row";
   name.setAttribute("role", "rowheader");
   if (row.you) name.append(star());
-  if (row.portrait !== null) name.append(portraitImage(row.portrait, PORTRAIT_SIZE));
+  if (row.portrait !== null) name.append(portraitImage(row.portrait, ROW_PORTRAIT));
   name.append(characterLink(row.name, row.nameHref));
   const reportCell = make("td", "lb-report");
   if (!row.you) {

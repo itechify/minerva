@@ -412,7 +412,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date): B
     caption,
     empty: rows.length === 0 ? { text: `No one at ${at} has put a best on this map yet.`, link: PUT_YOURS } : null,
     ruler: rows.length === 0 ? [] : rulerTo(top),
-    portraits: [...rows, ...(yours === null ? [] : [row(yours)])].some((r) => r.portrait !== null),
+    portraits: [...answer.entries, ...(yours === null ? [] : [yours])].some((e) => e.portrait !== undefined),
   };
 }
 

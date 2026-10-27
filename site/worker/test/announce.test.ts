@@ -24,7 +24,7 @@ const MADE_UP_TOWN = "https://osms.invalid/images/map_marks/MadeUpTown.png";
 const MADE_UP_MARK: PostedMark = { name: "Made-up Town", picture: MADE_UP_TOWN };
 
 /** No map has a Map Mark. */
-const NO_PICTURES = (): PostedMark | null => null;
+const NO_MARKS = (): PostedMark | null => null;
 
 /** A Character's name as a post writes it: a link to their page (ADR 0027). */
 function linked(name: string): string {
@@ -102,11 +102,11 @@ describe("taken top spots", () => {
 
 describe("the post", () => {
   it("is nothing with no spot taken", () => {
-    expect(postFor([], NO_PICTURES)).toBeNull();
+    expect(postFor([], NO_MARKS)).toBeNull();
   });
 
   it("is an embed for the spot, titled with the map as the site names it and linked to its Map Leaderboard", () => {
-    const post = postFor([taken(HUNTING_GROUND, 20, 153_216)], NO_PICTURES)!;
+    const post = postFor([taken(HUNTING_GROUND, 20, 153_216)], NO_MARKS)!;
 
     expect(post.content).toBeUndefined();
     expect(post.embeds).toEqual([
@@ -137,32 +137,32 @@ describe("the post", () => {
 
     expect(marked.thumbnail).toEqual({ url: photoOf("Hakuo") });
     expect(marked.footer).toEqual({ text: "Made-up Town", icon_url: MADE_UP_TOWN });
-    expect(marked.description.endsWith(" · Portrait: [ClassicRank](https://classicrank.com)")).toBe(true);
+    expect(marked.description.endsWith(PORTRAIT_CREDIT)).toBe(true);
     expect(unmarked.thumbnail).toEqual({ url: photoOf("Hakuo") });
     expect(unmarked).not.toHaveProperty("footer");
   });
 
   it("says nothing of ClassicRank with no portrait", () => {
-    expect(postFor([taken(QUIET, 20)], NO_PICTURES)!.embeds[0].description).not.toContain(PORTRAIT_CREDIT);
+    expect(postFor([taken(QUIET, 20)], NO_MARKS)!.embeds[0].description).not.toContain(PORTRAIT_CREDIT);
   });
 
   it("names a map the fixture doesn't by its ID", () => {
-    expect(postFor([taken(QUIET, 20)], NO_PICTURES)!.embeds[0].title).toBe(`Map ${QUIET}`);
+    expect(postFor([taken(QUIET, 20)], NO_MARKS)!.embeds[0].title).toBe(`Map ${QUIET}`);
   });
 
   it("titles a map whose name holds Discord formatting as it is written", () => {
     // "G* Coconut Season" (090040203) is one in the map names fixture.
-    expect(postFor([taken("090040203", 20)], NO_PICTURES)!.embeds[0].title).toBe("G* Coconut Season");
+    expect(postFor([taken("090040203", 20)], NO_MARKS)!.embeds[0].title).toBe("G* Coconut Season");
   });
 
   it("pings nobody", () => {
-    expect(postFor([taken(QUIET, 20)], NO_PICTURES)!.allowed_mentions).toEqual({ parse: [] });
+    expect(postFor([taken(QUIET, 20)], NO_MARKS)!.allowed_mentions).toEqual({ parse: [] });
   });
 
   it("counts the rest once an upload takes more than it names", () => {
     const many = Array.from({ length: MOST_TOLD + 2 }, (_, at) => taken(QUIET, (at + 2) * 10));
 
-    const post = postFor(many, NO_PICTURES)!;
+    const post = postFor(many, NO_MARKS)!;
 
     expect(post.embeds).toHaveLength(MOST_TOLD);
     expect(post.content).toBe("…and 2 more top spots in the same upload.");
@@ -171,7 +171,7 @@ describe("the post", () => {
   it("counts one left over as a spot", () => {
     const many = Array.from({ length: MOST_TOLD + 1 }, (_, at) => taken(QUIET, (at + 2) * 10));
 
-    expect(postFor(many, NO_PICTURES)!.content).toBe("…and 1 more top spot in the same upload.");
+    expect(postFor(many, NO_MARKS)!.content).toBe("…and 1 more top spot in the same upload.");
   });
 });
 

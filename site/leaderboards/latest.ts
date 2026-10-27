@@ -2,7 +2,7 @@
 // map, each a link to its Map Leaderboard with the entry marked, saying when it took a top
 // spot (ADR 0024). What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
-import { byId, characterLink, jobWithIcon, markSlot, names, portraitImage, read, said as saidWith, unreachable, wordsOf } from "./api.ts";
+import { byId, characterLink, jobWithIcon, markSlot, names, portraitImage, read, ROW_PORTRAIT, said as saidWith, unreachable, wordsOf } from "./api.ts";
 import { type LatestAnswer, type LatestLine, latestLines } from "./leaderboards.ts";
 
 const said = byId("latest-said");
@@ -28,7 +28,7 @@ function drawLine(line: LatestLine): HTMLLIElement {
   let character: HTMLElement = name;
   if (line.portrait !== null) {
     character = make("span", "lb-entry-character");
-    character.append(portraitImage(line.portrait, 32), name);
+    character.append(portraitImage(line.portrait, ROW_PORTRAIT), name);
   }
   who.append(character, " ", jobWithIcon(line.who, line.jobClass, "lb-entry-job"));
   const exp = make("span", "lb-entry-exp", line.expPerHour);
