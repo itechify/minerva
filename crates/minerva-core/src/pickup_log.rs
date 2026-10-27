@@ -479,8 +479,8 @@ impl PickupLogReader {
             let fresh = rows.get(line.slot).and_then(Option::as_ref).is_some_and(|row| row.fresh);
             line.done |= !fresh || at_ms.saturating_sub(line.since_ms) > FOLLOW_MS;
         }
-        for slot in ROWS - shift..ROWS {
-            following.push(Following { slot, since_ms: at_ms, reads: Vec::new(), done: rows[slot].is_none() });
+        for (slot, row) in rows.iter().enumerate().skip(ROWS - shift) {
+            following.push(Following { slot, since_ms: at_ms, reads: Vec::new(), done: row.is_none() });
         }
         let reading = following.iter().enumerate().filter(|(_, f)| !f.done).map(|(i, f)| (i, rows[f.slot].as_ref().unwrap())).collect::<Vec<_>>();
         let lines = self.read_rows(&reading.iter().map(|&(_, row)| row).collect::<Vec<_>>(), at_samples_size);
