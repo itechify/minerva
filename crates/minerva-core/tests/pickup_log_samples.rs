@@ -303,9 +303,10 @@ fn clip_ms() -> impl Iterator<Item = u64> + Clone {
     (2000..=LAST_ARRIVAL_MS + READ_FOR_MS).step_by(100)
 }
 
-/// The clip proper: its frames up to the last arrival.
+/// The clip proper: its frames to the one after the last arrival, which is all that is there to
+/// count for a reader that reads each line once (the frames after are for the vote).
 fn clip_proper_ms() -> Vec<u64> {
-    clip_ms().filter(|&ms| ms <= LAST_ARRIVAL_MS).collect()
+    clip_ms().filter(|&ms| ms <= LAST_ARRIVAL_MS + 100).collect()
 }
 
 #[test]
