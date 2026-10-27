@@ -331,13 +331,14 @@
   color: var(--ink-2);
 }
 
-/* The look-up at the market section's foot: set as a hint, a link as the item's name is. */
+/* The look-up at the market section's foot: set as a hint, in Portal Blue at rest so it
+   reads as a link (it will carry maplestory.market's credit), underlined under the pointer. */
 .item-card-market-foot {
   align-self: flex-start;
   margin-top: 2px;
   font-size: 11px;
   line-height: 14px;
-  color: var(--ink-2);
+  color: var(--portal);
 }
 
 .item-card-choices {
