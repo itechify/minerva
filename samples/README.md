@@ -73,7 +73,8 @@ inside the right edge, which is the client area's (as at the samples' size, 11 t
 are fed as the real band is (`tests/pickup_log_720p.rs`): the band `capture_band` makes at a UI Size of
 35/55 from a 1280×720 client area, 255×306 at client (1025,414), black, with the clip pasted in at
 (47,66) in it, and a cold reader read at 0.636 for each clip. Each clip must count only the lines
-that arrived, in the frame that brought them or not at all, and tally no more mesos or Items than
+that arrived, no earlier than the frame that brought them and no later than half a second after it (a
+line is read again at the captures after it arrives, and counted when the reads vote), and tally no more mesos or Items than
 arrived. At this size it may read fewer, and `Unreadable` stands for a line seen but not read:
 `exp-and-mesos` (EXP, mesos, an Etc Item), `etc-and-use-items` (mesos, Etc and Use Items, a name cut
 short, and a Mob's sprite over the top row for the clip's last second), `skill-effect` (a skill's

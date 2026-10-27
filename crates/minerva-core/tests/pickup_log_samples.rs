@@ -69,17 +69,19 @@ fn a_mob_covering_the_first_capture_after_reset_cannot_recount_loot() {
         let img = image::open(path).unwrap().to_rgba8();
         PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 }
     };
-    minerva.on_pickup_log_reading(reader.read(&capture(3000, 3000)));
-    minerva.on_pickup_log_reading(reader.read(&capture(3300, 3300)));
+    // The line that arrived at 3200 is read again at the captures after it, and counted when they vote.
+    for at_ms in (3000..=3600).step_by(100) {
+        minerva.on_pickup_log_reading(reader.read(&capture(at_ms, at_ms)));
+    }
     assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 26);
 
     reader.reset();
     // An opaque Mob hides every line on the first capture of the new stream.
     let mob = image::RgbaImage::from_pixel(325, 139, image::Rgba([80, 60, 40, 255]));
     minerva.on_pickup_log_reading(reader.read(&PickupLogCapture {
-        frame: common::frame(&mob, 3400), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0,
+        frame: common::frame(&mob, 3700), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0,
     }));
-    minerva.on_pickup_log_reading(reader.read(&capture(3300, 3500)));
+    minerva.on_pickup_log_reading(reader.read(&capture(3600, 3800)));
     assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 26);
 }
 
@@ -161,7 +163,8 @@ fn every_clip_counts_native_truth_and_at_other_ui_sizes_the_same_or_fewer_never_
 fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
     let mut reader = PickupLogReader::bundled();
     let mut arrivals = Vec::new();
-    for at_ms in [2000, 2800, 2900, 3000, 3100, 3200] {
+    // (The line that arrived at 3200 is read again at the captures after it, until they vote.)
+    for at_ms in [2000, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600] {
         let path = common::samples_in("pickup-log/empty-to-loot").join(format!("{at_ms:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
         let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
@@ -181,7 +184,7 @@ fn our_window_over_the_log_is_skipped_and_the_next_clean_stack_is_matched() {
     // establishes a baseline, so the four lines already present are not recounted.
     reader.reset();
     let mut arrivals = Vec::new();
-    for at_ms in [3000, 3200, 3300] {
+    for at_ms in [3000, 3200, 3300, 3400, 3500, 3600, 3700] {
         let path = common::samples_in("pickup-log/empty-to-loot").join(format!("{at_ms:08}.png"));
         let img = image::open(path).unwrap().to_rgba8();
         let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: 1590, y: 830 }, ui_size: 1.0 };
@@ -290,7 +293,9 @@ fn arrivals(reader: &mut PickupLogReader, captures: impl IntoIterator<Item = Pic
     captures.into_iter().flat_map(|capture| reader.read(&capture).arrived).collect()
 }
 
-const CLIP_MS: [u64; 14] = [2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300];
+/// The clip's frames, to 500 ms after the last line arrived (3200): a line is read again at the
+/// captures after it arrived, and counted when they vote.
+const CLIP_MS: [u64; 18] = [2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600, 3700];
 
 #[test]
 fn a_log_over_a_band_of_rock_is_found_and_counted() {
@@ -339,7 +344,7 @@ fn a_lookalike_that_never_reads_is_dropped_and_the_real_log_is_found() {
     let mut reader = PickupLogReader::bundled();
     // A lookalike two lines higher than the real log, for four seconds.
     for i in 0..40 {
-        let reading = reader.read(&wiped(log_in_band(CLIP_MS[i % CLIP_MS.len()], "no-log--244695.png", 2 * 22, i as u64 * 100)));
+        let reading = reader.read(&wiped(log_in_band(CLIP_MS[i % 14], "no-log--244695.png", 2 * 22, i as u64 * 100)));
         assert_eq!(reading.seen, PickupLogSeen::Nothing);
     }
     // The real log, still for four seconds, then the clip: its lines, all of them, are counted,
@@ -356,8 +361,11 @@ fn a_lookalike_that_never_reads_is_dropped_and_the_real_log_is_found() {
 /// report left out); and `Slime Bubble x1 earned. (Etc)` (188167).
 const LINES: [u64; 6] = [182792, 183333, 183631, 184483, 187992, 188167];
 
+/// The bands, and the last one again for half a second more (the stack stays as it was): a line
+/// is read again at the captures after it arrived, and counted when they vote.
 fn lines_clip() -> Vec<PickupLogCapture> {
-    LINES.iter().map(|ms| band_capture(&common::samples_in("pickup-log-band").join(format!("lines--{ms}.png")), *ms)).collect()
+    let band = |ms: u64, at_ms: u64| band_capture(&common::samples_in("pickup-log-band").join(format!("lines--{ms}.png")), at_ms);
+    LINES.iter().map(|&ms| band(ms, ms)).chain((1..=6).map(|i| band(188167, 188167 + 100 * i))).collect()
 }
 
 #[test]

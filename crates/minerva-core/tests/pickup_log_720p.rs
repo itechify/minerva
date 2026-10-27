@@ -169,20 +169,47 @@ fn a_clip_never_counts_a_line_that_did_not_arrive_or_one_it_already_did() {
     }
 }
 
+/// How long after the frame that brought a line it may be counted (ms): the line is read again
+/// at the captures after it, and counted where the reads vote.
+const READ_FOR_MS: u64 = 500;
+
 #[test]
-fn a_line_is_counted_in_the_frame_that_brought_it_or_not_at_all() {
+fn a_line_is_counted_when_its_reads_vote_not_before_it_arrived_and_not_after_half_a_second() {
     for name in CLIPS {
         let read = clip(name);
         let truth = truth(name);
+        let arrived_by = |at_ms: u64| -> usize {
+            truth.iter().filter(|(frame, _)| frame[..8].parse::<u64>().unwrap() <= at_ms).map(|(_, lines)| lines.len()).sum()
+        };
         for (at_ms, _) in &read.at {
-            let counted = read.at.iter().filter(|(ms, _)| ms == at_ms).count();
-            let arrived = truth
-                .iter()
-                .find(|(frame, _)| frame.starts_with(&format!("{at_ms:08}")))
-                .map_or(0, |(_, lines)| lines.len());
-            assert!(counted <= arrived, "{name}: {counted} lines counted at {at_ms}, {arrived} arrived in it");
+            let counted = read.at.iter().filter(|(ms, _)| ms <= at_ms).count();
+            assert!(counted <= arrived_by(*at_ms), "{name}: {counted} lines counted by {at_ms}, {} had arrived", arrived_by(*at_ms));
         }
+        // Every line that was counted at all is counted in the half second after the frame
+        // that brought it: the lines counted by `t` are at least as many as the lines that arrived
+        // by `t - 500`, less those the clip says it missed before the log was found.
+        let late = truth
+            .iter()
+            .map(|(frame, _)| frame[..8].parse::<u64>().unwrap())
+            .filter(|at_ms| {
+                let counted = read.at.iter().filter(|(ms, _)| *ms <= at_ms + READ_FOR_MS).count();
+                counted + MISSED_BEFORE_THE_LOG_WAS_FOUND < arrived_by(*at_ms)
+            })
+            .collect::<Vec<_>>();
+        assert!(late.is_empty(), "{name}: lines not counted in the half second after the frames {late:?}");
     }
+}
+
+/// The lines the clips' cold reader misses for want of a baseline (`etc-and-use-items`' first two).
+const MISSED_BEFORE_THE_LOG_WAS_FOUND: usize = 2;
+
+#[test]
+fn a_new_line_is_read_again_while_it_is_new_and_the_reads_vote() {
+    // Read once, as it arrived, 14 of the 30 lines in the clips read whole (the rest were
+    // `Unreadable` or missed): the same line is on screen for 1.5 s or more, and a read of it
+    // at a later capture, or the agreement of several, is better than any one.
+    let right = CLIPS.iter().map(|name| right(name, &clip(name).lines).0).sum::<usize>();
+    assert!(right >= 19, "{right} of the 30 lines read whole");
 }
 
 #[test]
@@ -191,6 +218,7 @@ fn a_stack_that_stays_as_it_was_counts_nothing_new() {
     // brightness and a Mob's sprite passes over its top row: a reader that took that row for a line
     // that was gone counted a second `+73` and a second Ligator Skin at 47400.
     let read = clip("etc-and-use-items");
-    let later = read.at.iter().filter(|(at_ms, _)| *at_ms > 46_800).collect::<Vec<_>>();
+    // (A line that did arrive is counted up to half a second after its frame.)
+    let later = read.at.iter().filter(|(at_ms, _)| *at_ms > 46_800 + READ_FOR_MS).collect::<Vec<_>>();
     assert!(later.is_empty(), "lines counted after the last that arrived: {later:?}");
 }
