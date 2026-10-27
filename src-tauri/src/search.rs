@@ -87,10 +87,17 @@ pub fn search_pick(id: String, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::SearchPick(id));
 }
 
-/// A click on a matched map (its ID): make it the Destination.
+/// A click on a matched map, or on a map in an NPC's map list (its ID): make it the
+/// Destination.
 #[tauri::command]
 pub fn search_pick_destination(id: String, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::SearchPickDestination(id));
+}
+
+/// A click on a matched NPC (its ID): make its map the Destination, or list its maps.
+#[tauri::command]
+pub fn search_pick_npc(id: String, commands: State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::SearchPickNpc(id));
 }
 
 /// A click on matched items (the first one's ID): show their Item Card.

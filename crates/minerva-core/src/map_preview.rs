@@ -22,6 +22,9 @@ pub struct MapPreview {
     pub marks: Vec<PortalMark>,
     /// Every Spawn Point on the map with a position, in OSMS's order.
     pub spawns: Vec<SpawnMark>,
+    /// Where the Destination's NPC stands, when the map is the Destination's and the player
+    /// picked it for the NPC (ADR 0028); each spot it stands at, in OSMS's order.
+    pub npc_spots: Vec<PicturePoint>,
 }
 
 /// The Map Preview's picture: where the overlay loads it from, or why it can't.
@@ -98,6 +101,12 @@ impl MapPreview {
         for mark in &mut self.marks {
             mark.next_on_route = next_map == Some(mark.to_map_id.as_str()) && mark.kind != PortalKind::Quest;
         }
+        self
+    }
+
+    /// The same preview, with the Destination's NPC marked at `spots`.
+    pub(crate) fn with_npc_at(mut self, spots: Vec<PicturePoint>) -> Self {
+        self.npc_spots = spots;
         self
     }
 }

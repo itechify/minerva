@@ -14,6 +14,9 @@
 .results th:nth-child(3) { width: 13%; }
 .results th:nth-child(4) { width: 19%; }
 .results th:nth-child(5) { width: 21%; }
+/* An NPC's map list has only the map and its Distance. */
+.results.npc-results th:nth-child(1) { width: 72%; }
+.results.npc-results th:nth-child(2) { width: 28%; }
 .results th, .results td { box-sizing: border-box; padding-left: 6px; vertical-align: top; }
 /* Inside the inset box, the first and last columns keep clear of its edge. */
 .results th:first-child, .results td:first-child { padding-left: 8px; }

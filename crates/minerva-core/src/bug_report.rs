@@ -185,6 +185,7 @@ pub enum Event {
     SearchQuery { query: String },
     SearchPick { id: String },
     SearchPickDestination { id: String },
+    SearchPickNpc { id: String },
     SearchPickItem { id: String },
     Hotkey { pressed: String },
     Press { control: PanelControl },
@@ -1645,6 +1646,9 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::SearchPickDestination { id } => {
                 minerva.search_pick_destination(&id);
             }
+            Event::SearchPickNpc { id } => {
+                minerva.search_pick_npc(&id);
+            }
             Event::SearchPickItem { id } => {
                 minerva.search_pick_item(&id);
             }
@@ -2073,6 +2077,7 @@ impl Event {
             Event::RebindKey { press } => format!("key pressed in the Settings window {}", json(press)),
             Event::SearchPick { id } => format!("search picked {id}"),
             Event::SearchPickDestination { id } => format!("search picked map {id} as the Destination"),
+            Event::SearchPickNpc { id } => format!("search picked NPC {id}"),
             Event::SearchPickItem { id } => format!("search picked item {id}"),
             Event::PickItem { id } => format!("item picked {id}"),
             Event::PickCardItem { id } => format!("Item Card's item picked {id}"),
