@@ -40,12 +40,13 @@ pub(crate) fn name(items: Option<&ItemSet>, name: &str, cut_short: bool, tab: &s
     let shown = if cut_short { format!("{}...", name.trim_end()) } else { name.trim().to_string() };
     let Some(items) = items else { return Named::Unmatched(shown) };
     if !cut_short {
-        if let Some(item) = items.named(name).first() {
-            return Named::Item(item.name.clone());
+        let tab = InventoryTab::named_like(tab);
+        if let Some(item) = in_its_tab(items, name, tab) {
+            return Named::Item(item.to_string());
         }
         // A name the whole set can't place may still be the one of its tab's names it is clearly
         // closest to, never one of two.
-        return match InventoryTab::named_like(tab).and_then(|tab| items.named_in_tab(name, tab)) {
+        return match tab.and_then(|tab| items.named_in_tab(name, tab)) {
             Some(name) => Named::Item(name.to_string()),
             None => Named::Unmatched(shown),
         };
@@ -67,11 +68,22 @@ pub(crate) fn name(items: Option<&ItemSet>, name: &str, cut_short: bool, tab: &s
 /// were known ([`ItemSet::named_in_tab_plain`]): the Item it names, if any. The Bug Report probe
 /// compares it with [`name`].
 pub(crate) fn name_plain(items: &ItemSet, name: &str, tab: &str) -> Option<String> {
-    if let Some(item) = items.named(name).first() {
-        return Some(item.name.clone());
+    let tab = InventoryTab::named_like(tab);
+    if let Some(item) = in_its_tab(items, name, tab) {
+        return Some(item.to_string());
     }
-    let tab = InventoryTab::named_like(tab)?;
-    items.named_in_tab_plain(name, tab).map(String::from)
+    items.named_in_tab_plain(name, tab?).map(String::from)
+}
+
+/// The Item the whole set names `read` as ([`ItemSet::named`]), if it can be the one picked up into
+/// `tab`: a name read exactly is its Item whatever tab was read (the tab may be the misread), but a
+/// name only close to one is that Item only if it is filed under the tab the line says.
+fn in_its_tab<'a>(items: &'a ItemSet, read: &str, tab: Option<InventoryTab>) -> Option<&'a str> {
+    let named = items.named(read);
+    let item = named.first()?;
+    let exact = crate::item_lookup::item_key(read) == crate::item_lookup::item_key(&item.name);
+    let filed = tab.is_none_or(|tab| named.iter().any(|item| item.inventory_tab() == tab));
+    (exact || filed).then_some(item.name.as_str())
 }
 
 /// A name that matched no Item, with the lines it was read on.

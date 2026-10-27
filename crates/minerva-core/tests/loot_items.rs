@@ -118,6 +118,18 @@ fn a_misread_name_is_only_matched_among_the_items_of_the_tab_its_line_says() {
 }
 
 #[test]
+fn a_misread_name_close_to_an_item_of_another_tab_is_not_that_item() {
+    let mut minerva = started(world());
+
+    // A glyph from Blue Snail Shell, close enough for the whole set to name it, but filed under
+    // Use: Blue Snail Shell is an Etc item, so it isn't what was picked up. An exact name is still
+    // the item whatever the tab read (the next line), as the tab may be the misread.
+    let state = picked_up(&mut minerva, 11 * S, vec![item("Blue Snail Shel", 1, "Use"), item("Red Potion", 1, "Etc")]);
+
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Potion", 1)]);
+}
+
+#[test]
 fn a_name_cut_short_that_starts_one_items_name_is_that_item() {
     let mut minerva = started(world());
 
