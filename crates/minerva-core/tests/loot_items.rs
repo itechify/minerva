@@ -351,3 +351,57 @@ fn a_read_too_far_from_every_item_for_its_slips_to_explain_stays_as_read() {
 
     assert!(state.exp_tracking.loot.items.is_empty());
 }
+
+/// What one Etc line `read` is tallied as on its first line, in a Session with `names` in the Etc
+/// tab: an Item's name, or nothing yet (a name that matches no Item waits for a second line).
+fn tallied_first(names: &[&str], read: &str) -> Vec<LootItem> {
+    let items = names.iter().enumerate().map(|(i, name)| etc(4_100_000 + i as u64, name).sells_for(1)).collect();
+    let mut minerva = started(item_world(items));
+    picked_up(&mut minerva, 11 * S, vec![item(read, 1, "Etc")]).exp_tracking.loot.items
+}
+
+#[test]
+fn a_misread_a_whole_edit_nearer_an_item_than_the_next_is_that_item() {
+    // The D read as "Ci" is a slip (0.4 of an edit); the other name is a letter further from it than
+    // that, by one whole edit and some. Plain edits alone see them 2 and 3 apart, not 2 clear.
+    let names = ["Very Dry Branch", "Very Dry Brunch"];
+
+    assert_eq!(tallied_first(&names, "Very Ciry Branch"), vec![tally("Very Dry Branch", 1)]);
+}
+
+#[test]
+fn a_misread_less_than_a_whole_edit_nearer_an_item_than_the_next_stays_as_read() {
+    // The B read as "A" is a slip; the other name is one plain edit from the read (0.6 further).
+    let names = ["Very Dry Branch", "Very Dry Oranch"];
+
+    assert_eq!(tallied_first(&names, "Very Dry Aranch"), vec![]);
+}
+
+#[test]
+fn a_misread_needs_the_next_item_to_be_half_as_far_again_as_the_closest() {
+    // The read is two plain edits and a "?" (2.4) from the first name. A name a whole edit
+    // further (3.4) is not half as far again; one 2 further (4.4) is.
+    assert_eq!(tallied_first(&["Wooden Shield Frame", "Wooden Shield Flame"], "Woodan Shi?ld Framo"), vec![]);
+    assert_eq!(tallied_first(&["Wooden Shield Frame", "Wooden Shield Flaze"], "Woodan Shi?ld Framo"), vec![tally("Wooden Shield Frame", 1)]);
+}
+
+#[test]
+fn a_slip_seen_in_one_read_only_is_not_one() {
+    // Each is a letter read as another in one distinct read of the Bug Report of 0.15.0, 2026-10-26
+    // 23:05, and in no second one; on names this short a plain edit is too far to name.
+    for (name, read) in [("Orb", "Crb"), ("Orb", "Drb"), ("Orb", "Prb"), ("Sap", "Eap"), ("Cab", "Eab"), ("Cab", "Iab"), ("Bat", "Iat"), ("Nag", "Rag")] {
+        assert_eq!(tallied_first(&[name], read), vec![], "{read:?} for {name:?}");
+    }
+}
+
+#[test]
+fn plain_edits_name_a_misread_only_as_the_item_the_slips_put_closest() {
+    // Three D's read as "Ci" are three slips (1.2) from the first name, which plain edits see as 6
+    // away; the second is two plain edits (2.0) from the read, so the slips don't lead by a whole
+    // edit, and plain edits (within 75%, but not the 85% of the whole set) name the second.
+    let names = ["Dad Dug", "Ciaci Cinx"];
+
+    assert_eq!(tallied_first(&names, "Ciaci Ciug"), vec![]);
+    // With no such name beside it, the same read is the first name: nothing else is as near.
+    assert_eq!(tallied_first(&names[..1], "Ciaci Ciug"), vec![tally("Dad Dug", 1)]);
+}
