@@ -7,7 +7,9 @@
 //! starts with, its tab narrowing the choice; if it still starts more than one Item's name it
 //! is tallied as the game shows it. A name that matches no Item (a misread, or an Item newer
 //! than OSMS's files) is tallied as read, but only once the same text has been read on two
-//! lines, so a single misread never makes an Item of its own.
+//! lines, so a single misread never makes an Item of its own. A name the whole set can't place
+//! is matched within its tab by the recogniser's usual slips on this font ([`crate::pickup_slips`]),
+//! so a single Item's count may now and then be a little high, the total never.
 
 use crate::bug_report::Note;
 use crate::osms_items::{InventoryTab, ItemSet};

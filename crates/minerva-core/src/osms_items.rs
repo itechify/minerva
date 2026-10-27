@@ -5,17 +5,12 @@
 //! takes down only the Item Card. Credit "OSMS Data Explorer (osmsdataexplorer.com)".
 
 use crate::item_card::ShopPrice;
-use crate::item_lookup::{closest, closest_within, item_key};
+use crate::item_lookup::{closest, item_key};
 use crate::loader::Saved;
 use crate::map_index::SourceError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-
-/// How similar a name read off a line of the Pickup Log must be to a name of an item in the line's
-/// own tab (1 minus edits over length), where the whole set asks for more: the tab says which
-/// names it can be, and the game's text over a bright world is read a few glyphs wrong.
-const SAME_TAB_CLOSE_ENOUGH: f32 = 0.75;
 
 /// OSMS's item files as fetched: each file's text, unread. Saved and swapped whole.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,13 +180,14 @@ impl ItemSet {
             .unwrap_or_default()
     }
 
-    /// The name `read` is among the names of the items filed under `tab`: one of them, or one
-    /// clearly closer to it than any other in the tab, though further from it than [`ItemSet::named`]
-    /// asks for, because the tab says which names it can be. `None` when none is.
+    /// The name `read` is among the names of the items filed under `tab`: one of them, or the one
+    /// clearly closest to it by the recogniser's usual slips on the Pickup Log's font
+    /// ([`crate::pickup_slips`]), though further from it than [`ItemSet::named`] asks for, because
+    /// the tab says which names it can be. `None` when none is.
     pub(crate) fn named_in_tab(&self, read: &str, tab: InventoryTab) -> Option<&str> {
         let names: Vec<_> = self.names.iter().filter(|(_, items)| items.iter().any(|&item| self.items[item].inventory_tab() == tab)).collect();
         let keys: Vec<&[char]> = names.iter().map(|(name, _)| &name[..]).collect();
-        let name = closest_within(&item_key(read), &keys, SAME_TAB_CLOSE_ENOUGH)?;
+        let name = crate::pickup_slips::closest(&item_key(read), &keys)?;
         Some(&self.items[names[name].1[0]].name)
     }
 
