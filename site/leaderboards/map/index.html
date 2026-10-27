@@ -75,6 +75,8 @@
                  Report has focus it names the keys between them, one Tab stop for them all.
                  Each entry's lane draws its EXP/h again, so it's hidden from assistive tech,
                  header and cells alike. -->
+            <!-- On a phone too narrow for a band with portraits, it scrolls sideways in here. -->
+            <div class="lb-table-box">
             <table class="lb-table" id="table" role="table" hidden>
               <caption class="lb-caption"><span id="caption"></span><span class="lb-keys" aria-hidden="true"> · ↑ and ↓ move between Reports</span></caption>
               <thead role="rowgroup">
@@ -93,6 +95,7 @@
               </thead>
               <tbody id="rows" role="rowgroup"></tbody>
             </table>
+            </div>
             <!-- ClassicRank asks for a visible link wherever its portraits show (ADR 0029). -->
             <p class="lb-credit" id="credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
             <p id="report-keys" hidden>The up and down arrow keys move between the table's Report buttons.</p>

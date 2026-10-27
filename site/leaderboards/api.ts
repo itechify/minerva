@@ -126,9 +126,6 @@ export function characterLink(name: string, href: string, className = ""): HTMLA
   return link;
 }
 
-/** How big a portrait is beside a name in Latest (ADR 0029). */
-export const LATEST_PORTRAIT = 32;
-
 /** How big a portrait is in a band's table (ADR 0029): ClassicRank's photos' own size, so
  *  each shows pixel for pixel. */
 export const BAND_PORTRAIT = 96;
@@ -144,7 +141,7 @@ export function portraitImage(slot: PortraitSlot, size: number): HTMLElement {
   if (slot === "waiting") {
     const room = make("span", "lb-portrait");
     room.setAttribute("aria-hidden", "true");
-    room.style.width = room.style.height = `${size}px`;
+    room.style.setProperty("--size", `${size}px`);
     return room;
   }
   const img = make("img", "lb-portrait");

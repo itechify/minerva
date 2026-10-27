@@ -37,11 +37,11 @@ Over a page with nothing to show: the site's 404 (`site/404.html`), heading it i
 
 ## The missing portrait
 
-Beside a Character's name where ClassicRank has no photo of them, or one that won't load (ADR 0029, `site/leaderboards/api.ts` draws it): a black figure with a white question mark for a face, in a white outline, supplied by the owner (October 2026), trimmed to the figure on its transparent ground and scaled to ClassicRank's photos' 96×96. It shows 96px in a band's table and on a Character's page, and 32px in Latest, smoothly, unlike the photos, as it isn't pixel art. Decoration: the name beside it says whose it is.
+Beside a Character's name where ClassicRank has no photo of them, or one that won't load (ADR 0029, `site/leaderboards/api.ts` draws it): the owl in black, drawn in pixels, a white question mark on its chest and a white outline, supplied by the owner (October 2026), trimmed to the owl on its transparent ground, scaled to 70px and set in a 96×96 square as a character stands in a ClassicRank photo (its foot 8px from the bottom), so it reads at their size. It shows 96px in a band's table and on a Character's page (48px on a phone's band), smoothly, unlike the photos, as scaling has taken it off its pixel grid. Decoration: the name beside it says whose it is.
 
 | File | Shows | What it shows | Size |
 | --- | --- | --- | --- |
-| `portrait-none.png` | A Character with no portrait | A black figure, a white question mark for its face, outlined in white | 96×96 |
+| `portrait-none.png` | A Character with no portrait | The owl in black pixels, a white question mark on its chest, outlined in white | 96×96 |
 
 ## The job icons
 

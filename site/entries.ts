@@ -103,7 +103,6 @@ export interface LatestEntry extends Best {
   mark: MapMark | null;
   band: number;
   took: { from: string | null; fromExpPerHour: number } | null;
-  portrait?: PortraitAnswer;
 }
 
 /** GET /api/latest: the newest entries, by when their Visit set them. */

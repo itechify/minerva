@@ -671,13 +671,10 @@ export interface LatestLine {
    *  of 80,000" once that Character has left the Map Leaderboards; `null` for an entry that
    *  took no top spot. */
   took: Words | null;
-  /** The Character's portrait, before their name; `null` for none at all. */
-  portrait: PortraitSlot | null;
 }
 
-/** Latest, from GET /api/latest, with dates written as of `now`, or why it lists nothing, and
- *  whether its lines show portraits, so the page credits ClassicRank under them. */
-export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): { lines: LatestLine[]; empty: Said | null; portraits: boolean } {
+/** Latest, from GET /api/latest, with dates written as of `now`, or why it lists nothing. */
+export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): { lines: LatestLine[]; empty: Said | null } {
   const lines = answer.entries.map((e): LatestLine => {
     const set = new Date(e.setAt);
     let took: Words | null = null;
@@ -700,9 +697,8 @@ export function latestLines(answer: LatestAnswer, names: MapNames, now: Date): {
       date: dayText(set, set.getFullYear() !== now.getFullYear()),
       href: linkTo({ map: e.map, band: e.band, name: e.name }),
       took,
-      portrait: portraitSlot(e.portrait),
     };
   });
   const empty = { text: "No one has put a best on the Map Leaderboards yet.", link: PUT_YOURS };
-  return { lines, empty: lines.length === 0 ? empty : null, portraits: lines.some((l) => l.portrait !== null) };
+  return { lines, empty: lines.length === 0 ? empty : null };
 }

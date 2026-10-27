@@ -46,7 +46,7 @@ async function refresh(): Promise<void> {
 const SHOWN = (name: string) => ({ photo: photoOf(name), profile: profileOf(name) });
 
 describe("a portrait", () => {
-  it("is asked for when a Character uploads, and shows on their page, in their band and in Latest", async () => {
+  it("is asked for when a Character uploads, and shows on their page and in their band, but not in Latest", async () => {
     knownOnClassicRank("Aria");
 
     await upload("Aria", key("aria"), [entry(FIELD, 21, 10_000)]);
@@ -54,7 +54,7 @@ describe("a portrait", () => {
     await vi.waitFor(async () => expect(await portraitOf("Aria")).toEqual(SHOWN("Aria")));
     expect((await band(FIELD, 20)).entries.find((e) => e.name === "Aria")?.portrait).toEqual(SHOWN("Aria"));
     expect((await band(FIELD, 20, "Aria")).character?.portrait).toEqual(SHOWN("Aria"));
-    expect((await latestOf("Aria"))?.portrait).toEqual(SHOWN("Aria"));
+    expect(await latestOf("Aria")).not.toHaveProperty("portrait");
   });
 
   it("is asked for with the ClassicRank key, by the name as uploaded, for the fields it shows", async () => {
@@ -138,7 +138,6 @@ describe("a portrait", () => {
 
       expect(await page("Jola")).not.toHaveProperty("portrait");
       expect((await band(FIELD, 110, "Jola")).character).not.toHaveProperty("portrait");
-      expect(await latestOf("Jola")).not.toHaveProperty("portrait");
       expect(asked().flat()).toEqual(["jola"]);
     } finally {
       env.CLASSICRANK_KEY = saved;

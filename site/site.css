@@ -3153,19 +3153,20 @@ button.button {
   .lb-train > .lb-bands {
     min-height: 108px;
   }
-  /* The rows as cards, the table's roles kept in the markup; the caption still under them. */
-  .lb-table,
+  /* The rows as cards, the table's roles kept in the markup; the caption still under them. A
+     band with portraits stays a table (below). */
+  .lb-table:not(.lb-faces),
   .lb-train-table,
   .ch-table {
     display: flex;
     flex-direction: column;
   }
-  .lb-table tbody,
+  .lb-table:not(.lb-faces) tbody,
   .lb-train-table tbody,
   .ch-table tbody {
     display: block;
   }
-  .lb-caption {
+  :not(.lb-faces) > .lb-caption {
     display: block;
     order: 1;
     padding: 8px 12px;
@@ -3240,7 +3241,7 @@ button.button {
     border-top: 0;
   }
   .lb-train-table thead,
-  .lb-table thead,
+  .lb-table:not(.lb-faces) thead,
   .ch-table thead {
     position: absolute;
     width: 1px;
@@ -3248,7 +3249,7 @@ button.button {
     overflow: hidden;
     clip-path: inset(50%);
   }
-  .lb-table tr {
+  .lb-table:not(.lb-faces) tr {
     display: grid;
     /* The figures stand down the card's right edge, the EXP/h over the level over the date
        (at the lane's end), and Report's flag beside the EXP/h, so the job has its line to
@@ -3261,72 +3262,72 @@ button.button {
     column-gap: 10px;
     padding: 8px 12px;
   }
-  .lb-table tbody tr + tr {
+  .lb-table:not(.lb-faces) tbody tr + tr {
     border-top: 1px solid var(--rule);
   }
-  .lb-table tbody tr > * {
+  .lb-table:not(.lb-faces) tbody tr > * {
     padding: 0;
     border-top: 0;
     background: none;
   }
-  .lb-table tr.lb-you {
+  .lb-table:not(.lb-faces) tr.lb-you {
     background: var(--select);
   }
-  .lb-table tr.lb-gap {
+  .lb-table:not(.lb-faces) tr.lb-gap {
     display: block;
     padding: 4px 12px;
   }
-  .lb-table tr.lb-gap > td {
+  .lb-table:not(.lb-faces) tr.lb-gap > td {
     display: block;
   }
-  .lb-table .lb-rank {
+  .lb-table:not(.lb-faces) .lb-rank {
     grid-area: rank;
     width: auto;
     text-align: left;
   }
-  .lb-table .lb-name {
+  .lb-table:not(.lb-faces) .lb-name {
     grid-area: name;
     overflow-wrap: anywhere;
   }
-  .lb-table .lb-exp {
+  .lb-table:not(.lb-faces) .lb-exp {
     grid-area: exp;
   }
-  .lb-table td.lb-job,
-  .lb-table td.lb-level,
-  .lb-table td.lb-date {
+  .lb-table:not(.lb-faces) td.lb-job,
+  .lb-table:not(.lb-faces) td.lb-level,
+  .lb-table:not(.lb-faces) td.lb-date {
     font-size: 13px;
     line-height: 20px;
     color: var(--ink-2);
     text-align: left;
   }
-  .lb-table .lb-job {
+  .lb-table:not(.lb-faces) .lb-job {
     grid-area: job;
   }
-  .lb-table .lb-level {
+  .lb-table:not(.lb-faces) .lb-level {
     grid-area: level;
     justify-self: end;
   }
-  .lb-table td.lb-level::before {
+  .lb-table:not(.lb-faces) td.lb-level::before {
     content: "Lv ";
   }
-  .lb-table .lb-date {
+  .lb-table:not(.lb-faces) .lb-date {
     grid-area: date;
     justify-self: end;
     align-self: center;
   }
-  .lb-table .lb-report {
+  .lb-table:not(.lb-faces) .lb-report {
     grid-area: report;
     width: auto;
     align-self: center;
   }
   /* The lane under the job, across the card to the date, still on the band's one scale. */
-  .lb-table .lb-lane {
+  .lb-table:not(.lb-faces) .lb-lane {
     --lane-inset: 0px;
     --lane-end: 0px;
     grid-area: lane;
     width: auto;
   }
-  .lb-table tbody tr > .lb-lane {
+  .lb-table:not(.lb-faces) tbody tr > .lb-lane {
     padding-top: 0;
     align-self: center;
   }
@@ -3658,6 +3659,10 @@ button.button {
 .lb-portrait-photo {
   image-rendering: pixelated;
 }
+span.lb-portrait {
+  width: var(--size);
+  height: var(--size);
+}
 /* In a band's table, a column of its own before the names, 96px, the photos' own size: each row
    is as tall as a portrait, its words set on the row's middle. Without portraits, no column. */
 .lb-table .lb-face {
@@ -3672,46 +3677,51 @@ button.button {
 .lb-table.lb-faces tbody tr > * {
   vertical-align: middle;
 }
-/* On a phone, where the band's rows are cards, the portrait stands at the card's left, beside the
-   rank, name, job and figures, and the card has no lane: the portrait is what it shows. */
+/* On a phone, a band with portraits stays a table under its headers, not cards: Rank, the
+   portrait, Character, Job, Level, EXP/h and Report, without the lanes, the dates out of sight
+   (still read by assistive tech, each the row's under the pointer), the cells closer, the
+   portraits 48px (half their size) and each job its class's icon alone (its name still read by
+   assistive tech, and a job without an icon keeps its name), so it fits a phone's width. On a
+   phone narrower still, the table scrolls sideways in its box rather than the page. */
 @media (max-width: 640px) {
-  .lb-table.lb-faces tr {
-    grid-template-columns: 2.6em 96px minmax(0, 1fr) auto auto;
-    /* The words take only their lines, on the portrait's middle. */
-    grid-template-rows: 1fr auto auto auto 1fr;
-    grid-template-areas:
-      "rank face . . ."
-      "rank face name report exp"
-      "rank face job job level"
-      "rank face . . date"
-      "rank face . . .";
-    align-items: center;
-    padding-block: 4px;
-  }
-  .lb-table.lb-faces .lb-face {
-    display: block;
-    grid-area: face;
-    padding: 0;
-  }
-  .lb-table.lb-faces .lb-lane {
+  .lb-table.lb-faces .lb-lane,
+  .lb-table.lb-faces .lb-under {
     display: none;
   }
-}
-.lb-entry-character {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.lb-entry-character .lb-portrait {
-  margin-block: -6px;
-}
-@media (min-width: 641px) {
-  .lb-latest .lb-entry-character {
-    grid-column: 1;
-    margin-right: 8px;
+  .lb-table.lb-faces .lb-date {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
-  .lb-latest .lb-entry-character .lb-entry-name {
-    margin-right: 0;
+  .lb-table.lb-faces th,
+  .lb-table.lb-faces td {
+    padding-inline: 4px;
+  }
+  .lb-table.lb-faces .lb-rank {
+    width: auto;
+  }
+  .lb-table.lb-faces tbody .lb-name {
+    overflow-wrap: anywhere;
+  }
+  .lb-table.lb-faces .lb-face,
+  .lb-table.lb-faces .lb-face > * {
+    width: 48px;
+    height: 48px;
+  }
+  .lb-table.lb-faces td.lb-job .lb-job-line:has(.lb-job-icon) {
+    padding-left: 0;
+    font-size: 0;
+    text-indent: 0;
+  }
+  .lb-table.lb-faces td.lb-job .lb-job-icon {
+    margin: 0;
+  }
+  .lb-table-box {
+    overflow-x: auto;
   }
 }
 /* Under what shows portraits: the visible link to ClassicRank it asks for. */

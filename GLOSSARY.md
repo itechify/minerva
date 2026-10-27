@@ -191,7 +191,7 @@ A Character's page on owlofminerva.app (`/character/?name=`), which every name t
 _Avoid_: profile, player page, Personal Bests page
 
 **Portrait**:
-A Character's photo from ClassicRank, beside their name on the Map Leaderboards, in Latest, on their Character page and in a new #1's post on Discord (ADR 0029). The site's Worker asks ClassicRank for it by name when the Character uploads and every day, so it goes within a day of the player hiding their character there. A question-mark figure shows where ClassicRank has no photo of them.
+A Character's photo from ClassicRank, beside their name on a Map Leaderboard, on their Character page and in a new #1's post on Discord (ADR 0029). The site's Worker asks ClassicRank for it by name when the Character uploads and every day, so it goes within a day of the player hiding their character there. A question-mark figure shows where ClassicRank has no photo of them.
 _Avoid_: avatar, picture, profile picture
 
 **Top spot taken**:
