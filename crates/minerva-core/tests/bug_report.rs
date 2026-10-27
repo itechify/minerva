@@ -958,9 +958,19 @@ fn item_cards_replay_through_the_same_states_with_the_runs_item_files() {
     assert_eq!(replay.lines, recording.lines.len());
 }
 
+/// The made-up game with NPCs to search for: Heena in Kerning City, and the Maple
+/// Administrator there and on Sunset Sky.
+fn game_with_npcs() -> osms::World {
+    osms::game()
+        .changing(osms::KERNING_CITY, |m| m.npc_at(1, 400, 250).npc_at(9_010_000, 700, 300))
+        .changing(osms::SUNSET_SKY, |m| m.npc_at(9_010_000, 200, 300))
+        .with_npc(osms::npc(1, "Heena"))
+        .with_npc(osms::npc(9_010_000, "Maple Administrator"))
+}
+
 #[test]
 fn searches_replay_through_the_same_states_with_the_runs_files() {
-    let mut shell = Shell::new(FakeSource::osms().with_items(items()));
+    let mut shell = Shell::new(FakeSource::with_world(game_with_npcs()).with_items(items()));
     shell.minerva.set_item_card_size(Size { width: 280, height: 160 });
     shell.play(10 * S, CONSTRUCTION_SITE, grind);
     shell.minerva.on_hotkey("ctrl+shift+f");
@@ -976,15 +986,26 @@ fn searches_replay_through_the_same_states_with_the_runs_files() {
     shell.minerva.search_query("ore");
     shell.minerva.search_pick_item("04010000");
     shell.play(30 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.act(Action::OpenSearch);
+    shell.minerva.search_query("heena");
+    shell.minerva.act(Action::SearchEnter);
+    shell.play(35 * S, CONSTRUCTION_SITE, grind);
+    shell.minerva.act(Action::OpenSearch);
+    shell.minerva.search_query("maple");
+    shell.minerva.search_pick_npc("9010000");
+    shell.minerva.act(Action::SearchNext);
+    shell.minerva.search_pick_destination(SUNSET_SKY_ID);
+    shell.play(40 * S, SUNSET_SKY, grind);
 
     let (_, recording) = shell.report();
-    let with = ReplayData { osms: Some(osms::game().files()), items: Some(items().files()) };
+    let with = ReplayData { osms: Some(game_with_npcs().files()), items: Some(items().files()) };
     let replay = bug_report::replay_with(&recording, with);
 
     assert_eq!(replay.divergence, None);
     assert_eq!(replay.lines, recording.lines.len());
     let said: Vec<String> = recording.timeline(0).into_iter().filter(|line| line.contains("search picked")).collect();
-    assert_eq!(said.len(), 2, "{said:?}");
+    assert_eq!(said.len(), 4, "{said:?}");
+    assert!(said.iter().any(|line| line.contains("search picked NPC 9010000")), "{said:?}");
 }
 
 #[test]

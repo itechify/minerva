@@ -103,8 +103,11 @@ pub(crate) enum Command {
     /// The player clicked the search view's mob (in the matches) or map (in the mob's
     /// map list) with this ID.
     SearchPick(String),
-    /// The player clicked the map with this ID in the search view's matches.
+    /// The player clicked the map with this ID in the search view's matches, or in an
+    /// NPC's map list.
     SearchPickDestination(String),
+    /// The player clicked the NPC with this ID in the search view's matches.
+    SearchPickNpc(String),
     /// The player clicked the item with this ID in the search view's matches.
     SearchPickItem(String),
     /// The player clicked the name of the listed mob with this ID in the panel.
@@ -414,6 +417,7 @@ pub fn run() {
             search::search_query,
             search::search_pick,
             search::search_pick_destination,
+            search::search_pick_npc,
             search::search_pick_item,
             settings_window::rebind_key,
             bests_window::personal_bests_open_map,
@@ -836,6 +840,9 @@ fn core_loop(
             }
             Ok(Command::SearchPickDestination(id)) => {
                 minerva.search_pick_destination(&id);
+            }
+            Ok(Command::SearchPickNpc(id)) => {
+                minerva.search_pick_npc(&id);
             }
             Ok(Command::SearchPickItem(id)) => {
                 minerva.search_pick_item(&id);

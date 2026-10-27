@@ -197,6 +197,13 @@ fn osms() -> Result<(), String> {
     );
     println!("Hidden Portal rows: {} (to a Hidden Street: {})", hidden.len(), hidden.iter().filter(|p| p.to_hidden_street).count());
     println!("Mobs spawning: {}", mobs.len());
+    let npcs = set.npcs();
+    println!(
+        "NPCs on a map: {} ({} on more than one, {} without a picture)",
+        npcs.len(),
+        npcs.iter().filter(|npc| npc.maps.len() > 1).count(),
+        npcs.iter().filter(|npc| npc.picture.is_none()).count()
+    );
 
     let files = minerva_lib::osms::fetch_live::<minerva_core::osms_items::ItemFiles>()?;
     let sizes = [&files.items, &files.cash_shop];

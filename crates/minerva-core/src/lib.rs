@@ -96,7 +96,7 @@ pub use personal_best::{BESTS_VERSION, BestKind, CharacterBests, MapBests, Saved
 pub use osms_items::ScrollTier;
 pub use player_shop::{ListedPrice, PlayerShopReader, ShopCapture, ShopHover, ShopList, ShopNearMiss, ShopReading, ShopRow};
 pub use search::{
-    DensityTier, Destination, HuntingTarget, ItemMatch, ItemsMissing, MapMatch, Matches, MobChoice, MobMatch, RouteStop,
+    DensityTier, Destination, HuntingTarget, ItemMatch, ItemsMissing, MapMatch, Matches, MobChoice, MobMatch, NpcChoice, NpcMap, NpcMatch, RouteStop,
     SearchResult, SearchState, SearchView, Trip,
 };
 pub use session::{
@@ -922,14 +922,24 @@ impl Minerva {
     }
 
     /// What shows OSMS's pictures, with those in so far: the Map Marks, the Map Preview (its
-    /// portals on the route to the Hunting Target or Destination marked), the map's mobs'
-    /// Mob Cards, Search's matches and the Hunting Target's mob.
+    /// portals on the route to the Hunting Target or Destination marked, and the
+    /// Destination's NPC), the map's mobs' Mob Cards, Search's matches and the Hunting
+    /// Target's mob.
     fn sync_pictured(&mut self) {
         let set = self.maps.held();
         self.state.map_marks = set.map(|maps| map_mark::table(maps, &self.pictures)).unwrap_or_default();
         let next_map = self.state.search.next_map_by_portal();
-        self.state.map_preview =
-            set.and_then(|maps| self.shown_map.preview(maps, &self.pictures)).map(|preview| preview.on_route_to(next_map));
+        let npc_spots = match (set, &self.state.map) {
+            (Some(maps), Some(map)) => self.state.search.npc_spots(maps, &map.id),
+            _ => Vec::new(),
+        };
+        self.state.map_preview = set
+            .and_then(|maps| self.shown_map.preview(maps, &self.pictures))
+            .map(|preview| preview.on_route_to(next_map).with_npc_at(npc_spots));
+        if let Some(destination) = &mut self.state.search.destination {
+            let preview = self.state.map_preview.as_ref().filter(|preview| preview.image != PreviewImage::Unavailable);
+            destination.npc_marked = preview.is_some_and(|preview| !preview.npc_spots.is_empty());
+        }
         let mobs = self.state.data.data().map_or(&[][..], |data| &data.mobs);
         self.state.mob_cards = match set {
             Some(maps) => mob_card::cards(mobs, maps, &self.pictures),
@@ -1281,6 +1291,15 @@ impl Minerva {
     pub fn search_pick_destination(&mut self, id: &str) -> &PanelState {
         self.record(Event::SearchPickDestination { id: id.to_string() });
         self.search.pick_destination(id, &searched(&self.maps, &self.items, &self.state, &self.settings));
+        self.sync_search();
+        self.sync_panel()
+    }
+
+    /// The player clicked the NPC with this ID in the search view's matches: on one map,
+    /// that map becomes the Destination, with the NPC. Like Enter on it.
+    pub fn search_pick_npc(&mut self, id: &str) -> &PanelState {
+        self.record(Event::SearchPickNpc { id: id.to_string() });
+        self.search.pick_npc(id, &searched(&self.maps, &self.items, &self.state, &self.settings));
         self.sync_search();
         self.sync_panel()
     }

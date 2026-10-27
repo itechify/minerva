@@ -1256,6 +1256,17 @@ code.path {
   vertical-align: -2px;
 }
 
+/* The NPC picked in search: the minimap's green NPC dot inside the route's ring. */
+.ring-key.npc {
+  --ring: var(--route);
+  width: 15px;
+  height: 15px;
+  margin: 0 7px 0 2px;
+  border-width: 2.5px;
+  background: radial-gradient(circle, var(--npc) 0 2.5px, var(--npc-edge) 2.5px 3.25px, #fff 3.25px);
+  vertical-align: -2px;
+}
+
 /* Tags as the panel draws them: Tag Periwinkle, and Quest Violet for Quest. */
 .tag {
   display: inline-block;

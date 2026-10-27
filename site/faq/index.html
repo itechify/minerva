@@ -461,7 +461,7 @@
                   <ul class="toolbar-legend">
                     <li>
                       <span class="icon-button" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.25" /><path d="M10.2 10.2 13.5 13.5" /></svg></span>
-                      <span>Search for a mob to hunt, a map to go to, or an item.</span>
+                      <span>Search for a mob to hunt, a map to go to, an NPC to find, or an item.</span>
                     </li>
                     <li>
                       <span class="icon-button" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13" /></svg></span>
@@ -563,7 +563,11 @@
                     <li><span class="ring-key unknown" aria-hidden="true"></span><b>Grey:</b> to a map Minerva doesn't know.</li>
                     <li>
                       <span class="ring-key route" aria-hidden="true"></span><b>Wide magenta:</b> the next portal on your way
-                      to a <a href="/#navigation">Hunting Target</a>.
+                      to a <a href="/#navigation">Hunting Target</a> or a Destination.
+                    </li>
+                    <li>
+                      <span class="ring-key npc" aria-hidden="true"></span><b>A green dot in magenta:</b> the NPC you picked
+                      in search, where they stand, once you're on their map.
                     </li>
                   </ul>
                   <p>A dashed ring is a portal the game doesn't show.</p>
@@ -682,17 +686,22 @@
                 <details class="qa" id="search">
                   <summary>How do I search?</summary>
                   <p>
-                    <kbd>Ctrl+Shift+F</kbd>, or the magnifier at the top of the panel. Type part of a name: the mobs, maps
-                    and items that have it show in a section each, mobs first, names that start with what you typed first.
+                    <kbd>Ctrl+Shift+F</kbd>, or the magnifier at the top of the panel. Type part of a name: the mobs, maps,
+                    NPCs and items that have it show in a section each, mobs first, names that start with what you typed
+                    first.
                     Each section shows its best five and counts the rest. Pick one with the arrow keys and
                     <kbd>Enter</kbd>, or a click.
                   </p>
                 </details>
                 <details class="qa" id="search-picks">
-                  <summary>What happens when I pick a mob, a map or an item?</summary>
+                  <summary>What happens when I pick a mob, a map, an NPC or an item?</summary>
                   <ul>
                     <li><b>A mob:</b> it lists the maps the mob spawns on, to pick one to hunt it on.</li>
                     <li><b>A map:</b> it becomes your Destination, and the panel shows the way there.</li>
+                    <li>
+                      <b>An NPC:</b> its map becomes your Destination, or you choose from its maps, nearest first, when it
+                      stands on more than one. Once you're there, <a href="#ring-colours">the Map Preview marks them</a>.
+                    </li>
                     <li><b>An item:</b> its <a href="#item-card">Item Card</a> opens beside the panel.</li>
                   </ul>
                 </details>
@@ -722,8 +731,9 @@
                   <p>
                     Pick one of a mob's maps and it's your <strong>Hunting Target</strong>: Navigation shows the mob as OSMS
                     animates it, the map, its figures and the way there. Pick a map itself and it's your
-                    <strong>Destination</strong>: the map, its street, how far it is and the way, without a mob. You have
-                    one or the other: the last you picked.
+                    <strong>Destination</strong>: the map, its street, how far it is and the way, without a mob. Pick an
+                    NPC and its map is your Destination, with the NPC shown above the map. You have one or the other: the
+                    last you picked.
                   </p>
                 </details>
                 <details class="qa" id="route">
@@ -745,7 +755,7 @@
                   <summary>Why can't I move my character while searching?</summary>
                   <p>
                     The search view has the keyboard, for your typing, until it closes. <kbd>Esc</kbd> or the back arrow
-                    goes back a step without changing anything: from a mob's maps to what you typed, and from there to the
+                    goes back a step without changing anything: from a mob's or an NPC's maps to what you typed, and from there to the
                     panel, where the game has the keyboard again.
                   </p>
                 </details>
