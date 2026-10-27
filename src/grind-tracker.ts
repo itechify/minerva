@@ -123,7 +123,7 @@ function total(n: number, word: string) {
   if (n === 0) return null;
   const part = document.createElement("span");
   // "+", in the words' weight: the header has no "(Estimate)", and the Pickup Log can miss a
-  // pickup but never adds one, so the figure is at least what was picked up.
+  // pickup but never adds one, so the player picked up at least the figure, possibly more.
   part.append(span("figure", whole(n)), `+ ${word}${n === 1 ? "" : "s"}`);
   return part;
 }
