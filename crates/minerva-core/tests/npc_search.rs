@@ -11,8 +11,10 @@ mod common;
 use common::{FakeSource, KERNING_SAMPLE, SUNSET_SAMPLE, arrive, fresh_files};
 use common::items::{item_world, use_item};
 use common::osms::npc;
-use common::world::{SEARCH, WorldMap, map, on_sunset_sky_from, osms_world, stops, world};
-use minerva_core::{Action, Destination, Distance, Minerva, PanelState, Recognition, SearchView};
+use common::world::{
+    WorldMap, destination, highlighted_match, map, on_sunset_sky, on_sunset_sky_from, osms_world, stops, typed, world,
+};
+use minerva_core::{Action, Distance, Minerva, PanelState, Recognition, SearchView};
 
 /// Sunset Sky leads to Kerning City, Kerning City to Henesys. Heena stands in Henesys, the
 /// Maple Administrator in Henesys and in Kerning City, and Sam in Henesys's weapon store.
@@ -26,20 +28,6 @@ fn towns() -> Vec<WorldMap> {
             .npc(npc(9_010_000, "Maple Administrator"), 700, 300),
         map("100000003", "Henesys Weapon Store", 100, vec![]).npc(npc(211, "Sam"), 120, 90),
     ]
-}
-
-/// A core over `maps`, OSMS's file set and the (empty) item files in, the player arrived on
-/// Sunset Sky.
-fn on_sunset_sky(maps: Vec<WorldMap>) -> Minerva {
-    on_sunset_sky_from(world(maps).with_items(item_world(vec![])))
-}
-
-/// The search view open with `query` typed.
-fn typed(minerva: &mut Minerva, query: &str) -> PanelState {
-    minerva.act(Action::SearchEscape);
-    minerva.act(Action::SearchEscape);
-    minerva.on_hotkey(SEARCH);
-    minerva.search_query(query).clone()
 }
 
 /// Each NPC matched, as "name · its map", or "name · on N maps".
@@ -93,22 +81,6 @@ fn an_npc_on_no_map_or_only_on_event_and_dev_maps_isnt_matched() {
     assert_eq!(npcs(&typed(&mut minerva, "heena")), ["Heena · Henesys"], "not the Event Hall");
 }
 
-/// What the highlight is on, as "kind: name".
-fn highlighted(state: &PanelState) -> Option<String> {
-    let search = &state.search;
-    let at = search.highlighted?;
-    let (mobs, maps, npcs) = (search.mobs.shown.len(), search.maps.shown.len(), search.npcs.shown.len());
-    Some(if at < mobs {
-        format!("mob: {}", search.mobs.shown[at].mob.name)
-    } else if at < mobs + maps {
-        format!("map: {}", search.maps.shown[at - mobs].map_name)
-    } else if at < mobs + maps + npcs {
-        format!("npc: {}", search.npcs.shown[at - mobs - maps].name)
-    } else {
-        format!("item: {}", search.items.shown[at - mobs - maps - npcs].name)
-    })
-}
-
 #[test]
 fn the_npcs_come_between_the_maps_and_the_items_and_the_highlight_goes_through_them_in_turn() {
     let maps = vec![
@@ -119,14 +91,10 @@ fn the_npcs_come_between_the_maps_and_the_items_and_the_highlight_goes_through_t
     let mut minerva = on_sunset_sky_from(world(maps).with_items(items));
 
     let state = typed(&mut minerva, "henesys");
-    let seen: Vec<String> = (0..2).filter_map(|_| highlighted(minerva.act(Action::SearchNext))).collect();
+    let seen: Vec<String> = (0..2).filter_map(|_| highlighted_match(minerva.act(Action::SearchNext))).collect();
 
-    assert_eq!(highlighted(&state).as_deref(), Some("map: Henesys"));
+    assert_eq!(highlighted_match(&state).as_deref(), Some("map: Henesys"));
     assert_eq!(seen, ["npc: Henesys Guide", "item: Henesys Return Scroll"]);
-}
-
-fn destination(state: &PanelState) -> &Destination {
-    state.search.destination.as_ref().expect("a Destination")
 }
 
 #[test]
@@ -294,10 +262,27 @@ fn the_map_preview_marks_where_the_npc_stands_once_the_player_is_on_its_map() {
     let picked = minerva.act(Action::SearchEnter).clone();
     assert!(npc_spots(&picked).is_empty(), "Sunset Sky has no Administrator");
 
+    assert!(!destination(&picked).npc_marked, "not there yet");
+
     let there = arrive(&mut minerva, KERNING_SAMPLE, 2_000);
 
     assert!(destination(&there).arrived);
     assert_eq!(npc_spots(&there), [(900, 300)]);
+    assert!(destination(&there).npc_marked);
+}
+
+#[test]
+fn an_npc_osms_doesnt_place_on_its_map_is_found_but_not_marked() {
+    let maps = vec![map("100000000", "Sunset Sky", 100, vec![]).npc_unplaced(npc(1, "Heena"))];
+    let mut minerva = on_sunset_sky(maps);
+    typed(&mut minerva, "heena");
+
+    let state = minerva.act(Action::SearchEnter).clone();
+
+    let to = destination(&state);
+    assert_eq!((to.map_name.as_str(), to.arrived), ("Sunset Sky", true));
+    assert!(npc_spots(&state).is_empty());
+    assert!(!to.npc_marked, "nowhere to mark");
 }
 
 #[test]

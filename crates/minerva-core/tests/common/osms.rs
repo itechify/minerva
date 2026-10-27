@@ -27,8 +27,9 @@ pub struct Map {
     /// `map_mark`; written as `"None"` when `None`, as OSMS writes a map without one.
     pub mark: Option<String>,
     /// `npc_positions`: each NPC standing on the map, by its ID, and where in the map's
-    /// picture. `npcs` lists their IDs, each once.
-    pub npcs: Vec<(u64, i64, i64)>,
+    /// picture (`None`: nowhere, so `npcs` lists it and `npc_positions` doesn't). `npcs`
+    /// lists their IDs, each once.
+    pub npcs: Vec<(u64, Option<(i64, i64)>)>,
 }
 
 /// An NPC, as `maps.json`'s `npc_lookup` holds it.
@@ -300,7 +301,14 @@ impl Map {
 
     /// NPC `id` standing at (`x`, `y`) in the map's picture.
     pub fn npc_at(mut self, id: u64, x: i64, y: i64) -> Self {
-        self.npcs.push((id, x, y));
+        self.npcs.push((id, Some((x, y))));
+        self
+    }
+
+    /// NPC `id` standing on the map, with no position: `npcs` lists it, `npc_positions`
+    /// doesn't.
+    pub fn npc_unplaced(mut self, id: u64) -> Self {
+        self.npcs.push((id, None));
         self
     }
 
@@ -487,12 +495,16 @@ impl World {
             }
             if !map.npcs.is_empty() {
                 let mut ids: Vec<u64> = Vec::new();
-                for &(id, _, _) in &map.npcs {
+                for &(id, _) in &map.npcs {
                     if !ids.contains(&id) {
                         ids.push(id);
                     }
                 }
-                let positions: Vec<Value> = map.npcs.iter().map(|&(id, x, y)| json!({ "id": id, "x": x, "y": y })).collect();
+                let positions: Vec<Value> = map
+                    .npcs
+                    .iter()
+                    .filter_map(|&(id, at)| at.map(|(x, y)| json!({ "id": id, "x": x, "y": y })))
+                    .collect();
                 m.insert("npcs".into(), json!(ids));
                 m.insert("npc_positions".into(), Value::Array(positions));
             }

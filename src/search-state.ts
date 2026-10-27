@@ -104,6 +104,8 @@ export type Destination = {
   arrived: boolean;
   trip: Trip | null;
   npc: NpcChoice | null;
+  /** The Map Preview marks where the NPC stands: you're on its map, and OSMS says where. */
+  npcMarked: boolean;
 };
 
 /** An arrival's trip: "2 map changes from Sunset Sky, by teleport scroll". */
@@ -193,7 +195,7 @@ const STEP_TITLES: Record<Step, string> = {
 type Way = { distance: Distance; route: RouteStop[]; travel: Step[] };
 
 /** A way's travel marker: "ship", "taxi, ship", or "" for portals alone. */
-const travelMarker = (way: Way) => way.travel.map((step) => STEP_NAMES[step]).join(", ");
+const travelMarker = (way: Pick<Way, "travel">) => way.travel.map((step) => STEP_NAMES[step]).join(", ");
 
 /** The headline: "Nearest: Mushroom Field, 2 map changes away", or "" with none. */
 export function nearestLine(search: SearchState): string {
@@ -226,8 +228,8 @@ export function resultsHead(): HTMLTableSectionElement {
   return head;
 }
 
-/** A way's Distance as the map list and the Navigation section read it ("5 · ship"), with why. */
-export function distanceWithTravel(way: Way): { text: string; title: string } {
+/** A way's Distance as the map lists and the Navigation section read it ("5 · ship"), with why. */
+export function distanceWithTravel(way: Pick<Way, "distance" | "travel">): { text: string; title: string } {
   const distance = distanceText(way.distance);
   const travel = travelMarker(way);
   const travelTitle = way.travel.map((step) => STEP_TITLES[step]).join(", ");
@@ -297,7 +299,7 @@ export function npcMapGroup(map: NpcMap, marks: MapMarks): HTMLTableSectionEleme
   const name = cell(map.mapName, "result-map");
   name.prepend(mapMark(marks, map.mark));
   name.title = map.mapName;
-  const distance = distanceWithTravel({ ...map, route: [] });
+  const distance = distanceWithTravel(map);
   const distanceCell = cell(distance.text, typeof map.distance === "string" ? "distance none" : "distance");
   distanceCell.title = distance.title;
   distanceCell.rowSpan = 2;

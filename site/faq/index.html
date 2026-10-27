@@ -562,7 +562,11 @@
                     <li><span class="ring-key unknown" aria-hidden="true"></span><b>Grey:</b> to a map Minerva doesn't know.</li>
                     <li>
                       <span class="ring-key route" aria-hidden="true"></span><b>Wide magenta:</b> the next portal on your way
-                      to a <a href="/#navigation">Hunting Target</a>.
+                      to a <a href="/#navigation">Hunting Target</a> or a Destination.
+                    </li>
+                    <li>
+                      <span class="ring-key npc" aria-hidden="true"></span><b>A green dot in magenta:</b> the NPC you picked
+                      in search, where they stand, once you're on their map.
                     </li>
                   </ul>
                   <p>A dashed ring is a portal the game doesn't show.</p>
@@ -695,7 +699,7 @@
                     <li><b>A map:</b> it becomes your Destination, and the panel shows the way there.</li>
                     <li>
                       <b>An NPC:</b> its map becomes your Destination, or you choose from its maps, nearest first, when it
-                      stands on more than one. The NPC is marked on the Map Preview once you're there.
+                      stands on more than one. Once you're there, <a href="#ring-colours">the Map Preview marks them</a>.
                     </li>
                     <li><b>An item:</b> its <a href="#item-card">Item Card</a> opens beside the panel.</li>
                   </ul>
@@ -736,8 +740,7 @@
                   <p>
                     Between the Map and the Mobs, it lists the route from the map you're on, worked out again as you move,
                     and the portal it takes next wears a wide magenta ring on the Map Preview. When you arrive, it says
-                    <strong>You're here</strong>, with how far you came, until you leave the map. Going to an NPC, the
-                    Map Preview then marks where they stand: a green dot in a magenta ring.
+                    <strong>You're here</strong>, with how far you came, until you leave the map.
                   </p>
                 </details>
                 <details class="qa" id="change-target">
@@ -751,7 +754,7 @@
                   <summary>Why can't I move my character while searching?</summary>
                   <p>
                     The search view has the keyboard, for your typing, until it closes. <kbd>Esc</kbd> or the back arrow
-                    goes back a step without changing anything: from a mob's maps to what you typed, and from there to the
+                    goes back a step without changing anything: from a mob's or an NPC's maps to what you typed, and from there to the
                     panel, where the game has the keyboard again.
                   </p>
                 </details>

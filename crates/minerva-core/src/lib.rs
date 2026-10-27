@@ -893,6 +893,10 @@ impl Minerva {
         self.state.map_preview = set
             .and_then(|maps| self.shown_map.preview(maps, &self.pictures))
             .map(|preview| preview.on_route_to(next_map).with_npc_at(npc_spots));
+        if let Some(destination) = &mut self.state.search.destination {
+            let preview = self.state.map_preview.as_ref().filter(|preview| preview.image != PreviewImage::Unavailable);
+            destination.npc_marked = preview.is_some_and(|preview| !preview.npc_spots.is_empty());
+        }
         let mobs = self.state.data.data().map_or(&[][..], |data| &data.mobs);
         self.state.mob_cards = match set {
             Some(maps) => mob_card::cards(mobs, maps, &self.pictures),

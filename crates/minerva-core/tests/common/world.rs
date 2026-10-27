@@ -3,7 +3,7 @@
 
 use super::{FakeSource, SUNSET_SAMPLE, arrive};
 use super::osms::{self, Spawn, SpawnAt};
-use minerva_core::{Action, Distance, Minerva, Mob, PanelState, PortalKind, RouteStop, SearchResult};
+use minerva_core::{Action, Destination, Distance, Minerva, Mob, PanelState, PortalKind, RouteStop, SearchResult};
 
 /// The search hotkey (the default).
 pub const SEARCH: &str = "ctrl+shift+f";
@@ -81,6 +81,13 @@ impl WorldMap {
         self
     }
 
+    /// The same map with NPC `npc` standing on it, nowhere OSMS says.
+    pub fn npc_unplaced(mut self, npc: osms::Npc) -> Self {
+        self.map = self.map.npc_unplaced(npc.id);
+        self.npcs.push(npc);
+        self
+    }
+
     /// The same map with map `town` as its nearest town.
     pub fn returning_to(mut self, town: &str) -> Self {
         self.map.return_map = Some(town.parse().expect("a map ID"));
@@ -118,6 +125,36 @@ pub fn search_for(minerva: &mut Minerva, query: &str) -> PanelState {
     minerva.on_hotkey(SEARCH);
     minerva.search_query(query);
     minerva.act(Action::SearchEnter).clone()
+}
+
+/// The search view open afresh (closing it first if it is open: Esc goes back a step at a
+/// time), with `query` typed: the matches.
+pub fn typed(minerva: &mut Minerva, query: &str) -> PanelState {
+    minerva.act(Action::SearchEscape);
+    minerva.act(Action::SearchEscape);
+    minerva.on_hotkey(SEARCH);
+    minerva.search_query(query).clone()
+}
+
+/// The Destination, which there must be.
+pub fn destination(state: &PanelState) -> &Destination {
+    state.search.destination.as_ref().expect("a Destination")
+}
+
+/// What the matches' highlight is on, as "kind: name".
+pub fn highlighted_match(state: &PanelState) -> Option<String> {
+    let search = &state.search;
+    let at = search.highlighted?;
+    let (mobs, maps, npcs) = (search.mobs.shown.len(), search.maps.shown.len(), search.npcs.shown.len());
+    Some(if at < mobs {
+        format!("mob: {}", search.mobs.shown[at].mob.name)
+    } else if at < mobs + maps {
+        format!("map: {}", search.maps.shown[at - mobs].map_name)
+    } else if at < mobs + maps + npcs {
+        format!("npc: {}", search.npcs.shown[at - mobs - maps].name)
+    } else {
+        format!("item: {}", search.items.shown[at - mobs - maps - npcs].name)
+    })
 }
 
 /// The result the headline names as the nearest.

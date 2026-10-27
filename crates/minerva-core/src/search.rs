@@ -77,6 +77,10 @@ pub struct Destination {
     /// The NPC the player picked the map for, who stands on it; `None` for a map picked as
     /// itself.
     pub npc: Option<NpcChoice>,
+    /// The Map Preview marks where the NPC stands: the player is on its map, OSMS says where
+    /// it stands there, and the preview shows. Arrived without it, the NPC is somewhere on
+    /// the map, not shown.
+    pub npc_marked: bool,
 }
 
 /// A map the picked NPC stands on, in its map list.
@@ -303,8 +307,8 @@ pub struct SearchState {
     /// Every map the picked NPC stands on (Event and Dev maps left out), nearest first and
     /// then by name: the search view's map list for it.
     pub npc_maps: Vec<NpcMap>,
-    /// The map Enter would pick from the map list, the mob's ([`SearchState::results`]) or
-    /// the NPC's ([`SearchState::npc_maps`]); `None` when it lists none.
+    /// The map Enter would pick from the map list, the mob's ([`SearchState::results`])
+    /// or the NPC's ([`SearchState::npc_maps`]); `None` when it lists none.
     pub highlighted_result: Option<usize>,
     /// The headline: which of the results is the nearest with a route, whatever its
     /// tier (of those equally near, the densest). `None` with no map shown or no route
@@ -342,9 +346,12 @@ impl SearchState {
     /// Where the Destination's NPC stands on map `map_id`: nowhere unless the Destination
     /// is that map, picked for the NPC.
     pub(crate) fn npc_spots(&self, set: &MapSet, map_id: &str) -> Vec<PicturePoint> {
-        let Some(Destination { npc: Some(npc), map_id: to, .. }) = &self.destination else { return Vec::new() };
-        let on = set.npc(&npc.id).and_then(|npc| npc.maps.iter().find(|(id, _)| id == map_id && id == to));
-        on.map(|(_, spots)| spots.clone()).unwrap_or_default()
+        match &self.destination {
+            Some(Destination { npc: Some(npc), map_id: to, .. }) if to == map_id => {
+                set.npc(&npc.id).and_then(|npc| npc.spots_on(map_id)).map(<[_]>::to_vec).unwrap_or_default()
+            }
+            _ => Vec::new(),
+        }
     }
 
     /// The pictures the search view's matches want, below [`crate::osms::PICTURES_URL`]:
@@ -510,7 +517,7 @@ impl Search {
                 move_through(&mut self.highlighted_result, &results, by, |r| r.map_id.clone());
             }
             Some(SearchView::NpcMaps) => {
-                let maps = self.npc_maps(searched);
+                let maps = self.npc_map_list(searched);
                 move_through(&mut self.highlighted_result, &maps, by, |m| m.map_id.clone());
             }
             None => {}
@@ -539,7 +546,7 @@ impl Search {
                 self.pick(&results[at].map_id, searched);
             }
             Some(SearchView::NpcMaps) => {
-                let maps = self.npc_maps(searched);
+                let maps = self.npc_map_list(searched);
                 let at = highlight_in(&maps, &self.highlighted_result, |m| m.map_id.clone())?;
                 self.pick_destination(&maps[at].map_id, searched);
             }
@@ -584,7 +591,7 @@ impl Search {
                 }
             }
             Some(SearchView::NpcMaps) => {
-                if self.npc_maps(searched).iter().any(|map| map.map_id == id) {
+                if self.npc_map_list(searched).iter().any(|map| map.map_id == id) {
                     self.go_to(id, self.picked_npc.clone(), searched);
                 }
             }
@@ -682,7 +689,7 @@ impl Search {
         let found = self.found(searched);
         let rows = found.rows();
         let results = self.results(searched);
-        let npc_maps = self.npc_maps(searched);
+        let npc_maps = self.npc_map_list(searched);
         let highlighted_result = match self.view {
             Some(SearchView::NpcMaps) => highlight_in(&npc_maps, &self.highlighted_result, |m| m.map_id.clone()),
             _ => highlight_in(&results, &self.highlighted_result, |r| r.map_id.clone()),
@@ -744,6 +751,8 @@ impl Search {
             arrived: target.arrived,
             trip: target.trip.clone(),
             npc: target.npc.clone(),
+            // Once the Map Preview is made (`Minerva::sync_pictured`).
+            npc_marked: false,
         })
     }
 
@@ -756,11 +765,11 @@ impl Search {
     }
 
     /// The picked NPC's map list, nearest first, then by name; none outside that step.
-    fn npc_maps(&self, searched: &Searched) -> Vec<NpcMap> {
+    fn npc_map_list(&self, searched: &Searched) -> Vec<NpcMap> {
         let (Some(picked), Some(set)) = (&self.picked_npc, searched.set) else { return Vec::new() };
         let Some(npc) = set.npc(&picked.id) else { return Vec::new() };
         let distances = searched.here.map(|here| World::of(set, searched.travel).distances_from(here));
-        let mut maps: Vec<NpcMap> = npc_maps(npc, set)
+        let mut maps: Vec<NpcMap> = maps_of(npc, set)
             .into_iter()
             .map(|map| {
                 let (distance, travel) = match &distances {
@@ -777,8 +786,8 @@ impl Search {
     }
 
     /// Everything the query matches, whatever the case, each kind best first: the mobs
-    /// (each once), the maps by their Map Name (Event and Dev maps aside), and the items,
-    /// those that look alike as one. Nothing outside the view's first step, or with
+    /// (each once), the maps by their Map Name (Event and Dev maps aside), the NPCs on any
+    /// other map, and the items, those that look alike as one. Nothing outside the view's first step, or with
     /// nothing typed.
     fn found(&self, searched: &Searched) -> Found {
         let query = self.query.trim().to_lowercase();
@@ -843,7 +852,7 @@ fn npcs_found(set: &MapSet, query: &str) -> Vec<NpcMatch> {
     let mut found: Vec<(Fit, NpcMatch)> = Vec::new();
     for npc in set.npcs() {
         let Some(fit) = fit(&npc.name, query) else { continue };
-        let maps = npc_maps(npc, set);
+        let maps = maps_of(npc, set);
         if !maps.is_empty() {
             found.push((fit, NpcMatch { id: npc.id.clone(), name: npc.name.clone(), maps, image: None }));
         }
@@ -855,11 +864,11 @@ fn npcs_found(set: &MapSet, query: &str) -> Vec<NpcMatch> {
 }
 
 /// The maps `npc` stands on, Event and Dev maps aside, by Map Name.
-fn npc_maps(npc: &Npc, set: &MapSet) -> Vec<MapMatch> {
+fn maps_of(npc: &Npc, set: &MapSet) -> Vec<MapMatch> {
     let mut maps: Vec<MapMatch> = npc
         .maps
         .iter()
-        .filter_map(|(id, _)| set.entry(id))
+        .filter_map(|on| set.entry(&on.map_id))
         .filter(|entry| !entry.is_left_out())
         .map(map_match)
         .collect();

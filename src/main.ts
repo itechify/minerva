@@ -203,6 +203,9 @@ const searchTitle = byId("search-title");
 const matchesStep = byId("matches-step");
 const mapsStep = byId("maps-step");
 const npcMapsStep = byId("npc-maps-step");
+const npcSprite = byId("npc-sprite");
+const npcHeadName = byId("npc-head-name");
+const npcHeadMaps = byId("npc-head-maps");
 const npcMapsBox = byId("npc-maps-box");
 const npcMapsTable = byId("npc-maps") as HTMLTableElement;
 const query = byId("query") as HTMLInputElement;
@@ -531,12 +534,8 @@ function renderNavigation(panel: PanelState) {
   // The map, with its way there.
   const map = hunting?.map ?? destination;
   const npc = destination?.npc ?? null;
-  // The NPC is marked on the Map Preview once you're on its map.
-  const npcMarked = !!npc && (panel.mapPreview?.npcSpots.length ?? 0) > 0;
   navigation.hidden = !target;
-  if (!target || !map || !changed("navigation", target, panel.collapsedSections.navigation, panel.mapMarks, npcMarked)) {
-    return;
-  }
+  if (!target || !map || !changed("navigation", target, panel.collapsedSections.navigation, panel.mapMarks)) return;
   foldSection(navigation, navigationToggle, panel.collapsedSections.navigation, true);
   const line = (className: string, ...parts: (Node | string)[]) => {
     const el = document.createElement("span");
@@ -565,11 +564,12 @@ function renderNavigation(panel: PanelState) {
     byId("hunting-density").textContent = density(hunting.map.densityHundredths);
     byId("hunting-share").textContent = `${hunting.map.spawnSharePercent}%`;
   } else if (npc) {
-    // The NPC on the first line, the map they stand on on the next.
+    // The NPC on the first line, the map they stand on on the next, its street under it.
     fillSprite(huntingSprite, npc.image, TARGET_SPRITE);
     huntingTitle.replaceChildren(
       line("hunting-mob", npc.name),
       line("hunting-map", mapMark(panel.mapMarks, map.mark), map.mapName),
+      line("hunting-map destination-street", map.streetName),
     );
     huntingTitle.title = `${npc.name}, on ${map.streetName}: ${map.mapName}`;
   } else {
@@ -604,7 +604,9 @@ function renderNavigation(panel: PanelState) {
   huntingArrival.hidden = !arrived;
   huntingTrip.textContent = trip ? tripLine(trip) : "";
   huntingTrip.hidden = !trip;
-  huntingNpc.textContent = arrived && npc && npcMarked ? `${npc.name} is marked on the Map Preview` : "";
+  // Where the NPC is, once you're on its map: marked, or somewhere OSMS doesn't say.
+  const npcLine = destination?.npcMarked ? "is marked on the Map Preview" : "is on this map; OSMS doesn't say where";
+  huntingNpc.textContent = arrived && npc ? `${npc.name} ${npcLine}` : "";
   huntingNpc.hidden = huntingNpc.textContent === "";
 }
 
@@ -639,6 +641,10 @@ function renderSearchView(panel: PanelState) {
     }
   } else if (view === "npcMaps") {
     searchTitle.textContent = search.pickedNpc?.name ?? "";
+    // The NPC heads its list, as OSMS pictures it.
+    fillSprite(npcSprite, search.pickedNpc?.image ?? null, TARGET_SPRITE);
+    npcHeadName.textContent = search.pickedNpc?.name ?? "";
+    npcHeadMaps.textContent = `stands on ${search.npcMaps.length} maps`;
     renderNpcMaps(search, panel.mapMarks);
     if (opened) npcMapsBox.focus({ preventScroll: true });
   } else {

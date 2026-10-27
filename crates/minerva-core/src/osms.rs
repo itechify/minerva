@@ -76,9 +76,24 @@ pub struct Npc {
     pub name: String,
     /// Its picture's path ([`crate::MapDataSource::picture`]); `None` when OSMS has none.
     pub picture: Option<String>,
-    /// Each map in the map list it stands on, by its ID, with where it stands there in the
-    /// map's picture (in OSMS's order; more than once, it stands in more than one spot).
-    pub maps: Vec<(String, Vec<PicturePoint>)>,
+    /// Each map in the map list it stands on, in OSMS's order.
+    pub maps: Vec<NpcOnMap>,
+}
+
+/// A map an NPC stands on, and where.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NpcOnMap {
+    pub map_id: String,
+    /// Each spot it stands at in the map's picture, in OSMS's order: more than one when it
+    /// stands in more than one, none when OSMS doesn't place it.
+    pub spots: Vec<PicturePoint>,
+}
+
+impl Npc {
+    /// Where it stands on map `map_id`; `None` when it doesn't stand there.
+    pub(crate) fn spots_on(&self, map_id: &str) -> Option<&[PicturePoint]> {
+        self.maps.iter().find(|on| on.map_id == map_id).map(|on| on.spots.as_slice())
+    }
 }
 
 /// Every map's data from OSMS's file set: the map list, each listed map's figures, and
@@ -258,7 +273,7 @@ fn read_set(files: &OsmsFiles, overrides: &[PortalOverride]) -> Result<MapSet, S
                         at.insert(Npc { id: id.to_string(), name: named.name.trim().to_string(), picture, maps: Vec::new() })
                     }
                 };
-                npc.maps.push((entry.id.clone(), spots));
+                npc.maps.push(NpcOnMap { map_id: entry.id.clone(), spots });
             }
             set.push((entry.clone(), data));
         }

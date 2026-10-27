@@ -10,10 +10,10 @@
 mod common;
 
 use common::items::{ItemWorld, cash, equip, item_world, use_item};
-use common::world::{SEARCH, WorldMap, map, mob, orange, world, on_sunset_sky_from, stops};
+use common::world::{SEARCH, WorldMap, destination, highlighted_match as highlighted, map, mob, orange, world, on_sunset_sky_from, stops, typed};
 use common::{ItemSetAnswer, arrive, tracking_with, SUNSET_SAMPLE, KERNING_SAMPLE, overlaps};
 use minerva_core::{
-    Action, Minerva, Destination, Distance, ItemCardView, ItemsMissing, PanelSizes, PanelState, ScreenRect, SearchView,
+    Action, Minerva, Distance, ItemCardView, ItemsMissing, PanelSizes, PanelState, ScreenRect, SearchView,
     Size, Step,
 };
 use std::task::Poll;
@@ -42,14 +42,6 @@ fn mushroom_items() -> ItemWorld {
 /// A core over `maps` and `items`, both in, with the player arrived on Sunset Sky.
 fn on_sunset_sky(maps: Vec<WorldMap>, items: ItemWorld) -> Minerva {
     on_sunset_sky_from(world(maps).with_items(items))
-}
-
-/// The search view open with `query` typed.
-fn typed(minerva: &mut Minerva, query: &str) -> PanelState {
-    minerva.act(Action::SearchEscape);
-    minerva.act(Action::SearchEscape);
-    minerva.on_hotkey(SEARCH);
-    minerva.search_query(query).clone()
 }
 
 fn mobs(state: &PanelState) -> Vec<&str> {
@@ -194,20 +186,6 @@ fn items_arriving_while_the_search_view_is_open_are_matched_at_once() {
     assert_eq!(items(&state), ["Mushroom Hat (Hat)", "Mushroom Stew (Use)"]);
 }
 
-/// What the highlight is on, as "kind: name".
-fn highlighted(state: &PanelState) -> Option<String> {
-    let search = &state.search;
-    let at = search.highlighted?;
-    let (mobs, maps) = (search.mobs.shown.len(), search.maps.shown.len());
-    Some(if at < mobs {
-        format!("mob: {}", search.mobs.shown[at].mob.name)
-    } else if at < mobs + maps {
-        format!("map: {}", search.maps.shown[at - mobs].map_name)
-    } else {
-        format!("item: {}", search.items.shown[at - mobs - maps].name)
-    })
-}
-
 #[test]
 fn the_highlight_starts_on_the_first_match_and_goes_through_the_mobs_then_the_maps_then_the_items() {
     let mut minerva = on_sunset_sky(mushroom_roads(), mushroom_items());
@@ -242,10 +220,6 @@ fn a_new_query_starts_the_highlight_at_the_top_again() {
     let state = minerva.search_query("mushroo").clone();
 
     assert_eq!(highlighted(&state).as_deref(), Some("mob: Orange Mushroom"));
-}
-
-fn destination(state: &PanelState) -> &Destination {
-    state.search.destination.as_ref().expect("a Destination")
 }
 
 /// The Destination's route, as its map names with how each is reached.

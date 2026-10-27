@@ -1639,6 +1639,33 @@ td:first-child {
   line-height: 17px;
 }
 
+/* The NPC whose maps are listed, as the Navigation section leads with a target. */
+.npc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.npc-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+.npc-head-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--ink);
+}
+
 .panel .arrival-npc,
 .panel .arrival-trip {
   grid-column: 2;
