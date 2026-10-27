@@ -1,5 +1,6 @@
 // The Worker's tests (`pnpm site:test`), run in workerd against a local D1 with the
-// migrations applied, a made-up ceilings table, a made-up maintainer token and a made-up Discord application.
+// migrations applied, a made-up ceilings table, a made-up maintainer token, a made-up Discord
+// application and a made-up ClassicRank.
 import path from "node:path";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
@@ -11,7 +12,7 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: path.join(import.meta.dirname, "../wrangler.jsonc") },
         miniflare: {
-          // A second database, for the test that runs migration 0004 on rows from before it.
+          // A second database, for the test that runs migration 0005 on rows from before it.
           d1Databases: ["OLD_DB"],
           bindings: {
             TEST_MIGRATIONS: migrations,
@@ -24,6 +25,9 @@ export default defineConfig(async () => {
             DISCORD_CLIENT_ID: "made-up-client",
             DISCORD_CLIENT_SECRET: "made-up-client-secret",
             MAINTAINER_DISCORD_IDS: "900000000000000001",
+            // A made-up ClassicRank key. The tests take the Worker's asks of ClassicRank off the
+            // global fetch and answer them from a made-up ClassicRank (test/classicrank.ts).
+            CLASSICRANK_KEY: "crk_made-up-key",
             // A made-up ceilings table, in place of osms-ceilings.json: test/api.ts's maps, and
             // test/where-to-train.test.ts's, with a made-up Map Mark that test/latest.test.ts and
             // test/announce.test.ts show on 100000060.
@@ -42,6 +46,6 @@ export default defineConfig(async () => {
       }),
     ],
     // Run from the repo root with --config, Vite's root would be the whole repo.
-    test: { root: import.meta.dirname, setupFiles: [path.join(import.meta.dirname, "test/apply-migrations.ts")] },
+    test: { root: import.meta.dirname, setupFiles: [path.join(import.meta.dirname, "test/apply-migrations.ts"), path.join(import.meta.dirname, "test/classicrank.ts")] },
   };
 });

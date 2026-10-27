@@ -15,6 +15,7 @@ import {
   type Kind,
   type LatestAnswer,
   type MapMark,
+  type PortraitAnswer,
   type Ranked,
   type TrainingAnswer,
 } from "../entries.ts";
@@ -31,6 +32,20 @@ export type { JobClass } from "../jobs.ts";
 
 /** A place in a band's top 3, crowned in gold, silver or bronze. */
 export type Medal = 1 | 2 | 3;
+
+/** A Character's portrait as the pages show it beside their name (ADR 0029): their photo on
+ *  ClassicRank; `"none"`, the question-mark figure, once ClassicRank has been asked and has no
+ *  photo of them or doesn't show them; or `"waiting"`, the same figure, until it's been
+ *  asked. */
+export type PortraitSlot = { photo: string } | "none" | "waiting";
+
+/** A Character's portrait from the API's answer; `null`, none at all, while the API gives
+ *  none (the Worker has no ClassicRank key). */
+export function portraitSlot(answer: PortraitAnswer | undefined): PortraitSlot | null {
+  if (answer === undefined) return null;
+  if (answer === null) return "waiting";
+  return answer.photo === null ? "none" : { photo: answer.photo };
+}
 
 /** The crown an entry at `rank` wears: gold for #1, silver for #2, bronze for #3; none
  *  past them. */
@@ -352,6 +367,8 @@ export interface Row {
   party: boolean;
   /** How far along its lane the EXP/h runs, from 0 to 1: the band's #1 runs it full. */
   lane: number;
+  /** The Character's portrait, before their name; `null` for none at all. */
+  portrait: PortraitSlot | null;
 }
 
 /** A band's table: its rows, the linked Character's under them when it's outside them (after
@@ -369,6 +386,8 @@ export interface BandTable {
   empty: Said | null;
   /** The lanes' ruler: 0, then each round step up to #1's EXP/h; none with no rows. */
   ruler: RulerStep[];
+  /** Whether its rows show portraits, so the page credits ClassicRank under the table. */
+  portraits: boolean;
 }
 
 /** A step on a band's ruler: how far along the lanes it falls, and its figure ("50k"). */
@@ -416,6 +435,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date, ki
       you: entry.rank === yours?.rank,
       party: entry.party,
       lane: Math.min(1, entry.expPerHour / top),
+      portrait: portraitSlot(entry.portrait),
     };
   };
   const rows = answer.entries.map(row);
@@ -440,6 +460,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date, ki
     caption,
     empty: rows.length === 0 ? { text: `No one at ${at} has put a ${kindWord(kind)}best on this map yet.`, link: PUT_YOURS } : null,
     ruler: rows.length === 0 ? [] : rulerTo(top),
+    portraits: [...answer.entries, ...(yours === null ? [] : [yours])].some((e) => e.portrait !== undefined),
   };
 }
 

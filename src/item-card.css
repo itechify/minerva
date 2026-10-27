@@ -118,9 +118,10 @@
 }
 
 /* The Market Lines, under a rule: the heading, "Market" with the light buttons that add a
-   line and look the item up on MesoWatch at its right; then a row per line, its name at
-   the left and the item's price on it right-aligned, as the figures above. Each is a link:
-   the name opens its name field, the price (or "Not set") its price field. */
+   line and look the item up on maplestory.market at its right; then a row per line, its
+   name at the left and the item's price on it right-aligned, as the figures above. Each is
+   a link: the name opens its name field, the price (or "Not set") its price field. At the
+   foot, the look-up again in words. */
 .item-card-market {
   display: flex;
   flex-direction: column;
@@ -328,6 +329,25 @@
 .item-card-hint {
   margin: 0;
   color: var(--ink-2);
+}
+
+/* The look-up at the market section's foot: set as a hint, one link, the site's name in
+   Portal Blue at rest so it reads as one (it will carry maplestory.market's credit). Under
+   the pointer it is all Portal Blue and underlined; pressed, all Frame Navy. */
+.item-card-market-foot {
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--ink-2);
+}
+
+.item-card-market-foot .site {
+  color: var(--portal);
+}
+
+.item-card-market-foot:active .site {
+  color: inherit;
 }
 
 .item-card-choices {

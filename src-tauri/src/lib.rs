@@ -185,8 +185,9 @@ pub(crate) enum Command {
     PickCardItem(String),
     /// The player clicked the Item Card's name: open the item's MeowDB page.
     OpenCardMeowdbPage,
-    /// The player clicked the Item Card's MesoWatch button: open MesoWatch.
-    OpenCardMesowatch,
+    /// The player clicked one of the Item Card's buttons that look the item up on
+    /// maplestory.market: open the item's page there.
+    OpenCardMarket,
     /// The player clicked the price on the Item Card's Market Line with this ID.
     EditCardMarketPrice(String),
     /// The player pressed Enter in the Item Card's price field, holding this.
@@ -434,7 +435,7 @@ pub fn run() {
             item_card::item_card_close,
             item_card::item_card_pick,
             item_card::item_card_open_meowdb,
-            item_card::item_card_open_mesowatch,
+            item_card::item_card_open_market,
             item_card::item_card_edit_market,
             item_card::item_card_enter_market,
             item_card::item_card_edit_market_line,
@@ -933,8 +934,8 @@ fn core_loop(
             Ok(Command::ChooseDealLine(line)) => {
                 minerva.choose_deal_line(&line);
             }
-            Ok(Command::OpenCardMesowatch) => {
-                let request = minerva.open_card_mesowatch();
+            Ok(Command::OpenCardMarket) => {
+                let request = minerva.open_card_market();
                 carry_out(&app, &window.overlay, &mut panels, &reader, &mut minerva, request);
             }
             Ok(Command::Height(label, height)) => match label.as_str() {

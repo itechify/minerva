@@ -5,6 +5,7 @@ import { type CharacterAnswer, type CharacterEntry, isName } from "../entries";
 import { ceilingsOf, markOf } from "./ceilings";
 import { type Answer, badRequest } from "./http";
 import { isParty } from "./kinds";
+import { PORTRAIT_COLUMNS, PORTRAIT_JOIN, type PortraitColumns, portraitIn } from "./portraits";
 
 /** What a name with no entries reads as, whatever the reason: never uploaded, opted out, or
  *  every entry taken down. The page tells none of them apart, so neither does this. */
@@ -20,11 +21,11 @@ export async function readCharacterPage(env: Env, name: string): Promise<Answer>
                                    ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank,
                 COUNT(*) OVER (PARTITION BY e.map_id, e.band, e.party) AS total
          FROM entries e JOIN places p ON p.map_id = e.map_id AND p.band = e.band)
-     SELECT r.*, c.name FROM ranked r JOIN characters c USING (name_key)
+     SELECT r.*, c.name, ${PORTRAIT_COLUMNS} FROM ranked r JOIN characters c USING (name_key) ${PORTRAIT_JOIN}
      WHERE r.name_key = ?1 ORDER BY r.band DESC, r.exp_per_hour DESC, r.map_id, r.party`,
   )
     .bind(name.toLowerCase())
-    .all<{
+    .all<PortraitColumns & {
       name: string;
       map_id: string;
       band: number;
@@ -51,6 +52,6 @@ export async function readCharacterPage(env: Env, name: string): Promise<Answer>
     mobs: table[r.map_id]?.mobs ?? null,
     mark: markOf(env, r.map_id),
   }));
-  const answer: CharacterAnswer = { name: rows.results[0].name, entries };
+  const answer: CharacterAnswer = { name: rows.results[0].name, entries, ...portraitIn(env, rows.results[0]) };
   return { status: 200, body: answer };
 }

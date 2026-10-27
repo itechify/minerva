@@ -5,7 +5,7 @@
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import { STAR } from "../star.ts";
-import { byId, characterLink, crown, drawKindLinks, jobWithIcon, names, partyMark, read, said as saidWith, unreachable } from "./api.ts";
+import { BAND_PORTRAIT, byId, characterLink, crown, drawKindLinks, jobWithIcon, names, partyMark, portraitImage, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
@@ -179,10 +179,12 @@ function drawBand(band: BandAnswer, morph: Map<string, string> | null, grow: boo
   shown = table.yours === null ? table.rows : [...table.rows, table.yours];
   if (table.empty !== null) {
     byId("table").hidden = true;
+    byId("credit").hidden = true;
     rows.replaceChildren();
     return say(table.empty);
   }
   said.hidden = true;
+  byId("table").classList.toggle("lb-faces", table.portraits);
   byId("caption").textContent = table.caption ?? "";
   drawRuler(table.ruler);
   const at = { place: place!, band: band.band, ruler: table.ruler, morph };
@@ -195,6 +197,7 @@ function drawBand(band: BandAnswer, morph: Map<string, string> | null, grow: boo
   rows.classList.toggle("lb-grow", grow);
   rovingReports(rows);
   byId("table").hidden = false;
+  byId("credit").hidden = !table.portraits;
 }
 
 /** The band choices, each a link to its band on the page, the open one marked. The links
@@ -372,7 +375,8 @@ function lineRow(className: string, text: string): HTMLTableRowElement {
   tr.setAttribute("role", "row");
   const cell = make("td", "", text);
   cell.setAttribute("role", "cell");
-  cell.colSpan = 8;
+  // Across the portraits' column too, while the band has one.
+  cell.colSpan = byId("table").classList.contains("lb-faces") ? 9 : 8;
   tr.append(cell);
   return tr;
 }
@@ -426,11 +430,11 @@ interface RowsAt {
   morph: Map<string, string> | null;
 }
 
-/** An entry's row: its rank (crowned in the top 3), name (a link to the Character's page), job
- *  (beside its class's icon), level, EXP/h, lane, date (under the pointer, with a mouse) and
- *  Report's flag; or, for the linked Character's, the You Yellow star before the name and no
- *  Report (the player takes their own entries off from Minerva). A row that slides in a
- *  switch takes its Character's name for it. */
+/** An entry's row: its rank (crowned in the top 3), the Character's portrait (ADR 0029), name
+ *  (a link to the Character's page), job (beside its class's icon), level, EXP/h, lane, date
+ *  (under the pointer, with a mouse) and Report's flag; or, for the linked Character's, the
+ *  You Yellow star before the name and no Report (the player takes their own entries off from
+ *  Minerva). A row that slides in a switch takes its Character's name for it. */
 function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowElement {
   const tr = make("tr", row.you ? "lb-you" : "");
   tr.setAttribute("role", "row");
@@ -446,6 +450,14 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   if (row.you) name.append(star());
   name.append(characterLink(row.name, row.nameHref));
   if (row.party) name.append(partyMark());
+  // On a phone, a band with portraits writes the job and level under the name, in place of
+  // their columns: the class's icon kept with the job's first word, and the level whole.
+  if (row.portrait !== null) {
+    const [first, ...rest] = row.job.split(" ");
+    const job = make("span", "lb-name-job");
+    job.append(jobWithIcon(first, row.jobClass, "", false), ...rest.map((word) => ` ${word}`), " ", make("span", "lb-name-level", `Lv ${row.level}`));
+    name.append(job);
+  }
   const reportCell = make("td", "lb-report");
   if (!row.you) {
     const report = make("button", "lb-report-button");
@@ -468,7 +480,17 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   exp.append(lane(row, "lb-lane-track lb-under"));
   const figures = [exp, make("td", "lb-date", row.date), reportCell];
   for (const cell of [...cells, ...figures]) cell.setAttribute("role", "cell");
-  tr.append(cells[0], name, cells[1], cells[2], figures[0], laneCell(row, ruler), figures[1], figures[2]);
+  tr.append(cells[0]);
+  // The portrait has a column of its own, before the name, as long as the band shows them.
+  if (row.portrait !== null) {
+    // Decoration, as its header is: assistive tech counts no cell for it, so each figure
+    // stays under its own header.
+    const face = make("td", "lb-face");
+    face.setAttribute("aria-hidden", "true");
+    face.append(portraitImage(row.portrait, BAND_PORTRAIT));
+    tr.append(face);
+  }
+  tr.append(name, cells[1], cells[2], figures[0], laneCell(row, ruler), figures[1], figures[2]);
   return tr;
 }
 

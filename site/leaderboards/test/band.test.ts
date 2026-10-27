@@ -20,8 +20,8 @@ describe("a Level Band", () => {
 
     // A Party Best's entry carries the party mark.
     expect(table.rows).toEqual([
-      { rank: "1", medal: 1, name: "Egbert", nameHref: "/character/?name=Egbert", job: "Magician", jobClass: "magician", level: "23", expPerHour: "153,000", date: "3 Oct", you: false, party: true, lane: expect.any(Number) },
-      { rank: "2", medal: 2, name: "Ada", nameHref: "/character/?name=Ada", job: "Bowman", jobClass: "bowman", level: "29", expPerHour: "66,600", date: "30 Dec 2025", you: false, party: false, lane: expect.any(Number) },
+      { rank: "1", medal: 1, name: "Egbert", nameHref: "/character/?name=Egbert", job: "Magician", jobClass: "magician", level: "23", expPerHour: "153,000", date: "3 Oct", you: false, party: true, lane: expect.any(Number), portrait: null },
+      { rank: "2", medal: 2, name: "Ada", nameHref: "/character/?name=Ada", job: "Bowman", jobClass: "bowman", level: "29", expPerHour: "66,600", date: "30 Dec 2025", you: false, party: false, lane: expect.any(Number), portrait: null },
     ]);
     expect(table.yours).toBe(null);
     expect(table.gap).toBe(null);
@@ -93,6 +93,7 @@ describe("a Level Band", () => {
       you: true,
       party: false,
       lane: expect.any(Number),
+      portrait: null,
     });
     expect(table.note).toBe("Egbert is #57 of 63 at Lv 20–29.");
   });
@@ -126,6 +127,7 @@ describe("a Level Band", () => {
         link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
       },
       ruler: [],
+      portraits: false,
     });
     expect(bandTable(answer([]), "Egbert", NOW).note).toBe("Egbert has no entry here at Lv 20–29.");
   });

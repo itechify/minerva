@@ -1,15 +1,15 @@
-// Migration 0004 gives every row from before party entries the kind of a best with no known
+// Migration 0005 gives every row from before party entries the kind of a best with no known
 // kind: Party (ADR 0015, ADR 0026). It runs here on a second database that has only 0001 to
-// 0003 applied and rows in them, as production has.
+// 0004 applied and rows in them, as production has.
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-describe("migration 0004", () => {
+describe("migration 0005", () => {
   it("marks every row from before it Party, in each table that has a kind", async () => {
     const db = env.OLD_DB;
-    const before = env.TEST_MIGRATIONS.filter((m) => !m.name.startsWith("0004"));
-    const party = env.TEST_MIGRATIONS.filter((m) => m.name.startsWith("0004"));
+    const before = env.TEST_MIGRATIONS.filter((m) => !m.name.startsWith("0005"));
+    const party = env.TEST_MIGRATIONS.filter((m) => m.name.startsWith("0005"));
     expect([before.length, party.length]).toEqual([env.TEST_MIGRATIONS.length - 1, 1]);
     await applyD1Migrations(db, before);
 

@@ -3,7 +3,7 @@
 //! the Item Tooltip reader reads the item's name, and the card shows at the pointer what
 //! the game's tooltip doesn't: what a shop pays for the item, and the market prices the
 //! player keeps for it on their Market Lines (ADR 0011), with links to its MeowDB page and
-//! to MesoWatch's market prices. The name is matched against OSMS's items on the player's
+//! to its page on maplestory.market, the market's listings and prices. The name is matched against OSMS's items on the player's
 //! machine: nothing is asked at the press.
 //!
 //! The player can also find an item in Search: its card then shows beside the panel.
@@ -35,13 +35,15 @@ pub enum ShopPrice {
 }
 
 /// The Item Card's credit (ADR 0010): its data is OSMS Data Explorer's, its name opens
-/// NiaMeowDB's page and the button on its market heading MesoWatch.
-pub const ITEM_CARD_CREDIT: &str = "Data: OSMS Data Explorer · Pages: NiaMeowDB, MesoWatch";
+/// NiaMeowDB's page and its market section the item's page on maplestory.market.
+pub const ITEM_CARD_CREDIT: &str = "Data: OSMS Data Explorer · Pages: NiaMeowDB, maplestory.market";
 
-/// MesoWatch, the market prices players see in Free Market shops: the button on the card's
-/// market heading opens it in the player's browser. It has no page per item, and its terms forbid collecting its
-/// prices, so the player looks the item up there themselves.
-pub const MESOWATCH_URL: &str = "https://meso.watch/";
+/// The item's page on maplestory.market, the listings in the Free Market's stores and the
+/// prices they sell at: the market section's buttons open it in the player's browser. Its
+/// address takes the game's item ID as a number, without the leading zeros the game writes.
+pub fn market_page(id: &str) -> String {
+    format!("https://maplestory.market/items/{}", id.trim_start_matches('0'))
+}
 
 /// One of the card's Market Lines, with the price the player keeps on it for the item.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

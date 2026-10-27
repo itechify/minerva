@@ -76,12 +76,16 @@
                  Report has focus it names the keys between them, one Tab stop for them all.
                  Each entry's lane draws its EXP/h again, so it's hidden from assistive tech,
                  header and cells alike. -->
+            <!-- On a phone too narrow for a band with portraits, it scrolls sideways in here. -->
+            <div class="lb-table-box">
             <table class="lb-table" id="table" role="table" hidden>
               <caption class="lb-caption"><span id="caption"></span><span class="lb-keys" aria-hidden="true"> · ↑ and ↓ move between Reports</span></caption>
               <thead role="rowgroup">
                 <tr role="row">
                   <th scope="col" role="columnheader" class="lb-rank">Rank</th>
-                  <th scope="col" role="columnheader" class="lb-name">Character</th>
+                  <!-- The portraits' column (ADR 0029), shown while the band has them. -->
+                  <th scope="col" class="lb-face" aria-hidden="true"></th>
+                  <th scope="col" role="columnheader" class="lb-name">Character<span class="lb-name-and-job"> Job</span></th>
                   <th scope="col" role="columnheader" class="lb-job">Job</th>
                   <th scope="col" role="columnheader" class="lb-level">Level</th>
                   <th scope="col" role="columnheader" class="lb-exp">EXP/h</th>
@@ -92,6 +96,9 @@
               </thead>
               <tbody id="rows" role="rowgroup"></tbody>
             </table>
+            </div>
+            <!-- ClassicRank asks for a visible link wherever its portraits show (ADR 0029). -->
+            <p class="lb-credit" id="credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
             <p id="report-keys" hidden>The up and down arrow keys move between the table's Report buttons.</p>
             <!-- Says which band a click on a Level Band opened, as the page doesn't reload. -->
             <p class="sr-only" id="switched" aria-live="polite"></p>

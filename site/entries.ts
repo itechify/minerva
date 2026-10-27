@@ -18,6 +18,19 @@ export function isMap(map: string): boolean {
  *  each Character's higher entry. */
 export type Kind = "solo" | "party";
 
+/** A Character's portrait from ClassicRank (ADR 0029), as the Worker last found it there: its
+ *  photo (a PNG on classicrank.com) and its ClassicRank profile, each `null` when ClassicRank
+ *  has none. Both `null`, ClassicRank doesn't know the Character, or hides them. */
+export interface Portrait {
+  photo: string | null;
+  profile: string | null;
+}
+
+/** A Character's portrait in an answer: `null` until the Worker has asked ClassicRank for it.
+ *  Every answer that has a Character leaves it out while portraits are off (the Worker has no
+ *  ClassicRank key), and the pages then show no portrait at all. */
+export type PortraitAnswer = Portrait | null;
+
 /** An entry in a Level Band, with its rank there. */
 export interface Ranked {
   rank: number;
@@ -29,6 +42,7 @@ export interface Ranked {
   setAt: number;
   /** It is the Character's Party Best, not its Solo Best. */
   party: boolean;
+  portrait?: PortraitAnswer;
 }
 
 /** GET /api/maps/<map>/bands/<band>?name=<name>&kind=<kind>: the band's top 50, and the named
@@ -140,4 +154,5 @@ export interface CharacterEntry {
 export interface CharacterAnswer {
   name: string;
   entries: CharacterEntry[];
+  portrait?: PortraitAnswer;
 }

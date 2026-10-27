@@ -10,7 +10,7 @@ Minerva still reads no market prices of its own: ADR 0010's test for a source st
 
 ## On the card
 
-- The market section is a heading, "Market", with two buttons: a + that adds a line, and MesoWatch's (ADR 0010), which used to sit beside the one price. Under it, a row per line.
+- The market section is a heading, "Market", with two buttons: a + that adds a line, and MesoWatch's (ADR 0010), which used to sit beside the one price. (ADR 0010's amendment makes it maplestory.market's, and adds the look-up in words at the section's foot.) Under it, a row per line.
 - A click on a line's price, or its "Not set", opens its price field, which works as ADR 0010's did: typed as players write prices, Enter keeps it dated by the wall clock, an empty field forgets it, Esc leaves it.
 - A click on a line's name opens its name field, to rename the line, or to remove it with the bin button beside the field. The + opens the same field as a new row at the end. A name needs more than spaces, and no two lines share one, whatever their case: the field stays open saying so. A name field left empty closes as it was.
 - Removing a line asks first, in the line's place, saying how many items' prices go with it ("Remove “Typical” and its prices on 312 items?"), with Remove and Keep. A line can hold hundreds of prices, and they don't come back.
