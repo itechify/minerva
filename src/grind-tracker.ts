@@ -19,8 +19,6 @@ type TrackerView = {
   lootOpen: boolean;
 };
 
-/** How many Items the open Loot section lists before "+N more". */
-const TOP_ITEMS = 5;
 
 const panelEl = byId("panel");
 const openBests = byId("open-bests");
@@ -43,7 +41,7 @@ const sessionExp = byId("session-exp");
 const sessionPercent = byId("session-percent");
 const bestRow = byId("best-row");
 const bestExp = byId("best-exp");
-const bestThisVisit = byId("best-this-visit");
+const bestLink = document.querySelector<HTMLButtonElement>("#best-row .best-link")!;
 const mesoTotal = byId("meso-total");
 const mesoRate = byId("meso-rate");
 const pickupCovered = byId("tracking-pickup-covered");
@@ -53,13 +51,6 @@ const lootHead = byId("loot-head");
 const lootBody = byId("loot-body");
 const lootCount = byId("loot-count");
 const lootItems = byId("loot-items");
-const lootMore = byId("loot-more");
-/** "+N more" opened the rest of the Items: for this window only, not kept. */
-let allItems = false;
-lootMore.addEventListener("click", () => {
-  allItems = !allItems;
-  if (shown) render(shown);
-});
 const deaths = byId("tracking-deaths");
 const exp = byId("tracking-exp");
 const expFigures = byId("exp-figures");
@@ -105,8 +96,8 @@ function noTimeToLevel(rolling: ExpRate | null) {
 }
 
 /** The Loot section, once the Session has started: collapsed, its totals on the header ("1,593
- *  mesos 28 items", a part left out while it is none); open, the Mesos row, then the 5 Items
- *  picked up most with their counts, and "+N more" for the rest. */
+ *  mesos 28 items", a part left out while it is none); open, "(Estimate)" by the label, the
+ *  Mesos row, then every Item with its count, the most picked up first, in a list that scrolls. */
 function renderLoot(l: Loot, open: boolean, started: boolean) {
   loot.hidden = !started;
   lootHead.setAttribute("aria-expanded", String(open));
@@ -117,17 +108,13 @@ function renderLoot(l: Loot, open: boolean, started: boolean) {
   mesoTotal.textContent = whole(l.mesos);
   mesoRate.textContent = l.mesosPerHour === null ? "–" : rate(l.mesosPerHour);
   lootItems.hidden = l.items.length === 0;
-  const shownItems = allItems ? l.items : l.items.slice(0, TOP_ITEMS);
   lootItems.replaceChildren(
-    ...shownItems.map((item) => {
+    ...l.items.map((item) => {
       const row = document.createElement("li");
       row.append(span("name", item.name), span("tally", whole(item.count)));
       return row;
     }),
   );
-  const rest = l.items.length - TOP_ITEMS;
-  lootMore.hidden = rest <= 0;
-  lootMore.textContent = allItems ? "Show fewer" : `+${rest} more`;
 }
 
 /** One of the Loot header's totals: its figure in Panel Ink, then its word as the label's; none
@@ -153,8 +140,8 @@ function render(view: TrackerView) {
   openBests.setAttribute("aria-pressed", String(personalBestsOpen));
   const started = t.rolling !== null || t.state === "warmingUp" || t.state === "active" || t.state === "paused";
   tracking.dataset.state = t.state;
-  // Rates still settling, held while paused, or the bar out of sight: the figures step back.
-  tracking.classList.toggle("held", t.state !== "active");
+  // Rates still settling in the first minute: the EXP figures step back to the light weight.
+  tracking.classList.toggle("warming", t.state === "warmingUp");
 
   unreadable.hidden = t.state !== "unreadable";
   const why = t.noStatusBar
@@ -193,7 +180,7 @@ function render(view: TrackerView) {
   // Visit set it.
   bestRow.hidden = t.personalBest === null;
   bestExp.textContent = t.personalBest === null ? "" : rate(t.personalBest);
-  bestThisVisit.hidden = !t.personalBestThisVisit;
+  bestLink.textContent = t.personalBestThisVisit ? "Visit best" : "Best";
   // Racing the Party Best, while Party EXP is in the last 5 minutes: a small party mark.
   bestParty.toggleAttribute("hidden", !t.personalBestParty);
   // The EXP Split, once Party EXP has come in this Session: the shares, on hovering the

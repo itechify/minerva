@@ -155,7 +155,7 @@ The last 5 minutes of active play drawn kill by kill on the Grind Tracker, raced
 _Avoid_: graph, chart, sparkline
 
 **Personal Best**:
-The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in their Visit History of the map, or the Visit under way's once it beats that. Each is stamped with the Character, level and job the Status Bar showed at the refresh that set it. The Grind Tracker's Best row shows the Character playing's (the Unassigned one while no name is read) as it stands, from arriving on the map and from the refresh that sets a new one, saying "this visit" while the Visit under way set it; a star marks the Rolling Rate while it is that best (ADR 0018). A map has two, its Solo Best and its Party Best.
+The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in their Visit History of the map, or the Visit under way's once it beats that. Each is stamped with the Character, level and job the Status Bar showed at the refresh that set it. The Grind Tracker's Best row shows the Character playing's (the Unassigned one while no name is read) as it stands, from arriving on the map and from the refresh that sets a new one, labelled "Visit best" while the Visit under way set it; a star marks the Rolling Rate while it is that best (ADR 0018). A map has two, its Solo Best and its Party Best.
 _Avoid_: record, high score, PB, max
 
 **Solo Best**:

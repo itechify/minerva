@@ -250,8 +250,7 @@
   color: var(--ink-2);
 }
 
-.loot-head,
-.loot-more {
+.loot-head {
   all: unset;
   cursor: pointer;
   white-space: nowrap;
@@ -263,21 +262,18 @@
   gap: 4px;
 }
 
-.loot-head:hover .label,
-.loot-more:hover {
+.loot-head:hover .label {
   color: var(--portal);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
 
-.loot-head:active .label,
-.loot-more:active {
+.loot-head:active .label {
   color: var(--frame);
 }
 
-.loot-head:focus-visible,
-.loot-more:focus-visible {
+.loot-head:focus-visible {
   outline: 2px solid var(--edit);
   outline-offset: 2px;
   border-radius: 2px;
@@ -299,6 +295,15 @@
   transform: rotate(90deg);
 }
 
+/* Open, "(Estimate)" beside the label: the Pickup Log can miss pickups, never add one. */
+.loot .estimate {
+  color: var(--ink-3);
+}
+
+.loot:not(.open) .estimate {
+  display: none;
+}
+
 .loot .count .figure {
   font-size: 13px;
   font-weight: 700;
@@ -309,10 +314,14 @@
   padding-left: 13px;
 }
 
+/* Every Item picked up, the most first, in a list five rows tall that scrolls past that. */
 .loot-items {
   margin: 0;
   padding: 0 0 0 13px;
   list-style: none;
+  max-height: calc(5 * 17px);
+  overflow-y: auto;
+  scrollbar-color: var(--select-edge) transparent;
 }
 
 .loot-items li {
@@ -332,11 +341,6 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
-}
-
-.loot-more {
-  display: block;
-  padding-left: 13px;
 }
 
 /* The Pace Trace, under the rates it draws: a race with the 5 minutes before, as split
@@ -436,12 +440,12 @@
   color: var(--ink-2);
 }
 
-/* Rates still settling, held while paused, or held while the bar can't be read (the note
-   above says why): the figures show in the light weight, a step back from the bold they
-   stand in when they move. Never faded: they stay as legible as ever. The Best row's
-   figure doesn't move, so it stays bold. */
-.tracking.held .time-to-level,
-.tracking.held .rates .row:not(.best) .value {
+/* Rates still settling, in the first minute: the EXP figures show in the light weight, a
+   step back from the bold they stand in once settled. Never faded: they stay as legible as
+   ever. Paused or unreadable, they stay bold: the "paused" tag or the note above says so.
+   The Best row's figure and the Loot's never step back. */
+.tracking.warming .time-to-level,
+.tracking.warming .rates:not(#meso-rates) .row:not(.best) .value {
   font-weight: 400;
 }
 
@@ -566,6 +570,6 @@
   right: 0;
 }
 
-.tracking.held .forecast .end {
+.tracking.warming .forecast .end {
   font-weight: 400;
 }
