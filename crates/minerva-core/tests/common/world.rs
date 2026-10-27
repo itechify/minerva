@@ -8,11 +8,12 @@ use minerva_core::{Action, Distance, Minerva, Mob, PanelState, PortalKind, Route
 /// The search hotkey (the default).
 pub const SEARCH: &str = "ctrl+shift+f";
 
-/// A map in a hand-built world, and the mobs it holds.
+/// A map in a hand-built world, and the mobs and NPCs it holds.
 #[derive(Debug, Clone)]
 pub struct WorldMap {
     pub map: osms::Map,
     pub mobs: Vec<osms::Mob>,
+    pub npcs: Vec<osms::Npc>,
 }
 
 /// A map on Victoria Road, Victoria Island, with this Mob Rate (hundredths) and these
@@ -32,7 +33,7 @@ pub fn map(id: &str, name: &str, mob_rate_percent: u32, mobs: Vec<Mob>) -> World
         .into_iter()
         .map(|mob| osms::mob(mob.id.parse().expect("a mob ID"), &mob.name, mob.level, mob.hp, mob.exp))
         .collect();
-    WorldMap { map, mobs }
+    WorldMap { map, mobs, npcs: Vec::new() }
 }
 
 /// A mob with ID `id`, `spawn_count` of it on the map.
@@ -73,6 +74,13 @@ impl WorldMap {
         to.iter().fold(self, |map, to| map.exit(PortalKind::Visible, to))
     }
 
+    /// The same map with NPC `npc` standing on it at (`x`, `y`) in its picture.
+    pub fn npc(mut self, npc: osms::Npc, x: i64, y: i64) -> Self {
+        self.map = self.map.npc_at(npc.id, x, y);
+        self.npcs.push(npc);
+        self
+    }
+
     /// The same map with map `town` as its nearest town.
     pub fn returning_to(mut self, town: &str) -> Self {
         self.map.return_map = Some(town.parse().expect("a map ID"));
@@ -83,8 +91,9 @@ impl WorldMap {
 /// The OSMS world of these maps, each mob once.
 pub fn osms_world(maps: Vec<WorldMap>) -> osms::World {
     let mut world = osms::world(Vec::new(), Vec::new());
-    for WorldMap { map, mobs } in maps {
+    for WorldMap { map, mobs, npcs } in maps {
         world = mobs.into_iter().fold(world.with(map), osms::World::with_mob);
+        world = npcs.into_iter().fold(world, osms::World::with_npc);
     }
     world
 }

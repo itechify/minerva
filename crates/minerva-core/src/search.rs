@@ -7,7 +7,8 @@ use crate::OSMS_ONLY_CREDIT;
 use crate::item_card::{ShopPrice, icon_path, item_id};
 use crate::map_data::Mob;
 use crate::map_index::MapEntry;
-use crate::osms::MapSet;
+use crate::map_preview::PicturePoint;
+use crate::osms::{MapSet, Npc};
 use crate::osms_items::ItemSet;
 use crate::world::{Distance, Distances, Step, Travel, World};
 use serde::Serialize;
@@ -26,6 +27,8 @@ pub enum SearchView {
     Matches,
     /// The picked mob's ranked map list, to pick the Hunting Target's map from.
     Maps,
+    /// The picked NPC's maps, nearest first, to pick the Destination from.
+    NpcMaps,
 }
 
 /// The mob and map the player picked to go and hunt, with the map's figures and the way
@@ -71,6 +74,38 @@ pub struct Destination {
     /// The way there as it stood when the player picked it; `None` when they picked the
     /// map they were on, or no route led there.
     pub trip: Option<Trip>,
+    /// The NPC the player picked the map for, who stands on it; `None` for a map picked as
+    /// itself.
+    pub npc: Option<NpcChoice>,
+}
+
+/// A map the picked NPC stands on, in its map list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcMap {
+    pub map_id: String,
+    pub street_name: String,
+    pub map_name: String,
+    /// The map's Map Mark, by OSMS's name for it (see [`crate::PanelState::map_marks`]);
+    /// `None` for a map without one.
+    pub mark: Option<String>,
+    /// How many map changes it is from the map the panel shows.
+    pub distance: Distance,
+    /// The kinds of travel besides portals the route there takes, each once, in route
+    /// order, as [`SearchResult::travel`].
+    pub travel: Vec<Step>,
+}
+
+/// An NPC the player picked, to go to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcChoice {
+    /// The NPC's ID, OSMS's.
+    pub id: String,
+    pub name: String,
+    /// Where the overlay loads OSMS's picture of the NPC from; `None` until it's in, if it
+    /// can't be had, or if OSMS has none.
+    pub image: Option<String>,
 }
 
 /// The way to a Hunting Target or a Destination as it stood when the player picked it.
@@ -133,6 +168,21 @@ pub struct MapMatch {
     /// The map's Map Mark, by OSMS's name for it (see [`crate::PanelState::map_marks`]);
     /// `None` for a map without one.
     pub mark: Option<String>,
+}
+
+/// An NPC the query matches, by its name: picked, its map becomes the Destination, or with
+/// more than one its maps are listed to pick from (ADR 0028).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcMatch {
+    /// The NPC's ID, OSMS's.
+    pub id: String,
+    pub name: String,
+    /// The maps it stands on (Event and Dev maps aside), by Map Name: at least one.
+    pub maps: Vec<MapMatch>,
+    /// Where the overlay loads OSMS's picture of the NPC from; `None` until it's in, if it
+    /// can't be had, or if OSMS has none.
+    pub image: Option<String>,
 }
 
 /// Items the query matches that look alike (they share their name, kind and shop price,
@@ -230,13 +280,15 @@ pub struct SearchState {
     pub mobs: Matches<MobMatch>,
     /// The maps whose Map Name contains it, Event and Dev maps aside.
     pub maps: Matches<MapMatch>,
+    /// The NPCs whose name contains it, those standing only on Event and Dev maps aside.
+    pub npcs: Matches<NpcMatch>,
     /// The items whose name contains it, those that look alike as one.
     pub items: Matches<ItemMatch>,
     /// Why no items are matched, while the query box holds something: OSMS's item files
     /// aren't in. `None` once they are.
     pub items_missing: Option<ItemsMissing>,
     /// Which match Enter would pick, counting through the mobs shown, then the maps, then
-    /// the items; `None` when there are none.
+    /// the NPCs, then the items; `None` when there are none.
     pub highlighted: Option<usize>,
     /// The mob whose map list the search view shows; `None` outside that step.
     pub picked: Option<MobChoice>,
@@ -246,14 +298,20 @@ pub struct SearchState {
     /// The picked mob spawns only on maps search leaves out (Event maps; the Dev map has
     /// no mobs): why it has no results.
     pub only_on_event_maps: bool,
-    /// The map Enter would pick from the map list; `None` when there are no results.
+    /// The NPC whose map list the search view shows; `None` outside that step.
+    pub picked_npc: Option<NpcChoice>,
+    /// Every map the picked NPC stands on (Event and Dev maps left out), nearest first and
+    /// then by name: the search view's map list for it.
+    pub npc_maps: Vec<NpcMap>,
+    /// The map Enter would pick from the map list, the mob's ([`SearchState::results`]) or
+    /// the NPC's ([`SearchState::npc_maps`]); `None` when it lists none.
     pub highlighted_result: Option<usize>,
     /// The headline: which of the results is the nearest with a route, whatever its
     /// tier (of those equally near, the densest). `None` with no map shown or no route
     /// to any.
     pub nearest: Option<usize>,
-    /// [`crate::OSMS_ONLY_CREDIT`] whenever there are results, a Hunting Target or a
-    /// Destination.
+    /// [`crate::OSMS_ONLY_CREDIT`] whenever there are results (a mob's maps or an NPC's), a
+    /// Hunting Target or a Destination.
     pub credit: Option<&'static str>,
     /// What Distances count besides portals and ships (the checkboxes).
     pub travel: Travel,
@@ -281,27 +339,52 @@ impl SearchState {
         }
     }
 
+    /// Where the Destination's NPC stands on map `map_id`: nowhere unless the Destination
+    /// is that map, picked for the NPC.
+    pub(crate) fn npc_spots(&self, set: &MapSet, map_id: &str) -> Vec<PicturePoint> {
+        let Some(Destination { npc: Some(npc), map_id: to, .. }) = &self.destination else { return Vec::new() };
+        let on = set.npc(&npc.id).and_then(|npc| npc.maps.iter().find(|(id, _)| id == map_id && id == to));
+        on.map(|(_, spots)| spots.clone()).unwrap_or_default()
+    }
+
     /// The pictures the search view's matches want, below [`crate::osms::PICTURES_URL`]:
-    /// the items', then the mobs' animations.
+    /// the items', then the mobs' animations, then the NPCs' pictures (the matched NPCs',
+    /// the one whose map list shows, and the Destination's).
     pub(crate) fn pictures(&self, set: Option<&MapSet>) -> Vec<String> {
         let items = self.items.shown.iter().map(|item| icon_path(&item.id));
         let mobs = self.mobs.shown.iter().filter_map(|found| set?.animation(&found.mob.id)).map(String::from);
-        items.chain(mobs).collect()
+        let npcs = self.npcs.shown.iter().map(|npc| &npc.id).chain(self.npc_ids());
+        let npcs = npcs.filter_map(|id| set?.npc(id)?.picture.clone());
+        items.chain(mobs).chain(npcs).collect()
+    }
+
+    /// The IDs of the NPC whose map list shows and the Destination's NPC, if any.
+    fn npc_ids(&self) -> impl Iterator<Item = &String> {
+        let destination = self.destination.as_ref().and_then(|to| to.npc.as_ref());
+        self.picked_npc.iter().chain(destination).map(|npc| &npc.id)
     }
 
     /// Fill in where the overlay loads the pictures from that `picture` has (by their path
-    /// below [`crate::osms::PICTURES_URL`]): the matched mobs' and items', and the Hunting
-    /// Target mob's.
+    /// below [`crate::osms::PICTURES_URL`]): the matched mobs', NPCs' and items', the NPC
+    /// whose map list shows, the Hunting Target mob's and the Destination's NPC.
     pub(crate) fn fill_pictures(&mut self, set: &MapSet, picture: impl Fn(&str) -> Option<String>) {
         let animation = |id: &str| set.animation(id).and_then(&picture);
+        let npc_picture = |id: &str| set.npc(id)?.picture.as_deref().and_then(&picture);
         for found in &mut self.mobs.shown {
             found.image = animation(&found.mob.id);
+        }
+        for npc in &mut self.npcs.shown {
+            npc.image = npc_picture(&npc.id);
         }
         for item in &mut self.items.shown {
             item.icon = picture(&icon_path(&item.id));
         }
         if let Some(hunting) = &mut self.hunting {
             hunting.image = animation(&hunting.mob.id);
+        }
+        let destination = self.destination.as_mut().and_then(|to| to.npc.as_mut());
+        for npc in self.picked_npc.iter_mut().chain(destination) {
+            npc.image = npc_picture(&npc.id);
         }
     }
 }
@@ -327,6 +410,7 @@ pub(crate) type PickedItems = Vec<u32>;
 enum Row {
     Mob(String),
     Map(String),
+    Npc(String),
     Item(String),
 }
 
@@ -336,17 +420,19 @@ enum Row {
 struct Found {
     mobs: Vec<MobChoice>,
     maps: Vec<MapMatch>,
+    npcs: Vec<NpcMatch>,
     items: Vec<(ItemMatch, PickedItems)>,
 }
 
 impl Found {
     /// The matches the search view shows, in order: the first few mobs, then maps, then
-    /// items.
+    /// NPCs, then items.
     fn rows(&self) -> Vec<Row> {
         let mobs = self.mobs.iter().take(SHOWN).map(|mob| Row::Mob(mob.id.clone()));
         let maps = self.maps.iter().take(SHOWN).map(|map| Row::Map(map.map_id.clone()));
+        let npcs = self.npcs.iter().take(SHOWN).map(|npc| Row::Npc(npc.id.clone()));
         let items = self.items.iter().take(SHOWN).map(|(item, _)| Row::Item(item.id.clone()));
-        mobs.chain(maps).chain(items).collect()
+        mobs.chain(maps).chain(npcs).chain(items).collect()
     }
 }
 
@@ -360,17 +446,21 @@ pub(crate) struct Search {
     highlighted: Option<Row>,
     /// The mob whose map list the search view shows.
     picked: Option<MobChoice>,
+    /// The NPC whose map list the search view shows.
+    picked_npc: Option<NpcChoice>,
     /// The ID of the map the player moved the map list's highlight to; `None` for the
     /// first map. Kept by ID, so the highlight stays on it as the list reorders.
     highlighted_result: Option<String>,
     target: Option<Target>,
 }
 
-/// The Hunting Target, or with no mob the Destination: the ID of its map, the trip there
-/// as it stood when the player picked it, and whether they have arrived.
+/// The Hunting Target, or with no mob the Destination (with the NPC it was picked for, if
+/// any): the ID of its map, the trip there as it stood when the player picked it, and
+/// whether they have arrived.
 #[derive(Clone)]
 struct Target {
     mob: Option<MobChoice>,
+    npc: Option<NpcChoice>,
     map_id: String,
     trip: Option<Trip>,
     arrived: bool,
@@ -419,14 +509,19 @@ impl Search {
                 let results = self.results(searched);
                 move_through(&mut self.highlighted_result, &results, by, |r| r.map_id.clone());
             }
+            Some(SearchView::NpcMaps) => {
+                let maps = self.npc_maps(searched);
+                move_through(&mut self.highlighted_result, &maps, by, |m| m.map_id.clone());
+            }
             None => {}
         }
     }
 
     /// Enter: pick the highlighted match (a mob, to list its maps; a map, to make it the
-    /// Destination; or items, for their card), or pick the highlighted map from the map
-    /// list and make it the Hunting Target. Nothing to pick (nothing typed, or a query
-    /// matching nothing) leaves the view as it is.
+    /// Destination; an NPC, to make its map the Destination or list its maps; or items, for
+    /// their card), or pick the highlighted map from the map list and make it the Hunting
+    /// Target, or from the NPC's the Destination. Nothing to pick (nothing typed, or a
+    /// query matching nothing) leaves the view as it is.
     pub fn enter(&mut self, searched: &Searched) -> Option<PickedItems> {
         match self.view {
             Some(SearchView::Matches) => {
@@ -434,6 +529,7 @@ impl Search {
                 match rows.get(highlight_in(&rows, &self.highlighted, Row::clone)?)? {
                     Row::Mob(id) => self.pick(id, searched),
                     Row::Map(id) => self.pick_destination(id, searched),
+                    Row::Npc(id) => self.pick_npc(id, searched),
                     Row::Item(id) => return self.pick_item(id, searched),
                 }
             }
@@ -441,6 +537,11 @@ impl Search {
                 let results = self.results(searched);
                 let at = highlight_in(&results, &self.highlighted_result, |r| r.map_id.clone())?;
                 self.pick(&results[at].map_id, searched);
+            }
+            Some(SearchView::NpcMaps) => {
+                let maps = self.npc_maps(searched);
+                let at = highlight_in(&maps, &self.highlighted_result, |m| m.map_id.clone())?;
+                self.pick_destination(&maps[at].map_id, searched);
             }
             None => {}
         }
@@ -462,23 +563,61 @@ impl Search {
                 let listed = self.results(searched).into_iter().find(|result| result.map_id == id);
                 if let (Some(mob), Some(result)) = (&self.picked, listed) {
                     let way = Way { distance: result.distance, route: result.route, travel: result.travel };
-                    let target = Target { mob: Some(mob.clone()), map_id: id.to_string(), trip: trip(&way), arrived: false };
+                    let mob = Some(mob.clone());
+                    let target = Target { mob, npc: None, map_id: id.to_string(), trip: trip(&way), arrived: false };
                     self.target = Some(target);
                     self.close();
                 }
             }
-            None => {}
+            Some(SearchView::NpcMaps) | None => {}
         }
     }
 
-    /// The player picked the map with this ID from the matches: it becomes the
-    /// Destination, in place of any Hunting Target, and the search view closes. Picked
-    /// while on it, the player is there already.
+    /// The player picked the map with this ID from the matches, or from the NPC's map
+    /// list (for the NPC): it becomes the Destination, in place of any Hunting Target, and
+    /// the search view closes. Picked while on it, the player is there already.
     pub fn pick_destination(&mut self, id: &str, searched: &Searched) {
-        let listed = self.found(searched).maps.iter().take(SHOWN).any(|map| map.map_id == id);
-        let Some(set) = searched.set.filter(|_| listed && self.view == Some(SearchView::Matches)) else { return };
-        let trip = trip(&way_to(id, set, searched.here, searched.travel));
-        self.target = Some(Target { mob: None, map_id: id.to_string(), trip, arrived: searched.here == Some(id) });
+        match self.view {
+            Some(SearchView::Matches) => {
+                if self.found(searched).maps.iter().take(SHOWN).any(|map| map.map_id == id) {
+                    self.go_to(id, None, searched);
+                }
+            }
+            Some(SearchView::NpcMaps) => {
+                if self.npc_maps(searched).iter().any(|map| map.map_id == id) {
+                    self.go_to(id, self.picked_npc.clone(), searched);
+                }
+            }
+            Some(SearchView::Maps) | None => {}
+        }
+    }
+
+    /// The player picked the NPC with this ID from the matches: on one map, that map
+    /// becomes the Destination, with the NPC, as [`Search::pick_destination`] has it; on
+    /// more, they are listed to pick from.
+    pub fn pick_npc(&mut self, id: &str, searched: &Searched) {
+        if self.view != Some(SearchView::Matches) {
+            return;
+        }
+        let Some(npc) = self.found(searched).npcs.into_iter().take(SHOWN).find(|npc| npc.id == id) else { return };
+        let choice = NpcChoice { id: npc.id, name: npc.name, image: None };
+        match &npc.maps[..] {
+            [map] => self.go_to(&map.map_id, Some(choice), searched),
+            _ => {
+                self.picked_npc = Some(choice);
+                self.highlighted_result = None;
+                self.view = Some(SearchView::NpcMaps);
+            }
+        }
+    }
+
+    /// Map `map_id` becomes the Destination, for `npc` if one, in place of any Hunting
+    /// Target, and the search view closes. Picked while on it, the player is there already.
+    fn go_to(&mut self, map_id: &str, npc: Option<NpcChoice>, searched: &Searched) {
+        let Some(set) = searched.set else { return };
+        let trip = trip(&way_to(map_id, set, searched.here, searched.travel));
+        let arrived = searched.here == Some(map_id);
+        self.target = Some(Target { mob: None, npc, map_id: map_id.to_string(), trip, arrived });
         self.close();
     }
 
@@ -493,14 +632,15 @@ impl Search {
         Some(ids)
     }
 
-    /// Esc or the back arrow: back a step, with nothing changed. From the map list to the
-    /// matches as they were (with nothing typed when the Navigation section reopened the
+    /// Esc or the back arrow: back a step, with nothing changed. From a map list (the mob's
+    /// or the NPC's) to the matches as they were (with nothing typed when the Navigation section reopened the
     /// list); from the matches to the normal view.
     pub fn escape(&mut self) {
         match self.view {
-            Some(SearchView::Maps) => {
+            Some(SearchView::Maps | SearchView::NpcMaps) => {
                 self.view = Some(SearchView::Matches);
                 self.picked = None;
+                self.picked_npc = None;
                 self.highlighted_result = None;
             }
             _ => self.close(),
@@ -512,6 +652,7 @@ impl Search {
         self.view = None;
         self.type_query("");
         self.picked = None;
+        self.picked_npc = None;
         self.highlighted_result = None;
     }
 
@@ -541,6 +682,11 @@ impl Search {
         let found = self.found(searched);
         let rows = found.rows();
         let results = self.results(searched);
+        let npc_maps = self.npc_maps(searched);
+        let highlighted_result = match self.view {
+            Some(SearchView::NpcMaps) => highlight_in(&npc_maps, &self.highlighted_result, |m| m.map_id.clone()),
+            _ => highlight_in(&results, &self.highlighted_result, |r| r.map_id.clone()),
+        };
         let only_on_event_maps = match (&self.picked, set) {
             (Some(mob), Some(set)) if results.is_empty() => {
                 set.maps().any(|(entry, data)| entry.is_left_out() && data.mobs.iter().any(|m| m.id == mob.id))
@@ -554,12 +700,16 @@ impl Search {
             highlighted: highlight_in(&rows, &self.highlighted, Row::clone),
             mobs: shown(found.mobs.into_iter().map(|mob| MobMatch { mob, image: None }).collect()),
             maps: shown(found.maps),
+            npcs: shown(found.npcs),
             items: shown(found.items.into_iter().map(|(item, _)| item).collect()),
             items_missing: searched.items.err().filter(|_| typed),
             picked: self.picked.clone(),
-            credit: (!results.is_empty() || hunting.is_some() || destination.is_some()).then_some(OSMS_ONLY_CREDIT),
+            credit: (!results.is_empty() || !npc_maps.is_empty() || hunting.is_some() || destination.is_some())
+                .then_some(OSMS_ONLY_CREDIT),
             nearest: nearest(&results),
-            highlighted_result: highlight_in(&results, &self.highlighted_result, |r| r.map_id.clone()),
+            picked_npc: self.picked_npc.clone(),
+            npc_maps,
+            highlighted_result,
             only_on_event_maps,
             results,
             travel,
@@ -593,6 +743,7 @@ impl Search {
             travel,
             arrived: target.arrived,
             trip: target.trip.clone(),
+            npc: target.npc.clone(),
         })
     }
 
@@ -602,6 +753,27 @@ impl Search {
             (Some(mob), Some(set)) => results(&mob.id, set, searched.here, searched.travel),
             _ => Vec::new(),
         }
+    }
+
+    /// The picked NPC's map list, nearest first, then by name; none outside that step.
+    fn npc_maps(&self, searched: &Searched) -> Vec<NpcMap> {
+        let (Some(picked), Some(set)) = (&self.picked_npc, searched.set) else { return Vec::new() };
+        let Some(npc) = set.npc(&picked.id) else { return Vec::new() };
+        let distances = searched.here.map(|here| World::of(set, searched.travel).distances_from(here));
+        let mut maps: Vec<NpcMap> = npc_maps(npc, set)
+            .into_iter()
+            .map(|map| {
+                let (distance, travel) = match &distances {
+                    Some(distances) => (distances.to(&map.map_id), travel_on(&route(distances, &map.map_id, set))),
+                    None => (Distance::Unknown, Vec::new()),
+                };
+                let MapMatch { map_id, street_name, map_name, mark } = map;
+                NpcMap { map_id, street_name, map_name, mark, distance, travel }
+            })
+            .collect();
+        // Already by name: a stable sort keeps them so among equals.
+        maps.sort_by_key(|map| map.distance);
+        maps
     }
 
     /// Everything the query matches, whatever the case, each kind best first: the mobs
@@ -625,13 +797,7 @@ impl Search {
                     }
                 }
                 if let Some(fit) = fit(&entry.map_name, &query).filter(|_| !entry.is_left_out()) {
-                    let map = MapMatch {
-                        map_id: entry.id.clone(),
-                        street_name: entry.street_name.clone(),
-                        map_name: entry.map_name.clone(),
-                        mark: entry.mark.clone(),
-                    };
-                    maps.push((fit, map));
+                    maps.push((fit, map_match(entry)));
                 }
             }
             mobs.sort_by(|(a_fit, a), (b_fit, b)| (a_fit, &a.name, a.level, &a.id).cmp(&(b_fit, &b.name, b.level, &b.id)));
@@ -640,6 +806,7 @@ impl Search {
             });
             found.mobs = mobs.into_iter().map(|(_, mob)| mob).collect();
             found.maps = maps.into_iter().map(|(_, map)| map).collect();
+            found.npcs = npcs_found(set, &query);
         }
         if let Ok(items) = searched.items {
             found.items = items_found(items, &query);
@@ -668,6 +835,46 @@ fn fit(name: &str, query: &str) -> Option<Fit> {
             Some(_) => Fit::Within,
         })
         .min()
+}
+
+/// The NPCs whose name holds `query` (lower case), best first, each with the maps it
+/// stands on (Event and Dev maps aside, and those standing only there left out).
+fn npcs_found(set: &MapSet, query: &str) -> Vec<NpcMatch> {
+    let mut found: Vec<(Fit, NpcMatch)> = Vec::new();
+    for npc in set.npcs() {
+        let Some(fit) = fit(&npc.name, query) else { continue };
+        let maps = npc_maps(npc, set);
+        if !maps.is_empty() {
+            found.push((fit, NpcMatch { id: npc.id.clone(), name: npc.name.clone(), maps, image: None }));
+        }
+    }
+    // Of NPCs sharing a name, the one on the map first by name first.
+    let first_map = |npc: &NpcMatch| npc.maps.first().map(|map| map.map_name.clone());
+    found.sort_by(|(a_fit, a), (b_fit, b)| (a_fit, &a.name, first_map(a), &a.id).cmp(&(b_fit, &b.name, first_map(b), &b.id)));
+    found.into_iter().map(|(_, npc)| npc).collect()
+}
+
+/// The maps `npc` stands on, Event and Dev maps aside, by Map Name.
+fn npc_maps(npc: &Npc, set: &MapSet) -> Vec<MapMatch> {
+    let mut maps: Vec<MapMatch> = npc
+        .maps
+        .iter()
+        .filter_map(|(id, _)| set.entry(id))
+        .filter(|entry| !entry.is_left_out())
+        .map(map_match)
+        .collect();
+    maps.sort_by(|a, b| (&a.map_name, &a.street_name, &a.map_id).cmp(&(&b.map_name, &b.street_name, &b.map_id)));
+    maps
+}
+
+/// The map `entry` lists, as a match.
+fn map_match(entry: &MapEntry) -> MapMatch {
+    MapMatch {
+        map_id: entry.id.clone(),
+        street_name: entry.street_name.clone(),
+        map_name: entry.map_name.clone(),
+        mark: entry.mark.clone(),
+    }
 }
 
 /// The items whose name holds `query` (lower case), best first; those that share their

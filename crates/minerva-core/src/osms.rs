@@ -12,6 +12,7 @@ use crate::portal_overrides::{PORTAL_OVERRIDES, PortalOverride};
 use crate::portals::{self, Destination, Exit, MapFacts};
 use crate::shown_map::LevelRange;
 use serde::{Deserialize, Serialize};
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 
 /// Where OSMS Data Explorer publishes its current data set: each of [`OsmsFiles::NAMES`]
@@ -67,6 +68,19 @@ pub struct SiteMark {
     pub picture_url: String,
 }
 
+/// An NPC standing on a map in the map list, as Search finds it (ADR 0028).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Npc {
+    /// Its ID, unpadded, as OSMS gives it.
+    pub id: String,
+    pub name: String,
+    /// Its picture's path ([`crate::MapDataSource::picture`]); `None` when OSMS has none.
+    pub picture: Option<String>,
+    /// Each map in the map list it stands on, by its ID, with where it stands there in the
+    /// map's picture (in OSMS's order; more than once, it stands in more than one spot).
+    pub maps: Vec<(String, Vec<PicturePoint>)>,
+}
+
 /// Every map's data from OSMS's file set: the map list, each listed map's figures, and
 /// every mob's Mob Card figures.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -80,6 +94,8 @@ pub struct MapSet {
     animations: HashMap<String, String>,
     /// The path of each Map Mark's picture, by OSMS's name for the mark.
     marks: BTreeMap<String, String>,
+    /// Every NPC that stands on a map in the map list, by ID.
+    npcs: Vec<Npc>,
 }
 
 impl MapSet {
@@ -137,6 +153,16 @@ impl MapSet {
         self.animations.get(id).map(String::as_str)
     }
 
+    /// Every NPC that stands on a map in the map list.
+    pub fn npcs(&self) -> &[Npc] {
+        &self.npcs
+    }
+
+    /// NPC `id`, if it stands on a map in the map list.
+    pub(crate) fn npc(&self, id: &str) -> Option<&Npc> {
+        self.npcs.iter().find(|npc| npc.id == id)
+    }
+
     /// Every Map Mark OSMS has a picture of: its name, and its picture's path
     /// ([`crate::MapDataSource::picture`]), by name.
     pub fn marks(&self) -> impl Iterator<Item = (&str, &str)> {
@@ -157,6 +183,9 @@ impl MapSet {
 /// portal not to the dead end, at its position in the map's picture (named in
 /// `map_manifest.json`), and so is every spawn point with a position. A destination
 /// outside the map list is named from `lookups.json`, with no street, or else by its ID.
+///
+/// The NPCs are those `npc_lookup` names that stand on a map in the map list, with where
+/// they stand there; an NPC it doesn't name can't be searched for, so it is left out.
 pub fn read(files: &OsmsFiles) -> Result<MapSet, SourceError> {
     read_with(files, PORTAL_OVERRIDES)
 }
@@ -213,14 +242,28 @@ fn read_set(files: &OsmsFiles, overrides: &[PortalOverride]) -> Result<MapSet, S
     };
 
     let mut set = Vec::new();
+    let mut npcs: BTreeMap<u64, Npc> = BTreeMap::new();
     for (entry, map) in &listed {
         let mut data = map_data(entry, map, portals.get(&entry.id), &mobs, &lookups.mob_names, &name_of, overrides)
             .map_err(|why| format!("map {}: {why}", entry.id))?;
         data.picture = pictures.get(&entry.id).cloned();
         if titled(entry) {
+            for (id, spots) in npcs_on(map)? {
+                let Some(named) = maps.npc_lookup.get(&id.to_string()) else { continue };
+                let npc = match npcs.entry(id) {
+                    Entry::Occupied(npc) => npc.into_mut(),
+                    Entry::Vacant(at) => {
+                        let picture = named.thumbnail.as_deref().map(map_mark::picture_path).transpose();
+                        let picture = picture.map_err(|why| format!("npc {id}: {why}"))?;
+                        at.insert(Npc { id: id.to_string(), name: named.name.trim().to_string(), picture, maps: Vec::new() })
+                    }
+                };
+                npc.maps.push((entry.id.clone(), spots));
+            }
             set.push((entry.clone(), data));
         }
     }
+    let npcs = npcs.into_values().filter(|npc| !npc.name.is_empty()).collect();
     let mobs = monsters.monsters.iter().map(|mob| (mob.id.to_string(), mob_details(mob, &monsters.monsters))).collect();
     let mut animations = HashMap::new();
     for mob in &monsters.monsters {
@@ -228,7 +271,29 @@ fn read_set(files: &OsmsFiles, overrides: &[PortalOverride]) -> Result<MapSet, S
             animations.insert(mob.id.to_string(), animation_path(hash).map_err(|why| format!("mob {}: {why}", mob.id))?);
         }
     }
-    Ok(MapSet { maps: set, mobs, animations, marks })
+    Ok(MapSet { maps: set, mobs, animations, marks, npcs })
+}
+
+/// The NPCs standing on `map`, each once in the order `npcs` lists them, with where it
+/// stands in the map's picture (none, when `npc_positions` doesn't place it).
+fn npcs_on(map: &OsmsMap) -> Result<Vec<(u64, Vec<PicturePoint>)>, String> {
+    let mut on = Vec::new();
+    for &id in &map.npcs {
+        if on.iter().any(|&(listed, _)| listed == id) {
+            continue;
+        }
+        let spots = map
+            .npc_positions
+            .iter()
+            .filter(|spot| spot.id == id)
+            .map(|spot| match (pixel(spot.x), pixel(spot.y)) {
+                (Some(x), Some(y)) => Ok(PicturePoint { x, y }),
+                _ => Err(format!("npc {id} at {}, {}", spot.x, spot.y)),
+            })
+            .collect::<Result<_, _>>()?;
+        on.push((id, spots));
+    }
+    Ok(on)
 }
 
 /// Where OSMS keeps the mob animation with content hash `hash`, below [`PICTURES_URL`].
@@ -480,6 +545,25 @@ struct MapsFile {
     /// (`"images/map_marks/Henesys.png"`). Without it, no map has a mark.
     #[serde(default)]
     map_mark_icons: BTreeMap<String, String>,
+    /// Every NPC, by its ID unpadded.
+    #[serde(default)]
+    npc_lookup: HashMap<String, OsmsNpc>,
+}
+
+/// An NPC in `maps.json`'s `npc_lookup`.
+#[derive(Deserialize)]
+struct OsmsNpc {
+    name: String,
+    /// Its picture, below [`DATA_URL`] (`"images/npcs/0000001.png"`); `null` for none.
+    thumbnail: Option<String>,
+}
+
+/// Where an NPC stands on a map, in the pixels of the map's picture.
+#[derive(Deserialize)]
+struct NpcSpot {
+    id: u64,
+    x: f64,
+    y: f64,
 }
 
 #[derive(Deserialize)]
@@ -509,6 +593,12 @@ struct OsmsMap {
     /// One per spawn point.
     #[serde(default)]
     mob_positions: Vec<SpawnPoint>,
+    /// The NPCs standing on it, by ID; absent for none.
+    #[serde(default)]
+    npcs: Vec<u64>,
+    /// Where each of them stands; one NPC may stand in more than one spot.
+    #[serde(default)]
+    npc_positions: Vec<NpcSpot>,
 }
 
 /// A pixel of a map's picture, as OSMS gives a portal's position: whole, though read

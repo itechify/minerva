@@ -120,6 +120,7 @@
           <div class="arrival" id="hunting-arrival" role="status" hidden>
             <p class="arrival-here">You're here</p>
             <p class="arrival-trip" id="hunting-trip" hidden></p>
+            <p class="arrival-npc" id="hunting-npc" hidden></p>
           </div>
         </section>
         <section class="map-mobs" id="map-mobs" aria-labelledby="mobs-name" hidden>
@@ -167,7 +168,7 @@
             <input
               id="query"
               type="text"
-              placeholder="Mobs, maps or items"
+              placeholder="Mobs, maps, NPCs or items"
               autocomplete="off"
               spellcheck="false"
               role="combobox"
@@ -178,7 +179,7 @@
           </label>
           <ul class="suggestions scroll" id="suggestions" role="listbox" aria-label="Matches" hidden></ul>
           <p class="note" id="no-match" hidden></p>
-          <p class="keys">↑ ↓ choose · Enter or a click: a mob lists its maps, a map shows the way, an item its card · Esc goes back</p>
+          <p class="keys">↑ ↓ choose · Enter or a click: a mob lists its maps, a map or an NPC shows the way, an item its card · Esc goes back</p>
         </div>
         <div class="step" id="maps-step" hidden>
           <p class="nearest" id="search-nearest" hidden></p>
@@ -196,6 +197,12 @@
             </label>
           </fieldset>
           <p class="keys">↑ ↓ choose a map · Enter or a click makes it your Hunting Target · Esc goes back</p>
+        </div>
+        <div class="step" id="npc-maps-step" hidden>
+          <div class="results-box scroll" id="npc-maps-box" tabindex="-1">
+            <table class="results npc-results" id="npc-maps"></table>
+          </div>
+          <p class="keys">↑ ↓ choose a map · Enter or a click makes it your Destination · Esc goes back</p>
         </div>
         <p class="search-credit" id="search-credit" hidden></p>
       </section>

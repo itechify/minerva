@@ -16,6 +16,9 @@
  * Every spawn point is dotted under the rings, as the minimap dots mobs. Resting on a
  * mob's row lights its dots and dims the rest; resting on a dot lights its mob's dots and
  * row, and shows its card, close up.
+ *
+ * On the map of a Destination picked for an NPC, the NPC is marked where it stands, over
+ * everything else: the minimap's green NPC dot in the Destination's Route Magenta ring.
  */
 
 import { byId, cardTop, span, svgEl } from "./dom";
@@ -80,6 +83,8 @@ export type MapPreview = {
   image: { status: "loading" | "unavailable" } | { status: "ready"; url: string };
   marks: PortalMark[];
   spawns: SpawnMark[];
+  /** Where the Destination's NPC stands, on its map. */
+  npcSpots: { x: number; y: number }[];
 };
 
 /** The tallest the picture is drawn, inside its paper's 5px margin: the box stays within 180px. */
@@ -117,6 +122,9 @@ const SPAWN_DOT = 2.25;
 const SPAWN_LIT_RING = 5;
 const CLOSE_SPAWN_DOT = 3.5;
 const CLOSE_SPAWN_LIT_RING = 7.5;
+/** The Destination's NPC: the minimap's NPC dot, larger than a mob's, in a ring of its own. */
+const NPC_DOT = 3.25;
+const NPC_RING = 7;
 /** How faint the other mobs' dots go while one mob's are lit. */
 const DIMMED = 0.3;
 
@@ -359,19 +367,20 @@ export function layOutMapPreview() {
   const onRoute = next > 0 ? `, ${next} next on your route` : "";
   const points = shown.spawns.length;
   const spawns = points > 0 ? `, and ${points} mob spawn point${points === 1 ? "" : "s"}` : "";
+  const npc = shown.npcSpots.length > 0 ? ". The NPC you're looking for is marked where they stand" : "";
   picture.setAttribute(
     "aria-label",
-    `Map of ${mapName}: ${portals} portal${portals === 1 ? "" : "s"} marked, ${hidden} of them hidden${onRoute}${spawns}`,
+    `Map of ${mapName}: ${portals} portal${portals === 1 ? "" : "s"} marked, ${hidden} of them hidden${onRoute}${spawns}${npc}`,
   );
   if (shown !== keyedFor) {
     keyedFor = shown;
-    marksKey = JSON.stringify([shown.marks, shown.spawns]);
+    marksKey = JSON.stringify([shown.marks, shown.spawns, shown.npcSpots]);
   }
   const key = `${marksKey}|${frame.width}|${frame.height}|${frame.scale}`;
   if (key !== drawnFor) {
     drawnFor = key;
     drawnAt = { left: Math.round(left), top: Math.round(top) };
-    drawMarks(shown.marks, shown.spawns, frame);
+    drawMarks(shown.marks, shown.spawns, shown.npcSpots, frame);
     relight();
   }
   drawnMarks?.setAttribute(
@@ -398,8 +407,11 @@ const at = (x: number, y: number, f: Frame) => ({
   y: Math.round(f.top) + y * f.scale,
 });
 
-/** The spawn points' dots, then the arrows of the teleports within the map, then the rings. */
-function drawMarks(marks: PortalMark[], spawns: SpawnMark[], f: Frame) {
+/**
+ * The spawn points' dots, then the arrows of the teleports within the map, then the rings,
+ * then the Destination's NPC.
+ */
+function drawMarks(marks: PortalMark[], spawns: SpawnMark[], npcSpots: MapPreview["npcSpots"], f: Frame) {
   marksSvg.setAttribute("width", String(f.width));
   marksSvg.setAttribute("height", String(f.height));
   const defs = svgEl("defs");
@@ -476,8 +488,18 @@ function drawMarks(marks: PortalMark[], spawns: SpawnMark[], f: Frame) {
     );
     dots.append(g);
   });
+  // The NPC the player is looking for, over everything: they came to this map for it.
+  const npcs = svgEl("g", { class: "npc-spots" });
+  for (const spot of npcSpots) {
+    const { x, y } = at(spot.x, spot.y, f);
+    npcs.append(
+      svgEl("circle", { class: "npc-halo", cx: x, cy: y, r: NPC_RING }),
+      svgEl("circle", { class: "npc-ring", cx: x, cy: y, r: NPC_RING }),
+      svgEl("circle", { class: "npc-dot", cx: x, cy: y, r: NPC_DOT }),
+    );
+  }
   drawnMarks = svgEl("g");
-  drawnMarks.append(dots, arrows, routeRings, rings);
+  drawnMarks.append(dots, arrows, routeRings, rings, npcs);
   marksSvg.replaceChildren(defs, drawnMarks);
 }
 

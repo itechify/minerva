@@ -27,6 +27,8 @@ import {
   distanceText,
   distanceWithTravel,
   nearestLine,
+  npcMapGroup,
+  npcMapsHead,
   resultGroup,
   resultsHead,
   resultsNote,
@@ -194,11 +196,15 @@ const huntingRoute = byId("hunting-route");
 const huntingRouteNone = byId("hunting-route-none");
 const huntingArrival = byId("hunting-arrival");
 const huntingTrip = byId("hunting-trip");
+const huntingNpc = byId("hunting-npc");
 const searchView = byId("search-view");
 const searchBack = byId("search-back");
 const searchTitle = byId("search-title");
 const matchesStep = byId("matches-step");
 const mapsStep = byId("maps-step");
+const npcMapsStep = byId("npc-maps-step");
+const npcMapsBox = byId("npc-maps-box");
+const npcMapsTable = byId("npc-maps") as HTMLTableElement;
 const query = byId("query") as HTMLInputElement;
 const suggestions = byId("suggestions");
 const noMatch = byId("no-match");
@@ -216,6 +222,8 @@ const dealDetail = byId("deal-detail");
 const iconArt = byId("icon-art") as HTMLImageElement;
 const resultsHeader = resultsHead();
 resultsTable.append(resultsHeader);
+const npcMapsHeader = npcMapsHead();
+npcMapsTable.append(npcMapsHeader);
 let draggable = false;
 
 /**
@@ -511,18 +519,24 @@ const TARGET_SPRITE = 40;
 /**
  * The Navigation section, between the Map and the Mobs, while there is a Hunting Target or
  * a Destination: the Hunting Target's mob (as OSMS animates it) and map, with the map's
- * figures, or the Destination's map and street; then the route there from the map you're
- * on, which scrolls when the panel runs out of room; once you're there, that you've
- * arrived. A Hunting Target's 🔍 reopens the mob's map list; the × clears either. It
- * collapses to its heading like the map's sections.
+ * figures; or the Destination's NPC (as OSMS pictures it) and map, or its map and street;
+ * then the route there from the map you're on, which scrolls when the panel runs out of
+ * room; once you're there, that you've arrived, and where the NPC is marked. A Hunting
+ * Target's 🔍 reopens the mob's map list; the × clears either. It collapses to its heading
+ * like the map's sections.
  */
 function renderNavigation(panel: PanelState) {
   const { hunting, destination } = panel.search;
   const target = hunting ?? destination;
   // The map, with its way there.
   const map = hunting?.map ?? destination;
+  const npc = destination?.npc ?? null;
+  // The NPC is marked on the Map Preview once you're on its map.
+  const npcMarked = !!npc && (panel.mapPreview?.npcSpots.length ?? 0) > 0;
   navigation.hidden = !target;
-  if (!target || !map || !changed("navigation", target, panel.collapsedSections.navigation, panel.mapMarks)) return;
+  if (!target || !map || !changed("navigation", target, panel.collapsedSections.navigation, panel.mapMarks, npcMarked)) {
+    return;
+  }
   foldSection(navigation, navigationToggle, panel.collapsedSections.navigation, true);
   const line = (className: string, ...parts: (Node | string)[]) => {
     const el = document.createElement("span");
@@ -530,7 +544,7 @@ function renderNavigation(panel: PanelState) {
     el.append(...parts);
     return el;
   };
-  huntingSprite.hidden = !hunting;
+  huntingSprite.hidden = !hunting && !npc;
   huntingReopen.hidden = !hunting;
   for (const figure of navigation.querySelectorAll<HTMLElement>("[data-hunting]")) figure.hidden = !hunting;
   const clear = hunting ? "Clear the Hunting Target" : "Clear the Destination";
@@ -550,6 +564,14 @@ function renderNavigation(panel: PanelState) {
     tier.className = `tier ${hunting.map.tier}`;
     byId("hunting-density").textContent = density(hunting.map.densityHundredths);
     byId("hunting-share").textContent = `${hunting.map.spawnSharePercent}%`;
+  } else if (npc) {
+    // The NPC on the first line, the map they stand on on the next.
+    fillSprite(huntingSprite, npc.image, TARGET_SPRITE);
+    huntingTitle.replaceChildren(
+      line("hunting-mob", npc.name),
+      line("hunting-map", mapMark(panel.mapMarks, map.mark), map.mapName),
+    );
+    huntingTitle.title = `${npc.name}, on ${map.streetName}: ${map.mapName}`;
   } else {
     // The map on the first line, its street on the next.
     fillSprite(huntingSprite, null, TARGET_SPRITE);
@@ -582,13 +604,16 @@ function renderNavigation(panel: PanelState) {
   huntingArrival.hidden = !arrived;
   huntingTrip.textContent = trip ? tripLine(trip) : "";
   huntingTrip.hidden = !trip;
+  huntingNpc.textContent = arrived && npc && npcMarked ? `${npc.name} is marked on the Map Preview` : "";
+  huntingNpc.hidden = huntingNpc.textContent === "";
 }
 
 /**
  * The search view, which takes over the whole panel: first the query box and what it
- * matches (mobs, maps and items), then a picked mob's ranked map list. Picking a map from
- * that list makes it the Hunting Target, a matched map the Destination, and matched items
- * show their Item Card; the back arrow or Esc goes back a step with nothing changed.
+ * matches (mobs, maps, NPCs and items), then a picked mob's ranked map list, or a picked
+ * NPC's maps. Picking a map from the mob's list makes it the Hunting Target; a matched map,
+ * a matched NPC's one map, or a map from the NPC's list, the Destination; and matched items
+ * show their Item Card. The back arrow or Esc goes back a step with nothing changed.
  */
 function renderSearchView(panel: PanelState) {
   const { search } = panel;
@@ -600,6 +625,7 @@ function renderSearchView(panel: PanelState) {
   if (view === null) return;
   matchesStep.hidden = view !== "matches";
   mapsStep.hidden = view !== "maps";
+  npcMapsStep.hidden = view !== "npcMaps";
   // Before the lists, which scroll their highlight into what room is left.
   searchCredit.textContent = search.credit ?? "";
   searchCredit.hidden = !search.credit;
@@ -611,6 +637,10 @@ function renderSearchView(panel: PanelState) {
       query.value = search.query;
       query.focus({ preventScroll: true });
     }
+  } else if (view === "npcMaps") {
+    searchTitle.textContent = search.pickedNpc?.name ?? "";
+    renderNpcMaps(search, panel.mapMarks);
+    if (opened) npcMapsBox.focus({ preventScroll: true });
   } else {
     searchTitle.textContent = search.picked?.name ?? "";
     if (search.picked) searchTitle.append(span("level", `Lv ${search.picked.level}`));
@@ -623,6 +653,7 @@ function renderSearchView(panel: PanelState) {
 const MATCH_KINDS = {
   mob: { heading: "Mobs", pick: "search_pick" },
   map: { heading: "Maps", pick: "search_pick_destination" },
+  npc: { heading: "NPCs", pick: "search_pick_npc" },
   item: { heading: "Items", pick: "search_pick_item" },
 } as const;
 type MatchKind = keyof typeof MATCH_KINDS;
@@ -638,15 +669,15 @@ const ITEMS_MISSING = {
 } as const;
 
 /**
- * The first step: what the query matches, a section for each kind (mobs, maps, then items)
+ * The first step: what the query matches, a section for each kind (mobs, maps, NPCs, then items)
  * with its best five, and a line counting the rest. The highlighted match is what Enter
  * picks. Search knows no mob or map until OSMS's file set is in, which `recognition` says,
  * and no item until its item files are, which the Items section says in its place.
  */
 function renderMatches(search: SearchState, recognition: Recognition, marks: MapMarks) {
   const loaded = recognition.status === "ready" || recognition.status === "savedCopy";
-  const { mobs, maps, items, itemsMissing, highlighted } = search;
-  if (!changed("matches", mobs, maps, items, itemsMissing, highlighted, search.query, loaded, marks)) return;
+  const { mobs, maps, npcs, items, itemsMissing, highlighted } = search;
+  if (!changed("matches", mobs, maps, npcs, items, itemsMissing, highlighted, search.query, loaded, marks)) return;
   let at = 0;
   let current: HTMLElement | null = null;
   const option = (kind: MatchKind, id: string, title: string, ...parts: Node[]) => {
@@ -708,6 +739,18 @@ function renderMatches(search: SearchState, recognition: Recognition, marks: Map
       maps.more,
     ),
     ...section(
+      "npc",
+      npcs.shown.map((npc) => {
+        // Its one map, by which NPCs sharing a name are told apart; or how many it stands on.
+        const only = npc.maps.length === 1 ? npc.maps[0] : null;
+        const where = span("match-detail", only ? only.mapName : `on ${npc.maps.length} maps`);
+        if (only) where.prepend(mapMark(marks, only.mark));
+        const title = only ? `${npc.name}, on ${only.streetName}: ${only.mapName}` : `${npc.name}, on ${npc.maps.length} maps`;
+        return option("npc", npc.id, title, picture(npc.image, false), span("name", npc.name), where);
+      }),
+      npcs.more,
+    ),
+    ...section(
       "item",
       items.shown.map((item) =>
         option("item", item.id, `${item.name} (${item.kind})`, picture(item.icon, true), span("name", item.name), span("match-detail", item.kind)),
@@ -751,6 +794,21 @@ function renderMaps(search: SearchState, marks: MapMarks) {
   resultsTable.replaceChildren(resultsHeader, ...groups);
   const current = resultsTable.querySelector<HTMLElement>("tbody.current");
   if (current) scrollWithin(resultsBox, current);
+}
+
+/** The NPC's maps, nearest first, the highlighted one to Enter. */
+function renderNpcMaps(search: SearchState, marks: MapMarks) {
+  if (!changed("npc-maps", search.npcMaps, search.highlightedResult, marks)) return;
+  const groups = search.npcMaps.map((map, i) => {
+    const group = npcMapGroup(map, marks);
+    const current = i === search.highlightedResult;
+    group.classList.toggle("current", current);
+    group.setAttribute("aria-selected", String(current));
+    return group;
+  });
+  npcMapsTable.replaceChildren(npcMapsHeader, ...groups);
+  const current = npcMapsTable.querySelector<HTMLElement>("tbody.current");
+  if (current) scrollWithin(npcMapsBox, current);
 }
 
 /** Scroll `box` just enough to show `item`. Not `scrollIntoView`, which would scroll the overlay's page too. */
@@ -1130,16 +1188,17 @@ for (const toggle of [portalsToggle, navigationToggle, mobsToggle]) {
   toggle.addEventListener("click", () => invoke("act", { action: { toggleSection: toggle.dataset.section } }));
 }
 
-// A click on a match, or on a map in a mob's map list, picks it, like Enter on it.
-function pickOnClick(list: HTMLElement, item: string) {
+// A click on a match, or on a map in a mob's or an NPC's map list, picks it, like Enter on it.
+function pickOnClick(list: HTMLElement, item: string, pick = "search_pick") {
   list.addEventListener("click", (e) => {
     const picked = e.target instanceof Element ? e.target.closest<HTMLElement>(item) : null;
     const kind = picked?.dataset.kind as MatchKind | undefined;
-    if (picked?.dataset.id) invoke(kind ? MATCH_KINDS[kind].pick : "search_pick", { id: picked.dataset.id });
+    if (picked?.dataset.id) invoke(kind ? MATCH_KINDS[kind].pick : pick, { id: picked.dataset.id });
   });
 }
 pickOnClick(suggestions, "li[data-id]");
 pickOnClick(resultsTable, "tbody[data-id]");
+pickOnClick(npcMapsTable, "tbody[data-id]", "search_pick_destination");
 
 /** The search view's keys: the arrows move the highlight, Enter picks, Esc goes back. */
 function searchKey(e: KeyboardEvent): boolean {
