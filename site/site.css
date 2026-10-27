@@ -3677,12 +3677,17 @@ span.lb-portrait {
 .lb-table.lb-faces tbody tr > * {
   vertical-align: middle;
 }
-/* On a phone, a band with portraits stays a table under its headers, not cards: Rank, the
-   portrait, Character, Job, Level, EXP/h and Report, without the lanes, the dates out of sight
-   (still read by assistive tech, each the row's under the pointer), the cells closer, the
-   portraits 48px (half their size) and each job its class's icon alone (its name still read by
-   assistive tech, and a job without an icon keeps its name), so it fits a phone's width. On a
-   phone narrower still, the table scrolls sideways in its box rather than the page. */
+/* A row's job and level under the name, and "/ Job" in the column's header, for a phone
+   (below). */
+.lb-name-job,
+.lb-name-and-job {
+  display: none;
+}
+/* On a phone, a band with portraits stays a table under its headers, not cards, its portraits at
+   their full 96px: Rank, the portrait, the name over the job (beside its class's icon) and
+   level in one column, EXP/h and Report, without the lanes, the dates out of sight (still read by
+   assistive tech, each the row's under the pointer), the cells closer. On a phone narrower
+   still, the table scrolls sideways in its box rather than the page. */
 @media (max-width: 640px) {
   .lb-table.lb-faces .lb-lane,
   .lb-table.lb-faces .lb-under {
@@ -3707,18 +3712,20 @@ span.lb-portrait {
   .lb-table.lb-faces tbody .lb-name {
     overflow-wrap: anywhere;
   }
-  .lb-table.lb-faces .lb-face,
-  .lb-table.lb-faces .lb-face > * {
-    width: 48px;
-    height: 48px;
+  .lb-table.lb-faces .lb-job,
+  .lb-table.lb-faces .lb-level {
+    display: none;
   }
-  .lb-table.lb-faces td.lb-job .lb-job-line:has(.lb-job-icon) {
-    padding-left: 0;
-    font-size: 0;
-    text-indent: 0;
+  .lb-table.lb-faces .lb-name-and-job {
+    display: inline;
   }
-  .lb-table.lb-faces td.lb-job .lb-job-icon {
-    margin: 0;
+  .lb-table.lb-faces .lb-name-job {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 20px;
+    color: var(--ink-2);
   }
   .lb-table-box {
     overflow-x: auto;

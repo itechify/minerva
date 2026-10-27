@@ -404,6 +404,9 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   name.setAttribute("role", "rowheader");
   if (row.you) name.append(star());
   name.append(characterLink(row.name, row.nameHref));
+  // On a phone, a band with portraits writes the job and level under the name, in place of
+  // their columns.
+  if (row.portrait !== null) name.append(jobWithIcon(`${row.job} Lv ${row.level}`, row.jobClass, "lb-name-job", false));
   const reportCell = make("td", "lb-report");
   if (!row.you) {
     const report = make("button", "lb-report-button");
