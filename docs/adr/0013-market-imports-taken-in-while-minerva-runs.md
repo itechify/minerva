@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended 2026-10-28 (Minerva fetches maplestory.market's prices, ADR 0030; imports in shape 2 still read)
 ---
 
 # Market Imports, taken in while Minerva runs

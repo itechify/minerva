@@ -41,6 +41,7 @@ use crate::item_lookup::ItemLookup;
 use crate::item_tooltip::{ItemCapture, ItemTooltip, ItemTooltipReading};
 use crate::discord_link::{DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest};
 use crate::leaderboards::{LeaderboardAnswer, RejectedReason};
+use crate::maplestory_market::MarketAnswer;
 use crate::map_data::MapSummary;
 use crate::map_index::{Fetched, MapDataSource, SourceError};
 use crate::market_prices::{MarketImport, SavedMarketPrices};
@@ -300,6 +301,8 @@ pub enum Event {
     /// The Map Leaderboards answered upload `id`, for the Character named `name` (empty for an
     /// upload no longer under way), with `answer`.
     LeaderboardAnswer { id: u64, name: String, answer: LeaderboardAnswer },
+    /// The site answered ask `id` for maplestory.market's figures (ADR 0030) with `answer`.
+    MarketAnswer { id: u64, answer: MarketAnswer },
     /// The player pressed Link Discord in the Personal Bests window.
     LinkDiscord {},
     /// The player said not now to the prompt to link Discord.
@@ -1902,6 +1905,9 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::LeaderboardAnswer { id, answer, .. } => {
                 minerva.on_leaderboard_answer(id, answer);
             }
+            Event::MarketAnswer { id, answer } => {
+                minerva.on_market_answer(id, answer);
+            }
             Event::LinkDiscord {} => {
                 minerva.link_discord();
             }
@@ -2016,6 +2022,7 @@ impl Recording {
                     | Event::ShowOnLeaderboards { .. }
                     | Event::SendToLeaderboardsAgain { .. }
                     | Event::LeaderboardAnswer { .. }
+                    | Event::MarketAnswer { .. }
                     | Event::LinkDiscord {}
                     | Event::DismissLinkPrompt {}
                     | Event::DiscordLinkAnswer { .. }
@@ -2320,7 +2327,11 @@ impl Event {
                 let name = or_unread(bar.name.as_ref().map(|name| format!("{name:?}")));
                 format!("Status Bar read: level {level}, {job}, {name}")
             }
-            Event::ChooseDealLine { line } => format!("Item Card's market line {line} chosen as the Deal Line"),
+            Event::ChooseDealLine { line } => format!("{line} chosen as the Deal Line"),
+            Event::MarketAnswer { id, answer: MarketAnswer::Answered { items, .. } } => {
+                format!("maplestory.market's figures for ask {id}: {} items", items.len())
+            }
+            Event::MarketAnswer { id, answer: MarketAnswer::Failed { why } } => format!("maplestory.market's figures for ask {id}: {why}"),
             Event::Restore { .. } => "settings restored".to_string(),
             Event::RestoreBests { bests } => {
                 let maps = bests.unassigned.len() + bests.characters.iter().map(|c| c.maps.len()).sum::<usize>();

@@ -13,7 +13,7 @@ use minerva_core::{
     ListedPrice, ScrollTier, ShopCapture, ShopHover, ShopList, ShopNearMiss, Verdict, ShopReading, ShopRow, StatusBarCapture, StatusBarNearMiss, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, DiscordLinkAnswer, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, STATUS_BAR_STRIP, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
-    TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
+    TitleReading, TrackingState, read_market_answer, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
 };
 
 /// The wall clock at capture time 0: 11 Oct 2026, 12:00 UTC.
@@ -1176,7 +1176,31 @@ fn the_deal_finder_replays_through_the_same_states_with_the_runs_item_files() {
     assert_eq!(replay.lines, recording.lines.len());
     let timeline = recording.timeline(0).join("\n");
     assert!(timeline.contains(r#"Player Shop read: "Bronze Ore" 1 for 999, ? 1 for 999"#), "{timeline}");
-    assert!(timeline.contains("market line 2 chosen as the Deal Line"), "{timeline}");
+    assert!(timeline.contains("2 chosen as the Deal Line"), "{timeline}");
+}
+
+/// The Deal Finder against maplestory.market's Going rate (ADR 0030): the site's answer to the
+/// ask for the shop's items is written down, and replays to the same badges.
+#[test]
+fn maplestory_markets_figures_are_written_down_and_replay_to_the_same_badges() {
+    let mut shell = Shell::new(FakeSource::osms().with_items(items()));
+    shell.minerva.set_deal_badges_size(Size { width: 160, height: 0 });
+    shell.play(10 * S, CONSTRUCTION_SITE, grind);
+    assert!(shell.minerva.on_hotkey("ctrl+shift+d").is_none());
+    shell.minerva.on_player_shop_read(shop_capture(10_400), shop_reading(&[Some("Bronze Ore")], 10_400));
+    let ask = shell.minerva.tick(10_500).market_asks[0].id;
+    let answer = r#"{"prices":{"pulledAt":1,"items":{"4010000":{"reference":{"unit_price":1500,"basis":"sold","samples":4},"sold":null,"seen":null}}},"listed":null}"#;
+    shell.minerva.on_market_answer(ask, read_market_answer(200, answer));
+    assert!(matches!(&shell.minerva.panel_state().deal_badges.as_ref().unwrap().badges[0].verdict, Verdict::Deal { line_mesos: 1500, .. }));
+    shell.play(20 * S, CONSTRUCTION_SITE, grind);
+
+    let (_, recording) = shell.report();
+    let replay = bug_report::replay_with(&recording, ReplayData { osms: Some(osms::game().files()), items: Some(items().files()) });
+
+    assert_eq!(replay.divergence, None);
+    let timeline = recording.timeline(0).join("
+");
+    assert!(timeline.contains("maplestory.market's figures for ask 1: 1 items"), "{timeline}");
 }
 
 /// The pointer on a listing whose name the game cut short so that it could be either Pet

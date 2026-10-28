@@ -6,7 +6,7 @@ Minerva bundles or uses the following third-party material. The app shows the sa
 
 - **Map, mob and item data, map pictures, Map Marks, mob animations and item pictures:** [OSMS Data Explorer](https://osmsdataexplorer.com) (by @ohmi), fetched from its site at run time and never bundled. Its data is mined from MapleStory Classic World, and the pictures, marks and animations are NEXON's art.
 - **Map, mob and item pages:** [NiaMeowDB](https://meowdb.com). Minerva opens its pages in your browser, and Item Lookup asks its search which page to open.
-- **Market prices:** [maplestory.market](https://maplestory.market). The Item Card's market section opens the item's page there in your browser; Minerva reads nothing from it.
+- **Market prices:** [maplestory.market](https://maplestory.market). The Item Card's Going rate and Cheapest now come from its API, asked by Minerva's site with its key under its API terms and never stored by the app, and the card's market section opens the item's page there in your browser.
 - MapleStory and its art are NEXON's. Minerva isn't made, endorsed or supported by NEXON.
 
 ## Text-recognition model (ocrs)

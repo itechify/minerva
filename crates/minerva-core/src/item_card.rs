@@ -14,6 +14,7 @@
 use crate::grind_tracker::ClientOffset;
 use crate::item_lookup::{ItemLookup, OurWindow, item_name};
 use crate::item_tooltip::{ItemTooltip, ItemTooltipReading};
+use crate::maplestory_market::{MARKET_REF, MARKET_SITE, Market, MarketRows};
 use crate::market_prices::{MarketPrice, MarketPrices};
 use crate::osms_items::{ItemFacts, ItemSet};
 use crate::panel::{GameWindow, ScreenPoint, ScreenRect, Size, in_view};
@@ -40,9 +41,10 @@ pub const ITEM_CARD_CREDIT: &str = "Data: OSMS Data Explorer · Pages: NiaMeowDB
 
 /// The item's page on maplestory.market, the listings in the Free Market's stores and the
 /// prices they sell at: the market section's buttons open it in the player's browser. Its
-/// address takes the game's item ID as a number, without the leading zeros the game writes.
+/// address takes the game's item ID as a number, without the leading zeros the game writes,
+/// and Minerva's link code, as maplestory.market's terms ask (ADR 0030).
 pub fn market_page(id: &str) -> String {
-    format!("https://maplestory.market/items/{}", id.trim_start_matches('0'))
+    format!("{MARKET_SITE}/items/{}?ref={MARKET_REF}", id.trim_start_matches('0'))
 }
 
 /// One of the card's Market Lines, with the price the player keeps on it for the item.
@@ -54,8 +56,6 @@ pub struct MarketLine {
     pub name: String,
     /// The price the player keeps on it for the item; `None` until they set one.
     pub price: Option<MarketPrice>,
-    /// It is the Deal Line, which the Deal Finder compares listings with (ADR 0014).
-    pub deal_line: bool,
 }
 
 /// What the card's market section has open: a field for the player to type in, or the
@@ -101,6 +101,9 @@ pub struct ItemCard {
     /// in; `None` until then.
     pub icon: Option<String>,
     pub shop: ShopPrice,
+    /// maplestory.market's Going rate and Cheapest now for the item (ADR 0030), above the
+    /// player's lines; `None` while the player has them off.
+    pub market_rows: Option<Box<MarketRows>>,
     /// Every Market Line, in the player's order, each with the item's price on it.
     pub market: Vec<MarketLine>,
     /// What the market section has open, while it has something.
@@ -400,6 +403,7 @@ impl ItemCards {
         items: Option<&ItemSet>,
         saved_copy_from: Option<u64>,
         market: &MarketPrices,
+        source: Option<&Market>,
         picture: impl Fn(&str) -> Option<String>,
     ) -> Option<ShownItemCard> {
         let shown = self.shown.as_ref()?;
@@ -407,18 +411,13 @@ impl ItemCards {
         let view = match &shown.showing {
             Showing::Card(ids) => {
                 let card = card(ids, items, &picture)?;
-                let deal_line = market.deal_line().map(|line| line.id.as_str());
                 let lines = market
                     .lines()
                     .iter()
-                    .map(|line| MarketLine {
-                        id: line.id.clone(),
-                        name: line.name.clone(),
-                        price: line.prices.get(&card.id).copied(),
-                        deal_line: deal_line == Some(line.id.as_str()),
-                    })
+                    .map(|line| MarketLine { id: line.id.clone(), name: line.name.clone(), price: line.prices.get(&card.id).copied() })
                     .collect();
                 ItemCardView::Card(ItemCard {
+                    market_rows: source.map(|source| Box::new(source.rows(&card.id))),
                     market: lines,
                     market_edit: shown.editing.as_ref().and_then(|editing| market_edit(editing, market)),
                     saved_copy_from_unix_ms: saved_copy_from,
@@ -468,6 +467,7 @@ fn card(ids: &[u32], items: &ItemSet, picture: impl Fn(&str) -> Option<String>) 
         name: first.name.clone(),
         icon: picture(&icon_path(&item_id(first.id))),
         shop: first.shop,
+        market_rows: None,
         market: Vec::new(),
         market_edit: None,
         saved_copy_from_unix_ms: None,

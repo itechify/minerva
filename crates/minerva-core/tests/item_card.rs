@@ -19,8 +19,9 @@ use common::{FakeSource, ItemSetAnswer, GAME, SAVED_AT, DAY, overlaps, POINTER, 
 use common::items::{ItemWorld, cash, equip, etc, item_world, scroll, setup, use_item, weapon};
 use minerva_core::{
     Action, Minerva, Foreground, Hotkey, ItemCard, ItemHit, ItemCardChoice, ItemCardView, ItemLookup, ItemTooltip,
-    ItemTooltipReading, MarketEdit, MarketImport, MarketPrice, NameProblem, OurWindow, PanelSizes, PanelState, Request, ScreenPoint, ScreenRect, ShopPrice,
-    Recognition, Size, SourceError, meowdb,
+    Asking, Basis, GoingRate, ItemTooltipReading, Listed, MarketAnswer, MarketAsk, MarketEdit, MarketImport, MarketPrice, MarketRows, NameProblem, Sales,
+    read_market_answer, OurWindow, PanelSizes, PanelState, Request, SavedMarketLine,
+    SavedMarketPrices, ScreenPoint, ScreenRect, ShopPrice, SourceRow, Recognition, Size, SourceError, meowdb,
 };
 use minerva_core::osms_items::ItemFiles;
 use std::sync::atomic::Ordering;
@@ -49,8 +50,17 @@ fn started_with(source: FakeSource) -> Minerva {
     minerva.set_item_card_size(CARD);
     minerva.on_game_window(Some(common::window_on_wide_screen(GAME)));
     common::found_title(&mut minerva, common::title_on(GAME), 0);
+    minerva.restore_market_prices(a_players_lines());
     minerva.tick(0);
     minerva
+}
+
+/// A player's market prices from before maplestory.market's figures (ADR 0030): the one line
+/// every player started with then, "Your price", with no prices yet, and chosen as the Deal
+/// Line, as it was then. A new player starts with none.
+fn a_players_lines() -> SavedMarketPrices {
+    let line = SavedMarketLine { id: "1".into(), name: "Your price".into(), prices: Default::default() };
+    SavedMarketPrices { lines: vec![line], deal_line: Some("1".into()), ..SavedMarketPrices::default() }
 }
 
 /// The made-up item data in.
@@ -577,6 +587,7 @@ fn started_at(source: FakeSource, now_unix_ms: u64) -> Minerva {
     minerva.set_item_card_size(CARD);
     minerva.on_game_window(Some(common::window_on_wide_screen(GAME)));
     common::found_title(&mut minerva, common::title_on(GAME), 0);
+    minerva.restore_market_prices(a_players_lines());
     minerva.tick(0);
     minerva
 }
@@ -779,7 +790,7 @@ fn the_cards_market_section_opens_the_items_page_on_maplestory_market() {
 
     press_over(&mut minerva, "Bronze Ore", 1_000);
 
-    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/4010000"));
+    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/4010000?ref=76rbdbd7"));
 }
 
 #[test]
@@ -788,7 +799,7 @@ fn of_items_that_look_alike_the_market_page_is_the_first_ones_whose_prices_the_c
 
     press_over(&mut minerva, "Red Potion", 1_000);
 
-    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/2000000"));
+    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/2000000?ref=76rbdbd7"));
 }
 
 #[test]
@@ -799,7 +810,7 @@ fn of_items_sharing_a_name_the_market_page_is_the_picked_ones_and_none_before_th
 
     minerva.pick_card_item("01032001");
 
-    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/1032001"));
+    assert_eq!(market_page(&minerva).as_deref(), Some("https://maplestory.market/items/1032001?ref=76rbdbd7"));
 }
 
 #[test]
@@ -889,12 +900,15 @@ fn not_set(names: &[&str]) -> Vec<(String, Option<u64>)> {
 }
 
 #[test]
-fn a_card_starts_with_one_market_line_and_no_price_on_it() {
+fn a_new_players_card_has_maplestory_markets_figures_and_no_lines_of_their_own() {
     let mut minerva = started();
+    minerva.restore_market_prices(SavedMarketPrices::default());
 
     let state = press_over(&mut minerva, "Bronze Ore", 1_000);
 
-    assert_eq!(market(&state), not_set(&["Your price"]));
+    assert!(market(&state).is_empty());
+    let loading = MarketRows { going_rate: SourceRow::Loading, cheapest: SourceRow::Loading, any_roll: false };
+    assert_eq!(card(&state).expect("a card").market_rows, Some(Box::new(loading)));
     assert_eq!(editing(&state), None);
 }
 
@@ -1034,7 +1048,7 @@ fn a_price_kept_before_there_were_lines_is_on_the_first_line() {
     let state = press_over(&mut minerva, "Bronze Ore", 1_000);
 
     assert_eq!(market(&state), [("Your price".to_string(), Some(450_000))]);
-    assert_eq!(minerva.market_prices().version, 2, "saved in the shape with lines from then on");
+    assert_eq!(minerva.market_prices().version, 3, "saved in the shape with lines from then on");
 }
 
 #[test]
@@ -1274,7 +1288,7 @@ fn with_every_line_removed_the_card_has_none_until_the_player_adds_one() {
 fn a_line_keeps_the_id_it_was_saved_with_and_a_new_line_takes_none_of_theirs() {
     let mut minerva = started();
     // Lines as a tool of the player's own might write them, beside the player's.
-    let kept = r#"{"version":2,"lines":[
+    let kept = r#"{"version":3,"lines":[
         {"id":"1","name":"Your price","prices":{}},
         {"id":"tool-typical","name":"Typical","prices":{"04010000":{"mesos":500000}}},
         {"id":"4","name":"Mine","prices":{}}]}"#;
@@ -1448,4 +1462,129 @@ fn imported_prices_are_saved_with_the_rest_and_restored_at_the_next_launch() {
 
     let state = press_over(&mut next, "Bronze Ore", 1_000);
     assert_eq!(market(&state), [("Your price".to_string(), None), ("Typical".to_string(), Some(500_000))]);
+}
+
+// maplestory.market's figures on the card (ADR 0030): the site's Worker answers in its shape,
+// made up here; nothing real from maplestory.market is in the tests.
+
+/// When the made-up Worker pulled its made-up tables: a little before `SAVED_AT`.
+const PULLED: u64 = SAVED_AT - 10 * 60_000;
+
+/// The made-up Worker's answer, in its shape: `prices` and `listed`, each `null` or a table
+/// with the items given.
+fn worker(prices: Option<&str>, listed: Option<&str>) -> MarketAnswer {
+    let table = |items: Option<&str>| items.map_or("null".to_string(), |items| format!(r#"{{"pulledAt":{PULLED},"items":{{{items}}}}}"#));
+    read_market_answer(200, &format!(r#"{{"prices":{},"listed":{}}}"#, table(prices), table(listed)))
+}
+
+/// A made-up row of /api/prices for item `id` (maplestory.market's number), its Going rate
+/// `reference` (JSON, or `null`).
+fn priced(id: &str, reference: &str) -> String {
+    format!(
+        r#""{id}":{{"reference":{reference},"sold":{{"sales":12,"units":40,"avg_unit_price":130.5,"median_unit_price":120,"day_sales":3,"day_units":9}},"seen":{{"listings":30,"median_unit_price":125,"p25_unit_price":110,"p75_unit_price":160}}}}"#
+    )
+}
+
+/// The ask the card made at the tick after its press, answered with `answer`.
+fn answer_the_ask(minerva: &mut Minerva, at_ms: u64, answer: MarketAnswer) -> PanelState {
+    let asks = minerva.tick(at_ms).market_asks.clone();
+    assert_eq!(asks.len(), 1, "{asks:?}");
+    minerva.on_market_answer(asks[0].id, answer).clone()
+}
+
+fn rows(state: &PanelState) -> MarketRows {
+    *card(state).expect("a card").market_rows.expect("maplestory.market's rows")
+}
+
+#[test]
+fn a_cards_item_is_asked_of_the_site_and_its_going_rate_and_cheapest_listing_shown() {
+    let mut minerva = started();
+    press_over(&mut minerva, "Bronze Ore", 1_000);
+    assert_eq!(rows(minerva.panel_state()).going_rate, SourceRow::Loading, "until the site answers");
+
+    let asks = minerva.tick(1_100).market_asks.clone();
+    assert_eq!(asks.iter().map(MarketAsk::path).collect::<Vec<_>>(), ["api/market?ids=4010000"]);
+    let reference = r#"{"unit_price":120.4,"basis":"sold","samples":12,"scope":"item"}"#;
+    let answer = worker(Some(&priced("4010000", reference)), Some(r#""4010000":{"min_unit_price":95,"listings":7}"#));
+    let state = minerva.on_market_answer(asks[0].id, answer).clone();
+
+    let going_rate = GoingRate { mesos: 120, basis: Basis::Sold, samples: 12 };
+    let sales = Some(Sales { sales: 12, today: 3 });
+    let asking = Some(Asking { low: 110, high: 160, listings: 30 });
+    assert_eq!(
+        rows(&state),
+        MarketRows {
+            going_rate: SourceRow::GoingRate { going_rate, sales, asking, as_of_unix_ms: PULLED },
+            cheapest: SourceRow::Cheapest { listed: Listed { cheapest: 95, listings: 7 }, as_of_unix_ms: PULLED },
+            any_roll: false,
+        }
+    );
+    assert!(state.market_asks.is_empty());
+    assert_eq!(market(&state), not_set(&["Your price"]), "the player's lines below");
+}
+
+#[test]
+fn the_rows_say_when_maplestory_market_has_no_figure_for_the_item() {
+    let mut minerva = started();
+    // Neither listed nor sold lately: in neither table.
+    press_over(&mut minerva, "Bronze Ore", 1_000);
+    let state = answer_the_ask(&mut minerva, 1_100, worker(Some(""), Some("")));
+    assert_eq!((rows(&state).going_rate, rows(&state).cheapest), (SourceRow::NoneListed, SourceRow::NoneListed));
+
+    // Equipment, with no Going rate: its sales too few, its asking prices too far apart.
+    press_over(&mut minerva, "Blue Moon", 2_000);
+    let state = answer_the_ask(&mut minerva, 2_100, worker(Some(&priced("1002067", "null")), Some("")));
+    assert_eq!(rows(&state), MarketRows { going_rate: SourceRow::NoPrice, cheapest: SourceRow::NoneListed, any_roll: true });
+
+    // The site has never pulled a table (it has no key).
+    press_over(&mut minerva, "Red Potion", 3_000);
+    let state = answer_the_ask(&mut minerva, 3_100, worker(None, None));
+    assert_eq!((rows(&state).going_rate, rows(&state).cheapest), (SourceRow::NotAvailable, SourceRow::NotAvailable));
+}
+
+#[test]
+fn with_the_site_unreachable_the_rows_say_so_and_it_is_asked_again_a_minute_on() {
+    let mut minerva = started();
+    press_over(&mut minerva, "Bronze Ore", 1_000);
+
+    let state = answer_the_ask(&mut minerva, 1_100, MarketAnswer::Failed { why: "the site couldn't be reached".into() });
+    assert_eq!(rows(&state).cheapest, SourceRow::NotAvailable);
+    assert!(minerva.tick(30_000).market_asks.is_empty(), "not again within a minute");
+
+    let state = answer_the_ask(&mut minerva, 61_200, worker(Some(""), Some(r#""4010000":{"min_unit_price":95,"listings":7}"#)));
+    assert_eq!(rows(&state).cheapest, SourceRow::Cheapest { listed: Listed { cheapest: 95, listings: 7 }, as_of_unix_ms: PULLED });
+}
+
+#[test]
+fn an_items_figures_are_asked_again_only_once_the_sites_table_is_an_hour_old() {
+    let mut minerva = started_at(FakeSource::osms_offline().with_items(shop()), SAVED_AT);
+    press_over(&mut minerva, "Bronze Ore", 1_000);
+    answer_the_ask(&mut minerva, 1_100, worker(Some(""), Some(r#""4010000":{"min_unit_price":95,"listings":7}"#)));
+
+    press_over(&mut minerva, "Bronze Ore", 120_000);
+    assert!(minerva.tick(120_100).market_asks.is_empty(), "held");
+
+    // The table was pulled 10 minutes before; 50 minutes on, it is an hour old.
+    minerva.on_wall_clock(SAVED_AT + 50 * 60_000);
+    let state = minerva.tick(130_000).clone();
+    assert_eq!(state.market_asks.len(), 1, "asked again");
+    assert!(matches!(rows(&state).cheapest, SourceRow::Cheapest { .. }), "what is held shows meanwhile");
+}
+
+#[test]
+fn turned_off_nothing_is_asked_and_the_card_shows_none_of_it() {
+    let mut minerva = started();
+    press_over(&mut minerva, "Bronze Ore", 1_000);
+    let asks = minerva.tick(1_100).market_asks.clone();
+
+    let state = minerva.act(Action::SetMarketPrices { on: false }).clone();
+    assert_eq!(card(&state).expect("a card").market_rows, None);
+    assert!(state.market_asks.is_empty(), "the ask under way dropped");
+    let state = minerva.on_market_answer(asks[0].id, worker(Some(""), Some(""))).clone();
+    assert_eq!(card(&state).expect("a card").market_rows, None);
+    assert!(minerva.tick(120_000).market_asks.is_empty());
+    assert!(!minerva.settings().market_prices, "saved with the settings");
+
+    minerva.act(Action::SetMarketPrices { on: true });
+    assert_eq!(minerva.tick(120_100).market_asks.len(), 1, "asked once on again");
 }

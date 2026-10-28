@@ -1,6 +1,6 @@
 // The Worker's tests (`pnpm site:test`), run in workerd against a local D1 with the
 // migrations applied, a made-up ceilings table, a made-up maintainer token, a made-up Discord
-// application and a made-up ClassicRank.
+// application, a made-up ClassicRank and a made-up maplestory.market.
 import path from "node:path";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
@@ -28,6 +28,9 @@ export default defineConfig(async () => {
             // A made-up ClassicRank key. The tests take the Worker's asks of ClassicRank off the
             // global fetch and answer them from a made-up ClassicRank (test/classicrank.ts).
             CLASSICRANK_KEY: "crk_made-up-key",
+            // A made-up maplestory.market key. test/market.test.ts takes the Worker's asks of
+            // maplestory.market off the global fetch and answers them with made-up tables.
+            MM_API_KEY: "mm_made-up-key",
             // A made-up ceilings table, in place of osms-ceilings.json: test/api.ts's maps, and
             // test/where-to-train.test.ts's, with a made-up Map Mark that test/latest.test.ts and
             // test/announce.test.ts show on 100000060.

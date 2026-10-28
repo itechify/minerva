@@ -34,6 +34,8 @@ struct BadgesView<'a> {
     badges: &'a [DealBadge],
     /// The Deal Line's name, for each badge's words.
     deal_line: Option<&'a str>,
+    /// The Deal Line is one of maplestory.market's figures, which the player can't set a price on.
+    from_market: bool,
 }
 
 /// Show the badges where the core says, or nothing; and take clicks only while there are
@@ -43,6 +45,7 @@ pub fn sync(window: &mut PanelWindow, state: &PanelState) {
     let view = BadgesView {
         badges: shown.map_or(&[], |shown| &shown.badges),
         deal_line: state.deal_finder.deal_line.as_deref(),
+        from_market: state.deal_finder.from_market,
     };
     let shows = Shows { placement: shown.map(|shown| shown.placement), clickable: state.deal_badges_clickable, takes_keyboard: false };
     window.sync(&view, shows);

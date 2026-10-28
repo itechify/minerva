@@ -107,9 +107,3 @@ pub fn item_card_enter_market_line(typed: String, commands: State<'_, Sender<Com
     let _ = commands.send(Command::EnterCardMarketLine(typed));
 }
 
-/// The player chose the Market Line with this ID as the Deal Line, which the Deal Finder
-/// compares listings with.
-#[tauri::command]
-pub fn item_card_choose_deal_line(line: String, commands: State<'_, Sender<Command>>) {
-    let _ = commands.send(Command::ChooseDealLine(line));
-}

@@ -64,9 +64,19 @@ pnpm exec wrangler secret put CLASSICRANK_KEY --config site/wrangler.jsonc
 
 Paste the key. Check it with `curl -i -H "Authorization: Bearer <key>" https://classicrank.com/api/v1`: the `X-Read-Key` header says `accepted`, and the answer's `your_key` gives its tier. Portraits show from each Character's next upload, and for everyone at the next daily run (the cron trigger in `site/wrangler.jsonc`, 05:17 UTC). Until then the boards show the question-mark figure, so once the deploy with the key is live, run the refresh at once: `curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/portraits`, which answers 204 when it's done. For `wrangler dev`, put `CLASSICRANK_KEY=...` in `site/.dev.vars`; an unknown key there is served as ClassicRank's keyless tier, which is enough to try it. To stop the portraits, `pnpm exec wrangler secret delete CLASSICRANK_KEY --config site/wrangler.jsonc`: from then on the answers carry none, and the pages show none.
 
-## 7. Deploy the API before any app that uses it
+## 7. Set the maplestory.market key (optional)
 
-The API must be live before any Minerva version that uses it is released: one that uploads (#110), one that links a PC to an Account (#152), or one that uploads a Party Best as an entry of its own (#173: an older Worker refuses a set with two entries for one map and Level Band). Migration `0005_party_entries.sql` makes `entries` and `removed_entries` again with the entry's kind in their keys, every entry before it a Party Best (an entry of no known kind is one: a player's earlier bests rank as Party Bests until they set a Solo Best), and the Worker reads an upload entry with no `party` the same way; it keeps the Worker before it working until the deploy after. Once this is on `main`, publish the site from `main`:
+The Item Card's and the Deal Finder's prices come from maplestory.market's API (ADR 0030), which the Worker asks with a key: asked for on the Account page at [maplestory.market](https://maplestory.market) and approved by its admins, under its [API terms](https://maplestory.market/docs/api/terms). It is optional: with no secret set, the Worker never asks maplestory.market, and the app shows its prices as not available. The key is a secret, so it is never committed; keep it in the password manager beside `ADMIN_TOKEN`. The key's link code (`?ref=`) isn't secret: the app adds it to its links to maplestory.market.
+
+```bash
+pnpm exec wrangler secret put MM_API_KEY --config site/wrangler.jsonc
+```
+
+Paste the key. Check it with `curl -s "https://owlofminerva.app/api/market?ids=4010000"` once the deploy is live: the first read pulls both tables, and `prices` and `listed` come back with their `pulledAt`. The key's limit (6 requests a minute) is far above what the Worker asks: each table at most once an hour. To stop the prices, `pnpm exec wrangler secret delete MM_API_KEY --config site/wrangler.jsonc`: from then on reads give none, and the app says they're not available.
+
+## 8. Deploy the API before any app that uses it
+
+The API must be live before any Minerva version that uses it is released: one that uploads (#110), one that links a PC to an Account (#152), one that uploads a Party Best as an entry of its own (#173: an older Worker refuses a set with two entries for one map and Level Band), or one that shows maplestory.market's prices (ADR 0030: an older Worker has no `/api/market`, and the cards say the prices aren't available). Migration `0005_party_entries.sql` makes `entries` and `removed_entries` again with the entry's kind in their keys, every entry before it a Party Best (an entry of no known kind is one: a player's earlier bests rank as Party Bests until they set a Solo Best), and the Worker reads an upload entry with no `party` the same way; it keeps the Worker before it working until the deploy after. Once this is on `main`, publish the site from `main`:
 
 ```bash
 gh workflow run site.yml -f ref=main

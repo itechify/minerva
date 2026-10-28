@@ -1,5 +1,5 @@
 ---
-status: accepted, amended 2026-10-21 (item files another version saved are fetched afresh at launch, and Refresh fetches them with the map set) and 2026-10-27 (the market section opens the item's page on maplestory.market, in place of MesoWatch's home page)
+status: accepted, amended 2026-10-21 (item files another version saved are fetched afresh at launch, and Refresh fetches them with the map set) and 2026-10-27 (the market section opens the item's page on maplestory.market, in place of MesoWatch's home page) and 2026-10-28 (the card shows maplestory.market's Going rate and Cheapest now, ADR 0030)
 ---
 
 # The Item Card, from OSMS's item files, with the player's own market price

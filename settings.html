@@ -32,9 +32,21 @@
             <button type="button" class="text-button" id="hotkeys-reset" data-focus="reset">Restore defaults</button>
           </div>
           <div class="settings-head">
-            <h3 class="settings-heading" id="deal-heading">Deal Finder</h3>
-            <p class="settings-intro" id="deal-intro">A listing is a deal when one item costs at least this much less than its price on the Deal Line. Choose the Deal Line on any Item Card.</p>
+            <h3 class="settings-heading">Market Prices</h3>
+            <p class="settings-intro" id="market-intro">Item Cards show the Going rate and Cheapest now from maplestory.market, and the Deal Finder can judge against them. Minerva asks owlofminerva.app for the items you look at, sending only their item numbers. Off, it asks for none.</p>
           </div>
+          <label class="grind-switch" aria-describedby="market-intro">
+            <span class="action">Prices from maplestory.market</span>
+            <input type="checkbox" id="market-prices-on" data-focus="market-prices" />
+          </label>
+          <div class="settings-head">
+            <h3 class="settings-heading" id="deal-heading">Deal Finder</h3>
+            <p class="settings-intro" id="deal-intro">A listing is a deal when one item costs at least the Deal Margin less than its price on the Deal Line.</p>
+          </div>
+          <fieldset class="deal-lines" aria-describedby="deal-intro">
+            <legend class="action">Deal Line</legend>
+            <div class="deal-line-choices" id="deal-line-choices"></div>
+          </fieldset>
           <div class="deal-margin" role="group" aria-labelledby="deal-heading" aria-describedby="deal-intro">
             <label class="action" for="deal-margin">Deal Margin</label>
             <span class="deal-margin-field">

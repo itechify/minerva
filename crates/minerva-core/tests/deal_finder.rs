@@ -16,7 +16,7 @@ mod common;
 use common::{FakeSource, GAME, SCREEN};
 use common::items::{ItemWorld, equip, etc, item_world, scroll, use_item};
 use minerva_core::{
-    Action, DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Edge, Foreground, GameWindow, Hotkey, Hotkeys, ItemCardView, ListedPrice,
+    Action, CHEAPEST_LINE, DealBadge, DealBadges, DealGrade, DealItem, GOING_RATE_LINE, MarketAnswer, MarketAsk, read_market_answer, Edge, Foreground, GameWindow, Hotkey, Hotkeys, ItemCardView, ListedPrice,
     MarketPrice, Minerva, PanelControl, PanelSizes, PanelState, Request, SavedMarketLine, SavedMarketPrices, ScreenRect, ScrollTier, ShopHover, ShopList, ShopReading, ShopRow, Size, Verdict, ItemTooltip, ScreenPoint,
 };
 use std::task::Poll;
@@ -56,7 +56,8 @@ fn items() -> ItemWorld {
     .with_scroll(scroll(2_044_702, "Claw Attack Scroll: Greater").of_tier("Greater"))
 }
 
-/// The market prices: "Your price" and "Lowest ask", with a few prices on each.
+/// The market prices: "Your price" and "Lowest ask", with a few prices on each, "Your price"
+/// chosen as the Deal Line.
 fn market() -> SavedMarketPrices {
     let line = |id: &str, name: &str, prices: &[(&str, u64)]| SavedMarketLine {
         id: id.into(),
@@ -72,6 +73,7 @@ fn market() -> SavedMarketPrices {
             ),
             line("2", "Lowest ask", &[(GARNET, 900), (GARNET_ORE, 700)]),
         ],
+        deal_line: Some("1".into()),
         ..SavedMarketPrices::default()
     }
 }
@@ -134,7 +136,8 @@ fn verdicts(state: &PanelState) -> Vec<Verdict> {
 #[test]
 fn it_is_off_at_launch_and_its_hotkey_turns_it_on_and_off() {
     let mut minerva = started();
-    assert_eq!(minerva.panel_state().deal_finder, DealFinderView { on: false, deal_line: Some("Your price".into()), margin_percent: 0, shop_found: false });
+    let view = &minerva.panel_state().deal_finder;
+    assert_eq!((view.on, view.deal_line.as_deref(), view.margin_percent, view.shop_found), (false, Some("Your price"), 0, false));
     assert_eq!(minerva.panel_state().deal_finder_capture, None, "nothing captured while it is off");
     assert_eq!(minerva.panel_state().hotkeys.deal_finder, "ctrl+shift+d");
 
@@ -307,19 +310,22 @@ fn the_deal_margin_is_how_far_below_the_line_a_deal_must_be() {
     assert_eq!(minerva.panel_state().deal_finder.margin_percent, 99, "at most 99%");
 }
 
+/// The Settings window's choices for the Deal Line, the chosen one marked.
+fn choices(state: &PanelState) -> Vec<(String, bool)> {
+    state.deal_finder.choices.iter().map(|choice| (choice.name.clone(), choice.chosen)).collect()
+}
+
 #[test]
-fn the_deal_line_is_chosen_on_the_item_card_and_saved_with_the_market_prices() {
+fn the_deal_line_is_chosen_in_the_settings_window_and_saved_with_the_market_prices() {
     let mut minerva = on();
     minerva.on_player_shop_reading(shop(vec![row(0, Some("Garnet"), Some((1, 999)))], 400));
-    minerva.act(Action::OpenDealItem { row: 0 });
-    let marked = |state: &PanelState| match &state.item_card.as_ref().unwrap().view {
-        ItemCardView::Card(card) => card.market.iter().filter(|line| line.deal_line).map(|line| line.id.clone()).collect::<Vec<_>>(),
-        _ => panic!("a card"),
+    let offered = |chosen: &str| {
+        ["Going rate", "Cheapest now", "Your price", "Lowest ask"].map(|name| (name.to_string(), name == chosen)).to_vec()
     };
-    assert_eq!(marked(minerva.panel_state()), ["1"], "the first line until the player chooses");
+    assert_eq!(choices(minerva.panel_state()), offered("Your price"), "maplestory.market's figures, then the player's lines");
 
     let state = minerva.choose_deal_line("2");
-    assert_eq!(marked(state), ["2"]);
+    assert_eq!(choices(state), offered("Lowest ask"));
     assert_eq!(state.deal_finder.deal_line.as_deref(), Some("Lowest ask"));
     assert_eq!(
         verdicts(state),
@@ -328,12 +334,13 @@ fn the_deal_line_is_chosen_on_the_item_card_and_saved_with_the_market_prices() {
     );
     assert_eq!(minerva.market_prices().deal_line.as_deref(), Some("2"));
 
-    // Removing it, the first line is the Deal Line again.
+    // Removing it on its card, the Going rate is the Deal Line again.
+    minerva.act(Action::OpenDealItem { row: 0 });
     minerva.edit_card_market_line("2");
     minerva.act(Action::AskRemoveCardMarketLine);
     let state = minerva.act(Action::RemoveCardMarketLine);
-    assert_eq!(marked(state), ["1"]);
-    assert_eq!(state.deal_finder.deal_line.as_deref(), Some("Your price"));
+    assert_eq!(choices(state), offered("Going rate")[..3].to_vec());
+    assert_eq!((state.deal_finder.deal_line.as_deref(), state.deal_finder.from_market), (Some("Going rate"), true));
     assert_eq!(minerva.market_prices().deal_line, None);
 }
 
@@ -461,11 +468,17 @@ fn its_hotkey_is_rebound_like_the_others() {
 }
 
 #[test]
-fn market_prices_saved_before_the_deal_line_read_with_the_first_line_as_it() {
-    let saved: SavedMarketPrices = serde_json::from_str(r#"{"version":2,"lines":[{"id":"1","name":"Your price"}]}"#).unwrap();
-    assert_eq!(saved.deal_line, None);
-    let written = serde_json::to_string(&SavedMarketPrices { deal_line: Some("1".into()), ..saved }).unwrap();
+fn market_prices_saved_with_no_deal_line_chosen_keep_their_first_line_as_it() {
+    let saved: SavedMarketPrices =
+        serde_json::from_str(r#"{"version":2,"lines":[{"id":"1","name":"Your price","prices":{"04020000":{"mesos":1000}}},{"id":"2","name":"Lowest ask"}]}"#)
+            .unwrap();
+    assert_eq!((saved.version, saved.deal_line.as_deref()), (3, Some("1")), "no player's badges change");
+    let written = serde_json::to_string(&saved).unwrap();
     assert!(written.contains(r#""dealLine":"1""#), "{written}");
+
+    let chosen: SavedMarketPrices =
+        serde_json::from_str(r#"{"version":2,"lines":[{"id":"1","name":"Your price"},{"id":"2","name":"Mine"}],"dealLine":"2"}"#).unwrap();
+    assert_eq!(chosen.deal_line.as_deref(), Some("2"), "a line chosen stays chosen");
 }
 
 fn badge(state: &PanelState, row: u32) -> (bool, Verdict) {
@@ -856,4 +869,91 @@ fn a_tier_read_stands_while_the_pointer_covers_the_picture() {
     // Another listing where it was: what was read there before is gone.
     let state = minerva.on_player_shop_reading(shop(vec![row(0, Some(SWORD_SCROLL), Some((1, 9_000)))], 2_000));
     assert_eq!(badge(state, 0), (false, Verdict::Unknown));
+}
+
+// Against maplestory.market's figures (ADR 0030): the site's Worker answers in its shape, made
+// up here; nothing real from maplestory.market is in the tests.
+
+/// The made-up Worker's answer: a Going rate from sales for each of `rates`, and the cheapest
+/// listing for each of `cheapest`, by maplestory.market's number for the item.
+fn worker(rates: &[(&str, u64)], cheapest: &[(&str, u64)]) -> MarketAnswer {
+    let rates: Vec<String> = rates
+        .iter()
+        .map(|(id, mesos)| format!(r#""{id}":{{"reference":{{"unit_price":{mesos},"basis":"sold","samples":9,"scope":"item"}},"sold":null,"seen":null}}"#))
+        .collect();
+    let cheapest: Vec<String> = cheapest.iter().map(|(id, mesos)| format!(r#""{id}":{{"min_unit_price":{mesos},"listings":4}}"#)).collect();
+    read_market_answer(
+        200,
+        &format!(r#"{{"prices":{{"pulledAt":1,"items":{{{}}}}},"listed":{{"pulledAt":1,"items":{{{}}}}}}}"#, rates.join(","), cheapest.join(",")),
+    )
+}
+
+/// A shop with a Garnet at 999, a Garnet Ore at 1,008 and a Bronze Ore at 177.
+fn three_listings() -> ShopReading {
+    shop(vec![row(0, Some("Garnet"), Some((1, 999))), row(1, Some("Garnet Ore"), Some((1, 1_008))), row(2, Some("Bronze Ore"), Some((1, 177)))], 400)
+}
+
+#[test]
+fn against_the_going_rate_a_shops_items_are_asked_of_the_site_in_one_ask_and_judged_once_answered() {
+    let mut minerva = on();
+    minerva.choose_deal_line(GOING_RATE_LINE);
+    let state = minerva.on_player_shop_reading(three_listings()).clone();
+    assert!(verdicts(&state).iter().all(|verdict| matches!(verdict, Verdict::NoPrice { .. })), "until the site answers");
+
+    let asks = minerva.tick(500).market_asks.clone();
+    assert_eq!(asks.iter().map(MarketAsk::path).collect::<Vec<_>>(), ["api/market?ids=4021000,4020000,4010000"]);
+    let state = minerva.on_market_answer(asks[0].id, worker(&[("4021000", 1_470), ("4020000", 900)], &[])).clone();
+
+    assert_eq!(
+        verdicts(&state),
+        [
+            Verdict::Deal { item: item(GARNET, "Garnet"), listed: listed(1, 999), percent: -32, line_mesos: 1_470, grade: DealGrade::Great },
+            Verdict::NoDeal { item: item(GARNET_ORE, "Garnet Ore"), listed: listed(1, 1_008), percent: 12, line_mesos: 900 },
+            Verdict::NoPrice { item: item(BRONZE_ORE, "Bronze Ore"), listed: listed(1, 177) },
+        ]
+    );
+    assert_eq!((state.deal_finder.deal_line.as_deref(), state.deal_finder.from_market), (Some("Going rate"), true), "the panel credits it");
+}
+
+#[test]
+fn against_cheapest_now_a_listing_is_judged_by_the_cheapest_listed() {
+    let mut minerva = on();
+    minerva.choose_deal_line(CHEAPEST_LINE);
+    minerva.on_player_shop_reading(three_listings());
+
+    let asks = minerva.tick(500).market_asks.clone();
+    let state = minerva.on_market_answer(asks[0].id, worker(&[], &[("4021000", 999), ("4020000", 1_120)])).clone();
+
+    assert_eq!(
+        verdicts(&state)[..2],
+        [
+            Verdict::NoDeal { item: item(GARNET, "Garnet"), listed: listed(1, 999), percent: 0, line_mesos: 999 },
+            Verdict::Deal { item: item(GARNET_ORE, "Garnet Ore"), listed: listed(1, 1_008), percent: -10, line_mesos: 1_120, grade: DealGrade::Good },
+        ]
+    );
+    assert_eq!(state.deal_finder.deal_line.as_deref(), Some("Cheapest now"));
+}
+
+#[test]
+fn against_a_players_line_nothing_is_asked_of_the_site() {
+    let mut minerva = on();
+    minerva.on_player_shop_reading(three_listings());
+
+    assert!(minerva.tick(500).market_asks.is_empty());
+}
+
+#[test]
+fn turned_off_the_deal_line_falls_back_to_the_players_first_line_until_it_is_on_again() {
+    let mut minerva = on();
+    minerva.choose_deal_line(GOING_RATE_LINE);
+    minerva.on_player_shop_reading(three_listings());
+
+    let state = minerva.act(Action::SetMarketPrices { on: false }).clone();
+    assert_eq!((state.deal_finder.deal_line.as_deref(), state.deal_finder.from_market), (Some("Your price"), false));
+    assert_eq!(choices(&state), [("Your price".to_string(), true), ("Lowest ask".to_string(), false)], "offered no more");
+    assert_eq!(verdicts(&state)[0], garnet_deal(), "judged against the player's line");
+    assert!(minerva.tick(500).market_asks.is_empty());
+
+    let state = minerva.act(Action::SetMarketPrices { on: true });
+    assert_eq!(state.deal_finder.deal_line.as_deref(), Some("Going rate"), "the choice kept");
 }

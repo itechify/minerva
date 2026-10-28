@@ -99,7 +99,9 @@ mod tests {
         assert_eq!(none, SavedMarketPrices::default());
 
         let mut prices = SavedMarketPrices::default();
-        prices.lines[0].prices.insert("04010000".into(), MarketPrice { mesos: 450_000, set_at_unix_ms: Some(1_791_720_000_000) });
+        let mut mine = SavedMarketLine { id: "1".into(), name: "Your price".into(), prices: Default::default() };
+        mine.prices.insert("04010000".into(), MarketPrice { mesos: 450_000, set_at_unix_ms: Some(1_791_720_000_000) });
+        prices.lines.push(mine);
         prices.lines.push(SavedMarketLine { id: "2".into(), name: "Lowest ask".into(), prices: Default::default() });
         first.save(&prices).unwrap();
 
@@ -122,7 +124,7 @@ mod tests {
     #[test]
     fn prices_saved_in_a_later_shape_are_set_aside() {
         let path = file("later-shape");
-        fs::write(&path, br#"{"version":3,"lines":[]}"#).unwrap();
+        fs::write(&path, br#"{"version":4,"lines":[]}"#).unwrap();
 
         let (_, prices) = MarketPricesFile::load(path.clone());
 
@@ -176,7 +178,7 @@ mod tests {
 
     #[test]
     fn an_import_that_doesnt_read_or_is_in_another_shape_is_set_aside() {
-        let dir = imports("bad", &[("broken.json", "not json"), ("later.json", r#"{"version":3,"lines":[]}"#), ("tool.json", TYPICAL)]);
+        let dir = imports("bad", &[("broken.json", "not json"), ("later.json", r#"{"version":4,"lines":[]}"#), ("tool.json", TYPICAL)]);
 
         let taken = take_imports(&dir);
 

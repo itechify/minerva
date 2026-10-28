@@ -56,6 +56,15 @@ pub(crate) async fn send(
     if let Some(body) = body {
         request = request.header(reqwest::header::CONTENT_TYPE, "application/json").body(body);
     }
+    reply(request, url).await
+}
+
+/// `GET` `url`, with no key; the reply, whatever its status, or why none came (naming the URL).
+pub(crate) async fn get(client: &reqwest::Client, url: &str) -> Result<Reply, String> {
+    reply(client.get(url), url).await
+}
+
+async fn reply(request: reqwest::RequestBuilder, url: &str) -> Result<Reply, String> {
     let sent = async {
         let response = request.send().await?;
         let status = response.status().as_u16();
