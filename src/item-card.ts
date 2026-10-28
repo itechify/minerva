@@ -212,38 +212,38 @@ const plural = (n: number, one: string, many = `${one}s`) => `${whole(n)} ${n ==
 /** One of maplestory.market's rows: its name, and its figure right-aligned as a line's price
  * is, or why there is none; what is behind it in its tooltip. Not a link: it can't be changed. */
 function sourceRow(name: string, row: SourceRow, anyRoll: boolean): HTMLElement {
-  const roll = anyRoll ? " Of every copy, whatever its stats." : "";
+  const roll = anyRoll ? " Covers every copy, whatever its stats." : "";
   const asOf = (unixMs: number) => ` As of ${momentText(unixMs)}.`;
   let value: string;
   let about: string;
   switch (row.status) {
     case "loading":
-      [value, about] = ["…", "Asking maplestory.market."];
+      [value, about] = ["…", "Asking maplestory.market for prices."];
       break;
     case "notAvailable":
-      [value, about] = ["Not available", "maplestory.market's prices couldn't be had. Minerva asks again in a minute."];
+      [value, about] = ["Not available", "Couldn't get prices from maplestory.market. Minerva asks again in a minute."];
       break;
     case "noneListed":
       value = "None listed";
       about = name === "Going rate" ? "Nothing listed or sold on maplestory.market in 3 days." : "Nothing listed on maplestory.market now.";
       break;
     case "noPrice":
-      [value, about] = ["No price", "Too few recent sales, and asking prices missing or too far apart."];
+      [value, about] = ["No price", "There are too few recent sales, and the asking prices are missing or too far apart."];
       break;
     case "goingRate": {
       const { goingRate, sales, asking } = row;
       value = mesos(goingRate.mesos);
       const basis =
         goingRate.basis === "sold"
-          ? `3-day average sale, from ${plural(goingRate.samples, "sale")}${sales ? ` (${whole(sales.today)} in the last day)` : ""}.`
-          : `3-day median asking price, from ${plural(goingRate.samples, "listing")}: too few sales.`;
-      const range = asking ? ` Most asking ${whole(asking.low)}–${mesos(asking.high)}.` : "";
+          ? `Average sale price over 3 days, from ${plural(goingRate.samples, "sale")}${sales ? ` (${whole(sales.today)} in the last day)` : ""}.`
+          : `Median asking price over 3 days, from ${plural(goingRate.samples, "listing")}, because there were too few sales.`;
+      const range = asking ? ` Most listings ask ${whole(asking.low)}–${mesos(asking.high)}.` : "";
       about = `${basis}${range}${roll}${asOf(row.asOfUnixMs)}`;
       break;
     }
     case "cheapest":
       value = mesos(row.listed.cheapest);
-      about = `The cheapest for one of ${plural(row.listed.listings, "listing")}.${roll}${asOf(row.asOfUnixMs)}`;
+      about = `The lowest price for one item across ${plural(row.listed.listings, "listing")}.${roll}${asOf(row.asOfUnixMs)}`;
       break;
   }
   const line = document.createElement("div");
@@ -300,7 +300,7 @@ function nameField(line: MarketLine | null, problem: NameProblem | null): HTMLEl
   }
   const says =
     problem?.kind === "empty"
-      ? "Give the line a name, or Esc to cancel."
+      ? "Give the line a name, or press Esc to cancel."
       : problem?.kind === "taken"
         ? `There's a line named ${quoted(problem.name)} already.`
         : null;
@@ -414,7 +414,7 @@ function renderCard(card: ItemCard) {
   if (card.savedCopyFromUnixMs !== null) {
     const note = document.createElement("p");
     note.className = "item-card-note";
-    note.textContent = `OSMS Data Explorer unreachable — item data from ${dayText(new Date(card.savedCopyFromUnixMs), true)}`;
+    note.textContent = `Can't reach OSMS Data Explorer, so this item data is from ${dayText(new Date(card.savedCopyFromUnixMs), true)}`;
     parts.push(note);
   }
   parts.push(creditFooter(card.credit));
@@ -441,7 +441,7 @@ function renderChoice(name: string, items: ItemCardChoice[]) {
   );
   const hint = document.createElement("p");
   hint.className = "item-card-hint";
-  hint.textContent = "Pick the one whose picture the game's tooltip shows.";
+  hint.textContent = "Pick the one whose picture matches the game's tooltip.";
   const box = document.createElement("div");
   box.className = "item-card-box";
   box.append(choices);

@@ -234,11 +234,11 @@ export function searchMaps(
 /** What the search says under its field, for `query` and what it found: how many maps, and
  *  the one Enter opens (the list marks it, and this says it in words). */
 export function searchSaid(query: string, found: { maps: MapPlace[]; more: number }): string {
-  if (query.trim() === "") return "Type part of a map's name as the game writes it, like Ant Tunnel.";
-  if (found.maps.length === 0) return `No map's name has “${query.trim()}” in it. Check the spelling, as the game writes it.`;
+  if (query.trim() === "") return "Type part of a map's name as it's spelled in the game, like Ant Tunnel.";
+  if (found.maps.length === 0) return `No map has “${query.trim()}” in its name. Check that it's spelled as in the game.`;
   const shown = counted(found.maps.length, "map");
   const all = found.more === 0 ? shown : `${shown}, and ${whole(found.more)} more: type more of the name`;
-  return `${all}. Enter opens ${found.maps[0].name}.`;
+  return `${all}. Press Enter to open ${found.maps[0].name}.`;
 }
 
 /** `count` of `thing`, plural when it isn't 1: "1 map", "12 maps". */
@@ -268,7 +268,7 @@ export interface Said {
 
 /** Where an empty Map Leaderboard sends the player: putting their own bests there, which
  *  only Minerva does. */
-const PUT_YOURS = { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" };
+const PUT_YOURS = { text: "How to add yours from Minerva", href: "/faq/#leaderboard-appear" };
 
 /** A Level Band's levels as the panel writes mob levels: "Lv 20–29". */
 function bandLevels(band: number): string {
@@ -458,7 +458,7 @@ export function bandTable(answer: BandAnswer, name: string | null, now: Date, ki
     yours: below ? row(yours) : null,
     note,
     caption,
-    empty: rows.length === 0 ? { text: `No one at ${at} has put a ${kindWord(kind)}best on this map yet.`, link: PUT_YOURS } : null,
+    empty: rows.length === 0 ? { text: `No one at ${at} has a ${kindWord(kind)}best on this map yet.`, link: PUT_YOURS } : null,
     ruler: rows.length === 0 ? [] : rulerTo(top),
     portraits: [...answer.entries, ...(yours === null ? [] : [yours])].some((e) => e.portrait !== undefined),
   };
@@ -488,7 +488,7 @@ export function morphNames(before: Row[], after: Row[]): Map<string, string> {
 export function reportOutcome(status: number | null): { taken: boolean; said: string } {
   switch (status) {
     case 201:
-      return { taken: true, said: "Reported. Thank you: Minerva's maker will look at it." };
+      return { taken: true, said: "Thanks for the report. Minerva's maker will look at it." };
     case 404:
       return { taken: false, said: "This entry isn't on the Map Leaderboard any more." };
     case 429:
@@ -704,18 +704,18 @@ export function trainingTable(
     none: !none
       ? null
       : shown.length === 1
-        ? { text: `No one at ${at} has put a ${kindWord(link.kind)}best on this map yet. Its mobs are at your level.`, link: PUT_YOURS }
+        ? { text: `No one at ${at} has a ${kindWord(link.kind)}best on this map yet. Its mobs are at your level.`, link: PUT_YOURS }
         : {
-            text: `No one at ${at} has put a ${kindWord(link.kind)}best on these maps yet. They're the maps whose mobs are at your level.`,
+            text: `No one at ${at} has a ${kindWord(link.kind)}best on these maps yet. Their mobs are at your level.`,
             link: PUT_YOURS,
           },
     empty:
-      rows.length === 0 ? { text: `No map's mobs are at ${at}, and no one has put a ${kindWord(link.kind)}best there yet.`, link: PUT_YOURS } : null,
+      rows.length === 0 ? { text: `No map has mobs at ${at}, and no one at those levels has a ${kindWord(link.kind)}best yet.`, link: PUT_YOURS } : null,
   };
 }
 
 /** What Where to train says before a band is picked. */
-export const PICK_A_BAND = "Pick a Level Band to see the maps for it, and the best players got on each.";
+export const PICK_A_BAND = "Pick a Level Band to see its maps and the best that players got on each.";
 
 /** An entry as Latest lists it. */
 export interface LatestLine {
@@ -737,8 +737,8 @@ export interface LatestLine {
   href: string;
   /** Whether it's a Party Best's: Latest marks it. */
   party: boolean;
-  /** "Took #1, past Egbert's 80,000", Egbert linking to their page, or "Took #1, past a best
-   *  of 80,000" once that Character has left the Map Leaderboards; `null` for an entry that
+  /** "Beat Egbert's 80,000 to take #1", Egbert linking to their page, or "Beat a best of
+   *  80,000 to take #1" once that Character has left the Map Leaderboards; `null` for an entry that
    *  took no top spot. */
   took: Words | null;
 }
@@ -758,8 +758,8 @@ export function latestLines(answer: LatestAnswer, names: MapNames, now: Date, ki
       const past = rate(e.took.fromExpPerHour);
       took =
         e.took.from === null
-          ? [`Took #1, past a best of ${past}`]
-          : ["Took #1, past ", { text: e.took.from, href: characterLinkTo(e.took.from) }, `'s ${past}`];
+          ? [`Beat a best of ${past} to take #1`]
+          : ["Beat ", { text: e.took.from, href: characterLinkTo(e.took.from) }, `'s ${past} to take #1`];
     }
     return {
       name: e.name,
@@ -776,6 +776,6 @@ export function latestLines(answer: LatestAnswer, names: MapNames, now: Date, ki
       took,
     };
   });
-  const empty = { text: `No one has put a ${kindWord(kind)}best on the Map Leaderboards yet.`, link: PUT_YOURS };
+  const empty = { text: `No one has a ${kindWord(kind)}best on the Map Leaderboards yet.`, link: PUT_YOURS };
   return { lines, empty: lines.length === 0 ? empty : null };
 }

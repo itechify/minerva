@@ -25,7 +25,7 @@ function drawPcs(account: AccountAnswer) {
   byId("pcs-said").textContent =
     account.pcs.length === 0
       ? "No PC linked yet. In Minerva, open Personal Bests and click Link Discord."
-      : "Unlinking a PC takes its Characters to your most recently used other PC. With no other PC, they stay with it, out of your Account.";
+      : "Unlinking a PC moves its Characters to the other PC you used most recently. If you have no other PC, they stay with the unlinked one, outside your Account.";
   list.replaceChildren(
     ...account.pcs.map((pc) => {
       const item = make("li", "account-item");

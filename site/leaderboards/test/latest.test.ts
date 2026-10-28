@@ -56,13 +56,13 @@ describe("latest", () => {
   it("says when an entry took a top spot, and from whom, linking to their page", () => {
     const { lines } = latestLines({ entries: [latest({ from: "Egbert", fromExpPerHour: 150_000 })] }, names, NOW);
 
-    expect(lines[0].took).toEqual(["Took #1, past ", { text: "Egbert", href: "/character/?name=Egbert" }, "'s 150,000"]);
+    expect(lines[0].took).toEqual(["Beat ", { text: "Egbert", href: "/character/?name=Egbert" }, "'s 150,000 to take #1"]);
   });
 
   it("leaves out the name of a Character who has since left the Map Leaderboards", () => {
     const { lines } = latestLines({ entries: [latest({ from: null, fromExpPerHour: 150_000 })] }, names, NOW);
 
-    expect(lines[0].took).toEqual(["Took #1, past a best of 150,000"]);
+    expect(lines[0].took).toEqual(["Beat a best of 150,000 to take #1"]);
   });
 
   it("writes a map without a Map Mark without one", () => {
@@ -81,10 +81,10 @@ describe("latest", () => {
     expect(latestLines({ entries: [] }, names, NOW)).toEqual({
       lines: [],
       empty: {
-        text: "No one has put a best on the Map Leaderboards yet.",
-        link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
+        text: "No one has a best on the Map Leaderboards yet.",
+        link: { text: "How to add yours from Minerva", href: "/faq/#leaderboard-appear" },
       },
     });
-    expect(latestLines({ entries: [] }, names, NOW, "party").empty?.text).toBe("No one has put a party best on the Map Leaderboards yet.");
+    expect(latestLines({ entries: [] }, names, NOW, "party").empty?.text).toBe("No one has a party best on the Map Leaderboards yet.");
   });
 });

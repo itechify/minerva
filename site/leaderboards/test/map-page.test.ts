@@ -88,7 +88,7 @@ describe("a map's page", () => {
     expect(page.bands).toEqual([]);
     expect(page.empty).toEqual({
       text: "No one has a best on this Map Leaderboard yet.",
-      link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
+      link: { text: "How to add yours from Minerva", href: "/faq/#leaderboard-appear" },
     });
     expect(page.found).toBe(true);
   });

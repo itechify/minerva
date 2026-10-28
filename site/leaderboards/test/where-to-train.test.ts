@@ -112,9 +112,9 @@ describe("where to train's kind of entries", () => {
     const quiet = { ...BAND_20, maps: [map("100000001", [25, 29], HARBOR, null)] };
 
     expect(table({ kind: "party" }, quiet).none?.text).toBe(
-      "No one at Lv 20–29 has put a party best on this map yet. Its mobs are at your level.",
+      "No one at Lv 20–29 has a party best on this map yet. Its mobs are at your level.",
     );
-    expect(table({ kind: "solo" }, quiet).none?.text).toMatch(/has put a solo best on this map/);
+    expect(table({ kind: "solo" }, quiet).none?.text).toMatch(/has a solo best on this map/);
   });
 });
 
@@ -160,13 +160,13 @@ describe("where to train's table", () => {
     expect(table().none).toBeNull();
   });
 
-  it("says once, over them, that no one has put a best on a band's maps when none has, their rows saying nothing of it", () => {
+  it("says once, over them, that no one has a best on a band's maps when none has, their rows saying nothing of it", () => {
     const quiet = { ...BAND_20, maps: [map("100000001", [25, 29], HARBOR, null), map("100000002", [20, 24], CITY, null)] };
     const shown = table({}, quiet);
 
     expect(shown.none).toEqual({
-      text: "No one at Lv 20–29 has put a best on these maps yet. They're the maps whose mobs are at your level.",
-      link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
+      text: "No one at Lv 20–29 has a best on these maps yet. Their mobs are at your level.",
+      link: { text: "How to add yours from Minerva", href: "/faq/#leaderboard-appear" },
     });
     expect(shown.rows.map((r) => [r.name, r.mobs, r.best, r.entries])).toEqual([
       ["Quiet Field", "Lv 20–24", null, null],
@@ -178,14 +178,14 @@ describe("where to train's table", () => {
   it("says so over one area's maps when none of them has an entry, though another area's have", () => {
     const answer = { ...BAND_20, maps: [...BAND_20.maps, map("100000005", [21, 26], { id: "Ellinia", name: "Ellinia", picture: "https://osms.invalid/images/map_marks/Ellinia.png" }, null)] };
 
-    expect(table({ area: "Ellinia" }, answer).none?.text).toMatch(/^No one at Lv 20–29 has put a best on this map yet\./);
+    expect(table({ area: "Ellinia" }, answer).none?.text).toMatch(/^No one at Lv 20–29 has a best on this map yet\./);
     expect(table({}, answer).none).toBeNull();
   });
 
   it("says it of one map as one", () => {
     const one = { ...BAND_20, maps: [map("100000001", [25, 29], HARBOR, null)] };
 
-    expect(table({}, one).none?.text).toBe("No one at Lv 20–29 has put a best on this map yet. Its mobs are at your level.");
+    expect(table({}, one).none?.text).toBe("No one at Lv 20–29 has a best on this map yet. Its mobs are at your level.");
   });
 
   it("offers the areas the band's maps are in, by name, each linking to it", () => {
@@ -232,8 +232,8 @@ describe("where to train's table", () => {
       more: null,
       none: null,
       empty: {
-        text: "No map's mobs are at Lv 150–159, and no one has put a best there yet.",
-        link: { text: "How to put yours here from Minerva", href: "/faq/#leaderboard-appear" },
+        text: "No map has mobs at Lv 150–159, and no one at those levels has a best yet.",
+        link: { text: "How to add yours from Minerva", href: "/faq/#leaderboard-appear" },
       },
     });
   });

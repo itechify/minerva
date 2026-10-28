@@ -113,7 +113,7 @@ function keysElement(binding: string, kind: "set" | "refused" = "set"): HTMLElem
 function rebindProblemText(problem: RebindProblem): string {
   switch (problem.kind) {
     case "noModifier":
-      return `Add Ctrl, Alt or Win: as a hotkey, ${keyLabel(problem.pressed)} would never reach the game, not even its chat.`;
+      return `Add Ctrl, Alt or Win. If ${keyLabel(problem.pressed)} alone were a hotkey, the game would never get that key, even in chat.`;
     case "unsupportedKey":
       return `${codeLabel(problem.code)} can't be part of a hotkey. Press another key.`;
     case "inUse":
@@ -130,7 +130,7 @@ function settingsNoticeText(notice: SettingsNotice, hotkeys: Hotkeys): string {
       return `Saved: ${now(notice.hotkey)}${swapped}.`;
     }
     case "restored":
-      return "Every hotkey is back to its default, and on.";
+      return "Every hotkey is back to its default and turned on.";
     case "restoreUndone":
       return "Saved: your hotkeys are back as they were.";
   }

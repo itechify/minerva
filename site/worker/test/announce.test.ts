@@ -125,8 +125,8 @@ describe("the post", () => {
         title: "Henesys Hunting Ground I",
         url: `https://owlofminerva.app/leaderboards/map/?map=${HUNTING_GROUND}&band=20&name=Hakuo&kind=solo`,
         description:
-          "**[Hakuo](https://owlofminerva.app/character/?name=Hakuo)** took #1, levels 20–29, with 153,000 EXP/h, " +
-          "past [Egbert](https://owlofminerva.app/character/?name=Egbert)'s 80,000.",
+          "**[Hakuo](https://owlofminerva.app/character/?name=Hakuo)** took #1 for levels 20–29 with 153,000 EXP/h. " +
+          "[Egbert](https://owlofminerva.app/character/?name=Egbert) held it with 80,000.",
       },
     ]);
   });
@@ -135,8 +135,8 @@ describe("the post", () => {
     const post = postsFor([taken(HUNTING_GROUND, 20, 153_216, true)], NO_MARKS)[0];
 
     expect(post.embeds[0].description).toBe(
-      "**[Hakuo](https://owlofminerva.app/character/?name=Hakuo)** took #1, levels 20–29, with 153,000 EXP/h in a party, " +
-        "past [Egbert](https://owlofminerva.app/character/?name=Egbert)'s 80,000.",
+      "**[Hakuo](https://owlofminerva.app/character/?name=Hakuo)** took #1 for levels 20–29 with 153,000 EXP/h in a party. " +
+        "[Egbert](https://owlofminerva.app/character/?name=Egbert) held it with 80,000.",
     );
   });
 
@@ -232,7 +232,7 @@ describe("an upload", () => {
 
     await postsSettle(1);
     expect(posts[0].embeds[0].description).toContain(`**${linked("Hakuo")}** took #1`);
-    expect(posts[0].embeds[0].description).toContain(`past ${linked("Egbert")}'s 80,000`);
+    expect(posts[0].embeds[0].description).toContain(`${linked("Egbert")} held it with 80,000`);
     expect(posts[0].embeds[0].url).toContain(`map=${CROWNED}&band=20&name=Hakuo`);
     // CROWNED has no Map Mark in the made-up ceilings.
     expect(posts[0].embeds[0]).not.toHaveProperty("thumbnail");
@@ -251,7 +251,7 @@ describe("an upload", () => {
     await upload("Lars", key("lars"), [entry(map, 25, 20_000), partyEntry(map, 25, 90_000)]);
     await postsSettle(2);
     expect(posts[1].embeds[0].description).not.toContain("in a party");
-    expect(posts[1].embeds[0].description).toContain("past [Kora](https://owlofminerva.app/character/?name=Kora)'s 10,000");
+    expect(posts[1].embeds[0].description).toContain("[Kora](https://owlofminerva.app/character/?name=Kora) held it with 10,000");
     expect(posts[1].embeds[0].url).toContain("kind=solo");
 
     await upload("Kora", key("kora"), [entry(map, 25, 50_000), partyEntry(map, 25, 80_000)]);
@@ -261,7 +261,7 @@ describe("an upload", () => {
     await upload("Kora", key("kora"), [entry(map, 25, 95_000), partyEntry(map, 25, 80_000)]);
     await upload("Lars", key("lars"), [entry(map, 25, 96_000), partyEntry(map, 25, 90_000)]);
     await postsSettle(4);
-    expect(posts[3].embeds[0].description).toContain("past [Kora](https://owlofminerva.app/character/?name=Kora)'s 95,000");
+    expect(posts[3].embeds[0].description).toContain("[Kora](https://owlofminerva.app/character/?name=Kora) held it with 95,000");
   });
 
   it("posts nothing for the same set uploaded again", async () => {

@@ -118,8 +118,8 @@ function embedFor(taken: Taken, mark: PostedMark | null, photo: string | null): 
     title: placeOf(PLACES, taken.map).name,
     url: linkTo(taken),
     description:
-      `${nameOf(taken.name, true)} took #1, levels ${first}–${last}, ` +
-      `with ${rate(taken.expPerHour)} EXP/h${taken.party ? " in a party" : ""}, past ${nameOf(taken.from)}'s ${rate(taken.fromExpPerHour)}.`,
+      `${nameOf(taken.name, true)} took #1 for levels ${first}–${last} ` +
+      `with ${rate(taken.expPerHour)} EXP/h${taken.party ? " in a party" : ""}. ${nameOf(taken.from)} held it with ${rate(taken.fromExpPerHour)}.`,
   };
   if (photo !== null) {
     embed.thumbnail = { url: photo };

@@ -9,7 +9,7 @@ const said = byId("said");
 const ask = byId("ask");
 
 /** What the page says when the token has gone: used, or past its 5 minutes. */
-const GONE = "This link has run out or was used already. In Minerva, click Link Discord again.";
+const GONE = "This link has expired or was already used. In Minerva, click Link Discord again.";
 
 async function load() {
   const token = tokenIn(location.search);
@@ -21,7 +21,7 @@ async function load() {
   if (account.status === 401) {
     said.textContent = signInFailed(location.search)
       ? "Signing in with Discord didn't go through. Try again."
-      : "Sign in with Discord to link this PC. Minerva learns only your Discord username.";
+      : "Sign in with Discord to link this PC. Minerva only learns your Discord username.";
     byId<HTMLAnchorElement>("sign-in").href = signInHref(`${location.pathname}?t=${token}`);
     byId("signed-out").hidden = false;
     return;
@@ -36,7 +36,7 @@ async function load() {
     return;
   }
   if (shown.body.linked === "this") {
-    said.textContent = `This PC is linked to your Discord account ${account.body!.username} already.`;
+    said.textContent = `This PC is already linked to your Discord account ${account.body!.username}.`;
     return;
   }
   const question = linkQuestion(account.body!.username, shown.body);
@@ -51,7 +51,7 @@ async function load() {
     ask.hidden = true;
     said.textContent =
       linked.status === 200
-        ? "Linked. Minerva shows it in Personal Bests in a few seconds; you can close this page."
+        ? "Linked. Minerva shows it in Personal Bests in a few seconds. You can close this page."
         : linked.status === 404
           ? GONE
           : UNREACHABLE;

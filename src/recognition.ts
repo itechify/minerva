@@ -12,7 +12,7 @@ export const LOADING_MAP_LIST = "Loading the map list from OSMS Data Explorer…
 export function recognitionProblem(recognition: Recognition): string | null {
   switch (recognition.status) {
     case "unavailable":
-      return "Couldn't load the map list from OSMS Data Explorer. Check your connection. The map list retries every minute.";
+      return "Couldn't load the map list from OSMS Data Explorer. Check your connection. Minerva tries again every minute.";
     case "formatChanged":
       return "OSMS Data Explorer's data has changed format. Minerva needs an update to read it.";
     default:

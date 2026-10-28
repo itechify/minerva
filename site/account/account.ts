@@ -114,7 +114,7 @@ export function linkQuestion(username: string, token: TokenAnswer): { ask: strin
         : `It holds ${listed(token.characters)}.`,
     warn:
       token.linked === "other"
-        ? "It's linked to another Discord account now, and moves to this one. Only link it if you just clicked Link Discord in Minerva."
+        ? "It's linked to another Discord account now. Linking moves it to this one. Only link it if you just clicked Link Discord in Minerva."
         : "Only link it if you just clicked Link Discord in Minerva.",
   };
 }

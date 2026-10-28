@@ -147,8 +147,8 @@ function render(view: TrackerView) {
 
   unreadable.hidden = t.state !== "unreadable";
   const why = t.noStatusBar
-    ? "Can't find the game's bar at the bottom of the window. If it shows, send a Bug Report from the owl's menu by the clock."
-    : "Can't read the EXP bar. Move whatever covers it.";
+    ? "Can't find the game's bar at the bottom of the window. If you can see it, send a Bug Report from the owl's menu by the clock."
+    : "Can't read the EXP bar. Move whatever is covering it.";
   if (unreadable.textContent !== why) unreadable.textContent = why;
   switched.hidden = !t.characterSwitched;
   resetNote.hidden = !t.resetUndoable;

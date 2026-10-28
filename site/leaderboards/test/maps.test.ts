@@ -82,7 +82,7 @@ describe("map search", () => {
       "Ant Tunnel Park (010005070)",
       "Ant Tunnel For Bowman (080001000)",
     ]);
-    expect(searchSaid("ant", searchMaps(names, "ant"))).toMatch(/Enter opens Ant Tunnel I\.$/);
+    expect(searchSaid("ant", searchMaps(names, "ant"))).toMatch(/Press Enter to open Ant Tunnel I\.$/);
   });
 
   it("shows a few and counts the rest", () => {
@@ -115,13 +115,13 @@ describe("map search", () => {
   });
 
   it("says what it found, and the map Enter opens", () => {
-    expect(searchSaid("", searchMaps(names, ""))).toBe("Type part of a map's name as the game writes it, like Ant Tunnel.");
-    expect(searchSaid("Zakum", searchMaps(names, "Zakum"))).toBe("No map's name has “Zakum” in it. Check the spelling, as the game writes it.");
+    expect(searchSaid("", searchMaps(names, ""))).toBe("Type part of a map's name as it's spelled in the game, like Ant Tunnel.");
+    expect(searchSaid("Zakum", searchMaps(names, "Zakum"))).toBe("No map has “Zakum” in its name. Check that it's spelled as in the game.");
     expect(searchSaid("henesys hunting ground", searchMaps(names, "henesys hunting ground"))).toBe(
-      "3 maps. Enter opens Henesys Hunting Ground I.",
+      "3 maps. Press Enter to open Henesys Hunting Ground I.",
     );
     expect(searchSaid("ant tunnel", searchMaps(names, "ant tunnel", { shown: 2 }))).toBe(
-      "2 maps, and 6 more: type more of the name. Enter opens Ant Tunnel I.",
+      "2 maps, and 6 more: type more of the name. Press Enter to open Ant Tunnel I.",
     );
   });
 
@@ -139,7 +139,7 @@ describe("map search", () => {
       ["Henesys Hunting Ground III", "12 entries"],
       ["Henesys Hunting Ground I", "No entries yet"],
     ]);
-    expect(searchSaid("henesys hunting ground", { maps, more: 0 })).toBe("3 maps. Enter opens Henesys Hunting Ground II.");
+    expect(searchSaid("henesys hunting ground", { maps, more: 0 })).toBe("3 maps. Press Enter to open Henesys Hunting Ground II.");
     // Before the API has said, or when it can't be reached, nothing is said of entries.
     expect(searchMaps(names, "henesys hunting ground").maps.map((m) => m.entries)).toEqual([null, null, null]);
   });
@@ -152,7 +152,7 @@ describe("map search", () => {
       ["Henesys", "No entries yet"],
       ["Henesys Hunting Ground I", "2 entries"],
     ]);
-    expect(searchSaid("henesys", { maps, more: 0 })).toMatch(/Enter opens Henesys\.$/);
+    expect(searchSaid("henesys", { maps, more: 0 })).toMatch(/Press Enter to open Henesys\.$/);
   });
 
   it("gives each map found its Map Mark from the ceilings table, and none to a map it holds without one", () => {

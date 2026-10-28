@@ -75,22 +75,22 @@ function words(badge: DealBadge, line: string, fromMarket: boolean): [string, st
     case "deal":
       return [
         off(badge.percent, true),
-        `${badge.item.name}: ${each(badge.item, badge.listed)}, ${GRADE_WORDS[badge.grade]} against ${line} (${whole(badge.lineMesos)}). Click for its card.`,
+        `${badge.item.name}: ${each(badge.item, badge.listed)}, ${GRADE_WORDS[badge.grade]} against ${line} (${whole(badge.lineMesos)}). Click to open its card.`,
       ];
     case "noDeal":
       return [
         off(badge.percent, false),
-        `${badge.item.name}: ${each(badge.item, badge.listed)}, no deal against ${line} (${whole(badge.lineMesos)}). Click for its card.`,
+        `${badge.item.name}: ${each(badge.item, badge.listed)}, not a deal against ${line} (${whole(badge.lineMesos)}). Click to open its card.`,
       ];
     case "noPrice":
       return [
         "no price",
         fromMarket
-          ? `${badge.item.name}: ${line} has none for it. Click for its card.`
+          ? `${badge.item.name}: ${line} has no price for it. Click to open its card.`
           : `${badge.item.name}: ${line} has no price for it. Click to set one on its card.`,
       ];
     case "unknown":
-      return ["?", "Couldn't read this listing for sure, so it isn't judged."];
+      return ["?", "Minerva couldn't read this listing reliably, so it doesn't judge it."];
   }
 }
 
@@ -108,8 +108,8 @@ function badgeItem(badge: DealBadge, line: string, fromMarket: boolean): HTMLLIE
   const full = !badge.covered
     ? said
     : badge.verdict === "unknown"
-      ? "Covered by the pointer or a tooltip, and not read before it was."
-      : `Covered by the pointer or a tooltip: this is what it read before. ${said}`;
+      ? "The pointer or a tooltip is covering this listing, and Minerva hadn't read it before that."
+      : `The pointer or a tooltip is covering this listing. This is what Minerva read before it was covered. ${said}`;
   const opens = badge.verdict !== "unknown";
   const el = document.createElement(opens ? "button" : "span");
   el.className = `deal-badge ${badge.verdict}`;

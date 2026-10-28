@@ -120,7 +120,7 @@ function shortcut(name: keyof Hotkeys): string {
 
 const NOTICES: Record<SetupReason, string> = {
   firstRun: "",
-  requested: "Here is setup again. Minerva finds the minimap title by itself, so there's nothing to redo.",
+  requested: "Here's setup again. Minerva finds the minimap title on its own, so you don't need to redo anything.",
 };
 
 function render() {
@@ -167,7 +167,7 @@ function render() {
       box.textContent = recognitionProblem(recognition);
     } else if (view.titleLost) {
       kind = "problem";
-      box.textContent = `${TITLE_LOST} Open it in the game, or carry on: Minerva keeps looking.`;
+      box.textContent = `${TITLE_LOST} Open it in the game, or carry on. Minerva keeps looking.`;
     } else {
       box.textContent = "Looking for the minimap title…";
     }
@@ -177,21 +177,21 @@ function render() {
 
   // The Grind Tracker needs no mark: it is on, or the player turned it off in Settings.
   $("exp-status").textContent = view.grindTrackerOn
-    ? "It's on. To turn it off, open Settings, the gear at the top of the panel."
-    : "It's off. To turn it on, open Settings, the gear at the top of the panel.";
+    ? "It's on. To turn it off, open Settings (the gear at the top of the panel)."
+    : "It's off. To turn it on, open Settings (the gear at the top of the panel).";
 
   $("handoff").hidden = !found;
   $("resetup-hint").textContent = hotkeyAvailable(view.hotkeys.setup, view.unavailableHotkeys)
     ? `${shortcut("setup")} reopens setup and this guide while you play.`
     : view.hotkeys.setup === ""
-      ? "Help & Setup, the ? at the top of the panel, reopens setup and this guide while you play."
+      ? "Help & Setup (the ? at the top of the panel) reopens setup and this guide while you play."
       : "The setup shortcut is unavailable. Resolve the shortcut warning before closing this window.";
   for (const label of document.querySelectorAll<HTMLElement>("[data-shortcut]")) {
     label.textContent = shortcut(label.dataset.shortcut as keyof Hotkeys);
   }
   // The hotkeys are changed on the panel, which shows only with the game.
   ($("change-hotkeys") as HTMLButtonElement).disabled = !game;
-  $("change-hotkeys-note").textContent = game ? "" : "Start the game first: the hotkeys are changed on its panel.";
+  $("change-hotkeys-note").textContent = game ? "" : "Start the game first. You change the hotkeys from its panel.";
   $("change-hotkeys-note").hidden = !!game;
   $("hotkey-problem").textContent = hotkeyProblems(view);
   $("hotkey-problem").hidden = $("hotkey-problem").textContent === "";
@@ -222,7 +222,7 @@ function render() {
 function updateProgress({ stage, version }: UpdateNotice): string {
   switch (stage) {
     case "notifyOnly":
-      return "This copy of Minerva doesn't update itself: download the new version from its release page.";
+      return "This copy of Minerva doesn't update itself. Download the new version from its release page.";
     case "downloading":
       return `Downloading Minerva ${version}…`;
     case "downloadingForQuit":
@@ -230,9 +230,9 @@ function updateProgress({ stage, version }: UpdateNotice): string {
     case "installsWhenYouQuit":
       return `Minerva ${version} installs when you choose Quit Minerva in the tray.`;
     case "finishingBeforeQuit":
-      return `Finishing Minerva ${version}'s download, then quitting to install it.`;
+      return `Finishing the download of Minerva ${version}. Then Minerva quits and installs it.`;
     case "installing":
-      return `Starting Minerva ${version}'s installer. Minerva closes while it installs.`;
+      return `Starting the installer for Minerva ${version}. Minerva closes while it installs.`;
     case "out":
     case "asking":
     case "downloadFailed":
@@ -246,11 +246,11 @@ function updateProgress({ stage, version }: UpdateNotice): string {
 function updateFailure({ stage, version }: UpdateNotice): string {
   switch (stage) {
     case "downloadFailed":
-      return `Couldn't download Minerva ${version}, or it wasn't signed as Minerva's own, so nothing was installed.`;
+      return `Couldn't download Minerva ${version}, or the download wasn't signed as Minerva's own. Nothing was installed.`;
     case "installFailed":
-      return `Couldn't start Minerva ${version}'s installer, so this version stays.`;
+      return `Couldn't start the installer for Minerva ${version}, so you're still on this version.`;
     case "changed":
-      return `The update changed since Minerva ${version} was found, so nothing was installed.`;
+      return `The update changed after Minerva found version ${version}, so nothing was installed.`;
     default:
       return "";
   }
@@ -278,7 +278,7 @@ function updateText({ checksOn, status, lastCheckedUnixMs }: Updates): string {
   const lastChecked = lastCheckedUnixMs === null ? "" : ` (last checked ${momentText(lastCheckedUnixMs)})`;
   switch (status) {
     case "notChecked":
-      return checksOn ? "" : "Check for updates is off in Settings: Minerva checks only when you ask.";
+      return checksOn ? "" : "Check for updates is off in Settings, so Minerva only checks when you ask.";
     case "checking":
       return "Checking for updates…";
     case "upToDate":

@@ -4,7 +4,7 @@ import { reportOutcome } from "../leaderboards.ts";
 
 describe("a report", () => {
   it("thanks the player once it's taken", () => {
-    expect(reportOutcome(201)).toEqual({ taken: true, said: "Reported. Thank you: Minerva's maker will look at it." });
+    expect(reportOutcome(201)).toEqual({ taken: true, said: "Thanks for the report. Minerva's maker will look at it." });
   });
 
   it("says when the entry has gone already", () => {
