@@ -149,7 +149,7 @@ type PanelState = {
   grindTracker: { on: boolean; open: boolean };
   search: SearchState;
   /** Mirror of `minerva_core::DealFinderView`. */
-  dealFinder: { on: boolean; dealLine: string | null; marginPercent: number; shopFound: boolean };
+  dealFinder: { on: boolean; dealLine: string | null; fromMarket: boolean; marginPercent: number; shopFound: boolean };
 };
 
 const panelEl = byId("panel");
@@ -995,14 +995,16 @@ mobRows.addEventListener("click", (e) => {
 
 /**
  * The Deal Finder's line, while it is on: whether it has found a Player Shop, the Deal Line
- * it compares listings with, and the Deal Margin when there is one.
+ * it compares listings with (maplestory.market's figures credited by name), and the Deal
+ * Margin when there is one.
  */
 function renderDealFinder(panel: PanelState) {
   const deal = panel.dealFinder;
   dealFinderEl.hidden = !deal.on;
   if (!deal.on) return;
   dealState.textContent = deal.shopFound ? "· reading the shop" : "· open a Player Shop";
-  const line = deal.dealLine ? `Comparing with ${deal.dealLine}` : "No Market Line to compare with";
+  const compared = deal.fromMarket ? `maplestory.market's ${deal.dealLine}` : deal.dealLine;
+  const line = compared ? `Comparing with ${compared}` : "No Market Line to compare with";
   dealDetail.textContent = deal.marginPercent > 0 ? `${line}, ${deal.marginPercent}% below` : line;
   const key = panel.hotkeys.dealFinder;
   const off = byId("deal-off");

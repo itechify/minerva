@@ -13,7 +13,7 @@ use crate::bests_window::PERSONAL_BESTS;
 use crate::gamewin;
 use crate::grind_tracker::GRIND_TRACKER;
 use crate::panel_window::{Heights, PanelWindow, Shows, WindowSpec};
-use minerva_core::{Action, GameData, Hotkeys, KeyPress, Minerva, PanelState, SettingsWindow};
+use minerva_core::{Action, DealLineChoice, GameData, Hotkeys, KeyPress, Minerva, PanelState, SettingsWindow};
 use serde::Serialize;
 use std::sync::mpsc::Sender;
 use tauri::{AppHandle, Manager, State, WindowEvent};
@@ -52,6 +52,10 @@ struct SettingsPage<'a> {
     grind_tracker_on: bool,
     /// "Check for updates".
     checks_on: bool,
+    /// "Prices from maplestory.market".
+    market_prices: bool,
+    /// What the Deal Line may be, the chosen one marked.
+    deal_lines: &'a [DealLineChoice],
     game_data: &'a GameData,
 }
 
@@ -68,6 +72,8 @@ pub fn sync(window: &mut PanelWindow, state: &PanelState) {
         margin_percent: state.deal_finder.margin_percent,
         grind_tracker_on: state.grind_tracker.on,
         checks_on: state.updates.checks_on,
+        market_prices: state.deal_finder.market_prices,
+        deal_lines: &state.deal_finder.choices,
         game_data: &state.game_data,
     };
     let takes_keyboard = settings.is_some_and(|settings| settings.takes_keyboard);
@@ -90,6 +96,13 @@ pub fn watch_focus(app: &AppHandle, commands: Sender<Command>) {
 }
 
 /// A key the player pressed on the Settings window.
+/// The player chose this as the Deal Line, which the Deal Finder compares listings with: a
+/// Market Line's ID, or one of maplestory.market's figures'.
+#[tauri::command]
+pub fn choose_deal_line(line: String, commands: State<'_, Sender<Command>>) {
+    let _ = commands.send(Command::ChooseDealLine(line));
+}
+
 #[tauri::command]
 pub fn rebind_key(press: KeyPress, commands: State<'_, Sender<Command>>) {
     let _ = commands.send(Command::RebindKey(press));

@@ -40,7 +40,7 @@ mod view;
 
 use minerva_core::{
     Action, DEAL_FINDER_CAPTURE_MS, Minerva, ExpBarReader, ExpBarReading, ExpFigures, GameWindow, ItemCapture, ItemTooltipReader,
-    ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, DiscordLinkAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
+    ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, MarketAnswer, DiscordLinkAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
     Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, StatusBarCapture, StatusBarReader, StatusBarReading,
     TITLE_READ_MS, TITLE_SEARCH_MS, TitleCapture, TitleReader, TitleReading, UpdateAnswer, VisitBest,
     PICKUP_LOG_CAPTURE_MS, PickupLogCapture, PickupLogReader, PickupLogReading,
@@ -140,6 +140,9 @@ pub(crate) enum Command {
     OpenBestsLeaderboard { character: Option<String>, id: String },
     /// The Map Leaderboards answered the core's upload `id` (or it couldn't be made).
     LeaderboardAnswer { id: u64, answer: LeaderboardAnswer },
+    /// The site answered the core's ask `id` for maplestory.market's figures (or it couldn't be
+    /// made).
+    MarketAnswer { id: u64, answer: MarketAnswer },
     /// The player pressed Link Discord in the Personal Bests window.
     LinkDiscord,
     /// The player said not now to the Personal Bests window's prompt to link Discord.
@@ -421,6 +424,7 @@ pub fn run() {
             search::search_pick_npc,
             search::search_pick_item,
             settings_window::rebind_key,
+            settings_window::choose_deal_line,
             bests_window::personal_bests_open_map,
             bests_window::personal_bests_remove_visit,
             bests_window::personal_bests_move_visit,
@@ -440,7 +444,6 @@ pub fn run() {
             item_card::item_card_enter_market,
             item_card::item_card_edit_market_line,
             item_card::item_card_enter_market_line,
-            item_card::item_card_choose_deal_line,
         ])
         .run(context)
         .expect("error while running tauri application");
@@ -884,6 +887,9 @@ fn core_loop(
             Ok(Command::LeaderboardAnswer { id, answer }) => {
                 minerva.on_leaderboard_answer(id, answer);
             }
+            Ok(Command::MarketAnswer { id, answer }) => {
+                minerva.on_market_answer(id, answer);
+            }
             Ok(Command::LinkDiscord) => {
                 minerva.link_discord();
             }
@@ -1065,6 +1071,7 @@ fn core_loop(
         // The core asks for uploads to the Map Leaderboards on a tick: each is made once.
         uploader.sync(&minerva.panel_state().leaderboard_uploads);
         uploader.sync_discord(&minerva.panel_state().discord_link_requests);
+        uploader.sync_market(&minerva.panel_state().market_asks);
         // And for a check for a newer version, and its download: each is run once.
         updater.sync(&minerva.panel_state().updates);
         // Its install, on this thread: whatever Quit Minerva saves is saved first, as the
@@ -1393,6 +1400,7 @@ mod tests {
             (r#""undoResetHotkeys""#, Action::UndoResetHotkeys),
             (r#""refreshGameData""#, Action::RefreshGameData),
             (r#"{"setCheckForUpdates":{"on":true}}"#, Action::SetCheckForUpdates { on: true }),
+            (r#"{"setMarketPrices":{"on":false}}"#, Action::SetMarketPrices { on: false }),
             (r#""cancelCardMarket""#, Action::CancelCardMarket),
             (r#""addCardMarketLine""#, Action::AddCardMarketLine),
             (r#""askRemoveCardMarketLine""#, Action::AskRemoveCardMarketLine),

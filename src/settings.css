@@ -104,6 +104,46 @@
   outline-offset: 1px;
 }
 
+/* The Deal Line: its name, then a radio per choice, in an inset box as the switches are. */
+.deal-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: -3px 0 0;
+  padding: 3px 7px 4px 11px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--body);
+  text-shadow: none;
+}
+
+.deal-lines legend {
+  float: left;
+  padding: 0;
+  line-height: 16px;
+  color: var(--ink-2);
+}
+
+.deal-line-choices {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+}
+
+.deal-line-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 19px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.deal-line-choice input {
+  margin: 0;
+  accent-color: var(--edit);
+}
+
 /* A switch's checkbox sits a little further in than the Deal Margin's field. */
 .grind-switch {
   padding-right: 7px;

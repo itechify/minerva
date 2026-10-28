@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended 2026-10-28 (the Deal Line may be maplestory.market's Going rate or Cheapest now, and is chosen in the Settings window, ADR 0030)
 ---
 
 # The Deal Finder finds the Player Shop in the client area

@@ -1232,10 +1232,25 @@
                 <details class="qa" id="market-prices">
                   <summary>Where do the market prices come from?</summary>
                   <p>
-                    From you. Minerva reads no market prices of its own, so you keep them for the items you care about. The
-                    button by Market, or "Look it up on maplestory.market" under the lines, opens the item's page on
-                    <a href="https://maplestory.market">maplestory.market</a>, with what's listed in the Free Market now and
-                    what it has sold for.
+                    <b>Going rate</b> and <b>Cheapest now</b> come from
+                    <a href="https://maplestory.market">maplestory.market</a>, which scans the Free Market's stores about
+                    once an hour. The Going rate is what the item sold for on average over 3 days, or, with too few sales,
+                    the middle of what it's listed at; Cheapest now is the cheapest listing for one. Hover either for what
+                    it's based on and when it was seen. For equipment they cover every copy, whatever its stats. The
+                    button by Market, or "Prices from maplestory.market" under the lines, opens the item's page there.
+                  </p>
+                  <p>
+                    Any lines below them are your own <a href="#market-lines">market lines</a>, with prices you keep.
+                  </p>
+                </details>
+                <details class="qa" id="market-sent">
+                  <summary>What does Minerva send to get the prices?</summary>
+                  <p>
+                    The item numbers of the card you open, and of the listings in a Player Shop while the Deal Finder
+                    compares with maplestory.market's prices, to owlofminerva.app, which asks maplestory.market for them.
+                    Nothing else. The prices are kept only while Minerva runs. To turn them off, untick
+                    <b>Prices from maplestory.market</b> in Settings, the gear at the top of the panel: Minerva asks for
+                    none, and the cards show only your own lines.
                   </p>
                 </details>
                 <details class="qa" id="set-price">
@@ -1249,8 +1264,8 @@
                 <details class="qa" id="market-lines">
                   <summary>Can I keep more than one price for each item?</summary>
                   <p>
-                    Yes. Click the <b>+</b> by Market and name a new line, such as the cheapest one listed beside what it
-                    typically sells for: every card lists it from then on, with its own price for each item. Click a line's
+                    Yes. Click the <b>+</b> by Market and name a new line, such as the price you mean to sell at: every
+                    card lists it from then on, under maplestory.market's, with its own price for each item. Click a line's
                     name to rename it, or to remove it with the bin beside it; the card asks first, saying how many items'
                     prices go with it.
                   </p>
@@ -1335,8 +1350,9 @@
                 <details class="qa" id="deal-line">
                   <summary>What does the Deal Finder compare prices with?</summary>
                   <p>
-                    One of your <a href="#market-lines">market lines</a>, the <b>Deal Line</b>: on any Item Card, the line
-                    with the filled ring. Click another line's ring to compare with that one instead. A listing of several
+                    The <b>Deal Line</b>: maplestory.market's <a href="#market-prices">Going rate</a> unless you choose
+                    otherwise in Settings, the gear at the top of the panel, under Deal Finder: Cheapest now, or one of
+                    your <a href="#market-lines">market lines</a>. A listing of several
                     is judged by the price of one: 10 for 6,800 mesos is 680 each. Throwing stars and bullets are judged by
                     the listing's whole price, since its number is how many the set holds. To count only bigger savings, set the
                     <b>Deal Margin</b> in Settings, the gear at the top of the panel: at 10%, a deal is at least 10% below
@@ -1354,7 +1370,8 @@
                     badge to open the item's card.
                   </p>
                   <p>
-                    <b>no price</b> means the Deal Line has no price for the item: click it to set one. <b>?</b> means
+                    <b>no price</b> means the Deal Line has no price for the item: maplestory.market has none, or, on
+                    a line of yours, click it to set one. <b>?</b> means
                     Minerva couldn't read the listing for sure, such as a name the shop cut short that could be several
                     items, and it won't guess. A scroll cut short is usually named anyway, by the colour of its
                     picture, which tells Lesser, Intermediate, Greater and Chaos apart. For the rest, hover the listing

@@ -252,15 +252,18 @@ _Avoid_: grade, rank, success rate (each tier's rate, not the tier)
 The box the game draws by the mouse pointer when the player hovers an item: the item's name on the line with the blue bullet (a crafted item's maker sits above it), then its picture and figures. It is the game's, not ours: the Item Card and the Mob Card are Minerva's own.
 
 **Item Card**:
-The card the hotkey (Ctrl+Shift+I by default) shows at the pointer for the item whose Item Tooltip the game shows there, or Search shows beside the panel for an item picked there: what a shop pays for it, and the market prices the player keeps for it on their Market Lines (typed into the card, with buttons that open its page on maplestory.market to look it up). It stays until the player closes it or presses the hotkey again, where the player drags it by its bar, and its name opens the item's MeowDB page. When items that don't look alike share the name, it first lists them, with their pictures, for the player to pick.
+The card the hotkey (Ctrl+Shift+I by default) shows at the pointer for the item whose Item Tooltip the game shows there, or Search shows beside the panel for an item picked there: what a shop pays for it, maplestory.market's Going rate and Cheapest now for it, and the market prices the player keeps for it on their Market Lines (typed into the card), with buttons that open its page on maplestory.market. It stays until the player closes it or presses the hotkey again, where the player drags it by its bar, and its name opens the item's MeowDB page. When items that don't look alike share the name, it first lists them, with their pictures, for the player to pick.
 _Avoid_: item tooltip (the game's), price check, popup
 
 **Market Line**:
-One of the market prices the player keeps for every item, under a name they give it ("Your price", "Typical", "Lowest ask"). Every Item Card lists every line, in the player's order, each with the item's price on it or "Not set"; the player adds, renames and removes lines on the card. A player starts with one, "Your price".
+One of the market prices the player keeps for every item, under a name they give it ("Your price", "Typical", "Lowest ask"). Every Item Card lists every line, in the player's order, under maplestory.market's figures, each with the item's price on it or "Not set"; the player adds, renames and removes lines on the card. A player starts with none (before ADR 0030, with one, "Your price").
+
+**Going rate** and **Cheapest now**:
+maplestory.market's figures for an item, on its Item Card above the Market Lines (ADR 0030): its established price (the 3-day average sale, or with too few sales the median asking price), and the cheapest listing for one. Asked of the site's Worker as the card shows, kept only while Minerva runs, and off with Settings' "Prices from maplestory.market". Not Market Lines: the player can't type on them.
 _Avoid_: column, field, price type
 
 **Market Import**:
-A file of prices a tool of the player's own leaves in the `market-imports` folder beside `market-prices.json`, for their Market Lines. Minerva takes each in within a couple of seconds, at launch if it was closed, onto the lines of the same IDs, the newest price winning, and deletes it. It adds a line it names, but removes nothing. Minerva fetches no market prices itself.
+A file of prices a tool of the player's own leaves in the `market-imports` folder beside `market-prices.json`, for their Market Lines. Minerva takes each in within a couple of seconds, at launch if it was closed, onto the lines of the same IDs, the newest price winning, and deletes it. It adds a line it names, but removes nothing.
 _Avoid_: sync, feed (the tool's business, not Minerva's)
 
 **Player Shop**:
@@ -272,7 +275,7 @@ What the hotkey (Ctrl+Shift+D by default) turns on and off: while it is on, Mine
 _Avoid_: scanner, price check
 
 **Deal Line**:
-The one Market Line the Deal Finder compares listings with, marked on every Item Card's market section, where the player chooses it. The first line until they choose one.
+What the Deal Finder compares listings with: the Going rate, Cheapest now or one of the player's Market Lines, chosen in the Settings window. The Going rate until they choose (with it off, their first line).
 _Avoid_: target price, reference price
 
 **Deal Margin**:

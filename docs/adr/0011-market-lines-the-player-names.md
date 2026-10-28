@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended 2026-10-28 (a player starts with no lines of their own, and the Deal Line is chosen in the Settings window, ADR 0030)
 ---
 
 # Market Lines the player names, on every Item Card

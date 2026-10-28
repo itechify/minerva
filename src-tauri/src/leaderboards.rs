@@ -3,7 +3,9 @@
 //! core the answer. What to upload, when, and what an answer means are the core's. So with
 //! linking this install to an Account (#152, ADR 0023): each request about it
 //! (`PanelState::discord_link_requests`) is made once, with the key, and starting a link opens
-//! the link page here, so its link token never reaches the core.
+//! the link page here, so its link token never reaches the core. And each ask for
+//! maplestory.market's figures (`PanelState::market_asks`, ADR 0030) is made once, with no key:
+//! the site's Worker holds maplestory.market's.
 //!
 //! The Leaderboard Key, which ties a Character's name to this install, is kept here and never
 //! handed to the core: everything the core takes in goes into a Bug Report, and those go into
@@ -14,8 +16,8 @@
 use crate::errors::error;
 use crate::{Command, http};
 use minerva_core::{
-    DiscordLinkAnswer, DiscordLinkRequest, LeaderboardAnswer, LeaderboardUpload, SITE_URL, link_page, read_leaderboard_answer,
-    read_link_state, read_link_token,
+    DiscordLinkAnswer, DiscordLinkRequest, LeaderboardAnswer, LeaderboardUpload, MarketAnswer, MarketAsk, SITE_URL, link_page,
+    read_leaderboard_answer, read_link_state, read_link_token, read_market_answer,
 };
 use std::fs;
 use std::io::ErrorKind;
@@ -102,7 +104,8 @@ fn make(path: &Path) -> Result<String, String> {
     Ok(key)
 }
 
-/// Makes the core's uploads, and its requests about linking to Discord.
+/// Makes the core's uploads, its requests about linking to Discord, and its asks for
+/// maplestory.market's figures.
 pub struct Uploader {
     key: KeyFile,
     /// The data source's: one HTTP client for all that Minerva fetches and sends.
@@ -111,13 +114,15 @@ pub struct Uploader {
     made: u64,
     /// The id of the last request about linking made.
     link_request_made: u64,
+    /// The id of the last ask for maplestory.market's figures made.
+    market_ask_made: u64,
     /// Where the answers go, for the core loop.
     commands: Sender<Command>,
 }
 
 impl Uploader {
     pub fn new(key: KeyFile, client: reqwest::Client, commands: Sender<Command>) -> Self {
-        Self { key, client, made: 0, link_request_made: 0, commands }
+        Self { key, client, made: 0, link_request_made: 0, market_ask_made: 0, commands }
     }
 
     /// Make each of `uploads` (the core's under way) not made yet, in the background; each
@@ -147,6 +152,23 @@ impl Uploader {
                     Err(why) => LeaderboardAnswer::Failed { why },
                 };
                 Command::LeaderboardAnswer { id, answer }
+            });
+        }
+    }
+
+    /// Make each of `asks` (the core's for maplestory.market's figures) not made yet, in the
+    /// background; each answer comes back to the core loop as [`Command::MarketAnswer`].
+    pub fn sync_market(&mut self, asks: &[MarketAsk]) {
+        let made = self.market_ask_made;
+        for ask in asks.iter().filter(|ask| ask.id > made) {
+            self.market_ask_made = self.market_ask_made.max(ask.id);
+            let (id, url, client) = (ask.id, format!("{}{}", site(), ask.path()), self.client.clone());
+            http::answer_in_background(self.commands.clone(), async move {
+                let answer = match http::get(&client, &url).await {
+                    Ok(reply) => read_market_answer(reply.status, &reply.body),
+                    Err(why) => MarketAnswer::Failed { why },
+                };
+                Command::MarketAnswer { id, answer }
             });
         }
     }

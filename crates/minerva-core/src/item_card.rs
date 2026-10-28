@@ -103,7 +103,7 @@ pub struct ItemCard {
     pub shop: ShopPrice,
     /// maplestory.market's Going rate and Cheapest now for the item (ADR 0030), above the
     /// player's lines; `None` while the player has them off.
-    pub market_rows: Option<MarketRows>,
+    pub market_rows: Option<Box<MarketRows>>,
     /// Every Market Line, in the player's order, each with the item's price on it.
     pub market: Vec<MarketLine>,
     /// What the market section has open, while it has something.
@@ -417,7 +417,7 @@ impl ItemCards {
                     .map(|line| MarketLine { id: line.id.clone(), name: line.name.clone(), price: line.prices.get(&card.id).copied() })
                     .collect();
                 ItemCardView::Card(ItemCard {
-                    market_rows: source.map(|source| source.rows(&card.id)),
+                    market_rows: source.map(|source| Box::new(source.rows(&card.id))),
                     market: lines,
                     market_edit: shown.editing.as_ref().and_then(|editing| market_edit(editing, market)),
                     saved_copy_from_unix_ms: saved_copy_from,

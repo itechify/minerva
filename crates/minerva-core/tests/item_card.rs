@@ -908,7 +908,7 @@ fn a_new_players_card_has_maplestory_markets_figures_and_no_lines_of_their_own()
 
     assert!(market(&state).is_empty());
     let loading = MarketRows { going_rate: SourceRow::Loading, cheapest: SourceRow::Loading, any_roll: false };
-    assert_eq!(card(&state).expect("a card").market_rows, Some(loading));
+    assert_eq!(card(&state).expect("a card").market_rows, Some(Box::new(loading)));
     assert_eq!(editing(&state), None);
 }
 
@@ -1493,7 +1493,7 @@ fn answer_the_ask(minerva: &mut Minerva, at_ms: u64, answer: MarketAnswer) -> Pa
 }
 
 fn rows(state: &PanelState) -> MarketRows {
-    card(state).expect("a card").market_rows.expect("maplestory.market's rows")
+    *card(state).expect("a card").market_rows.expect("maplestory.market's rows")
 }
 
 #[test]

@@ -1,6 +1,6 @@
 import "./errors";
 import { invoke } from "@tauri-apps/api/core";
-import { dayText } from "./dates";
+import { dayText, momentText } from "./dates";
 import { byId, reducedMotion, span, svgEl } from "./dom";
 import { whole } from "./figures";
 import { dragByHandles, followView, heightReporter } from "./shell";
@@ -13,7 +13,25 @@ type MarketPrice = { mesos: number; setAtUnixMs?: number };
 
 /** Mirror of `minerva_core::MarketLine`: one of the player's Market Lines, with the item's
  * price on it, and whether it is the Deal Line the Deal Finder compares listings with. */
-type MarketLine = { id: string; name: string; price: MarketPrice | null; dealLine: boolean };
+type MarketLine = { id: string; name: string; price: MarketPrice | null };
+
+/** Mirror of `minerva_core::GoingRate`, `Sales`, `Asking` and `Listed`. */
+type GoingRate = { mesos: number; basis: "sold" | "listed"; samples: number };
+type Sales = { sales: number; today: number };
+type Asking = { low: number; high: number; listings: number };
+type Listed = { cheapest: number; listings: number };
+
+/** Mirror of `minerva_core::SourceRow`: what one of maplestory.market's rows says. */
+type SourceRow =
+  | { status: "loading" }
+  | { status: "notAvailable" }
+  | { status: "noneListed" }
+  | { status: "noPrice" }
+  | { status: "goingRate"; goingRate: GoingRate; sales: Sales | null; asking: Asking | null; asOfUnixMs: number }
+  | { status: "cheapest"; listed: Listed; asOfUnixMs: number };
+
+/** Mirror of `minerva_core::MarketRows`. */
+type MarketRows = { goingRate: SourceRow; cheapest: SourceRow; anyRoll: boolean };
 
 /** Mirror of `minerva_core::NameProblem`. */
 type NameProblem = { kind: "empty" } | { kind: "taken"; name: string };
@@ -31,6 +49,8 @@ type ItemCard = {
   /** Where its picture loads from, once it's in. */
   icon: string | null;
   shop: ShopPrice;
+  /** maplestory.market's rows; `null` while the player has them off. */
+  marketRows: MarketRows | null;
   market: MarketLine[];
   marketEdit: MarketEdit | null;
   savedCopyFromUnixMs: number | null;
@@ -162,26 +182,9 @@ function hint(problem: string | null, otherwise: string): HTMLParagraphElement {
 
 const quoted = (name: string) => `“${name}”`;
 
-/** The Deal Line's mark before a line's name: filled on the one the Deal Finder compares
- * listings with, hollow on the others, where a click makes it the Deal Line. */
-function dealMark(line: MarketLine): HTMLButtonElement {
-  const mark = document.createElement("button");
-  mark.type = "button";
-  mark.className = "deal-mark";
-  mark.setAttribute("role", "radio");
-  mark.setAttribute("aria-checked", String(line.dealLine));
-  const label = line.dealLine
-    ? `${quoted(line.name)} is the Deal Line: the Deal Finder compares Player Shop listings with it`
-    : `Make ${quoted(line.name)} the Deal Line, which the Deal Finder compares Player Shop listings with`;
-  mark.title = label;
-  mark.setAttribute("aria-label", label);
-  if (!line.dealLine) mark.addEventListener("click", () => invoke("item_card_choose_deal_line", { line: line.id }));
-  return mark;
-}
-
-/** A line: the Deal Line's mark and its name at the left (a link that opens its name field)
- * and the item's price on it right-aligned (a link that opens its price field, the day it
- * was set in its tooltip), or "Not set". */
+/** A line: its name at the left (a link that opens its name field) and the item's price on it
+ * right-aligned (a link that opens its price field, the day it was set in its tooltip), or
+ * "Not set". */
 function lineRow(line: MarketLine): HTMLElement {
   const row = document.createElement("div");
   row.className = "item-card-line";
@@ -200,8 +203,56 @@ function lineRow(line: MarketLine): HTMLElement {
     : link("Not set", `Set your price on ${quoted(line.name)}`, editPrice);
   value.classList.toggle("quiet", !line.price);
   value.classList.add("value");
-  row.append(dealMark(line), name, value);
+  row.append(name, value);
   return row;
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${whole(n)} ${n === 1 ? one : many}`;
+
+/** One of maplestory.market's rows: its name, and its figure right-aligned as a line's price
+ * is, or why there is none; what is behind it in its tooltip. Not a link: it can't be changed. */
+function sourceRow(name: string, row: SourceRow, anyRoll: boolean): HTMLElement {
+  const roll = anyRoll ? " Of every copy, whatever its stats." : "";
+  const asOf = (unixMs: number) => ` As of ${momentText(unixMs)}.`;
+  let value: string;
+  let about: string;
+  switch (row.status) {
+    case "loading":
+      [value, about] = ["…", "Asking maplestory.market."];
+      break;
+    case "notAvailable":
+      [value, about] = ["Not available", "maplestory.market's prices couldn't be had. Minerva asks again in a minute."];
+      break;
+    case "noneListed":
+      value = "None listed";
+      about = name === "Going rate" ? "Nothing listed or sold on maplestory.market in 3 days." : "Nothing listed on maplestory.market now.";
+      break;
+    case "noPrice":
+      [value, about] = ["No price", "Too few recent sales, and asking prices missing or too far apart."];
+      break;
+    case "goingRate": {
+      const { goingRate, sales, asking } = row;
+      value = mesos(goingRate.mesos);
+      const basis =
+        goingRate.basis === "sold"
+          ? `3-day average sale, from ${plural(goingRate.samples, "sale")}${sales ? ` (${whole(sales.today)} in the last day)` : ""}.`
+          : `3-day median asking price, from ${plural(goingRate.samples, "listing")}: too few sales.`;
+      const range = asking ? ` Most asking ${whole(asking.low)}–${mesos(asking.high)}.` : "";
+      about = `${basis}${range}${roll}${asOf(row.asOfUnixMs)}`;
+      break;
+    }
+    case "cheapest":
+      value = mesos(row.listed.cheapest);
+      about = `The cheapest for one of ${plural(row.listed.listings, "listing")}.${roll}${asOf(row.asOfUnixMs)}`;
+      break;
+  }
+  const line = document.createElement("div");
+  line.className = "item-card-line source";
+  line.title = `${name} on maplestory.market: ${about}`;
+  const shown = span("value", value);
+  shown.classList.toggle("quiet", row.status !== "goingRate" && row.status !== "cheapest");
+  line.append(span("name", name), shown);
+  return line;
 }
 
 /** A line's price field, open in its price's place. */
@@ -294,6 +345,12 @@ function marketSection(card: ItemCard): HTMLElement {
   );
   head.append(span("label", "Market"), add, marketButton());
   section.append(head);
+  if (card.marketRows) {
+    section.append(
+      sourceRow("Going rate", card.marketRows.goingRate, card.marketRows.anyRoll),
+      sourceRow("Cheapest now", card.marketRows.cheapest, card.marketRows.anyRoll),
+    );
+  }
   const edit = card.marketEdit;
   for (const line of card.market) {
     if (edit?.line !== line.id) section.append(lineRow(line));
@@ -302,9 +359,9 @@ function marketSection(card: ItemCard): HTMLElement {
     else section.append(removeQuestion(line, edit.prices));
   }
   if (edit?.field === "name" && edit.line === null) section.append(...nameField(null, edit.problem));
-  else if (card.market.length === 0) section.append(hint(null, "No market lines. + adds one to every card."));
-  // One link, the site's name in it blue.
-  const foot = link("Look it up on ", "Open the item's page on maplestory.market", openMarket);
+  else if (card.market.length === 0 && !card.marketRows) section.append(hint(null, "No market lines. + adds one to every card."));
+  // One link, the site's name in it blue: the credit for its prices while they show.
+  const foot = link(card.marketRows ? "Prices from " : "Look it up on ", "Open the item's page on maplestory.market", openMarket);
   foot.classList.add("item-card-market-foot");
   foot.append(span("site", "maplestory.market"));
   section.append(foot);

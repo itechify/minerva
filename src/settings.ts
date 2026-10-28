@@ -38,8 +38,16 @@ type SettingsPage = {
   grindTrackerOn: boolean;
   /** "Check for updates". */
   checksOn: boolean;
+  /** "Prices from maplestory.market". */
+  marketPrices: boolean;
+  /** What the Deal Line may be, the chosen one marked: maplestory.market's figures while
+   *  they're on, then the player's Market Lines. */
+  dealLines: DealLineChoice[];
   gameData: GameData;
 };
+
+/** Mirror of `minerva_core::DealLineChoice`. */
+type DealLineChoice = { id: string; name: string; chosen: boolean };
 
 const panelEl = byId("panel");
 const settingsEl = byId("settings");
@@ -52,6 +60,8 @@ const hotkeysReset = byId("hotkeys-reset") as HTMLButtonElement;
 const dealMargin = byId("deal-margin") as HTMLInputElement;
 const grindTrackerOn = byId("grind-tracker-on") as HTMLInputElement;
 const checkForUpdatesOn = byId("check-for-updates-on") as HTMLInputElement;
+const marketPricesOn = byId("market-prices-on") as HTMLInputElement;
+const dealLineChoices = byId("deal-line-choices");
 const gameDataState = byId("game-data-state");
 const gameDataRefresh = byId("game-data-refresh") as HTMLButtonElement;
 
@@ -243,8 +253,8 @@ function takeKeys(view: SettingsWindow) {
  * Changing one, its row waits for the new keys, which the keys pressed now are (see the
  * keydown handler below), with its instruction, or why the keys pressed were refused, under
  * it. Every change is saved at once, and the line by Restore defaults says so. The rows are
- * drawn anew on every change, so the focus is put back where it was. Then the Deal Margin,
- * the Grind Tracker's switch, Game Data and Updates.
+ * drawn anew on every change, so the focus is put back where it was. Then maplestory.market's
+ * switch, the Deal Line and the Deal Margin, the Grind Tracker's switch, Game Data and Updates.
  */
 function render(page: SettingsPage) {
   shown = page;
@@ -266,6 +276,9 @@ function render(page: SettingsPage) {
   if (document.activeElement !== dealMargin) dealMargin.value = String(page.marginPercent);
   grindTrackerOn.checked = page.grindTrackerOn;
   checkForUpdatesOn.checked = page.checksOn;
+  marketPricesOn.checked = page.marketPrices;
+  const linesRedrawn = changed("deal-lines", page.dealLines);
+  if (linesRedrawn) dealLineChoices.replaceChildren(...page.dealLines.map(dealLineChoice));
   const gameData = gameDataText(page.gameData);
   if (changed("game-data", gameData)) gameDataState.textContent = gameData;
   settingsNotice.textContent = view.notice ? settingsNoticeText(view.notice, hotkeys) : "";
@@ -293,7 +306,7 @@ function render(page: SettingsPage) {
             ? "undo"
             : view.notice?.kind !== was.notice?.kind && view.notice?.kind === "restoreUndone"
               ? "reset"
-              : redrawn
+              : redrawn || linesRedrawn
                 ? focused
                 : undefined;
   if (target) focusOn(target);
@@ -349,6 +362,22 @@ dealMargin.addEventListener("keydown", (e) => {
   }
 });
 grindTrackerOn.addEventListener("change", () => invoke("act", { action: { setGrindTracker: { on: grindTrackerOn.checked } } }));
+/** One thing the Deal Line may be: a radio and its name, choosing it with a click. */
+function dealLineChoice(choice: DealLineChoice): HTMLLabelElement {
+  const label = document.createElement("label");
+  label.className = "deal-line-choice";
+  const radio = document.createElement("input");
+  radio.type = "radio";
+  radio.name = "deal-line";
+  radio.checked = choice.chosen;
+  radio.dataset.focus = `deal-line:${choice.id}`;
+  radio.addEventListener("change", () => invoke("choose_deal_line", { line: choice.id }));
+  label.append(radio, span("name", choice.name));
+  return label;
+}
+
+marketPricesOn.addEventListener("change", () => invoke("act", { action: { setMarketPrices: { on: marketPricesOn.checked } } }));
+
 checkForUpdatesOn.addEventListener("change", () =>
   invoke("act", { action: { setCheckForUpdates: { on: checkForUpdatesOn.checked } } }),
 );
