@@ -417,3 +417,43 @@ fn plain_edits_name_a_misread_only_as_the_item_the_slips_put_closest() {
     // With no such name beside it, the same read is the first name: nothing else is as near.
     assert_eq!(tallied_first(&names[..1], "Ciaci Ciug"), vec![tally("Dad Dug", 1)]);
 }
+
+/// Made-up Items whose names the game cuts short, a few of them alike at the start.
+fn candies() -> ItemWorld {
+    item_world(vec![
+        etc(4_000_200, "Halloween Candies").sells_for(1),
+        etc(4_000_201, "Halloween Teddy Bear Ear").sells_for(1),
+        setup(3_010_200, "Halloween Broomstick Chair"),
+        etc(4_000_202, "Red Slime Orb").sells_for(1),
+        etc(4_000_203, "Red Slime Orc").sells_for(1),
+    ])
+}
+
+#[test]
+fn a_name_cut_short_and_misread_is_the_item_whose_start_it_is_clearly_closest_to() {
+    // Bug Report 0.15.0, 2026-10-27 18:29: "Halloween Candies" is cut to "Halloween Can...", and
+    // 25 of its 53 lines read the cut's last letters wrong ("Halloween Car", "Hailoween Car").
+    // Plain prefixes start no Item, so they were tallied as read, under three names.
+    let mut minerva = started(candies());
+
+    let state = picked_up(
+        &mut minerva,
+        11 * S,
+        vec![cut("Halloween Can", 1, "Etc"), cut("Halloween Car", 1, "Etc"), cut("Hailoween Car", 1, "Etc")],
+    );
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Halloween Candies", 3)]);
+
+    // The game's "..." read as ".." or ".:" is still a name cut short.
+    let state = picked_up(&mut minerva, 12 * S, vec![item("Halloween Car..", 1, "Etc"), item("Halloween Can.:", 1, "Etc")]);
+    assert_eq!(state.exp_tracking.loot.items, vec![tally("Halloween Candies", 5)]);
+}
+
+#[test]
+fn a_name_cut_short_and_misread_as_near_two_items_starts_stays_as_read() {
+    let mut minerva = started(candies());
+
+    // As near the start of Red Slime Orb as of Red Slime Orc: no Item until read twice.
+    let state = picked_up(&mut minerva, 11 * S, vec![cut("Red Sxime Or", 1, "Etc")]);
+
+    assert!(state.exp_tracking.loot.items.is_empty());
+}

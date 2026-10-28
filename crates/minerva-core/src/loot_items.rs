@@ -37,6 +37,13 @@ pub(crate) enum Named {
 /// Name an Item line `name` (without the "..." if `cut_short`), picked up into `tab`, from
 /// `items`; with none loaded, no name matches.
 pub(crate) fn name(items: Option<&ItemSet>, name: &str, cut_short: bool, tab: &str) -> Named {
+    // The game's "..." read as ".." or ".:" (the Bug Report of 0.15.0, 2026-10-27 18:29): still a
+    // name cut short. No Item's name ends in two such marks.
+    let marks = name.trim_end().chars().rev().take_while(|c| matches!(c, '.' | ':' | ',' | ';' | '…')).count();
+    let (name, cut_short) = match marks {
+        2.. => (name.trim_end().trim_end_matches(['.', ':', ',', ';', '…']).trim_end(), true),
+        _ => (name, cut_short),
+    };
     let shown = if cut_short { format!("{}...", name.trim_end()) } else { name.trim().to_string() };
     let Some(items) = items else { return Named::Unmatched(shown) };
     if !cut_short {
@@ -58,7 +65,11 @@ pub(crate) fn name(items: Option<&ItemSet>, name: &str, cut_short: bool, tab: &s
         names.retain(|name| name.iter().any(|item| item.inventory_tab() == tab));
     }
     match names.len() {
-        0 => Named::Unmatched(shown),
+        // Read a few glyphs wrong at the cut, it may still clearly start one name of its tab.
+        0 => match InventoryTab::named_like(tab).and_then(|tab| items.starting_like_in_tab(name, tab)) {
+            Some(name) => Named::Item(name.to_string()),
+            None => Named::Unmatched(shown),
+        },
         1 => Named::Item(names[0][0].name.clone()),
         _ => Named::CutShort(shown),
     }

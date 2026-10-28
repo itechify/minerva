@@ -74,6 +74,17 @@ const UNKNOWN: char = '?';
 /// What turning `name` into `read` costs, in tenths of an edit: a plain edit is 10, a slip of
 /// `slips` is 4.
 fn cost(read: &[char], name: &[char], slips: &[Slip]) -> u32 {
+    *costs_to_starts(read, name, slips).last().expect("a name's whole length")
+}
+
+/// What turning the start of `name` into `read` costs, for a name the game cut short: the least
+/// over every start of the name.
+fn cost_to_start(read: &[char], name: &[char], slips: &[Slip]) -> u32 {
+    costs_to_starts(read, name, slips).into_iter().min().expect("a name's empty start")
+}
+
+/// What turning each start of `name` (its first 0, 1, … glyphs) into the whole of `read` costs.
+fn costs_to_starts(read: &[char], name: &[char], slips: &[Slip]) -> Vec<u32> {
     let (read_len, name_len) = (read.len(), name.len());
     // The least it costs to turn the first `i` glyphs of the read into the first `j` of the name.
     let mut cheapest = vec![u32::MAX; (read_len + 1) * (name_len + 1)];
@@ -115,7 +126,7 @@ fn cost(read: &[char], name: &[char], slips: &[Slip]) -> u32 {
             }
         }
     }
-    cheapest[cell(read_len, name_len)]
+    (0..=name_len).map(|j| cheapest[cell(read_len, j)]).collect()
 }
 
 /// Which of `names` (as [`crate::item_lookup::item_key`] writes them, each once) the name `read`
@@ -131,6 +142,23 @@ pub(crate) fn closest_by_slips(read: &[char], names: &[&[char]]) -> Option<usize
     }
     closest_plain(read, names).filter(|&plain| plain == index)
 }
+
+/// Which of `names` a name the game cut short, `read` without its "...", starts: the one whose start
+/// it is closest to by the recogniser's usual slips, when that is close enough and clearly leads
+/// the next, as [`closest_by_slips`] asks of a whole name. `None` when none is, when two are as
+/// near, and for a read too short to tell names apart by.
+pub(crate) fn closest_start_by_slips(read: &[char], names: &[&[char]]) -> Option<usize> {
+    if read.len() < SHORTEST_CUT {
+        return None;
+    }
+    let costs = names.iter().map(|name| cost_to_start(read, name, SLIPS)).collect::<Vec<_>>();
+    let closest = pick(&costs, read.len())?;
+    closest.clear.then_some(closest.index)
+}
+
+/// The fewest glyphs (as [`crate::item_lookup::item_key`] writes them) a read cut short must have
+/// for its start to name an Item by slips: the game cuts only long names, and a few glyphs start many.
+const SHORTEST_CUT: usize = 8;
 
 /// The same, by plain edits alone.
 pub(crate) fn closest_plain(read: &[char], names: &[&[char]]) -> Option<usize> {
@@ -149,13 +177,26 @@ fn closest_by_cost(read: &[char], names: &[&[char]]) -> Option<Closest> {
     if let Some(same) = names.iter().position(|name| *name == read) {
         return Some(Closest { index: same, clear: true });
     }
-    let mut costs: Vec<(usize, u32)> = names.iter().map(|name| cost(read, name, SLIPS)).enumerate().collect();
+    let costs = names.iter().map(|name| cost(read, name, SLIPS)).collect::<Vec<_>>();
+    let longest = |index: usize| read.len().max(names[index].len());
+    pick_by(&costs, longest)
+}
+
+/// The cheapest of `costs` as [`closest_by_cost`] judges it, against a read of `len` glyphs.
+fn pick(costs: &[u32], len: usize) -> Option<Closest> {
+    pick_by(costs, |_| len)
+}
+
+/// The one cheapest of `costs` (one per name), whether it is close enough against the length
+/// `len` gives for it and clearly leads the next; `None` if two are as cheap.
+fn pick_by(costs: &[u32], len: impl Fn(usize) -> usize) -> Option<Closest> {
+    let mut costs: Vec<(usize, u32)> = costs.iter().copied().enumerate().collect();
     costs.sort_by_key(|&(_, cost)| cost);
     let &(index, least) = costs.first()?;
     if costs.get(1).is_some_and(|&(_, next)| next == least) {
         return None;
     }
-    let len = read.len().max(names[index].len());
+    let len = len(index);
     let similar = len > 0 && 1.0 - least as f32 / (EDIT as usize * len) as f32 >= CLOSE_ENOUGH;
     let leads = |next: u32| next >= least + LEAD_MARGIN && 2 * next >= LEAD_RATIO_HALVES * least;
     let clear = costs.get(1).is_none_or(|&(_, next)| leads(next));

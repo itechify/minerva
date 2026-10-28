@@ -201,6 +201,13 @@ impl ItemSet {
         Some(&self.items[names[name].1[0]].name)
     }
 
+    /// The name among those filed under `tab` whose start `read`, a name the game cut short read a
+    /// few glyphs wrong, is clearly closest to by the recogniser's usual slips
+    /// ([`crate::pickup_slips::closest_start_by_slips`]). `None` when none is.
+    pub(crate) fn starting_like_in_tab(&self, read: &str, tab: InventoryTab) -> Option<&str> {
+        self.in_tab(read, tab, crate::pickup_slips::closest_start_by_slips)
+    }
+
     /// The items of each name that starts as `start` does (a name the game cut short), name by
     /// name, as [`ItemSet::named`] compares them. Empty when none does.
     pub(crate) fn names_starting_with(&self, start: &str) -> Vec<Vec<&ItemFacts>> {
