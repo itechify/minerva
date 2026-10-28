@@ -23,6 +23,9 @@ declare namespace Cloudflare {
     /** ClassicRank's API key, a Worker secret (docs/map-leaderboards-setup.md, ADR 0029).
      *  Without it, the Worker never asks ClassicRank, and its answers carry no portraits. */
     CLASSICRANK_KEY?: string;
+    /** maplestory.market's API key, a Worker secret (docs/map-leaderboards-setup.md, ADR 0030).
+     *  Without it, the Worker never asks maplestory.market, and market reads have nothing. */
+    MM_API_KEY?: string;
     /** The tests' made-up ceilings table, in place of osms-ceilings.json. */
     TEST_CEILINGS?: import("./ceilings").CeilingsTable;
   }
