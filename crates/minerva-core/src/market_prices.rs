@@ -1,17 +1,20 @@
 //! The market prices the player keeps (ADR 0010, ADR 0011): what they found an item sells
 //! for between players, typed into its Item Card, for reference, on Market Lines they name
-//! ("Your price", "Lowest ask"). Every card lists every line. Minerva reads no market
-//! prices of its own (no source allows it), so the player keeps them, and they are saved
-//! between launches as the Personal Bests are.
+//! ("Your price", "Lowest ask"). Every card lists every line, under maplestory.market's
+//! (ADR 0030), and they are saved between launches as the Personal Bests are. And the Deal
+//! Line: the line, or maplestory.market's figure, the Deal Finder judges listings against.
 
+use crate::maplestory_market::SourceLine;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// The shape of [`SavedMarketPrices`] this core writes. Bumped whenever it changes: 2 when
-/// the one price became Market Lines (ADR 0011).
-pub const MARKET_PRICES_VERSION: u32 = 2;
+/// the one price became Market Lines (ADR 0011), 3 when a player started with none and no Deal
+/// Line chosen became maplestory.market's Going rate (ADR 0030).
+pub const MARKET_PRICES_VERSION: u32 = 3;
 
-/// The line a player starts with, and the one 0.8.0's single price is read into.
+/// The line a player started with before shape 3, and the one 0.8.0's single price is read
+/// into.
 const FIRST_LINE_ID: &str = "1";
 const FIRST_LINE_NAME: &str = "Your price";
 
@@ -48,15 +51,18 @@ pub struct SavedMarketLine {
 pub struct SavedMarketPrices {
     pub version: u32,
     pub lines: Vec<SavedMarketLine>,
-    /// The Deal Line: the line the Deal Finder compares listings with (ADR 0014), by its ID;
-    /// `None` (files from before it) for the first line.
+    /// The Deal Line: what the Deal Finder compares listings with (ADR 0014), by its ID: a
+    /// line's, or one of maplestory.market's figures' ([`SourceLine::id`]); `None` until the
+    /// player chooses one, for the Going rate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deal_line: Option<String>,
 }
 
 impl Default for SavedMarketPrices {
+    /// A player starts with no lines of their own: maplestory.market's figures are on every
+    /// card.
     fn default() -> Self {
-        Self { version: MARKET_PRICES_VERSION, lines: vec![first_line(BTreeMap::new())], deal_line: None }
+        Self { version: MARKET_PRICES_VERSION, lines: Vec::new(), deal_line: None }
     }
 }
 
@@ -81,14 +87,22 @@ impl Default for SavedShape {
 }
 
 impl From<SavedShape> for SavedMarketPrices {
-    /// Shape 1 becomes the one line it had; a later shape keeps its version, so the shell
-    /// can tell one it doesn't know.
+    /// Shape 1 becomes the one line it had. Shapes 1 and 2 become shape 3: the line every
+    /// player started with goes if it holds no prices, and with no Deal Line chosen, the
+    /// first line left becomes it, as it was then, so no player's badges change. A later
+    /// shape keeps its version, so the shell can tell one it doesn't know.
     fn from(saved: SavedShape) -> Self {
-        if saved.version <= 1 {
-            return Self { version: MARKET_PRICES_VERSION, lines: vec![first_line(saved.items)], deal_line: None };
-        }
-        let lines = saved.lines.unwrap_or_else(|| Self::default().lines);
-        Self { version: saved.version, lines, deal_line: saved.deal_line }
+        let (lines, deal_line) = match saved.version {
+            ..=1 => (vec![first_line(saved.items)], None),
+            2 => (saved.lines.unwrap_or_else(|| vec![first_line(BTreeMap::new())]), saved.deal_line),
+            version => return Self { version, lines: saved.lines.unwrap_or_default(), deal_line: saved.deal_line },
+        };
+        let lines: Vec<SavedMarketLine> = lines
+            .into_iter()
+            .filter(|line| !(line.id == FIRST_LINE_ID && line.name == FIRST_LINE_NAME && line.prices.is_empty()))
+            .collect();
+        let deal_line = deal_line.or_else(|| lines.first().map(|line| line.id.clone()));
+        Self { version: MARKET_PRICES_VERSION, lines, deal_line }
     }
 }
 
@@ -111,10 +125,35 @@ pub struct MarketImport {
 }
 
 impl MarketImport {
-    /// Whether it is in a shape this version reads: the market prices' own. The shell sets
-    /// one in any other aside.
+    /// Whether it is in a shape this version reads: the market prices' own, or shape 2, whose
+    /// lines read the same. The shell sets one in any other aside.
     pub fn in_a_known_shape(&self) -> bool {
-        self.version == MARKET_PRICES_VERSION
+        (2..=MARKET_PRICES_VERSION).contains(&self.version)
+    }
+}
+
+/// What the Deal Finder judges listings against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DealLine<'a> {
+    /// One of maplestory.market's figures (ADR 0030).
+    Source(SourceLine),
+    /// One of the player's Market Lines.
+    Line(&'a SavedMarketLine),
+}
+
+impl DealLine<'_> {
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Source(source) => source.id(),
+            Self::Line(line) => &line.id,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Source(source) => source.name(),
+            Self::Line(line) => &line.name,
+        }
     }
 }
 
@@ -147,19 +186,26 @@ impl MarketPrices {
         self.saved.lines.iter().find(|known| known.id == line)
     }
 
-    /// The Deal Line: the line the player chose, or the first while they chose none or
-    /// removed the one they chose. `None` with no line at all.
-    pub fn deal_line(&self) -> Option<&SavedMarketLine> {
-        let chosen = self.saved.deal_line.as_deref().and_then(|line| self.line(line));
-        chosen.or_else(|| self.saved.lines.first())
+    /// The Deal Line, with maplestory.market's figures `from_market` or not: what the player
+    /// chose, or the Going rate while they chose none or removed the line they chose. Without
+    /// maplestory.market's figures, the first line in place of one of them. `None` with
+    /// nothing to judge against.
+    pub fn deal_line(&self, from_market: bool) -> Option<DealLine<'_>> {
+        let chosen = self.saved.deal_line.as_deref();
+        if let Some(line) = chosen.and_then(|id| self.line(id)) {
+            return Some(DealLine::Line(line));
+        }
+        let source = chosen.and_then(SourceLine::with_id).unwrap_or(SourceLine::GoingRate);
+        if from_market { Some(DealLine::Source(source)) } else { self.saved.lines.first().map(DealLine::Line) }
     }
 
-    /// The player chose `line` as the Deal Line; nothing changes for a line not held.
+    /// The player chose `line` as the Deal Line: a line's ID, or one of maplestory.market's
+    /// figures'. Nothing changes for a line not held.
     pub fn choose_deal_line(&mut self, line: &str) {
-        if self.line(line).is_none() {
+        if self.line(line).is_none() && SourceLine::with_id(line).is_none() {
             return;
         }
-        let changed = self.deal_line().is_none_or(|deal_line| deal_line.id != line);
+        let changed = self.saved.deal_line.as_deref() != Some(line);
         self.saved.deal_line = Some(line.to_string());
         self.changed(changed);
     }
@@ -197,7 +243,7 @@ impl MarketPrices {
     }
 
     /// Remove `line`, and its prices on every item. The Deal Line, if it was, goes back to
-    /// the first: a line added later may be numbered as this one was.
+    /// the Going rate: a line added later may be numbered as this one was.
     pub fn remove(&mut self, line: &str) {
         let before = self.saved.lines.len();
         self.saved.lines.retain(|known| known.id != line);

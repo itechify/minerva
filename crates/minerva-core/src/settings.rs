@@ -90,6 +90,10 @@ pub struct Settings {
     /// The Grind Tracker's Loot section is open, showing the mesos and Items picked up; it starts
     /// collapsed (#171).
     pub loot_open: bool,
+    /// "Market prices from maplestory.market" (Settings' switch, ADR 0030): Item Cards show its
+    /// Going rate and Cheapest now, and the Deal Finder may judge against them. Off, Minerva
+    /// asks for none. Files from before it have it on.
+    pub market_prices: bool,
 }
 
 impl Default for Settings {
@@ -117,6 +121,7 @@ impl Default for Settings {
             check_for_updates: true,
             link_prompt_dismissed: false,
             loot_open: false,
+            market_prices: true,
         }
     }
 }

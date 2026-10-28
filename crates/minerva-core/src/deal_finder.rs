@@ -1,8 +1,8 @@
 //! The Deal Finder (ADR 0014): while the player has it on (Ctrl+Shift+D by default), the
 //! shell captures the game's client area a few times a second, the Player Shop reader reads
 //! the open Player Shop's listings, and a Deal Badge beside each one says whether its price
-//! is a deal against the Deal Line: the one Market Line (ADR 0011) the player chose on the
-//! Item Card. A listing is a deal when the price of one item is at least the Deal Margin
+//! is a deal against the Deal Line: the Market Line (ADR 0011), or maplestory.market's figure
+//! (ADR 0030), the player chose in the Settings window. A listing is a deal when the price of one item is at least the Deal Margin
 //! (a percentage, 0 by default) below the item's price on the Deal Line. A throwing star or
 //! a bullet is one set however many it holds (the listing's number), so its listing's whole
 //! price is compared.
@@ -14,7 +14,7 @@
 //! Only what the reader is sure of is judged: a name that isn't one item's (unreadable, or
 //! cut short and shared by several), or a price not in the game's shape, gets a "?" badge,
 //! never another item's verdict. Equipment is judged by its name alone: Market Lines keep
-//! one price per item, whatever its stats.
+//! one price per item, whatever its stats, and maplestory.market's are of every copy.
 //!
 //! A name cut short and shared by several items is named by the Item Tooltip the game shows
 //! while the player hovers its listing: when the pointer is on its slot, and the tooltip's
@@ -30,7 +30,8 @@
 use crate::item_card::item_id;
 use crate::item_lookup::item_key;
 use crate::item_tooltip::ItemTooltip;
-use crate::market_prices::MarketPrices;
+use crate::maplestory_market::Market;
+use crate::market_prices::DealLine;
 use crate::osms_items::{ItemFacts, ItemSet, ScrollTier};
 use crate::panel::{GameWindow, ScreenRect, Size, clear_of};
 use crate::player_shop::{ListedPrice, ShopHover, ShopList, ShopReading, ShopRow};
@@ -42,12 +43,30 @@ use serde::Serialize;
 pub struct DealFinderView {
     /// The player has it on.
     pub on: bool,
-    /// The Deal Line's name; `None` with no Market Line at all.
+    /// The Deal Line's name; `None` with nothing to judge against.
     pub deal_line: Option<String>,
+    /// The Deal Line is one of maplestory.market's figures: the panel credits it.
+    pub from_market: bool,
+    /// What the Settings window offers as the Deal Line: maplestory.market's figures while
+    /// they are on, then the player's Market Lines.
+    pub choices: Vec<DealLineChoice>,
+    /// "Market prices from maplestory.market" is on.
+    pub market_prices: bool,
     /// How far below the Deal Line a price must be to be a deal, in percent.
     pub margin_percent: u32,
     /// A Player Shop's listings were found in the latest capture.
     pub shop_found: bool,
+}
+
+/// Something the Deal Line may be, as the Settings window offers it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DealLineChoice {
+    /// What [`crate::Minerva::choose_deal_line`] takes for it.
+    pub id: String,
+    pub name: String,
+    /// It is the Deal Line.
+    pub chosen: bool,
 }
 
 /// One listing's Deal Badge, level with it.
@@ -270,14 +289,15 @@ impl DealFinder {
         self.items.get(row as usize).cloned().flatten()
     }
 
-    /// Each listing's badge, judged against `market`'s Deal Line with the Deal Margin
-    /// `margin_percent`, its items from `items` (none yet: every badge is "?"); tops from
-    /// `top`, the badges' window's top on screen.
+    /// Each listing's badge, judged against `line` (maplestory.market's figures from `market`)
+    /// with the Deal Margin `margin_percent`, its items from `items` (none yet: every badge is
+    /// "?"); tops from `top`, the badges' window's top on screen.
     /// `opened` is the badge (on screen) the Item Card showing opened from, with its items.
     pub fn badges(
         &mut self,
         items: Option<&ItemSet>,
-        market: &MarketPrices,
+        line: Option<DealLine>,
+        market: &Market,
         margin_percent: u32,
         top: i32,
         opened: Option<(ScreenRect, &[u32])>,
@@ -286,7 +306,6 @@ impl DealFinder {
             self.items.clear();
             return Vec::new();
         };
-        let line = market.deal_line();
         let mut judged = Vec::with_capacity(shop.rows.len());
         let badges = shop
             .rows
@@ -329,8 +348,13 @@ impl DealFinder {
                 let verdict = match (named, listing.price) {
                     (Some((item, ids)), Some(listed)) => {
                         let item = DealItem { id: item_id(ids[0]), name: item.name.clone(), rechargeable: item.rechargeable };
-                        match line.and_then(|line| line.prices.get(&item.id)) {
-                            Some(price) => judge(item, listed, price.mesos, margin_percent),
+                        let price = match line {
+                            Some(DealLine::Line(line)) => line.prices.get(&item.id).map(|price| price.mesos),
+                            Some(DealLine::Source(source)) => market.price(source, &item.id),
+                            None => None,
+                        };
+                        match price {
+                            Some(mesos) => judge(item, listed, mesos, margin_percent),
                             None => Verdict::NoPrice { item, listed },
                         }
                     }

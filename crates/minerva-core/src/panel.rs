@@ -237,6 +237,10 @@ pub enum Action {
     /// The Settings window's "Check for updates": on, Minerva checks for a newer version at
     /// launch and every 6 hours; off, only when the player presses Check for updates.
     SetCheckForUpdates { on: bool },
+    /// The Settings window's "Market prices from maplestory.market" (ADR 0030): on, Item Cards
+    /// show its Going rate and Cheapest now, and the Deal Finder may judge against them; off,
+    /// Minerva asks for none.
+    SetMarketPrices { on: bool },
     /// Help & Setup's Update now: download the newer version if it isn't yet, then install
     /// it and start it, ending the Session.
     UpdateNow,

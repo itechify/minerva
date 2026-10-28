@@ -23,6 +23,7 @@ mod map_data;
 mod map_index;
 mod map_mark;
 mod map_preview;
+mod maplestory_market;
 mod market_prices;
 mod matcher;
 mod minimap_title;
@@ -59,7 +60,7 @@ mod world;
 
 pub use bests_window::{PersonalBestsCharacter, PersonalBestsKind, PersonalBestsMap, PersonalBestsVisit, PersonalBestsWindow};
 pub use bug_report::{BugReport, ReportAbout};
-pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Verdict};
+pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, DealLineChoice, Verdict};
 pub use exp_bar::{ExpBar, ExpBarPlace, ExpBarReader, ExpBarReading, ExpFigures};
 pub use game_data::{GameData, Refresh};
 pub use grind_tracker::{ClientOffset, GrindTrackerWindow};
@@ -68,6 +69,10 @@ pub use item_card::{
     Edge, ItemCard, ItemCardChoice, ItemCardView, MarketEdit, MarketLine, NameProblem, ShopPrice, ShownItemCard,
 };
 pub use market_prices::{MARKET_PRICES_VERSION, MarketImport, MarketPrice, SavedMarketLine, SavedMarketPrices};
+pub use maplestory_market::{
+    Asking, Basis, CHEAPEST_LINE, GOING_RATE_LINE, GoingRate, ItemFigures, Listed, MARKET_REF, MarketAnswer, MarketAsk, MarketRows, Priced, Sales,
+    SourceRow, read_market_answer,
+};
 pub use item_lookup::{ItemChoice, ItemHit, ItemLookup, ItemLookupLine, OurWindow};
 pub use owl_bubble::{OwlBubble, OwlLine, OwlMood};
 pub use item_tooltip::{ItemCapture, ItemTooltip, ItemTooltipReader, ItemTooltipReading};
@@ -122,7 +127,8 @@ use hotkey_settings::HotkeySettings;
 use settings_window::SettingsPlace;
 use item_card::{Editing, ItemCards, Pressed, market_page};
 use loader::{Held, Load, Loaded, Loader};
-use market_prices::MarketPrices;
+use maplestory_market::{Market, SourceLine};
+use market_prices::{DealLine, MarketPrices};
 use item_lookup::ItemLookups;
 use discord_link::DiscordLink;
 use leaderboards::Leaderboards;
@@ -333,6 +339,11 @@ pub struct PanelState {
     /// Not sent to the overlay.
     #[serde(skip_serializing)]
     pub leaderboard_uploads: Vec<LeaderboardUpload>,
+    /// The asks of the site for maplestory.market's figures under way (ADR 0030), for the shell
+    /// to make: a few items each, a card's or a shop's. The shell makes each once, by its id,
+    /// and tells the answer to [`Minerva::on_market_answer`]. Not sent to the overlay.
+    #[serde(skip_serializing)]
+    pub market_asks: Vec<MarketAsk>,
     /// The request about linking to Discord under way (#152), for the shell to make with the
     /// Leaderboard Key: starting a link, or reading the link state. The shell makes each once,
     /// by its id, and tells the answer to [`Minerva::on_discord_link_answer`]. Not sent to the
@@ -605,6 +616,9 @@ pub struct Minerva {
     card_capturing: bool,
     /// The market prices the player keeps, which the Item Card shows.
     market_prices: MarketPrices,
+    /// maplestory.market's figures held, which the Item Card shows above the player's, and the
+    /// asks for more under way (ADR 0030).
+    market: Market,
     /// The Deal Finder, and the Player Shop it read last.
     deal_finder: DealFinder,
     /// Reads captures fed to [`Minerva::on_player_shop_capture`]; loaded on the first one.
@@ -689,6 +703,7 @@ impl Minerva {
             item_cards: ItemCards::default(),
             card_capturing: false,
             market_prices: MarketPrices::default(),
+            market: Market::default(),
             deal_finder: DealFinder::default(),
             shop_reader: None,
             status_bar_reader: None,
@@ -1204,6 +1219,12 @@ impl Minerva {
             }
             Action::CheckForUpdates => self.updater.ask(),
             Action::SetCheckForUpdates { on } => self.settings.check_for_updates = on,
+            Action::SetMarketPrices { on } => {
+                self.settings.market_prices = on;
+                if !on {
+                    self.market.stop();
+                }
+            }
             Action::UpdateNow => self.updater.update_now(),
             Action::UpdateWhenIQuit => self.updater.when_i_quit(),
             Action::UpdateLater => self.updater.later(),
@@ -1532,6 +1553,15 @@ impl Minerva {
         let name = self.leaderboards.uploads().into_iter().find(|upload| upload.id == id).map(|upload| upload.name);
         self.record(Event::LeaderboardAnswer { id, name: name.unwrap_or_default(), answer: answer.clone() });
         self.leaderboards.answer(id, answer, self.wall_clock);
+        self.sync_panel()
+    }
+
+    /// The shell made ask `id` of [`PanelState::market_asks`], and it came to `answer`
+    /// ([`read_market_answer`], or [`MarketAnswer::Failed`] when it couldn't be made). An
+    /// answer to an ask no longer under way changes nothing.
+    pub fn on_market_answer(&mut self, id: u64, answer: MarketAnswer) -> &PanelState {
+        self.record(Event::MarketAnswer { id, answer: answer.clone() });
+        self.market.answer(id, answer);
         self.sync_panel()
     }
 
@@ -1924,8 +1954,9 @@ impl Minerva {
         self.sync_panel()
     }
 
-    /// The player chose the Item Card's Market Line `line` (its ID) as the Deal Line, which
-    /// the Deal Finder compares listings with. Saved with the market prices.
+    /// The player chose `line` as the Deal Line in the Settings window, which the Deal Finder
+    /// compares listings with: a Market Line's ID, or one of maplestory.market's figures'
+    /// ([`GOING_RATE_LINE`], [`CHEAPEST_LINE`]). Saved with the market prices.
     pub fn choose_deal_line(&mut self, line: &str) -> &PanelState {
         self.record(Event::ChooseDealLine { line: line.to_string() });
         self.market_prices.choose_deal_line(line);
@@ -2218,6 +2249,8 @@ impl Minerva {
         self.leaderboards.tick(at_ms, self.session.bests().history(), self.wall_clock);
         self.discord.tick(at_ms, self.bests_window.open);
         self.updater.tick(at_ms, self.settings.check_for_updates);
+        // maplestory.market's figures the card and the Deal Finder last wanted.
+        self.market.tick(at_ms, self.wall_clock, self.settings.market_prices);
         self.load_osms(at_ms);
         if self.maps.held().is_some() {
             self.sync_shown_map();
@@ -2373,6 +2406,7 @@ impl Minerva {
         self.sync_personal_bests();
         self.sync_settings_window();
         self.state.leaderboard_uploads = self.leaderboards.uploads();
+        self.state.market_asks = self.market.asks();
         self.state.discord_link_requests = self.discord.requests();
         self.sync_owl_bubble();
         self.sync_item_card();
@@ -2449,6 +2483,7 @@ impl Minerva {
             self.items.items().ok(),
             saved_copy_from,
             &self.market_prices,
+            self.settings.market_prices.then_some(&self.market),
             |path| pictures.url(path).map(String::from),
         );
         let shows = self.state.item_card.is_some() && self.panel.layer() != Layer::Hidden && !self.card_capturing;
@@ -2489,11 +2524,39 @@ impl Minerva {
         let top = placement.map_or(0, |at| at.y);
         let items = self.items.items().ok();
         let opened = self.item_cards.badge().filter(|_| self.state.item_card.is_some());
-        let badges = self.deal_finder.badges(items, &self.market_prices, self.settings.deal_margin_percent, top, opened);
+        let from_market = self.settings.market_prices;
+        let deal_line = self.market_prices.deal_line(from_market);
+        let badges = self.deal_finder.badges(items, deal_line, &self.market, self.settings.deal_margin_percent, top, opened);
+        // maplestory.market's figures for the card's item, and the shop's while one of them is
+        // the Deal Line, asked for at the next tick.
+        let card = match self.state.item_card.as_ref().map(|shown| &shown.view) {
+            Some(ItemCardView::Card(card)) => Some(card.id.clone()),
+            _ => None,
+        };
+        let shop = badges.iter().filter(|_| matches!(deal_line, Some(DealLine::Source(_)))).filter_map(|badge| match &badge.verdict {
+            Verdict::Deal { item, .. } | Verdict::NoDeal { item, .. } | Verdict::NoPrice { item, .. } => Some(item.id.clone()),
+            Verdict::Unknown => None,
+        });
+        let mut wanted: Vec<String> = Vec::new();
+        for item in card.into_iter().chain(self.deal_finder.on.then_some(shop).into_iter().flatten()) {
+            if !wanted.contains(&item) {
+                wanted.push(item);
+            }
+        }
+        self.market.want(wanted);
+        let sources = [SourceLine::GoingRate, SourceLine::Cheapest].into_iter().filter(|_| from_market);
+        let choices = sources
+            .map(|source| (source.id(), source.name()))
+            .chain(self.market_prices.lines().iter().map(|line| (line.id.as_str(), line.name.as_str())))
+            .map(|(id, name)| DealLineChoice { id: id.to_string(), name: name.to_string(), chosen: deal_line.is_some_and(|line| line.id() == id) })
+            .collect();
         self.state.deal_badges = placement.map(|placement| DealBadges { placement, badges });
         self.state.deal_finder = DealFinderView {
             on: self.deal_finder.on,
-            deal_line: self.market_prices.deal_line().map(|line| line.name.clone()),
+            deal_line: deal_line.map(|line| line.name().to_string()),
+            from_market: matches!(deal_line, Some(DealLine::Source(_))),
+            choices,
+            market_prices: from_market,
             margin_percent: self.settings.deal_margin_percent,
             shop_found: self.deal_finder.shop().is_some(),
         };
