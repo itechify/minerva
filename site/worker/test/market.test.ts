@@ -74,15 +74,15 @@ beforeEach(async () => {
     env.DB.prepare("DELETE FROM market_listed"),
     env.DB.prepare("DELETE FROM rate_events WHERE bucket LIKE 'market:%'"),
   ]);
-  setMarket([priced(ORE, 99), priced(STAR, 379)], [listed(ORE, 50, 314), listed(STAR, 300)]);
+  setMarket([priced(ORE, 120), priced(STAR, 410)], [listed(ORE, 95, 7), listed(STAR, 380)]);
 });
 
 describe("market reads", () => {
   it("give the items asked about from both tables, pulled with the key", async () => {
     const answer = await readOk(`${ORE},${SWORD}`);
 
-    expect(answer.prices?.items).toEqual({ [ORE]: { sold: priced(ORE, 99).sold, seen: priced(ORE, 99).seen, reference: priced(ORE, 99).reference } });
-    expect(answer.listed?.items).toEqual({ [ORE]: { min_unit_price: 50, listings: 314 } });
+    expect(answer.prices?.items).toEqual({ [ORE]: { sold: priced(ORE, 120).sold, seen: priced(ORE, 120).seen, reference: priced(ORE, 120).reference } });
+    expect(answer.listed?.items).toEqual({ [ORE]: { min_unit_price: 95, listings: 7 } });
     expect(answer.prices?.pulledAt).toBeGreaterThan(0);
     expect(market.asks).toEqual([
       { path: "/api/prices", key: "mm_made-up-key" },
@@ -122,7 +122,7 @@ describe("market reads", () => {
     const kept = await readOk(String(ORE));
     const soon = await readOk(String(ORE));
 
-    expect(kept.listed?.items[ORE]).toEqual({ min_unit_price: 50, listings: 314 });
+    expect(kept.listed?.items[ORE]).toEqual({ min_unit_price: 95, listings: 7 });
     expect(soon.prices?.items[ORE]).toBeDefined();
     expect(market.asks).toHaveLength(4);
 

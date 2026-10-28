@@ -31,8 +31,8 @@ const GRADE_WORDS: Record<DealGrade, string> = { good: "a good deal", great: "a 
 const ROOMY_BAND = 44;
 
 /** What the shell sends: the badges (none while the window draws nothing), and the Deal
- * Line's name for their words. */
-type BadgesView = { badges: DealBadge[]; dealLine: string | null };
+ * Line's name for their words, and whether it is one of maplestory.market's figures. */
+type BadgesView = { badges: DealBadge[]; dealLine: string | null; fromMarket: boolean };
 
 const list = byId("badges");
 
@@ -70,7 +70,7 @@ function short(mesos: number): string {
 }
 
 /** The badge's words, and what it says in full for its accessible name. */
-function words(badge: DealBadge, line: string): [string, string] {
+function words(badge: DealBadge, line: string, fromMarket: boolean): [string, string] {
   switch (badge.verdict) {
     case "deal":
       return [
@@ -83,13 +83,18 @@ function words(badge: DealBadge, line: string): [string, string] {
         `${badge.item.name}: ${each(badge.item, badge.listed)}, no deal against ${line} (${whole(badge.lineMesos)}). Click for its card.`,
       ];
     case "noPrice":
-      return ["no price", `${badge.item.name}: ${line} has no price for it. Click to set one on its card.`];
+      return [
+        "no price",
+        fromMarket
+          ? `${badge.item.name}: ${line} has none for it. Click for its card.`
+          : `${badge.item.name}: ${line} has no price for it. Click to set one on its card.`,
+      ];
     case "unknown":
       return ["?", "Couldn't read this listing for sure, so it isn't judged."];
   }
 }
 
-function badgeItem(badge: DealBadge, line: string): HTMLLIElement {
+function badgeItem(badge: DealBadge, line: string, fromMarket: boolean): HTMLLIElement {
   const row = document.createElement("li");
   row.className = "deal-slot";
   // The core places badges in physical px; the page lays out in CSS px.
@@ -99,7 +104,7 @@ function badgeItem(badge: DealBadge, line: string): HTMLLIElement {
   // Where the band has room (54 CSS px at 100%), the badge grows into it with a fuller gauge;
   // at 200% its 27 keep the compact one.
   row.classList.toggle("roomy", badge.height / scale >= ROOMY_BAND);
-  const [text, said] = words(badge, line);
+  const [text, said] = words(badge, line, fromMarket);
   const full = !badge.covered
     ? said
     : badge.verdict === "unknown"
@@ -151,8 +156,8 @@ function render(view: BadgesView) {
   const key = JSON.stringify([view, window.devicePixelRatio]);
   if (key === shown) return;
   shown = key;
-  const line = view.dealLine ?? "the Deal Line";
-  list.replaceChildren(...view.badges.map((badge) => badgeItem(badge, line)));
+  const line = view.dealLine === null ? "the Deal Line" : view.fromMarket ? `maplestory.market's ${view.dealLine}` : view.dealLine;
+  list.replaceChildren(...view.badges.map((badge) => badgeItem(badge, line, view.fromMarket)));
 }
 
 // A click on a badge shows its item's card. The window never takes the keyboard: it can't
