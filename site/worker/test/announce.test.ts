@@ -2,7 +2,7 @@
 // the spot from another (ADR 0022): a first entry in an empty band, a Character beating its
 // own best, a re-upload of the same set and an opt-out that hands the spot on all stay quiet.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MOST_TOLD, PORTRAIT_CREDIT, type Post, type PostedMark, type Taken, type Top, postFor, takenTops, tell } from "../announce";
+import { MOST_TOLD, type Post, type PostedMark, type Taken, type Top, postFor, takenTops, tell } from "../announce";
 import { entry, key, optOut, partyEntry, upload } from "./api";
 import { classicRank, knownOnClassicRank, photoOf } from "./classicrank";
 
@@ -150,20 +150,23 @@ describe("the post", () => {
     expect(unmarked).not.toHaveProperty("thumbnail");
   });
 
-  it("shows the Character's portrait, the Map Mark under it beside its area, and credits ClassicRank", () => {
+  it("shows the Character's portrait, and the Map Mark beside its area and ClassicRank's credit under it", () => {
     const markOf = (map: string) => (map === MARKED ? MADE_UP_MARK : null);
 
     const [marked, unmarked] = postFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], markOf, photoOf("Hakuo"))!.embeds;
 
     expect(marked.thumbnail).toEqual({ url: photoOf("Hakuo") });
-    expect(marked.footer).toEqual({ text: "Made-up Town", icon_url: MADE_UP_TOWN });
-    expect(marked.description.endsWith(PORTRAIT_CREDIT)).toBe(true);
+    expect(marked.footer).toEqual({ text: "Made-up Town · Portrait: classicrank.com", icon_url: MADE_UP_TOWN });
+    expect(marked.description).not.toContain("ClassicRank");
     expect(unmarked.thumbnail).toEqual({ url: photoOf("Hakuo") });
-    expect(unmarked).not.toHaveProperty("footer");
+    expect(unmarked.footer).toEqual({ text: "Portrait: classicrank.com" });
   });
 
   it("says nothing of ClassicRank with no portrait", () => {
-    expect(postFor([taken(QUIET, 20)], NO_MARKS)!.embeds[0].description).not.toContain(PORTRAIT_CREDIT);
+    const embed = postFor([taken(QUIET, 20)], NO_MARKS)!.embeds[0];
+
+    expect(embed.description).not.toContain("classicrank");
+    expect(embed).not.toHaveProperty("footer");
   });
 
   it("names a map the fixture doesn't by its ID", () => {
@@ -335,7 +338,7 @@ describe("an upload", () => {
 
       await postsSettle(1);
       expect(posts[0].embeds[0].thumbnail).toEqual({ url: photoOf("Xena") });
-      expect(posts[0].embeds[0].footer).toEqual({ text: "Made-up Town", icon_url: MADE_UP_TOWN });
+      expect(posts[0].embeds[0].footer).toEqual({ text: "Made-up Town · Portrait: classicrank.com", icon_url: MADE_UP_TOWN });
     } finally {
       classicRank.known.clear();
     }
