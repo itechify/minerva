@@ -359,7 +359,6 @@ function marketSection(card: ItemCard): HTMLElement {
     else section.append(removeQuestion(line, edit.prices));
   }
   if (edit?.field === "name" && edit.line === null) section.append(...nameField(null, edit.problem));
-  else if (card.market.length === 0 && !card.marketRows) section.append(hint(null, "No market lines. + adds one to every card."));
   // One link, the site's name in it blue: the credit for its prices while they show.
   const foot = link(card.marketRows ? "Prices from " : "Look it up on ", "Open the item's page on maplestory.market", openMarket);
   foot.classList.add("item-card-market-foot");
