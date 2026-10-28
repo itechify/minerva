@@ -89,8 +89,9 @@ interface Embed {
   description: string;
   /** The Character's portrait, or with none the map's Map Mark; none for neither. */
   thumbnail?: { url: string };
-  /** With a portrait, the map's Map Mark, beside the area it stands for. */
-  footer?: { text: string; icon_url: string };
+  /** With a portrait, its credit to ClassicRank, after the map's Map Mark beside the area it
+   *  stands for when the map has one. */
+  footer?: { text: string; icon_url?: string };
 }
 
 /** A Map Mark as a post shows it: the area it stands for, and its picture. */
@@ -99,14 +100,15 @@ export interface PostedMark {
   picture: string;
 }
 
-/** What a post with a portrait says of it, as ClassicRank asks wherever its data shows: a
- *  visible link to classicrank.com. */
-export const PORTRAIT_CREDIT = " · Portrait: [ClassicRank](https://classicrank.com)";
+/** What a post with a portrait says of it, as ClassicRank asks wherever its data shows: its
+ *  address, visible. It goes in the footer, at the bottom of the embed, where Discord shows no
+ *  links, so it is written out rather than linked. */
+export const PORTRAIT_CREDIT = "Portrait: classicrank.com";
 
 /** One taken spot as an embed: titled with the map's name, linked to its Map Leaderboard, and
- *  showing the Character's portrait (`photo`, its address) as its thumbnail, with
- *  the map's Map Mark under it; with no portrait, the Map Mark is the thumbnail, as before
- *  portraits. Each Character it names links to their page. The title isn't markdown, so the
+ *  showing the Character's portrait (`photo`, its address) as its thumbnail, with the map's
+ *  Map Mark and the portrait's credit in the footer; with no portrait, the Map Mark is the
+ *  thumbnail, as before portraits. Each Character it names links to their page. The title isn't markdown, so the
  *  map's name goes in as the site writes it ("G* Coconut Season" is one in the map names
  *  fixture); a Character's name is letters and digits only (ADR 0015), so the description
  *  needs no escaping either, in its words or its links. */
@@ -120,9 +122,8 @@ function embedFor(taken: Taken, mark: PostedMark | null, photo: string | null): 
       `with ${rate(taken.expPerHour)} EXP/h${taken.party ? " in a party" : ""}, past ${nameOf(taken.from)}'s ${rate(taken.fromExpPerHour)}.`,
   };
   if (photo !== null) {
-    embed.description += PORTRAIT_CREDIT;
     embed.thumbnail = { url: photo };
-    if (mark !== null) embed.footer = { text: mark.name, icon_url: mark.picture };
+    embed.footer = mark !== null ? { text: `${mark.name} · ${PORTRAIT_CREDIT}`, icon_url: mark.picture } : { text: PORTRAIT_CREDIT };
   } else if (mark !== null) {
     embed.thumbnail = { url: mark.picture };
   }
