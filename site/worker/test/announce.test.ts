@@ -2,7 +2,7 @@
 // the spot from another (ADR 0022): a first entry in an empty band, a Character beating its
 // own best, a re-upload of the same set and an opt-out that hands the spot on all stay quiet.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MOST_TOLD, type Post, type PostedMark, type Taken, type Top, postFor, takenTops, tell } from "../announce";
+import { EMBEDS_PER_POST, type Post, type PostedMark, type Taken, type Top, postsFor, takenTops, tell } from "../announce";
 import { entry, key, optOut, partyEntry, upload } from "./api";
 import { classicRank, knownOnClassicRank, photoOf } from "./classicrank";
 
@@ -113,13 +113,13 @@ describe("taken top spots", () => {
 
 describe("the post", () => {
   it("is nothing with no spot taken", () => {
-    expect(postFor([], NO_MARKS)).toBeNull();
+    expect(postsFor([], NO_MARKS)).toEqual([]);
   });
 
   it("is an embed for the spot, titled with the map as the site names it and linked to its Map Leaderboard", () => {
-    const post = postFor([taken(HUNTING_GROUND, 20, 153_216)], NO_MARKS)!;
+    const post = postsFor([taken(HUNTING_GROUND, 20, 153_216)], NO_MARKS)[0];
 
-    expect(post.content).toBeUndefined();
+    expect(post).not.toHaveProperty("content");
     expect(post.embeds).toEqual([
       {
         title: "Henesys Hunting Ground I",
@@ -132,7 +132,7 @@ describe("the post", () => {
   });
 
   it("says when the spot was taken in a party", () => {
-    const post = postFor([taken(HUNTING_GROUND, 20, 153_216, true)], NO_MARKS)!;
+    const post = postsFor([taken(HUNTING_GROUND, 20, 153_216, true)], NO_MARKS)[0];
 
     expect(post.embeds[0].description).toBe(
       "**[Hakuo](https://owlofminerva.app/character/?name=Hakuo)** took #1, levels 20–29, with 153,000 EXP/h in a party, " +
@@ -143,7 +143,7 @@ describe("the post", () => {
   it("shows the map's Map Mark", () => {
     const markOf = (map: string) => (map === MARKED ? MADE_UP_MARK : null);
 
-    const [marked, unmarked] = postFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], markOf)!.embeds;
+    const [marked, unmarked] = postsFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], markOf)[0].embeds;
 
     expect(marked.thumbnail).toEqual({ url: MADE_UP_TOWN });
     expect(marked).not.toHaveProperty("footer");
@@ -153,7 +153,7 @@ describe("the post", () => {
   it("shows the Character's portrait, and the Map Mark beside its area and ClassicRank's credit under it", () => {
     const markOf = (map: string) => (map === MARKED ? MADE_UP_MARK : null);
 
-    const [marked, unmarked] = postFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], markOf, photoOf("Hakuo"))!.embeds;
+    const [marked, unmarked] = postsFor([taken(MARKED, 30, 90_000), taken(QUIET, 20, 80_000)], markOf, photoOf("Hakuo"))[0].embeds;
 
     expect(marked.thumbnail).toEqual({ url: photoOf("Hakuo") });
     expect(marked.footer).toEqual({ text: "Made-up Town · Portrait: classicrank.com", icon_url: MADE_UP_TOWN });
@@ -163,38 +163,43 @@ describe("the post", () => {
   });
 
   it("says nothing of ClassicRank with no portrait", () => {
-    const embed = postFor([taken(QUIET, 20)], NO_MARKS)!.embeds[0];
+    const embed = postsFor([taken(QUIET, 20)], NO_MARKS)[0].embeds[0];
 
     expect(embed.description).not.toContain("classicrank");
     expect(embed).not.toHaveProperty("footer");
   });
 
   it("names a map the fixture doesn't by its ID", () => {
-    expect(postFor([taken(QUIET, 20)], NO_MARKS)!.embeds[0].title).toBe(`Map ${QUIET}`);
+    expect(postsFor([taken(QUIET, 20)], NO_MARKS)[0].embeds[0].title).toBe(`Map ${QUIET}`);
   });
 
   it("titles a map whose name holds Discord formatting as it is written", () => {
     // "G* Coconut Season" (090040203) is one in the map names fixture.
-    expect(postFor([taken("090040203", 20)], NO_MARKS)!.embeds[0].title).toBe("G* Coconut Season");
+    expect(postsFor([taken("090040203", 20)], NO_MARKS)[0].embeds[0].title).toBe("G* Coconut Season");
   });
 
   it("pings nobody", () => {
-    expect(postFor([taken(QUIET, 20)], NO_MARKS)!.allowed_mentions).toEqual({ parse: [] });
+    expect(postsFor([taken(QUIET, 20)], NO_MARKS)[0].allowed_mentions).toEqual({ parse: [] });
   });
 
-  it("counts the rest once an upload takes more than it names", () => {
-    const many = Array.from({ length: MOST_TOLD + 2 }, (_, at) => taken(QUIET, (at + 2) * 10));
+  it("tells every spot an upload took as an embed, with no text", () => {
+    const several = Array.from({ length: 3 }, (_, at) => taken(QUIET, (at + 2) * 10));
 
-    const post = postFor(many, NO_MARKS)!;
+    const told = postsFor(several, NO_MARKS);
 
-    expect(post.embeds).toHaveLength(MOST_TOLD);
-    expect(post.content).toBe("…and 2 more top spots in the same upload.");
+    expect(told).toHaveLength(1);
+    expect(told[0].embeds).toHaveLength(3);
+    expect(told[0]).not.toHaveProperty("content");
   });
 
-  it("counts one left over as a spot", () => {
-    const many = Array.from({ length: MOST_TOLD + 1 }, (_, at) => taken(QUIET, (at + 2) * 10));
+  it("goes on in another post past what one Discord message holds, in order", () => {
+    const many = Array.from({ length: EMBEDS_PER_POST + 2 }, (_, at) => taken(QUIET, (at + 2) * 10));
 
-    expect(postFor(many, NO_MARKS)!.content).toBe("…and 1 more top spot in the same upload.");
+    const told = postsFor(many, NO_MARKS);
+
+    expect(told.map((post) => post.embeds.length)).toEqual([EMBEDS_PER_POST, 2]);
+    expect(told[1].embeds[0].description).toContain(`levels ${(EMBEDS_PER_POST + 2) * 10}–`);
+    expect(told[1]).not.toHaveProperty("content");
   });
 });
 
@@ -203,6 +208,14 @@ describe("telling Discord", () => {
     await tell({} as Env, [taken(QUIET, 20)]);
 
     expect(posts).toHaveLength(0);
+  });
+
+  it("posts each of several posts, in order", async () => {
+    const many = Array.from({ length: EMBEDS_PER_POST + 1 }, (_, at) => taken(QUIET, (at + 2) * 10));
+
+    await tell({ DISCORD_WEBHOOK_URL: WEBHOOK } as Env, many);
+
+    expect(posts.map((post) => post.embeds.length)).toEqual([EMBEDS_PER_POST, 1]);
   });
 
   it("lets a webhook that fails pass", async () => {

@@ -14,10 +14,10 @@ import { markOf } from "./ceilings";
 /** The maps the fixture names, built once per isolate. */
 const PLACES: MapNames = mapNames(mapNameRows);
 
-/** How many taken spots one post names. A Character that mirrors a whole Visit History for
- *  the first time can take several at once; the rest are counted, not listed, so the channel
- *  stays readable. */
-export const MOST_TOLD = 3;
+/** How many taken spots one post names: Discord's most embeds in one message. A Character that
+ *  mirrors a whole Visit History for the first time can take more at once, and the rest go in
+ *  the posts after it, so every spot is told. */
+export const EMBEDS_PER_POST = 10;
 
 /** A map and Level Band's top entry. */
 export interface Top {
@@ -132,41 +132,41 @@ function embedFor(taken: Taken, mark: PostedMark | null, photo: string | null): 
 
 /** What a Discord webhook is posted. */
 export interface Post {
-  /** How many more spots the upload took than it names; none when it names them all. */
-  content?: string;
   embeds: Embed[];
   /** Nothing in a post ever pings: a Character's name is its own, not a mention. */
   allowed_mentions: { parse: [] };
 }
 
-/** The post for the spots an upload took, or `null` with none, with `markOf` giving a map's
- *  Map Mark (`null` for a map without one), and `photo` the address of the portrait of the
- *  Character that took them (`null` for none). */
-export function postFor(taken: Taken[], markOf: (map: string) => PostedMark | null, photo: string | null = null): Post | null {
-  if (taken.length === 0) return null;
-  const told = taken.slice(0, MOST_TOLD);
-  const post: Post = { embeds: told.map((t) => embedFor(t, markOf(t.map), photo)), allowed_mentions: { parse: [] } };
-  const rest = taken.length - told.length;
-  if (rest > 0) post.content = `…and ${rest} more top ${rest === 1 ? "spot" : "spots"} in the same upload.`;
-  return post;
+/** The posts for the spots an upload took, in order, none with none: an embed a spot and no
+ *  text, `EMBEDS_PER_POST` to a post. `markOf` gives a map's Map Mark (`null` for a map without
+ *  one), and `photo` is the address of the portrait of the Character that took them (`null` for
+ *  none). */
+export function postsFor(taken: Taken[], markOf: (map: string) => PostedMark | null, photo: string | null = null): Post[] {
+  const posts: Post[] = [];
+  for (let at = 0; at < taken.length; at += EMBEDS_PER_POST) {
+    const told = taken.slice(at, at + EMBEDS_PER_POST);
+    posts.push({ embeds: told.map((t) => embedFor(t, markOf(t.map), photo)), allowed_mentions: { parse: [] } });
+  }
+  return posts;
 }
 
 /** Post the taken spots to the Discord webhook, if one is set up (the DISCORD_WEBHOOK_URL
  *  secret), with the portrait of the Character that took them (`photo`, its address, `null`
- *  for none).
+ *  for none). Several posts go one after another, so they show in order.
  *  Nothing is retried and no failure reaches the upload: the Map Leaderboards are the record,
- *  and a post is only a nicety. */
+ *  and a post is only a nicety. A post that can't be sent at all leaves the ones after it unsent;
+ *  one Discord turns down (a 429) doesn't. */
 export async function tell(env: Env, taken: Taken[], photo: string | null = null): Promise<void> {
   const url = env.DISCORD_WEBHOOK_URL;
   if (!url) return;
-  const post = postFor(taken, (map) => markOf(env, map), photo);
-  if (post === null) return;
   try {
-    await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(post),
-    });
+    for (const post of postsFor(taken, (map) => markOf(env, map), photo)) {
+      await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(post),
+      });
+    }
   } catch {
     // A webhook that is gone, rate-limited or slow never fails an upload.
   }
