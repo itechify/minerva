@@ -637,11 +637,14 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
             "bar": { "exp": 266, "percentHundredths": 633 },
             "personalBest": null,
             "personalBestThisVisit": false,
+            "personalBestParty": false,
             "newBest": false,
             "pace": null,
             "forecast": [],
             "lostFromHundredths": null,
             "noStatusBar": false,
+            "loot": { "mesos": 0, "mesosPerHour": null, "items": [], "itemsTotal": 0 },
+            "expSplit": null,
         })
     );
 
@@ -666,6 +669,7 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
             "bar": { "exp": 335, "percentHundredths": 798 },
             "personalBest": null,
             "personalBestThisVisit": false,
+            "personalBestParty": false,
             "newBest": false,
             "pace": null,
             "forecast": [
@@ -676,6 +680,8 @@ fn the_overlay_gets_tracking_as_the_panel_renders_it() {
             ],
             "lostFromHundredths": null,
             "noStatusBar": false,
+            "loot": { "mesos": 0, "mesosPerHour": 0, "items": [], "itemsTotal": 0 },
+            "expSplit": null,
         })
     );
     let died = serde_json::to_value(read(&mut minerva, 75 * S, 266, 633)).unwrap();

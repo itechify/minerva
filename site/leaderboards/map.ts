@@ -5,10 +5,12 @@
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import { STAR } from "../star.ts";
-import { BAND_PORTRAIT, byId, characterLink, crown, jobWithIcon, names, portraitImage, read, said as saidWith, unreachable } from "./api.ts";
+import { BAND_PORTRAIT, byId, characterLink, crown, drawKindLinks, jobWithIcon, names, partyMark, portraitImage, read, said as saidWith, unreachable } from "./api.ts";
 import {
   type BandAnswer,
   bandTable,
+  kindChoices,
+  type Kind,
   type Link,
   linkTo,
   type MapAnswer,
@@ -107,13 +109,15 @@ async function openBoard(place: MapPlace) {
   if (!titled) drawHead(place);
   if (page.open === null) {
     drawBands(page.bands);
+    drawKinds();
     return say(page.empty!);
   }
   wanted = page.open;
 
-  const band = await readBand(page.open, link.name);
+  const band = await readBand(page.open, link.name, link.kind);
   if (band === null) return down();
   drawBands(page.bands);
+  drawKinds();
   drawBand(band, null, false);
   byId("board").classList.remove("lb-waiting");
   // The linked Character's entry is what the player came to see.
@@ -149,9 +153,11 @@ async function showPicture(place: MapPlace) {
 /** The bands read so far, by their address, so Back and Forward don't wait on the API. */
 const bandsRead = new Map<string, BandAnswer>();
 
-async function readBand(band: number, name: string | null): Promise<BandAnswer | null> {
-  const query = name === null ? "" : `?name=${encodeURIComponent(name)}`;
-  const path = `/api/maps/${place!.id}/bands/${band}${query}`;
+async function readBand(band: number, name: string | null, kind: Kind | null): Promise<BandAnswer | null> {
+  const query = new URLSearchParams();
+  if (name !== null) query.set("name", name);
+  if (kind !== null) query.set("kind", kind);
+  const path = `/api/maps/${place!.id}/bands/${band}${query.size > 0 ? `?${query}` : ""}`;
   const answer = bandsRead.get(path) ?? (await read<BandAnswer>(path));
   if (answer !== null) bandsRead.set(path, answer);
   return answer;
@@ -160,7 +166,7 @@ async function readBand(band: number, name: string | null): Promise<BandAnswer |
 /** The band a page shows, its title, the line about the linked Character, and its table,
  *  each row named by `morph` if it's to slide; `grow` regrows the lanes from the left. */
 function drawBand(band: BandAnswer, morph: Map<string, string> | null, grow: boolean) {
-  const table = bandTable(band, link.name, new Date());
+  const table = bandTable(band, link.name, new Date(), link.kind);
   const choice = mapPage(link, names, mapAnswer!).bands.find((b) => b.open)!;
   const title = byId("band-title");
   title.textContent = choice.levels;
@@ -199,7 +205,10 @@ function drawBand(band: BandAnswer, morph: Map<string, string> | null, grow: boo
 function drawBands(bands: ReturnType<typeof mapPage>["bands"]) {
   const nav = byId("bands");
   const had = [...nav.querySelectorAll<HTMLAnchorElement>("a.lb-band")];
-  const same = had.length === bands.length && had.every((a, i) => a.dataset.band === String(bands[i].band));
+  // The same bands, with the same counts and links (a switch of kind changes them).
+  const same =
+    had.length === bands.length &&
+    had.every((a, i) => a.dataset.band === String(bands[i].band) && a.getAttribute("href") === bands[i].href && a.lastElementChild?.textContent === bands[i].entries);
   if (same) {
     had.forEach((a, i) => (bands[i].open ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
     return;
@@ -220,6 +229,26 @@ function drawBands(bands: ReturnType<typeof mapPage>["bands"]) {
   if (focused) nav.querySelector<HTMLElement>("[aria-current]")?.focus();
 }
 
+/** The choice of kinds, both, solo or party, as links. Offered once a map has a Party Best's
+ *  entry, or the link names a kind: a map with only Solo Bests shows no choice to make. */
+function drawKinds() {
+  const nav = byId("kinds");
+  const hasParty = mapAnswer!.bands.some((b) => b.party > 0);
+  nav.hidden = !hasParty && link.kind === null;
+  if (!nav.hidden) drawKindLinks(nav, kindChoices(link));
+}
+
+/** Clicking a kind switches the page to it in place, as a Level Band does. */
+byId("kinds").addEventListener("click", (event) => {
+  const choice = (event.target as Element).closest<HTMLAnchorElement>("a.lb-kind");
+  if (choice === null || event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  const to = readLink(new URL(choice.href).search);
+  if (to.kind === link.kind) return;
+  switchTo(to, choice.href, true);
+});
+
 /** Clicking a Level Band switches the page to it in place, and the address with it, so
  *  the link still shares and Back comes back. A click meant for a new tab or window, or
  *  with script off, is the link it always was. */
@@ -229,7 +258,7 @@ byId("bands").addEventListener("click", (event) => {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   const to = readLink(new URL(choice.href).search);
-  if (to.band === wanted) return;
+  if (to.band === wanted && to.kind === link.kind) return;
   switchTo(to, choice.href, true);
 });
 
@@ -250,11 +279,26 @@ let moving: ViewTransition | null = null;
  *  for it, sliding the rows when `animate` and the browser can, and motion is welcome. */
 async function switchTo(to: Link, href: string | null, animate: boolean) {
   const turn = ++switches;
-  const open = mapPage(to, names, mapAnswer!).open;
-  if (open === null) return;
+  const page = mapPage(to, names, mapAnswer!);
+  const open = page.open;
+  if (open === null) {
+    // No band to open under this kind: the page still goes where the click asked, and says so.
+    const address = linkTo(to);
+    if (href !== null && address !== location.pathname + location.search) history.pushState(null, "", address);
+    link = to;
+    drawBands(page.bands);
+    drawKinds();
+    shown = [];
+    byId("table").hidden = true;
+    byId("band-title").hidden = true;
+    byId("note").hidden = true;
+    rows.replaceChildren();
+    byId("board").removeAttribute("aria-busy");
+    return say(page.empty!);
+  }
   wanted = open;
   byId("board").setAttribute("aria-busy", "true");
-  const band = await readBand(open, to.name);
+  const band = await readBand(open, to.name, to.kind);
   if (turn !== switches) return;
   byId("board").removeAttribute("aria-busy");
   // The API not answering: the link, loaded as a page, says so.
@@ -268,13 +312,14 @@ async function switchTo(to: Link, href: string | null, animate: boolean) {
     if (href !== null && address !== location.pathname + location.search) history.pushState(null, "", address);
     link = to;
     drawBands(mapPage(link, names, mapAnswer!).bands);
+    drawKinds();
     drawBand(band, morph, grow);
     byId("switched").textContent = byId("caption").textContent || said.textContent || "";
   };
   moving?.skipTransition();
   if (!animate || reducedMotion().matches || !document.startViewTransition) return update(null, false);
 
-  const next = bandTable(band, to.name, new Date());
+  const next = bandTable(band, to.name, new Date(), to.kind);
   const morph = morphNames(before, next.yours === null ? next.rows : [...next.rows, next.yours]);
   nameRows(morph);
   const root = document.documentElement;
@@ -404,6 +449,7 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
   name.setAttribute("role", "rowheader");
   if (row.you) name.append(star());
   name.append(characterLink(row.name, row.nameHref));
+  if (row.party) name.append(partyMark());
   // On a phone, a band with portraits writes the job and level under the name, in place of
   // their columns: the class's icon kept with the job's first word, and the level whole.
   if (row.portrait !== null) {
@@ -418,7 +464,7 @@ function drawRow(row: Row, { place, band, ruler, morph }: RowsAt): HTMLTableRowE
     report.type = "button";
     report.title = "Report";
     report.append(flag());
-    report.setAttribute("aria-label", `Report ${row.name}'s entry`);
+    report.setAttribute("aria-label", `Report ${row.name}'s ${row.party ? "party " : ""}entry`);
     report.setAttribute("aria-describedby", "report-keys");
     report.addEventListener("click", () => openReport(row, place, band));
     reportCell.append(report);
@@ -471,15 +517,16 @@ const reportSaid = byId("report-said");
 const send = byId<HTMLButtonElement>("report-send");
 const cancel = byId<HTMLButtonElement>("report-cancel");
 /** The entry the report window is open for. */
-let reporting: { name: string; map: string; band: number } | null = null;
+let reporting: { name: string; map: string; band: number; party: boolean } | null = null;
 /** Whether a report is on its way, so a second press of Send doesn't send it twice. */
 let sending = false;
 /** A touch screen, where focusing the box for why would raise the keyboard over the window. */
 const touch = matchMedia("(hover: none) and (pointer: coarse)");
 
 function openReport(row: Row, place: MapPlace, band: number) {
-  reporting = { name: row.name, map: place.id, band };
-  byId("report-what").textContent = `${row.name}'s ${row.expPerHour} EXP/h at level ${row.level}, #${row.rank} on ${place.name}.`;
+  reporting = { name: row.name, map: place.id, band, party: row.party };
+  const kind = row.party ? "party " : "";
+  byId("report-what").textContent = `${row.name}'s ${kind}${row.expPerHour} EXP/h at level ${row.level}, #${row.rank} on ${place.name}.`;
   reason.value = "";
   reason.disabled = false;
   reportSaid.hidden = true;

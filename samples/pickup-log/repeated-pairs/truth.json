@@ -1,0 +1,38 @@
+{
+  "source": "1025",
+  "baseline": "00090000.png",
+  "arrivals": [
+    {
+      "frame": "00090700.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 14,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 1
+        },
+        {
+          "kind": "exp",
+          "amount": 14,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 1
+        },
+        {
+          "kind": "exp",
+          "amount": 14,
+          "party": true
+        },
+        {
+          "kind": "partyBonus",
+          "amount": 1
+        }
+      ]
+    }
+  ]
+}

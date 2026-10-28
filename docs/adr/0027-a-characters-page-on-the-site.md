@@ -1,5 +1,5 @@
 ---
-status: accepted, amended (the top 3 of a band are crowned gold, silver and bronze, on a map's page as on a Character's, and each job shows its class's icon), and by ADR-0029 (the page shows the Character's portrait from ClassicRank, linked to their profile there)
+status: accepted, amended (the top 3 of a band are crowned gold, silver and bronze, on a map's page as on a Character's, and each job shows its class's icon), by #173 (a Character's Solo Best and Party Best are entries of their own: each is ranked among its kind, the page marks a Party Best, and its link opens the map's page of that kind: ADR 0015), and by ADR-0029 (the page shows the Character's portrait from ClassicRank, linked to their profile there)
 ---
 
 # A Character's page on the site

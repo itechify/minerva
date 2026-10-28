@@ -57,7 +57,9 @@ export interface CharacterRow {
   level: string;
   expPerHour: string;
   date: string;
-  /** The map's Map Leaderboard at the band, with the entry marked. */
+  /** Whether it's a Party Best's: the page marks it. */
+  party: boolean;
+  /** The map's Map Leaderboard at the band, with the entry marked, of its kind. */
   href: string;
 }
 
@@ -134,13 +136,14 @@ export function characterPage(answer: CharacterAnswer, names: MapNames, now: Dat
     level: String(e.level),
     expPerHour: rate(e.expPerHour),
     date: dated(e.setAt),
-    href: linkTo({ map: e.map, band: e.band, name: answer.name }),
+    party: e.party,
+    href: linkTo({ map: e.map, band: e.band, name: answer.name, kind: e.party ? "party" : "solo" }),
   });
   const bands = bandsHeld.map((band): CharacterBand => {
     const rows = entries
       .filter((e) => e.band === band)
       .sort((a, b) => b.expPerHour - a.expPerHour || byText(a.place.name, b.place.name) || byText(a.map, b.map));
-    return { band, levels: bandLevels(band), caption: `${counted(rows.length, "map")} at ${bandLevels(band)}`, rows: rows.map(row) };
+    return { band, levels: bandLevels(band), caption: `${counted(new Set(rows.map((r) => r.map)).size, "map")} at ${bandLevels(band)}`, rows: rows.map(row) };
   });
 
   return {

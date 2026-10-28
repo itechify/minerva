@@ -50,6 +50,7 @@ describe("latest", () => {
       map: LISTED,
       mark: null,
       band: 10,
+      party: false,
       took: null,
     });
   });

@@ -11,7 +11,7 @@ describe("mirroring", () => {
     expect(await response.json()).toEqual({ accepted: 1, rejected: [] });
     // Its portrait from ClassicRank comes after the upload (test/portraits.test.ts).
     expect((await band(FIELD, 20)).entries).toMatchObject([
-      { rank: 1, name: "Egbert", job: "Magician", level: 23, expPerHour: 50_000, setAt: 1_760_000_000_000 },
+      { rank: 1, name: "Egbert", job: "Magician", level: 23, expPerHour: 50_000, setAt: 1_760_000_000_000, party: false },
     ]);
   });
 

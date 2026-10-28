@@ -155,8 +155,24 @@ The last 5 minutes of active play drawn kill by kill on the Grind Tracker, raced
 _Avoid_: graph, chart, sparkline
 
 **Personal Best**:
-The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in their Visit History of the map, or the Visit under way's once it beats that. Each is stamped with the Character, level and job the Status Bar showed at the refresh that set it. The Grind Tracker's Best row shows the Character playing's (the Unassigned one while no name is read) as it stands, from arriving on the map and from the refresh that sets a new one, saying "this visit" while the Visit under way set it; a star marks the Rolling Rate while it is that best (ADR 0018).
+The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in their Visit History of the map, or the Visit under way's once it beats that. Each is stamped with the Character, level and job the Status Bar showed at the refresh that set it. The Grind Tracker's Best row shows the Character playing's (the Unassigned one while no name is read) as it stands, from arriving on the map and from the refresh that sets a new one, labelled "Visit best" while the Visit under way set it; a star marks the Rolling Rate while it is that best (ADR 0018). A map has two, its Solo Best and its Party Best.
 _Avoid_: record, high score, PB, max
+
+**Solo Best**:
+A map's Personal Best over 5 minutes with no Party EXP in them.
+_Avoid_: personal solo best, solo record
+
+**Party Best**:
+A map's Personal Best over 5 minutes with Party EXP in them, kept apart from its Solo Best so a party run never hides what the Character does alone. The Grind Tracker races the Party Best while the player is partied.
+_Avoid_: group best, party record
+
+**Party EXP**:
+The EXP the Pickup Log says came from being in a party: a share of a partymate's kill ("You received EXP" in yellow) and the bonus on every kill while partied ("Bonus EXP for PARTY"). The player's own EXP is "You received EXP" in white.
+_Avoid_: shared EXP, group EXP, bonus EXP (only part of it)
+
+**EXP Split**:
+How much of the Session's EXP was the player's own and how much was Party EXP, as shares of what the EXP bar gained, given on hovering the Grind Tracker's Session EXP/h once Party EXP has come in.
+_Avoid_: EXP breakdown, EXP sources
 
 **Level Band**:
 Ten levels, 1–9, 10–19, 20–29 and so on, that a Visit's best is counted in by the level that set it. A Visit History keeps the best Visit in each, and a Map Leaderboard ranks each on its own.
@@ -167,7 +183,7 @@ The Personal Bests no Character is known for: those saved before Minerva read Ch
 _Avoid_: unknown character, shared bests
 
 **Personal Bests window**:
-Every map's Personal Best side by side for one Character at a time, in a window over the game that the Grind Tracker opens and closes, to compare maps: each with its mob levels and how close the best came to the map's solo EXP/h ceiling. Its picker shows the Character playing until the player picks another, or Unassigned. Each map opens to its Visit History, the Visit under way's best among them, each Visit with the level that set it. It shows the bests as they stand, the Visit under way's included, and keeps up with them while it is open. In it the player moves any Visit to another Character, assigns every Unassigned Visit to one, and, under a Character's Manage, removes them with their bests or merges them into another (a name changed in the game shows as a new Character), each after confirming. Under a Character's name, their switch "Share" uploads their bests to the Map Leaderboards and takes them off again, at a click, its tooltip saying the site is public; it starts on for a Character Minerva meets for the first time with a best that can go up, and stays off once turned off. Upload problems show under Manage whether it is open or not, each with Send again. An opened map's Visit History links to its Map Leaderboard. Beside the Share, Link Discord links this PC to the player's Account, or says whose Discord it is linked to; it asks once, quietly, a player sharing a Character who hasn't linked, until they link or say not now.
+Every map's Personal Best side by side for one Character at a time, in a window over the game that the Grind Tracker opens and closes, to compare maps: each with its mob levels and how close the best came to the map's solo EXP/h ceiling. Its picker shows the Character playing until the player picks another, or Unassigned. Each map opens to its Visit History, the Visit under way's best among them, each Visit with the level that set it. It shows the bests as they stand, the Visit under way's included, and keeps up with them while it is open. It shows each map's Solo Best and Party Best. In it the player moves any Visit to another Character, assigns every Unassigned Visit to one, and, under a Character's Manage, removes them with their bests or merges them into another (a name changed in the game shows as a new Character), each after confirming. Under a Character's name, their switch "Share" uploads their bests to the Map Leaderboards and takes them off again, at a click, its tooltip saying the site is public; it starts on for a Character Minerva meets for the first time with a best that can go up, and stays off once turned off. Upload problems show under Manage whether it is open or not, each with Send again. An opened map's Visit History links to its Map Leaderboard. Beside the Share, Link Discord links this PC to the player's Account, or says whose Discord it is linked to; it asks once, quietly, a player sharing a Character who hasn't linked, until they link or say not now.
 _Avoid_: leaderboard (the site's are Map Leaderboards), records, best list, Personal Bests page
 
 **Visit**:
@@ -175,11 +191,11 @@ The stretch from the panel confirming a map until it confirms another. Losing th
 _Avoid_: stay, trip
 
 **Visit History**:
-A Character's best Visits on a map that have ended (or the Unassigned ones), highest first: the first is its Personal Best. It keeps the 10 best, and the best in each Level Band even if it isn't among them, so a Character that levels up keeps their lower bands' bests. The Visit under way's best joins it when the Visit ends, or when another Character is named. The player can remove any Visit in it that came from a bug, and the Visit under way's best before it joins.
+A Character's best Visits on a map that have ended (or the Unassigned ones), highest first: the first is its Personal Best. It keeps the 10 best of each kind (Solo and Party), and the best in each Level Band of each kind even if it isn't among them, so a Character that levels up keeps their lower bands' bests. The Visit under way's best joins it when the Visit ends, or when another Character is named. The player can remove any Visit in it that came from a bug, and the Visit under way's best before it joins.
 _Avoid_: runs, attempts, records
 
 **Map Leaderboard**:
-A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by EXP/h, ties going to whoever set it first. An entry is one Character's best Visit on the map in the band: its name, job, exact level, EXP/h and date. The site mirrors what the player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015). The Map Leaderboards page leads to them through Where to train, a search by name, and Latest, the 10 newest entries on every map (ADR 0024). Each name in them opens that Character's page (ADR 0027).
+A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by EXP/h, ties going to whoever set it first. An entry is one Character's best Visit of a kind on the map in the band, their Solo Best or their Party Best: its name, job, exact level, EXP/h, date and whether it is a Party Best. A page ranks each Character once by their higher entry, or only the Solo Bests or only the Party Bests (ADR 0015, amended); an entry of no known kind, as every one from before the site told them apart, is a Party Best. The site mirrors what the player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015). The Map Leaderboards page leads to them through Where to train, a search by name, and Latest, the 10 newest entries on every map (ADR 0024). Each name in them opens that Character's page (ADR 0027).
 _Avoid_: leaderboard (alone), ranking, high scores, hiscores
 
 **Where to train**:
@@ -187,7 +203,7 @@ The Map Leaderboards page's table of the maps for one Level Band: each map whose
 _Avoid_: best maps, recommended maps, map ranking
 
 **Character page**:
-A Character's page on owlofminerva.app (`/character/?name=`), which every name the Map Leaderboards show links to, and a new #1's post on Discord: every entry of theirs a Level Band at a time, highest first, each with its rank there, and over them the job and level of their newest entry, the #1s they hold (one per map and Level Band), their podiums (places in a band's top 3), how many maps they're on and their best EXP/h (ADR 0027). It shows what their entries show map by map, and their Portrait with a link to their ClassicRank profile (ADR 0029): no ceiling, and nothing that ties one Character to another or to an Account. A name with no entries, whatever the reason, shows the owl lost.
+A Character's page on owlofminerva.app (`/character/?name=`), which every name the Map Leaderboards show links to, and a new #1's post on Discord: every entry of theirs a Level Band at a time, highest first, each with its rank there, and over them the job and level of their newest entry, the #1s they hold (one per map, Level Band and kind of entry), their podiums (places in a band's top 3), how many maps they're on and their best EXP/h (ADR 0027); a Party Best has a small party mark, and ranks among the band's Party Bests as a Solo Best does among its Solo Bests. It shows what their entries show map by map, and their Portrait with a link to their ClassicRank profile (ADR 0029): no ceiling, and nothing that ties one Character to another or to an Account. A name with no entries, whatever the reason, shows the owl lost.
 _Avoid_: profile, player page, Personal Bests page
 
 **Portrait**:
@@ -218,11 +234,15 @@ _Avoid_: chat, drop log, kill feed
 The in-game currency; the game itself says "mesos".
 _Avoid_: miso, gold, money
 
+**Loot**:
+The mesos and Items the Pickup Log says the player picked up in a Session, each Item tallied by name. Read from the Pickup Log, it may be less than was picked up, never more (ADR 0026). The Grind Tracker shows it as a collapsible section.
+_Avoid_: pickups, drops, haul
+
 ### Items
 
 **Item**:
 Something the player can hold in the inventory: equipment, potions, scrolls, chairs, ores, Cash items. Each has its own MeowDB page.
-_Avoid_: drop, loot (when meaning the item itself)
+_Avoid_: drop, loot (when meaning one item; Loot is the Session's mesos and Items)
 
 **Scroll Tier**:
 Which of the four scrolls that improve the same thing one is: Lesser (100%), Intermediate (60%), Greater (10%) or Chaos, the end of its name ("One-Handed Sword Attack Scroll: Greater"). Every scroll of a tier has the same picture, whatever it improves, coloured by the tier: blue-grey, red, gold or grey.

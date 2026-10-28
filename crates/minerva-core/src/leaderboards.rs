@@ -9,9 +9,10 @@
 //!   went through, are kept with the settings.
 //! - **What is uploaded**: each shown Character's whole set of entries, which replaces the set
 //!   before it on the site, so a Visit removed, merged or moved in the window goes from the
-//!   site too. An entry is the Character's best Visit on a map in a Level Band, of those
-//!   that have ended (the Visit under way's best goes up when it ends), with the level and
-//!   job that set it and its date. A Visit with no level, job or date can't be an entry: the
+//!   site too. An entry is the Character's best Visit of a kind (Solo Best or Party Best,
+//!   ADR 0026) on a map in a Level Band, of those that have ended (the Visit under way's best
+//!   goes up when it ends), with the level and job that set it and its date: a band's Solo Best
+//!   and its Party Best are entries of their own (ADR 0015). A Visit with no level, job or date can't be an entry: the
 //!   next best dated one in its band stands in. Nor can one dated over 23 hours ahead of the
 //!   wall clock (the site refuses one over a day ahead of its own: see [`AHEAD_MS`]), until it isn't.
 //! - **When**: once per shown Character at each launch (what the site holds may have changed
@@ -52,8 +53,8 @@ const AHEAD_MS: u64 = 23 * 60 * 60_000;
 /// The longest job name the site takes.
 const MOST_JOB_CHARS: usize = 32;
 
-/// One entry on a Map Leaderboard, as the site's API takes it: a Character's best Visit on a
-/// map in a Level Band (the site works the band out from the level).
+/// One entry on a Map Leaderboard, as the site's API takes it: a Character's best Visit of a
+/// kind (solo or party) on a map in a Level Band (the site works the band out from the level).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LeaderboardEntry {
@@ -64,6 +65,11 @@ pub struct LeaderboardEntry {
     pub exp_per_hour: u64,
     /// When the Visit set it, in ms since the Unix epoch.
     pub set_at: u64,
+    /// It is the map's Party Best, not its Solo Best (ADR 0026): the site ranks the two apart
+    /// and marks a party entry. Always in the body: an entry that says nothing of it is a
+    /// Party Best to the site, as a best of no known kind is everywhere.
+    #[serde(default)]
+    pub party: bool,
 }
 
 /// An upload the shell is to make, from when the core asks for it until the shell tells it
@@ -108,6 +114,8 @@ pub fn read_leaderboard_answer(status: u16, retry_after: Option<&str>, body: &st
     struct Rejection {
         map: String,
         band: u32,
+        #[serde(default)]
+        party: bool,
         reason: String,
         cap: Option<u64>,
     }
@@ -129,7 +137,7 @@ pub fn read_leaderboard_answer(status: u16, retry_after: Option<&str>, body: &st
                         "removed" => RejectedReason::Removed {},
                         _ => return None,
                     };
-                    Some(RejectedEntry { map: r.map, band: r.band, reason })
+                    Some(RejectedEntry { map: r.map, band: r.band, party: r.party, reason })
                 })
                 .collect();
             LeaderboardAnswer::Accepted { rejected }
@@ -180,6 +188,9 @@ pub struct RejectedEntry {
     pub map: String,
     /// The Level Band, by its first level (1, 10, 20…), as the site names it.
     pub band: u32,
+    /// It was a Party Best's entry, not a Solo Best's.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub party: bool,
     pub reason: RejectedReason,
 }
 
@@ -193,6 +204,8 @@ pub struct RejectedListing {
     /// The Level Band's first level and last: 1 and 9, 10 and 19, and so on.
     pub lowest_level: u32,
     pub highest_level: u32,
+    /// It was a Party Best's entry, not a Solo Best's.
+    pub party: bool,
     pub reason: RejectedReason,
 }
 
@@ -203,6 +216,7 @@ impl From<&RejectedEntry> for RejectedListing {
             map: entry.map.clone(),
             lowest_level: band.lowest(),
             highest_level: band.highest(),
+            party: entry.party,
             reason: entry.reason.clone(),
         }
     }
@@ -586,8 +600,9 @@ fn encoded(name: &str) -> String {
 }
 
 /// The entries of the Character named `name` in `history`, the bests of ended Visits: their best
-/// Visit on each map in each Level Band that has a level, a job and a date, and isn't dated over
-/// [`AHEAD_MS`] after `now_unix_ms`. By map in the order they are saved, then by band, lowest first.
+/// Visit of each kind (Solo and Party Bests apart, ADR 0026) on each map in each Level Band that
+/// has a level, a job and a date, and isn't dated over [`AHEAD_MS`] after `now_unix_ms`. By map in
+/// the order they are saved, then by band, lowest first, a band's Solo Best before its Party Best.
 fn entries(history: &SavedBests, name: &str, now_unix_ms: u64) -> Vec<LeaderboardEntry> {
     let mut entries = Vec::new();
     for map in history.maps_of(Some(name)) {
@@ -595,11 +610,23 @@ fn entries(history: &SavedBests, name: &str, now_unix_ms: u64) -> Vec<Leaderboar
             let (Some(level), Some(job), Some(set_at)) = (visit.level, &visit.job, visit.set_at_unix_ms) else { return None };
             let job_fits = (1..=MOST_JOB_CHARS).contains(&job.chars().count());
             let fits = (1..=MAX_LEVEL).contains(&level) && job_fits && set_at <= now_unix_ms.saturating_add(AHEAD_MS);
-            fits.then(|| LeaderboardEntry { map: map.id.clone(), level, job: job.clone(), exp_per_hour: visit.exp_per_hour, set_at })
+            fits.then(|| LeaderboardEntry {
+                map: map.id.clone(),
+                level,
+                job: job.clone(),
+                exp_per_hour: visit.exp_per_hour,
+                set_at,
+                party: visit.kind.is_party(),
+            })
         };
-        // One that can't be an entry leaves the next best in its band to stand in.
-        let can_be_entries = map.visits.iter().filter(|visit| entry(visit).is_some());
-        entries.extend(band_bests(can_be_entries).into_iter().filter_map(|(_, visit)| entry(visit)));
+        // One that can't be an entry leaves the next best of its kind in its band to stand in.
+        let mut of_map: Vec<(LevelBand, crate::BestKind, LeaderboardEntry)> = Vec::new();
+        for kind in [crate::BestKind::Solo, crate::BestKind::Party] {
+            let can_be_entries = map.visits.iter().filter(|visit| visit.kind == kind && entry(visit).is_some());
+            of_map.extend(band_bests(can_be_entries).into_iter().filter_map(|(band, visit)| Some((band, kind, entry(visit)?))));
+        }
+        of_map.sort_by_key(|(band, party, _)| (*band, *party));
+        entries.extend(of_map.into_iter().map(|(_, _, entry)| entry));
     }
     entries
 }

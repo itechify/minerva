@@ -3,7 +3,7 @@
 // each Level Band, highest first, each row's map a link to the entry on its Map Leaderboard.
 // What it shows is worked out in character.ts.
 import { make } from "../../src/dom.ts";
-import { byId, crown, jobWithIcon, markSlot, names, portraitImage, said as saidWith, unreachable } from "../leaderboards/api.ts";
+import { byId, crown, jobWithIcon, markSlot, names, partyMark, portraitImage, said as saidWith, unreachable } from "../leaderboards/api.ts";
 import type { Said } from "../leaderboards/leaderboards.ts";
 import {
   type CharacterAnswer,
@@ -97,7 +97,8 @@ function drawRow(row: CharacterRow): HTMLTableRowElement {
   cell("td", row.mobs === null ? "ch-mobs ch-none" : "ch-mobs", row.mobs ?? "—");
   cell("td", "ch-job", jobWithIcon(row.job, row.jobClass));
   cell("td", "ch-level", row.level);
-  cell("td", "ch-exp", row.expPerHour);
+  const exp = cell("td", "ch-exp", row.expPerHour);
+  if (row.party) exp.append(partyMark());
   cell("td", "ch-date", row.date);
   return tr;
 }

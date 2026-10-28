@@ -34,6 +34,10 @@ pub mod osms_items;
 mod pace;
 mod panel;
 mod personal_best;
+mod pickup_cover;
+mod loot_items;
+mod pickup_log;
+mod pickup_slips;
 mod player_shop;
 mod pictures;
 mod portal_overrides;
@@ -53,7 +57,7 @@ mod ui_size;
 mod updates;
 mod world;
 
-pub use bests_window::{PersonalBestsCharacter, PersonalBestsMap, PersonalBestsVisit, PersonalBestsWindow};
+pub use bests_window::{PersonalBestsCharacter, PersonalBestsKind, PersonalBestsMap, PersonalBestsVisit, PersonalBestsWindow};
 pub use bug_report::{BugReport, ReportAbout};
 pub use deal_finder::{DealBadge, DealBadges, DealFinderView, DealGrade, DealItem, Verdict};
 pub use exp_bar::{ExpBar, ExpBarPlace, ExpBarReader, ExpBarReading, ExpFigures};
@@ -86,14 +90,18 @@ pub use panel::{
     PlacementMode, ScreenPoint,
     ScreenRect, Section, Size,
 };
-pub use personal_best::{BESTS_VERSION, CharacterBests, MapBests, SavedBests, VisitBest};
+pub use loot_items::LootItem;
+pub use pickup_log::{PICKUP_LOG_CAPTURE_MS, PickupLine, PickupLogCapture, PickupLogReader, PickupLogReading, PickupLogSeen};
+pub use personal_best::{BESTS_VERSION, BestKind, CharacterBests, MapBests, SavedBests, VisitBest};
 pub use osms_items::ScrollTier;
 pub use player_shop::{ListedPrice, PlayerShopReader, ShopCapture, ShopHover, ShopList, ShopNearMiss, ShopReading, ShopRow};
 pub use search::{
     DensityTier, Destination, HuntingTarget, ItemMatch, ItemsMissing, MapMatch, Matches, MobChoice, MobMatch, NpcChoice, NpcMap, NpcMatch, RouteStop,
     SearchResult, SearchState, SearchView, Trip,
 };
-pub use session::{Character, Deaths, ExpRate, ExpTracking, Forecast, PacePoint, PaceTrace, TrackingState};
+pub use session::{
+    Character, Deaths, ExpRate, ExpSplit, ExpTracking, Forecast, Loot, PacePoint, PaceTrace, TrackingState,
+};
 pub use settings::{Hotkey, Hotkeys, Settings};
 pub use settings_window::SettingsWindow;
 pub use setup::{SetupReason, SetupState};
@@ -122,6 +130,8 @@ use search::{Search, Searched};
 use shown_map::ShownMap;
 use matcher::{Match, Matcher, Snap};
 use pictures::Pictures;
+use pickup_cover::PickupCover;
+use pickup_log::KeepsCrops;
 use panel::Panel;
 use portal_overrides::PORTAL_OVERRIDES;
 use session::Session;
@@ -295,6 +305,17 @@ pub struct PanelState {
     /// [`STATUS_BAR_STRIP`] rows across the bottom of the game's client area, while there is a
     /// game window and the overlay can show (see [`Layer`]); `None` otherwise.
     pub status_bar_capture: Option<ScreenRect>,
+    /// Where on screen to capture for the Pickup Log (physical px), every
+    /// [`PICKUP_LOG_CAPTURE_MS`] on a thread of its own (ADR 0026); `None` while it isn't read.
+    pub pickup_log_capture: Option<ScreenRect>,
+    /// The UI Size the Status Bar measured, in thousandths, as the Pickup Log band was made
+    /// (ADR 0026): the log's lines are drawn at it. 0 while [`PanelState::pickup_log_capture`] is `None`.
+    pub pickup_log_ui_size_permille: u32,
+    /// Reader stream identity. The capture thread resets its reader when this changes.
+    pub pickup_log_generation: u64,
+    /// One of our windows has been over the Pickup Log for more than a few seconds, so it can't
+    /// read the lines under it: the Grind Tracker says so, quietly. While it shows.
+    pub pickup_log_covered: bool,
     /// What the Status Bar showed in the last capture of it; `None` while it isn't found.
     pub status_bar: Option<StatusBar>,
     /// The Character playing, as the Status Bar names them, whom the Session is for; `None`
@@ -460,6 +481,9 @@ pub enum PanelControl {
     /// The × on the Grind Tracker's Best row: remove the shown map's Personal Best the row
     /// shows, this Visit's or the best of the earlier Visits.
     RemoveBest,
+    /// The Grind Tracker window's Loot header: open the Session's mesos and Items picked up, or
+    /// collapse them to the header. Kept across launches.
+    ToggleLoot,
     /// The Grind Tracker window's ×: close it.
     CloseGrindTracker,
     /// The Grind Tracker window's Personal Bests button, or its Best row's "Best": open
@@ -491,6 +515,10 @@ pub enum PanelControl {
 const MAX_DEAL_MARGIN: u32 = 99;
 
 /// The region on screen a capture of `frame` from `origin` (its top-left pixel) was of.
+/// How many of the captures where the Pickup Log's stack shifted lines in are held (10 captures a
+/// second; a line's reads vote within half a second, or a second under a cover).
+const MOST_ARRIVALS_HELD: usize = 12;
+
 fn captured(frame: &Frame, origin: ScreenPoint) -> ScreenRect {
     ScreenRect { x: origin.x, y: origin.y, width: frame.width, height: frame.height }
 }
@@ -583,6 +611,16 @@ pub struct Minerva {
     shop_reader: Option<PlayerShopReader>,
     /// Reads captures fed to [`Minerva::on_status_bar_capture`]; loaded on the first one.
     status_bar_reader: Option<StatusBarReader>,
+    /// Reads captures fed to [`Minerva::on_pickup_log_capture`], in order; made on the first one.
+    pickup_log_reader: Option<PickupLogReader>,
+    pickup_log_seen: bool,
+    /// How long the reader has found nothing, for the Bug Report to keep a capture of the band.
+    pickup_log_crops: KeepsCrops,
+    /// The captures where the stack shifted lines in, the latest few: a Bug Report keeps the one a
+    /// line that would not read arrived in, which is a few captures before its vote ends.
+    pickup_log_arrivals: VecDeque<Frame>,
+    /// Whether our windows have been over the Pickup Log.
+    pickup_cover: PickupCover,
     /// Where the Status Bar's level, job and name were last found, and the game's client
     /// area then: our windows keep clear of them while the client area stays where it was.
     status_bar_area: Option<(ScreenRect, ScreenRect)>,
@@ -654,6 +692,11 @@ impl Minerva {
             deal_finder: DealFinder::default(),
             shop_reader: None,
             status_bar_reader: None,
+            pickup_log_reader: None,
+            pickup_log_seen: false,
+            pickup_log_crops: KeepsCrops::default(),
+            pickup_log_arrivals: VecDeque::new(),
+            pickup_cover: PickupCover::default(),
             status_bar_area: None,
             title_found: None,
             title_locked: false,
@@ -1041,7 +1084,11 @@ impl Minerva {
                 self.state.quit |= self.setup.needed() == Some(SetupReason::FirstRun);
                 self.setup.cancel();
             }
-            Action::ResetSession => self.session.reset_by_player(),
+            Action::ResetSession => {
+                self.session.reset_by_player();
+                // The lines the Pickup Log reader was still reading arrived in the Session just ended.
+                self.reset_pickup_log();
+            }
             Action::UndoReset => self.session.undo_reset(),
             Action::RemoveBest => {
                 if let Some(map) = bests_map(&self.state) {
@@ -1050,6 +1097,7 @@ impl Minerva {
                 // With no best left, there is nothing for the Personal Bests window to show.
                 self.bests_window.open &= self.session.bests().any();
             }
+            Action::ToggleLoot => self.settings.loot_open = !self.settings.loot_open,
             Action::ToggleGrindTracker => self.grind_tracker.open = !self.grind_tracker.open,
             Action::CloseGrindTracker => self.grind_tracker.open = false,
             Action::GrindTrackerMoved { x, y } => {
@@ -1354,6 +1402,7 @@ impl Minerva {
             PanelControl::ResetSession => Action::ResetSession,
             PanelControl::UndoReset => Action::UndoReset,
             PanelControl::RemoveBest => Action::RemoveBest,
+            PanelControl::ToggleLoot => Action::ToggleLoot,
             PanelControl::CloseGrindTracker => Action::CloseGrindTracker,
             PanelControl::TogglePersonalBests => Action::TogglePersonalBests,
             PanelControl::ClosePersonalBests => Action::ClosePersonalBests,
@@ -1692,6 +1741,105 @@ impl Minerva {
         self.sync_panel()
     }
 
+    /// Read a capture of [`PanelState::pickup_log_capture`] with the core's own
+    /// [`PickupLogReader`] and update the panel state, as [`Minerva::on_pickup_log_read`].
+    pub fn on_pickup_log_capture(&mut self, mut capture: PickupLogCapture) -> &PanelState {
+        if self.state.pickup_log_ui_size_permille != 0 {
+            capture.ui_size = self.state.pickup_log_ui_size_permille as f32 / 1000.0;
+        }
+        let reading = self.pickup_log_reader.get_or_insert_with(PickupLogReader::bundled).read_avoiding(&capture, &self.state.our_windows);
+        self.on_pickup_log_read(capture, reading)
+    }
+
+    /// Take in what the shell's [`PickupLogReader`] read in `capture`, a capture of
+    /// [`PanelState::pickup_log_capture`].
+    pub fn on_pickup_log_read(&mut self, capture: PickupLogCapture, reading: PickupLogReading) -> &PanelState {
+        let region = captured(&capture.frame, capture.origin);
+        if self.state.pickup_log_capture != Some(region) {
+            return self.pickup_log_reading_for(reading, Some(region));
+        }
+        // A crop of the capture only for a reading that really guessed, lost lines it had seen, or
+        // read a line it couldn't, and not more than one in 10 s for each cause; and, from a reader
+        // that finds nothing for a while, one whole band capture now and then, so a log it never
+        // finds can be looked for in the report (a Bug Report of 0.15.0 had none of 6,652).
+        let lost_lines = self.pickup_log_seen && reading.seen == PickupLogSeen::Nothing;
+        let crops = self.pickup_log_crops.on_reading(&reading, lost_lines);
+        // A line that would not read is kept as the capture it arrived in, where it is whole; a
+        // capture where the stack shifted a line in is held a little in case it is.
+        if reading.shift > 0 && matches!(reading.seen, PickupLogSeen::Clear { .. }) {
+            if self.pickup_log_arrivals.len() == MOST_ARRIVALS_HELD {
+                self.pickup_log_arrivals.pop_front();
+            }
+            self.pickup_log_arrivals.push_back(capture.frame.clone());
+        }
+        let arrival = crops.arrival.and_then(|at_ms| self.pickup_log_arrivals.iter().find(|frame| frame.at_ms == at_ms));
+        let mut frames: Vec<(Region, Frame)> = arrival.into_iter().map(|frame| (Region::PickupLog, frame.clone())).collect();
+        if (crops.current || (crops.arrival.is_some() && frames.is_empty())) && frames.iter().all(|(_, frame)| frame.at_ms != capture.frame.at_ms) {
+            frames.push((Region::PickupLog, capture.frame));
+        }
+        self.record_inputs(Event::PickupLog { reading: reading.clone(), stale_region: None }, Some(reading.at_ms), frames);
+        self.take_pickup_log_reading(reading)
+    }
+
+    /// Take in what a Pickup Log capture read as, with no capture: a Bug Report's replay.
+    pub fn on_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
+        self.pickup_log_reading_for(reading, None)
+    }
+
+    pub(crate) fn pickup_log_reading_for(&mut self, reading: PickupLogReading, stale_region: Option<ScreenRect>) -> &PanelState {
+        let stale_region = stale_region.filter(|&region| self.state.pickup_log_capture != Some(region));
+        self.record_input(Event::PickupLog { reading: reading.clone(), stale_region }, Some(reading.at_ms), None);
+        if stale_region.is_some() { return &self.state; }
+        self.take_pickup_log_reading(reading)
+    }
+
+    /// End both the core and capture thread readers' current stream.
+    fn reset_pickup_log(&mut self) {
+        self.pickup_log_reader = None;
+        self.pickup_log_seen = false;
+        self.pickup_log_crops.restart();
+        self.pickup_log_arrivals.clear();
+        self.state.pickup_log_generation += 1;
+    }
+
+    /// What a Pickup Log reading does, once the input is written down: the Session counts the
+    /// mesos that arrived in a clean capture, and tells the player's own EXP lines from Party
+    /// EXP (the EXP Split, and a party window from a solo one).
+    fn take_pickup_log_reading(&mut self, reading: PickupLogReading) -> &PanelState {
+        self.pickup_log_seen = match reading.seen {
+            PickupLogSeen::Clear { .. } => true,
+            PickupLogSeen::Covered { .. } => self.pickup_log_seen || !reading.rows.is_empty(),
+            PickupLogSeen::Nothing => false,
+        };
+        self.pickup_cover.on_reading(&reading, &self.state.our_windows);
+        let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });
+        // A line is read a few captures after it arrives: one that arrived before the Session
+        // started, or before a reset, an undo or a Character switch, is not its own.
+        let arrived_from = |from: u64| -> Vec<PickupLine> {
+            let lines = reading.arrived.iter().enumerate();
+            lines.filter(|&(i, _)| clear && reading.arrival_ms(i) >= from).map(|(_, line)| line.clone()).collect()
+        };
+        if self.tracking_on()
+            && let Some(from) = self.session.counts_loot_from()
+        {
+            let lines = arrived_from(from);
+            let set = self.items.items().ok();
+            let items = lines
+                .iter()
+                .filter_map(|line| match line {
+                    PickupLine::Item { name, quantity, tab, cut_short } => {
+                        Some((loot_items::name(set, name, *cut_short, tab), *quantity))
+                    }
+                    _ => None,
+                })
+                .collect();
+            self.session.on_loot(&lines, items, reading.at_ms);
+        }
+        let lines = arrived_from(self.session.counts_lines_from());
+        self.session.on_pickup_log(reading.at_ms, &lines);
+        self.sync_panel()
+    }
+
     /// Read a capture of [`PanelState::status_bar_capture`] and update the panel state: the
     /// same as [`Minerva::on_status_bar_read`] with what a [`StatusBarReader`] reads in it,
     /// and an [`ExpBarReader`] reads of its EXP figures while [`PanelState::exp_figures`]
@@ -1765,6 +1913,9 @@ impl Minerva {
     }
 
     fn take_status_bar_reading(&mut self, reading: StatusBarReading) -> &PanelState {
+        if self.state.status_bar.as_ref().and_then(|bar|bar.name.as_ref()) != reading.bar.as_ref().and_then(|bar|bar.name.as_ref()) {
+            self.reset_pickup_log();
+        }
         self.session.on_status_bar(reading.bar.as_ref(), reading.at_ms);
         if let (Some(bar), Some(game)) = (&reading.bar, &self.panel.game) {
             self.status_bar_area = Some((game.client, bar.area));
@@ -2238,6 +2389,7 @@ impl Minerva {
         .into_iter()
         .flatten()
         .collect();
+        self.state.pickup_log_covered = self.tracking_on() && self.pickup_cover.covered(&self.state.our_windows);
         self.state.hotkeys = self.settings.hotkeys.clone();
         let in_front = self.panel.foreground.is_some_and(|foreground| foreground != Foreground::OtherApp);
         self.state.hotkeys_live = in_front && !self.hotkey_settings.is_rebinding();
@@ -2357,6 +2509,17 @@ impl Minerva {
             ScreenRect { x: client.x, y: client.y + (client.height - height) as i32, width: client.width, height }
         });
         self.state.character = self.session.character().cloned();
+        let previous_pickup_capture = (self.state.pickup_log_capture, self.state.pickup_log_ui_size_permille);
+        self.state.pickup_log_capture = self.panel.game.as_ref()
+            .filter(|_| shows && self.settings.grind_tracker_on)
+            .zip(self.state.status_bar.as_ref().filter(|bar| bar.name.is_some()))
+            .map(|(game, bar)| pickup_log::capture_band(game.client, bar.area));
+        self.state.pickup_log_ui_size_permille = self.state.status_bar.as_ref()
+            .filter(|_| self.state.pickup_log_capture.is_some())
+            .map_or(0, |bar| pickup_log::ui_size_permille(bar.area));
+        if previous_pickup_capture != (self.state.pickup_log_capture, self.state.pickup_log_ui_size_permille) {
+            self.reset_pickup_log();
+        }
     }
 
     /// Where the Minimap Title was last found, inside the game's client area, while the client
@@ -2439,6 +2602,7 @@ impl Minerva {
             open: self.grind_tracker.open,
             placement,
             personal_bests: self.session.bests().any(),
+            loot_open: self.settings.loot_open,
         };
     }
 
@@ -2460,12 +2624,12 @@ impl Minerva {
                 Some((maps.entry(id)?, maps.data(id)?))
             };
             let (saved, this_visit) = self.session.bests().standing();
-            let this_visit = this_visit.as_ref().map(|(whose, map, at)| (whose.as_deref(), map.as_str(), *at));
+            let this_visit: Vec<_> = this_visit.iter().map(|(whose, map, at)| (whose.as_deref(), map.as_str(), *at)).collect();
             let playing = self.session.character();
             let current = (playing.map(|c| c.name.as_str()), playing.and_then(|c| c.level));
             let history = self.session.bests().history();
             let toggle = |name: &str| self.leaderboards.toggle(name, history, self.wall_clock);
-            bests_window::characters(&saved, current, this_visit, map, certain_map(&self.state), toggle)
+            bests_window::characters(&saved, current, &this_visit, map, certain_map(&self.state), toggle)
         } else {
             Vec::new()
         };

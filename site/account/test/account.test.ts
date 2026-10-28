@@ -59,18 +59,24 @@ describe("the link page", () => {
 
 describe("the admin page", () => {
   it("lists a report with its entry and when it was made", () => {
-    const report = { id: 7, name: "Egbert", map: "010001010", band: 20, expPerHour: 153_216, reason: "", reportedAt: OCT_21 };
+    const report = { id: 7, name: "Egbert", map: "010001010", band: 20, expPerHour: 153_216, reason: "", reportedAt: OCT_21, party: false };
 
     expect(reportLine(report, "Henesys Hunting Ground I")).toEqual({
       what: "Egbert on Henesys Hunting Ground I, levels 20–29: 153,216 EXP/h",
       when: "Reported 21 Oct 2026",
     });
+    expect(reportLine({ ...report, party: true }, "Henesys Hunting Ground I").what).toBe(
+      "Egbert on Henesys Hunting Ground I, levels 20–29: 153,216 EXP/h (Party Best)",
+    );
   });
 
   it("lists an entry taken down with the Visit kept off", () => {
-    const removed = { name: "Egbert", map: "010004042", band: 30, expPerHour: 61_536 };
+    const removed = { name: "Egbert", map: "010004042", band: 30, expPerHour: 61_536, party: false };
 
     expect(removedLine(removed, "Over the Wall")).toBe("Egbert on Over the Wall, levels 30–39: 61,536 EXP/h");
+    expect(removedLine({ ...removed, party: true }, "Over the Wall")).toBe(
+      "Egbert on Over the Wall, levels 30–39: 61,536 EXP/h (Party Best)",
+    );
   });
 
   it("shows a name looked up: its entries, its Account and the last key refused", () => {

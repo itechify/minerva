@@ -1,5 +1,5 @@
 ---
-status: accepted, amended 2026-10-23 (Where to train shows a long band's first 15 maps until Show all; Latest lists 10, each with its map's Map Mark), and by ADR-0027 (each name in Where to train and Latest links to its Character's page)
+status: accepted, amended 2026-10-23 (Where to train shows a long band's first 15 maps until Show all; Latest lists 10, each with its map's Map Mark), by #173 (Where to train and Latest can be filtered to solo or party entries, and mark a party one: ADR 0015), and by ADR-0027 (each name in Where to train and Latest links to its Character's page)
 ---
 
 # Where to train and Latest on the Map Leaderboards page

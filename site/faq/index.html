@@ -103,7 +103,8 @@
                   <summary>Does Minerva read or change the game?</summary>
                   <p>
                     No. Like a screenshot, it captures only what it needs: the minimap title, the bar at the bottom of the
-                    game (your EXP, level and name), the tooltip by the pointer when you press an item hotkey, and, while
+                    game (your EXP, level and name), the Pickup Log in the bottom-right corner (while the Grind Tracker
+                    is on), the tooltip by the pointer when you press an item hotkey, and, while
                     the Deal Finder is on, the game window a few times a second to find a Player Shop. It never reads or
                     changes the game's memory or files, never injects anything into it, and never presses keys or clicks
                     for you.
@@ -618,7 +619,7 @@
                     calculation without multiplying by EXP. EXP buffs, events and the map's Mob Rate aren't applied.
                   </p>
                   <p>
-                    Hover the <strong>?</strong> beside solo EXP/h in the panel, Grind Tracker or Personal Bests to see
+                    Hover the <strong>?</strong> beside solo EXP/h in the panel or Personal Bests to see
                     the calculation there too. Each mob's <strong>Share</strong> is its share of all the map's spawn
                     points: the higher it is, the fewer other mobs in your way.
                   </p>
@@ -780,8 +781,15 @@
                   <ul>
                     <li><strong>Time to Level</strong>, at your current pace.</li>
                     <li>Your EXP per hour over the last 5 minutes and, once you've played longer, over the whole Session.</li>
-                    <li>After a minute on a map, how your pace compares with its solo EXP/h ceiling.</li>
                     <li>Your deaths, and what they cost.</li>
+                    <li>
+                      Your <a href="#loot">Loot</a>, closed at first with the mesos and items you've picked up this Session.
+                      Open, it adds mesos per hour and every item you've picked up, the most first.
+                    </li>
+                    <li>
+                      Once you've shared EXP with a party, hover your Session rate to see how it
+                      <a href="#exp-split">splits</a> into yours and the party's.
+                    </li>
                     <li>
                       Your last 5 minutes, kill by kill, <a href="#pace-trace">raced against the 5 minutes before</a>
                       and, when you come close, your <a href="#personal-bests">Personal Best</a>.
@@ -803,6 +811,39 @@
                     <strong>Grind Tracker</strong>: Minerva then doesn't read your EXP at all, until you tick it again.
                   </p>
                 </details>
+                <details class="qa" id="loot">
+                  <summary>Where does the Loot come from, and why can the figures be low?</summary>
+                  <p>
+                    From the game's <strong>Pickup Log</strong>, the lines that fade in the bottom-right corner of the
+                    window ("You have gained mesos (+29)"). Minerva adds up the ones that arrive during the Session, so a
+                    reset or a <a href="#which-character">character switch</a> starts the count again, and shows mesos per
+                    hour over the Session's active time, as it does your EXP. Mesos you pick up while no EXP comes in still
+                    count, and keep the Session from pausing. It reads the log only while the Grind Tracker is on and the
+                    game is in front.
+                  </p>
+                  <p>
+                    The items you pick up come from the same lines ("Orange Mushroom Cap x26 earned. (Etc)") and are
+                    tallied by name. Closed, the <strong>Loot</strong> header shows the Session's totals ("Loot 1,593+ mesos
+                    28+ items"), the "+" because you picked up at least that much, possibly more. Click Loot to open it: the mesos and mesos per hour, then every item you've picked up, the
+                    most first, each with its count, in a short list that scrolls. It stays open or closed as you leave it, even
+                    after you restart Minerva. A reset or a character switch clears the items with the
+                    mesos, and there is no per-hour figure for them. Minerva names an item from the game's item list. When
+                    the game cuts a long name short ("Arrows for Cros...") it goes by the item list and the inventory tab
+                    named in the line; if more than one item fits, it's tallied as the game shows it, never guessed. The
+                    game's font gets some letters wrong in the same few ways again and again (a D that comes out as "Ci", a
+                    B as "El"), so a name that is only those slips away from an item in the line's tab is tallied as that
+                    item, when it is clearly nearer it than any other. That can put a line under the wrong one of two
+                    items with similar names, so one item's count may be a little high now and then; the total never is. A
+                    name that matches no item, such as a new one the list doesn't have yet, is tallied as read only once it has
+                    been read on two lines, so one misread never counts as an item.
+                  </p>
+                  <p>
+                    The figures can be low, never high. A line Minerva isn't sure of isn't counted: one a monster or a skill
+                    effect covered, or more lines at once than the log can show. Mesos and items you pick up before your first EXP of the
+                    Session aren't counted either. If one of Minerva's own windows sits over the log for a few seconds, the
+                    Grind Tracker says "Pickup Log covered": move it, and the count carries on.
+                  </p>
+                </details>
                 <details class="qa" id="reset-session">
                   <summary>How do I reset the Session?</summary>
                   <p>
@@ -819,6 +860,21 @@
                     another character and it reads the new name, so the Session starts afresh within seconds. A level-up the
                     status bar shows counts at once, even if something covered your EXP bar as it filled. While it
                     can't read a name, it still tells another character from the EXP bar.
+                  </p>
+                </details>
+                <details class="qa" id="exp-split">
+                  <summary>How much of my EXP came from my party?</summary>
+                  <p>
+                    Hover your Session rate's EXP/h on the Grind Tracker. Once a partymate's kill has shared EXP
+                    with you in this Session, it tells you the <strong>EXP Split</strong>: how much of your EXP was
+                    your own kills and how much came from your party (the share of your partymates' kills and the
+                    party bonus together). Playing alone, there is nothing to split. It starts afresh with each
+                    Session.
+                  </p>
+                  <p>
+                    Minerva tells the two apart from the lines the game writes at the bottom right of the screen: a
+                    share of a partymate's kill is yellow, your own is white. They give the shares, not the amounts,
+                    which come from your EXP bar, so the split is in proportion to what the lines it caught said.
                   </p>
                 </details>
                 <details class="qa" id="move-tracker">
@@ -838,9 +894,32 @@
                   <p>
                     On a map with mobs, the best EXP per hour the character you're playing has had over 5 minutes of play
                     there. Come back to the map and a Best row shows it from the moment you arrive. Beat it, or play 5
-                    minutes on a map for the first time, and the row moves up to your new best at once, saying
-                    "this visit". A yellow star marks your last 5 minutes while they're that best. When you slow down,
+                    minutes on a map for the first time, and the row moves up to your new best at once, labelled
+                    "Visit best". A yellow star marks your last 5 minutes while they're that best. When you slow down,
                     the row keeps your best, so you can see where you were.
+                  </p>
+                  <p>
+                    A map has two: a <a href="#party-bests">Solo Best and a Party Best</a>, and the Best row races the
+                    one you're playing.
+                  </p>
+                </details>
+                <details class="qa" id="party-bests">
+                  <summary>What's a Solo Best and a Party Best?</summary>
+                  <p>
+                    Each map keeps your best EXP per hour when you played alone, your <strong>Solo Best</strong>, and when
+                    you played with a party, your <strong>Party Best</strong>, so a party run never hides what you do on
+                    your own. You don't tell Minerva which: any 5 minutes with a partymate's EXP in them count as party,
+                    and 5 minutes with none count as solo. A partymate who leaves, or is on another map, shares no EXP,
+                    so 5 minutes later your play counts as solo again. Your Session carries on through it all.
+                  </p>
+                  <p>
+                    The Best row and the line under your rates race the best of the kind you're playing, and the row
+                    shows two small figures in gold while it's your Party Best. In your Personal Bests, a map with a
+                    Party Best shows both under its figure, and its visits say which kind each is.
+                  </p>
+                  <p>
+                    Bests from before Minerva told them apart are Party Bests, so a map's Solo Best starts empty until
+                    you set a new one.
                   </p>
                 </details>
                 <details class="qa" id="pace-trace">
@@ -886,7 +965,9 @@
                   <p>
                     Click the star on the Grind Tracker's bar to open your Personal Bests. It lists your best on every map
                     for the character you're playing, highest first, with the map's mob levels, how close you came to its
-                    solo EXP/h ceiling (the <strong>?</strong> explains it) and when you set it. Switch to another
+                    solo EXP/h ceiling (the <strong>?</strong> explains it) and when you set it; the higher of its
+                    <a href="#party-bests">Solo Best and Party Best</a>, with both shown under it if it has a Party
+                    Best. Switch to another
                     character, or to Unassigned, at the top. Each best is a bar on the same scale; a notch is another of
                     your visits there, and the dot is the visit you're on, moving as you play. Click a column to sort by
                     it, or a map to open it on MeowDB.
@@ -942,10 +1023,14 @@
                     A page on this site for each map, ranking players' Personal Bests from Minerva, so you can see what
                     EXP per hour others at your level get there. Each <a href="#level-bands">Level Band</a> is ranked
                     separately and shows its top 50, with each character's name, job, level, EXP per hour and date, and
-                    a bar showing how far behind #1 they are. On the <a href="/leaderboards/">Map Leaderboards</a>
-                    page, <a href="#where-to-train">Where to train</a> lists the maps for your Level Band, you can find
-                    a map by its name, and <strong>Latest</strong> lists the newest bests on every map. Click a
-                    character's name to see <a href="#character-page">all their bests</a>.
+                    a bar showing how far behind #1 they are. A <strong>Party</strong> mark in gold is on an entry
+                    that is a <a href="#party-bests">Party Best</a>, and <strong>Both</strong>, <strong>Solo</strong>
+                    and <strong>Party</strong> choose which entries are ranked: both, each character once by their
+                    higher best; or only Solo Bests, or only Party Bests. On the
+                    <a href="/leaderboards/">Map Leaderboards</a> page, <a href="#where-to-train">Where to train</a>
+                    lists the maps for your Level Band, you can find a map by its name, and <strong>Latest</strong>
+                    lists the newest bests on every map. Click a character's name to see
+                    <a href="#character-page">all their bests</a>.
                   </p>
                 </details>
                 <details class="qa" id="where-to-train">
@@ -958,15 +1043,18 @@
                     hour there and who set it, and how many entries it has. The maps with entries come first, the best
                     first, and a band with more than 20 maps shows its first 15: <strong>Show all</strong> lists the
                     rest. Pick an area, by the same emblem the game's minimap shows beside the map's name, to see only
-                    its maps.
+                    its maps. <strong>Solo</strong> and <strong>Party</strong> rank only Solo Bests or only Party Bests
+                    (<a href="#party-bests">what those are</a>), and a best set in a party has a gold
+                    <strong>Party</strong> mark.
                   </p>
                 </details>
                 <details class="qa" id="level-bands">
                   <summary>What's a Level Band?</summary>
                   <p>
                     Ten levels of a Map Leaderboard: 1–9, 10–19, 20–29 and on, so you're ranked against players near
-                    your level. An entry is one character's best visit to the map at those levels, so a character that
-                    levels up can have an entry in each band. The highest EXP per hour ranks first; on a tie, whoever
+                    your level. An entry is one character's best visit to the map at those levels, of one kind (their
+                    <a href="#party-bests">Solo Best or Party Best</a>), so a character that levels up can have an entry
+                    in each band, and a character with both kinds has two there. The highest EXP per hour ranks first; on a tie, whoever
                     set it first.
                   </p>
                 </details>
@@ -974,9 +1062,12 @@
                   <summary>What does the EXP per hour on the Map Leaderboards count?</summary>
                   <p>
                     The <a href="#personal-bests">Personal Best</a> as Minerva counted it: everything the EXP bar gained,
-                    at its best over 5 minutes of play on the map. It's raw, so party play, EXP events and buffs aren't
-                    told apart from playing solo. Only a figure over 5 times the map's solo EXP/h ceiling is kept off, as
-                    one no map gives.
+                    at its best over 5 minutes of play on the map. It's raw, so EXP events and buffs aren't told apart:
+                    Minerva can't see them, and the site has no tag for you to set. Party play is told apart, since
+                    Minerva sees a partymate's EXP: your <a href="#party-bests">Solo Best and Party Best</a> are entries
+                    of their own, and the Map Leaderboards rank them together (each character by their higher one) or
+                    apart. Only a figure over 5 times the map's solo EXP/h ceiling is kept off, of either kind, as one
+                    no map gives.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-appear">
@@ -985,8 +1076,8 @@
                     A new character is on them already. <strong>Share</strong>, the switch under their name in your
                     <a href="#every-best">Personal Bests</a>, starts on for every character Minerva meets for the first
                     time. A character Minerva knew before sharing was on by default starts off: pick them and click
-                    <strong>Share</strong> to turn it on. Minerva uploads the character's best visit on each map in each
-                    <a href="#level-bands">Level Band</a>, then each new best when its visit ends. Removing, moving or
+                    <strong>Share</strong> to turn it on. Minerva uploads the character's Solo Best and Party Best on each map in each
+                    <a href="#level-bands">Level Band</a> as entries of their own, then each new best when its visit ends. Removing, moving or
                     merging visits updates the site too.
                   </p>
                   <p>
@@ -999,8 +1090,8 @@
                 <details class="qa" id="leaderboard-public">
                   <summary>What does the site show of me?</summary>
                   <p>
-                    For each entry: your character's name and job, the exact level they set it at, the EXP per hour, and
-                    the date, for everyone to see. Nothing else about you or your PC goes, and you need no account. Instead Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the
+                    For each entry: your character's name and job, the exact level they set it at, the EXP per hour, the
+                    date, and whether it's a Party Best, for everyone to see. Nothing else about you or your PC goes, and you need no account. Instead Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the
                     first time it uploads, which ties your character's name to it, so no one else can upload under that
                     name. The site keeps only a scrambled form (a hash) of the key, and you never need to see it.
                     The newest bests on every map are also listed in <strong>Latest</strong> on the Map Leaderboards
@@ -1022,7 +1113,9 @@
                     have, a <a href="#level-bands">Level Band</a> at a time, each with its rank and a link to it on its
                     map. Over them are their job and level as their newest best says, how many #1s and top-3 places they
                     hold, how many maps they're on, and their best EXP per hour. Each Level Band of a map counts on its
-                    own, however few entries it has. It shows only what their entries already show map by map, and
+                    own, however few entries it has. A <a href="#party-bests">Party Best</a> has the gold Party mark
+                    and is ranked among the Party Bests, a Solo Best among the Solo Bests, so a character can have both
+                    on a map. It shows only what their entries already show map by map, and
                     their portrait from ClassicRank with a link to their profile there, and nothing ties it to your
                     other characters or your Discord.
                     <a href="#leaderboard-remove">Taking the character off</a> takes their page with them.
@@ -1031,11 +1124,13 @@
                 <details class="qa" id="leaderboard-discord">
                   <summary>My character's name turned up in Minerva's Discord. Why?</summary>
                   <p>
-                    When one of your uploads takes a map's top spot off someone else, Minerva's
+                    When one of your uploads takes a map's Solo or Party top spot off someone else, Minerva's
                     <a href="https://discord.gg/NnbnVWkRrF">Discord</a> posts it in <strong>#map-leaderboards</strong>:
                     the map, by its name and its Map Mark if it has one, and your character's name, the Level Band, the EXP per hour
-                    and whose spot it was, with your character's portrait from ClassicRank if they have one. That's all
-                    the Map Leaderboards <a href="#leaderboard-public">already show</a>, and it never pings anyone. Only a spot taken
+                    (with "in a party" if the entry is a <a href="#party-bests">Party Best</a>) and whose spot it was,
+                    with your character's portrait from ClassicRank if they have one.
+                    Each kind has its own top spot, so a Solo Best can take one even below the Party board's top rate. That's all from the entry itself, so it says nothing the Map Leaderboards
+                    <a href="#leaderboard-public">don't already show</a>, and it never pings anyone. Only a spot taken
                     is posted: the first entry in a Level Band nobody had one in, and beating your own best, both go
                     unsaid. <a href="#leaderboard-remove">Taking your character off</a> stops it, since a character
                     that isn't on the Map Leaderboards is never posted.

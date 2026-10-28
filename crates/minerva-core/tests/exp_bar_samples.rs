@@ -25,11 +25,17 @@
 //!   The `<ui-size>-<w>x<h>` ones (2026-10-22, #132) are the figures cut by hand from the
 //!   probe's record mode at each of the game's UI Sizes (Default Ratio, with its filter or
 //!   not, and Ideal Ratio) at 1366x768 to 2560x1440: drawn at ×0.64 to ×1.28 of the rest.
+//!   The `five-as-s-window-1280x720` ones (2026-10-26) are the Bug Report's crops of the figures
+//!   found in the Status Bar of a 1280x720 client (UI Size ~0.64): ocrs read the 5 of "53.01%"
+//!   as an "S", so every frame with one read as unreadable.
 //! - `recording-*` folders are the probe's record mode (one crop a second, named by
 //!   capture time in ms) with their readings in `readings.json` (`null`: unreadable).
 //!   2026-10-07: 150 s of hunting at Lv 15, client (1005,1144) 240x32 of a 1920x1200
 //!   client. Its readings all fit one level total of ~16,682 EXP (the game rounds the
 //!   percentage), which is how the frames ocrs misread were caught.
+//!   2026-10-26: 150 s of hunting at Lv 37, client (660,682) 160x26 of a 1280x720 client, 2 Hz:
+//!   the first crop of each reading that came up, every one read by eye. They fit one level
+//!   total of ~216,600 EXP, and each reading is no lower than the one before.
 
 mod common;
 

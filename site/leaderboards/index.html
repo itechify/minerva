@@ -71,6 +71,7 @@
           <section class="lb-train stop" id="where-to-train" data-mini="Where to train" aria-labelledby="train-title">
             <h2 id="train-title">Where to train</h2>
             <nav class="lb-bands" id="train-bands" aria-label="Level Bands"></nav>
+            <nav class="lb-kinds" id="train-kinds" aria-label="Solo or party entries" hidden></nav>
             <nav class="lb-areas" id="train-areas" aria-label="Areas, by their Map Marks" hidden></nav>
             <p class="lb-said" id="train-said" aria-live="polite">Loading the Level Bands…</p>
             <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
@@ -103,6 +104,7 @@
 
             <section class="lb-section lb-newest stop" id="latest" data-mini="Latest" aria-labelledby="latest-title">
               <h2 id="latest-title">Latest</h2>
+              <div class="lb-kinds" id="latest-kinds" role="group" aria-label="Solo or party entries" hidden></div>
               <p class="lb-said" id="latest-said" aria-live="polite" hidden></p>
               <!-- Its room is kept while the entries come, so the questions don't jump. -->
               <ol class="lb-maps lb-latest lb-waiting" id="latest-entries">

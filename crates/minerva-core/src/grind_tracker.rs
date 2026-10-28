@@ -29,6 +29,9 @@ pub struct GrindTrackerWindow {
     /// Some map has a Personal Best, the Visit under way's included: the window bar's
     /// button that opens the Personal Bests window shows.
     pub personal_bests: bool,
+    /// The Loot section is open, showing the Mesos row and the Items picked up (#171): as the
+    /// player left it, across launches.
+    pub loot_open: bool,
 }
 
 /// The gap between the panel and the Grind Tracker's window beside it.

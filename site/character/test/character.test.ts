@@ -20,7 +20,7 @@ const names = mapNames([
 const HARBOR: MapMark = { id: "Rith", name: "Lith Harbor", picture: "https://osms.invalid/images/map_marks/Rith.png" };
 
 function mine(map: string, band: number, rank: number, total: number, expPerHour: number, more: Partial<CharacterEntry> = {}): CharacterEntry {
-  return { map, band, rank, total, job: "Magician", level: band + 3, expPerHour, setAt: OCT_3, mobs: [22, 27], mark: HARBOR, ...more };
+  return { map, band, rank, total, job: "Magician", level: band + 3, expPerHour, setAt: OCT_3, party: false, mobs: [22, 27], mark: HARBOR, ...more };
 }
 
 function answer(...entries: CharacterEntry[]): CharacterAnswer {
@@ -118,8 +118,23 @@ describe("a Character's page", () => {
         level: "23",
         expPerHour: "153,000",
         date: "3 Oct",
-        href: "/leaderboards/map/?map=100000000&band=20&name=Egbert",
+        party: false,
+        href: "/leaderboards/map/?map=100000000&band=20&name=Egbert&kind=solo",
       },
+    ]);
+  });
+
+  it("marks a Party Best, linking to the Map Leaderboard of party entries, and counts a map once for both its entries", () => {
+    const page = characterPage(
+      answer(mine("100000000", 20, 2, 5, 90_000), mine("100000000", 20, 1, 3, 150_000, { party: true })),
+      names,
+      NOW,
+    );
+
+    expect(page.bands[0].caption).toBe("1 map at Lv 20–29");
+    expect(page.bands[0].rows.map((r) => [r.rank, r.party, r.href])).toEqual([
+      ["#1", true, "/leaderboards/map/?map=100000000&band=20&name=Egbert&kind=party"],
+      ["#2", false, "/leaderboards/map/?map=100000000&band=20&name=Egbert&kind=solo"],
     ]);
   });
 

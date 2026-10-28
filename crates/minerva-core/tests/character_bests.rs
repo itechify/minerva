@@ -32,23 +32,18 @@ fn bests_saved_before_characters_read_in_as_unassigned_with_nothing_lost() {
 
     // Every Visit is Unassigned, and the shell saves them in the new shape.
     let expected = serde_json::json!({
-        "version": 2,
+        "version": 3,
         "unassigned": [
             { "id": SUNSET_SKY_ID, "visits": [
-                { "expPerHour": 7200, "setAtUnixMs": WALL_AT_START },
-                { "expPerHour": 3600, "setAtUnixMs": null }
+                { "expPerHour": 7200, "setAtUnixMs": WALL_AT_START, "party": true },
+                { "expPerHour": 3600, "setAtUnixMs": null, "party": true }
             ]},
-            { "id": CONSTRUCTION_SITE_ID, "visits": [{ "expPerHour": 5000, "setAtUnixMs": null }] }
+            { "id": CONSTRUCTION_SITE_ID, "visits": [{ "expPerHour": 5000, "setAtUnixMs": null, "party": true }] }
         ],
         "characters": []
     });
+    // Version 1 had no kinds: each Visit is a Party Best, as a best of no known kind is.
     assert_eq!(handed_out(&minerva), expected);
-
-    // With no Character read, the Grind Tracker races them.
-    let mut player = Player::new(minerva);
-    assert_eq!(best_row(&player.arrive(SUNSET_SAMPLE)), Some(7200));
-    player.hunt(MIN, 10);
-    assert_eq!(best_row(&player.arrive(CONSTRUCTION_SAMPLE)), Some(5000));
 }
 
 /// What the bests `minerva` hands out keep for `character` (`None`: Unassigned) on `map`:
@@ -79,7 +74,7 @@ fn a_best_is_stamped_with_the_character_level_and_job_the_status_bar_showed_when
     let set = player.wall_clock().unwrap();
 
     let expected = serde_json::json!({
-        "version": 2,
+        "version": 3,
         "unassigned": [],
         "characters": [{ "name": "Egbert", "maps": [{ "id": SUNSET_SKY_ID, "visits": [
             { "expPerHour": 7200, "setAtUnixMs": set, "level": 13, "job": "Magician" }
@@ -115,7 +110,7 @@ fn each_characters_bests_are_kept_apart_and_the_grind_tracker_races_the_one_play
 fn the_best_row_races_the_unassigned_bests_until_a_name_is_read_then_the_characters_at_once() {
     let mut minerva = tracking();
     let saved = serde_json::json!({
-        "version": 2,
+        "version": 3,
         "unassigned": [{ "id": SUNSET_SKY_ID, "visits": [{ "expPerHour": 9000, "setAtUnixMs": null }] }],
         "characters": [{ "name": "Egbert", "maps": [{ "id": SUNSET_SKY_ID, "visits": [
             { "expPerHour": 7200, "setAtUnixMs": null, "level": 13, "job": "Magician" }
@@ -155,7 +150,7 @@ fn a_best_set_while_no_character_is_named_is_unassigned_and_the_player_can_move_
     assert_eq!((listed.exp_per_hour, listed.set_at_unix_ms, listed.level), (7200, set, Some(13)));
 
     // Moved to Egbert, it is his best at once, and Unassigned has none left to show.
-    let visit = VisitBest { exp_per_hour: 7200, set_at_unix_ms: set, level: Some(13), job: None };
+    let visit = VisitBest { exp_per_hour: 7200, set_at_unix_ms: set, level: Some(13), ..VisitBest::default() };
     let moved = player.move_visit(None, SUNSET_SKY_ID, visit, "Egbert");
     assert_eq!(best_row(&moved), Some(7200));
     assert_eq!(kept(&player.minerva, Some("Egbert"), SUNSET_SKY_ID), [(7200, Some(13))]);
@@ -215,7 +210,7 @@ fn at_level(exp_per_hour: u64, level: u32) -> serde_json::Value {
 
 /// Bests saved at an earlier launch: each Character's Visits on each map.
 fn saved(characters: serde_json::Value) -> SavedBests {
-    serde_json::from_value(serde_json::json!({ "version": 2, "unassigned": [], "characters": characters })).unwrap()
+    serde_json::from_value(serde_json::json!({ "version": 3, "unassigned": [], "characters": characters })).unwrap()
 }
 
 /// The Personal Bests window's choices, as (name, current, how many maps).
@@ -325,6 +320,7 @@ fn a_visit_is_removed_by_its_character_map_best_level_and_job_all() {
         set_at_unix_ms: None,
         level: Some(level),
         job: Some(job.to_string()),
+        ..VisitBest::default()
     };
     // Another job, the Unassigned bests, or another Character's: nothing is removed.
     player.remove_visit_of(Some("Egbert"), SUNSET_SKY_ID, visit(13, "Wizard (F/P)"));
@@ -339,7 +335,7 @@ fn a_visit_is_removed_by_its_character_map_best_level_and_job_all() {
 
 /// A Magician's Visit best of `exp_per_hour` at `level`, with no date, as the window lists it.
 fn best_at(exp_per_hour: u64, level: u32) -> VisitBest {
-    VisitBest { exp_per_hour, set_at_unix_ms: None, level: Some(level), job: Some("Magician".to_string()) }
+    VisitBest { exp_per_hour, level: Some(level), job: Some("Magician".to_string()), ..VisitBest::default() }
 }
 
 #[test]

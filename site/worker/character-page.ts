@@ -4,6 +4,7 @@
 import { type CharacterAnswer, type CharacterEntry, isName } from "../entries";
 import { ceilingsOf, markOf } from "./ceilings";
 import { type Answer, badRequest } from "./http";
+import { isParty } from "./kinds";
 import { PORTRAIT_COLUMNS, PORTRAIT_JOIN, type PortraitColumns, portraitIn } from "./portraits";
 
 /** What a name with no entries reads as, whatever the reason: never uploaded, opted out, or
@@ -13,15 +14,15 @@ const NO_ENTRIES: Answer = { status: 404, body: { error: "not-found" } };
 export async function readCharacterPage(env: Env, name: string): Promise<Answer> {
   if (!isName(name)) return badRequest("a Character's name is 1 to 16 letters and digits");
   const rows = await env.DB.prepare(
-    `WITH places AS (SELECT map_id, band FROM entries WHERE name_key = ?1),
+    `WITH places AS (SELECT DISTINCT map_id, band FROM entries WHERE name_key = ?1),
        ranked AS (
-         SELECT e.name_key, e.map_id, e.band, e.job, e.level, e.exp_per_hour, e.set_at,
-                ROW_NUMBER() OVER (PARTITION BY e.map_id, e.band
+         SELECT e.name_key, e.map_id, e.band, e.job, e.level, e.exp_per_hour, e.set_at, e.party,
+                ROW_NUMBER() OVER (PARTITION BY e.map_id, e.band, e.party
                                    ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank,
-                COUNT(*) OVER (PARTITION BY e.map_id, e.band) AS total
+                COUNT(*) OVER (PARTITION BY e.map_id, e.band, e.party) AS total
          FROM entries e JOIN places p ON p.map_id = e.map_id AND p.band = e.band)
      SELECT r.*, c.name, ${PORTRAIT_COLUMNS} FROM ranked r JOIN characters c USING (name_key) ${PORTRAIT_JOIN}
-     WHERE r.name_key = ?1 ORDER BY r.band DESC, r.exp_per_hour DESC, r.map_id`,
+     WHERE r.name_key = ?1 ORDER BY r.band DESC, r.exp_per_hour DESC, r.map_id, r.party`,
   )
     .bind(name.toLowerCase())
     .all<PortraitColumns & {
@@ -32,6 +33,7 @@ export async function readCharacterPage(env: Env, name: string): Promise<Answer>
       level: number;
       exp_per_hour: number;
       set_at: number;
+      party: number;
       rank: number;
       total: number;
     }>();
@@ -46,6 +48,7 @@ export async function readCharacterPage(env: Env, name: string): Promise<Answer>
     level: r.level,
     expPerHour: r.exp_per_hour,
     setAt: r.set_at,
+    party: isParty(r.party),
     mobs: table[r.map_id]?.mobs ?? null,
     mark: markOf(env, r.map_id),
   }));

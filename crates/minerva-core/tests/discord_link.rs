@@ -13,7 +13,7 @@ use minerva_core::{
 
 /// Egbert's one best, on the Construction Site, dated: something to upload.
 fn bests() -> SavedBests {
-    let visit = VisitBest { exp_per_hour: 6000, set_at_unix_ms: Some(WALL - DAY), level: Some(31), job: Some("Magician".to_string()) };
+    let visit = VisitBest { exp_per_hour: 6000, set_at_unix_ms: Some(WALL - DAY), level: Some(31), job: Some("Magician".to_string()), ..VisitBest::default() };
     let egbert = CharacterBests { name: "Egbert".to_string(), maps: vec![MapBests { id: CONSTRUCTION_SITE_ID.to_string(), visits: vec![visit] }] };
     SavedBests { version: BESTS_VERSION, unassigned: Vec::new(), characters: vec![egbert] }
 }

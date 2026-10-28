@@ -7,6 +7,7 @@ import { confirmLinkToken, deleteAccount, linkState, mintLinkToken, readAccount,
 import { callback, start } from "./discord";
 import { type Answer, badRequest, json } from "./http";
 import { isMaintainerToken } from "./keys";
+import { withKind } from "./kinds";
 import { readLatest } from "./latest";
 import { optOut, readBand, readMap, readMaps, upload } from "./leaderboards";
 import { deleteEntry, dismissReport, findAccounts, readCharacter, readRemoved, readReports, reassign, report, restoreEntry } from "./moderation";
@@ -68,14 +69,17 @@ async function route(request: Request, url: URL, env: Env, ctx: ExecutionContext
       return readMaps(env);
     case path.length === 2 && path[0] === "maps" && method === "GET":
       return readMap(env, path[1]);
-    case path.length === 4 && path[0] === "maps" && path[2] === "bands" && method === "GET":
-      return readBand(env, path[1], path[3], url.searchParams.get("name"));
+    case path.length === 4 && path[0] === "maps" && path[2] === "bands" && method === "GET": {
+      return withKind(url, (kind) => readBand(env, path[1], path[3], url.searchParams.get("name"), kind));
+    }
     case path.length === 1 && path[0] === "bands" && method === "GET":
       return readBands(env);
-    case path.length === 2 && path[0] === "bands" && method === "GET":
-      return readTraining(env, path[1]);
-    case path.length === 1 && path[0] === "latest" && method === "GET":
-      return readLatest(env);
+    case path.length === 2 && path[0] === "bands" && method === "GET": {
+      return withKind(url, (kind) => readTraining(env, path[1], kind));
+    }
+    case path.length === 1 && path[0] === "latest" && method === "GET": {
+      return withKind(url, (kind) => readLatest(env, kind));
+    }
     case path.length === 1 && path[0] === "reports" && method === "POST":
       return report(env, request);
     default:
@@ -153,12 +157,14 @@ async function routeAdmin(request: Request, url: URL, path: string[], env: Env):
       return readReports(env);
     case path.length === 2 && path[0] === "reports" && method === "DELETE":
       return dismissReport(env, path[1]);
-    case path.length === 4 && path[0] === "entries" && method === "DELETE":
-      return deleteEntry(env, path[1], path[2], path[3]);
+    case path.length === 4 && path[0] === "entries" && method === "DELETE": {
+      return withKind(url, (kind) => deleteEntry(env, path[1], path[2], path[3], kind));
+    }
     case path.length === 1 && path[0] === "removed" && method === "GET":
       return readRemoved(env);
-    case path.length === 5 && path[0] === "removed" && method === "DELETE":
-      return restoreEntry(env, path[1], path[2], path[3], path[4]);
+    case path.length === 5 && path[0] === "removed" && method === "DELETE": {
+      return withKind(url, (kind) => restoreEntry(env, path[1], path[2], path[3], path[4], kind));
+    }
     case path.length === 2 && path[0] === "characters" && method === "GET":
       return readCharacter(env, path[1]);
     case path.length === 3 && path[0] === "characters" && path[2] === "reassign" && method === "POST":

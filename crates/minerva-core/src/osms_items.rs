@@ -51,6 +51,49 @@ pub(crate) struct ItemFacts {
     pub tier: Option<ScrollTier>,
 }
 
+/// An inventory tab, shared by the Pickup Log parser and Item matching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InventoryTab { Equip, Use, Etc, Setup, Cash }
+
+impl InventoryTab {
+    pub fn as_str(self) -> &'static str {
+        match self { Self::Equip => "Equip", Self::Use => "Use", Self::Etc => "Etc", Self::Setup => "Setup", Self::Cash => "Cash" }
+    }
+
+    pub fn named(read: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|tab| tab.as_str().eq_ignore_ascii_case(read.trim()))
+    }
+
+    /// The tab `read` is, or reads as with a glyph misread (`Ett` for `Etc`): the one tab within
+    /// an edit of it, never one of two.
+    pub fn named_like(read: &str) -> Option<Self> {
+        if let Some(tab) = Self::named(read) {
+            return Some(tab);
+        }
+        let read = read.trim().to_ascii_lowercase().chars().collect::<Vec<_>>();
+        let mut near = Self::ALL.into_iter().filter(|tab| {
+            let name = tab.as_str().to_ascii_lowercase().chars().collect::<Vec<_>>();
+            crate::matcher::levenshtein(&read, &name) <= 1
+        });
+        near.next().filter(|_| near.next().is_none())
+    }
+
+    const ALL: [Self; 5] = [Self::Equip, Self::Use, Self::Etc, Self::Setup, Self::Cash];
+}
+
+impl ItemFacts {
+    /// OSMS's kind is an equipment slot or weapon kind, and Scrolls belong in Use.
+    pub fn inventory_tab(&self) -> InventoryTab {
+        match self.kind.as_str() {
+            "Use" | "Scroll" => InventoryTab::Use,
+            "Etc" => InventoryTab::Etc,
+            "Setup" => InventoryTab::Setup,
+            "Cash" => InventoryTab::Cash,
+            _ => InventoryTab::Equip,
+        }
+    }
+}
+
 /// A scroll's tier, which its picture shows by its colour alone (#140): every scroll of a tier
 /// has the same picture, whatever it improves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -135,6 +178,34 @@ impl ItemSet {
         closest(&item_key(read), &keys)
             .map(|name| self.names[name].1.iter().map(|&item| &self.items[item]).collect())
             .unwrap_or_default()
+    }
+
+    /// The name `read` is among the names of the items filed under `tab`: one of them, or the one
+    /// clearly closest to it by the recogniser's usual slips on the Pickup Log's font
+    /// ([`crate::pickup_slips`]), though further from it than [`ItemSet::named`] asks for, because
+    /// the tab says which names it can be. `None` when none is.
+    pub(crate) fn named_in_tab(&self, read: &str, tab: InventoryTab) -> Option<&str> {
+        self.in_tab(read, tab, crate::pickup_slips::closest_by_slips)
+    }
+
+    /// [`ItemSet::named_in_tab`] by plain edits alone, as it was before the recogniser's slips were
+    /// known: what the Bug Report probe compares the slips with.
+    pub(crate) fn named_in_tab_plain(&self, read: &str, tab: InventoryTab) -> Option<&str> {
+        self.in_tab(read, tab, crate::pickup_slips::closest_plain)
+    }
+
+    fn in_tab(&self, read: &str, tab: InventoryTab, closest: fn(&[char], &[&[char]]) -> Option<usize>) -> Option<&str> {
+        let names: Vec<_> = self.names.iter().filter(|(_, items)| items.iter().any(|&item| self.items[item].inventory_tab() == tab)).collect();
+        let keys: Vec<&[char]> = names.iter().map(|(name, _)| &name[..]).collect();
+        let name = closest(&item_key(read), &keys)?;
+        Some(&self.items[names[name].1[0]].name)
+    }
+
+    /// The name among those filed under `tab` whose start `read`, a name the game cut short read a
+    /// few glyphs wrong, is clearly closest to by the recogniser's usual slips
+    /// ([`crate::pickup_slips::closest_start_by_slips`]). `None` when none is.
+    pub(crate) fn starting_like_in_tab(&self, read: &str, tab: InventoryTab) -> Option<&str> {
+        self.in_tab(read, tab, crate::pickup_slips::closest_start_by_slips)
     }
 
     /// The items of each name that starts as `start` does (a name the game cut short), name by

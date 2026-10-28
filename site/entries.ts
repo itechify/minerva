@@ -13,6 +13,11 @@ export function isMap(map: string): boolean {
   return /^\d{9}$/.test(map);
 }
 
+/** The kind of an entry: a Character's Solo Best on a map in a Level Band, or its Party Best
+ *  (ADR 0015, amended; ADR 0026). A read asks for one (`?kind=`), or for neither, which ranks
+ *  each Character's higher entry. */
+export type Kind = "solo" | "party";
+
 /** A Character's portrait from ClassicRank (ADR 0029), as the Worker last found it there: its
  *  photo (a PNG on classicrank.com) and its ClassicRank profile, each `null` when ClassicRank
  *  has none. Both `null`, ClassicRank doesn't know the Character, or hides them. */
@@ -35,11 +40,14 @@ export interface Ranked {
   expPerHour: number;
   /** When the Visit set it, in ms since the Unix epoch. */
   setAt: number;
+  /** It is the Character's Party Best, not its Solo Best. */
+  party: boolean;
   portrait?: PortraitAnswer;
 }
 
-/** GET /api/maps/<map>/bands/<band>?name=<name>: the band's top 50, and the named
- *  Character's entry with its rank, wherever it is (`null` with none there). */
+/** GET /api/maps/<map>/bands/<band>?name=<name>&kind=<kind>: the band's top 50, and the named
+ *  Character's entry with its rank, wherever it is (`null` with none there). With a `kind`,
+ *  only the entries of that kind are ranked. */
 export interface BandAnswer {
   map: string;
   band: number;
@@ -57,6 +65,8 @@ export interface Best {
   expPerHour: number;
   /** When the Visit set it, in ms since the Unix epoch. */
   setAt: number;
+  /** It is the Character's Party Best, not its Solo Best. */
+  party: boolean;
 }
 
 /** GET /api/bands: the Level Bands Where to train has maps for, lowest first, each with how
@@ -116,19 +126,22 @@ export function characterLinkTo(name: string): string {
   return `/character/?${new URLSearchParams({ name })}`;
 }
 
-/** One of a Character's entries as their page shows it: where, its rank of how many in the
- *  band there, and the map's mob levels and Map Mark, as Where to train gives them. */
+/** One of a Character's entries as their page shows it: where, its rank of how many of its
+ *  kind in the band there, and the map's mob levels and Map Mark, as Where to train gives them. */
 export interface CharacterEntry {
   map: string;
   band: number;
   rank: number;
-  /** How many entries the band has on the map. */
+  /** How many entries of its kind the band has on the map. */
   total: number;
   job: string;
   level: number;
   expPerHour: number;
   /** When the Visit set it, in ms since the Unix epoch. */
   setAt: number;
+  /** Whether it's a Party Best's: its rank is among the band's Party Bests, and a Solo
+   *  Best's among its Solo Bests (ADR 0015). */
+  party: boolean;
   /** The levels of the middle half of the map's spawns; `null` for a map the ceilings
    *  table doesn't hold. */
   mobs: [number, number] | null;

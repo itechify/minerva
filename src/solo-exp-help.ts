@@ -3,10 +3,20 @@ import "./solo-exp-help.css";
 /** The Map Summary arithmetic in minerva-core/src/osms.rs, shared wherever the app
  *  compares a measured rate with the map's solo ceiling. */
 export function soloExpHelp() {
+  return helpButton("How solo EXP/h is computed", [
+    "Solo EXP/h estimates the map's hourly EXP ceiling from mob EXP and spawn points.",
+    "For each mob: base EXP × spawn points × spawns per hour. Normal spawns use 0.75 × 3,600 ÷ 7.56 (about 357 per point per hour). Timed spawns use 3,600 ÷ their timer in seconds; ranged timers use OSMS's listed average. Round each mob's EXP/h, then add them.",
+    "This assumes mobs are killed as they respawn, without EXP buffs or events. The map's Mob Rate isn't applied.",
+  ]);
+}
+
+/** A small outlined ? button that shows `paragraphs` in a tooltip, named `label` for
+ *  assistive tech: where a figure comes from. */
+export function helpButton(label: string, paragraphs: string[]) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "solo-exp-help";
-  button.setAttribute("aria-label", "How solo EXP/h is computed");
+  button.setAttribute("aria-label", label);
   button.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M6.2 6a1.8 1.8 0 0 1 3.6 0c0 1.3-1.8 1.3-1.8 2.7M8 11.2v.1"/></svg>';
 
   const tip = document.createElement("div");
@@ -14,11 +24,7 @@ export function soloExpHelp() {
   tip.id = `solo-exp-tip-${document.querySelectorAll(".solo-exp-tip").length}`;
   tip.setAttribute("role", "tooltip");
   tip.hidden = true;
-  for (const text of [
-    "Solo EXP/h estimates the map's hourly EXP ceiling from mob EXP and spawn points.",
-    "For each mob: base EXP × spawn points × spawns per hour. Normal spawns use 0.75 × 3,600 ÷ 7.56 (about 357 per point per hour). Timed spawns use 3,600 ÷ their timer in seconds; ranged timers use OSMS's listed average. Round each mob's EXP/h, then add them.",
-    "This assumes mobs are killed as they respawn, without EXP buffs or events. The map's Mob Rate isn't applied.",
-  ]) {
+  for (const text of paragraphs) {
     const p = document.createElement("p");
     p.textContent = text;
     tip.append(p);

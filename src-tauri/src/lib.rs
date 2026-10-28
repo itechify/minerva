@@ -43,6 +43,7 @@ use minerva_core::{
     ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, DiscordLinkAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
     Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, StatusBarCapture, StatusBarReader, StatusBarReading,
     TITLE_READ_MS, TITLE_SEARCH_MS, TitleCapture, TitleReader, TitleReading, UpdateAnswer, VisitBest,
+    PICKUP_LOG_CAPTURE_MS, PickupLogCapture, PickupLogReader, PickupLogReading,
 };
 use source::WebSource;
 use errors::error;
@@ -226,6 +227,8 @@ pub(crate) enum Command {
     /// Status Bar: the capture, what it read, and what its EXP figures read as (if they were
     /// asked for), or `None` if the capture failed.
     ReadStatusBar { reading: Option<(Box<StatusBarCapture>, StatusBarReading, Option<ExpBarReading>)> },
+    /// The independent 10 Hz Pickup Log capture thread finished reading its band.
+    ReadPickupLog { capture: Box<PickupLogCapture>, reading: PickupLogReading },
 }
 
 /// The overlay's drags and resizes, as the core loop hears them.
@@ -599,11 +602,13 @@ struct ReaderThread {
     shop_busy: bool,
     /// Likewise for the Status Bar's.
     status_bar_busy: bool,
+    pickup_log: PickupLogThread,
 }
 
 impl ReaderThread {
     fn spawn(commands: Sender<Command>) -> std::io::Result<Self> {
         let start = Instant::now();
+        let pickup_log = PickupLogThread::spawn(commands.clone(), start)?;
         let (captures, asked) = mpsc::channel::<Capture>();
         std::thread::Builder::new().name("reader".into()).spawn(move || {
             // The readers share one recogniser.
@@ -662,7 +667,7 @@ impl ReaderThread {
                 }
             }
         })?;
-        Ok(Self { captures, start, title_busy: false, shop_busy: false, status_bar_busy: false })
+        Ok(Self { captures, start, title_busy: false, shop_busy: false, status_bar_busy: false, pickup_log })
     }
 
     /// Capture `region` and read the Minimap Title in it, but not in `ours` (our windows), unless
@@ -702,6 +707,78 @@ impl ReaderThread {
 
     fn now_ms(&self) -> u64 {
         self.start.elapsed().as_millis() as u64
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct PickupLogTarget {
+    region: ScreenRect,
+    ui_size_permille: u32,
+    ours: Vec<ScreenRect>,
+    generation: u64,
+}
+
+/// Capture and OCR have their own clock and thread, so a shop or minimap recognition
+/// cannot hold up the log. The core supplies only the band it currently asks to read.
+struct PickupLogThread {
+    targets: Sender<Option<PickupLogTarget>>,
+    last: Option<PickupLogTarget>,
+}
+
+impl PickupLogThread {
+    fn spawn(commands: Sender<Command>, start: Instant) -> std::io::Result<Self> {
+        let (targets, asked) = mpsc::channel::<Option<PickupLogTarget>>();
+        std::thread::Builder::new().name("pickup-log".into()).spawn(move || {
+            let mut reader = PickupLogReader::bundled();
+            let mut target: Option<PickupLogTarget> = None;
+            let mut generation = None;
+            let mut next = Instant::now();
+            loop {
+                let update = if target.is_some() {
+                    asked.recv_timeout(next.saturating_duration_since(Instant::now()))
+                } else {
+                    asked.recv().map_err(|_| RecvTimeoutError::Disconnected)
+                };
+                match update {
+                    Ok(new) => {
+                        if let Some(new) = &new
+                            && generation != Some(new.generation) {
+                            generation = Some(new.generation);
+                            reader.reset();
+                            next = Instant::now();
+                        }
+                        target = new;
+                    }
+                    Err(RecvTimeoutError::Disconnected) => return,
+                    Err(RecvTimeoutError::Timeout) => {}
+                }
+                let Some(target) = target.as_ref().filter(|_| Instant::now() >= next) else { continue };
+                next = Instant::now() + Duration::from_millis(PICKUP_LOG_CAPTURE_MS);
+                let frame = match capture::frame(target.region, || start.elapsed().as_millis() as u64) {
+                    Ok(frame) => frame,
+                    Err(e) => { error!("Pickup Log capture failed: {e}"); continue; }
+                };
+                let capture = PickupLogCapture {
+                    frame,
+                    origin: ScreenPoint { x: target.region.x, y: target.region.y },
+                    ui_size: target.ui_size_permille as f32 / 1000.0,
+                };
+                let reading = reader.read_avoiding(&capture, &target.ours);
+                if commands.send(Command::ReadPickupLog { capture: Box::new(capture), reading }).is_err() { return; }
+            }
+        })?;
+        Ok(Self { targets, last: None })
+    }
+
+    fn follow(&mut self, state: &PanelState) {
+        let target = state.pickup_log_capture.map(|region| PickupLogTarget {
+            region, ui_size_permille: state.pickup_log_ui_size_permille, ours: state.our_windows.clone(),
+            generation: state.pickup_log_generation,
+        });
+        if target != self.last {
+            let _ = self.targets.send(target.clone());
+            self.last = target;
+        }
     }
 }
 
@@ -950,6 +1027,9 @@ fn core_loop(
                     minerva.on_status_bar_read(*capture, reading, exp);
                 }
             }
+            Ok(Command::ReadPickupLog { capture, reading }) => {
+                minerva.on_pickup_log_read(*capture, reading);
+            }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => return,
         }
@@ -969,6 +1049,7 @@ fn core_loop(
         // After every wake-up too: the hotkeys are released as soon as the player starts
         // rebinding one (a registered combination would never reach the Settings window), and the
         // new one is registered as soon as they have pressed it.
+        reader.pickup_log.follow(minerva.panel_state());
         let state = minerva.panel_state();
         if let Some((taken, invalid)) = hotkeys.sync(&app, &state.hotkeys, state.hotkeys_live) {
             minerva.hotkeys_unavailable(taken, invalid);

@@ -1,0 +1,88 @@
+{
+  "source": "720p",
+  "baseline": "00045700.png",
+  "arrivals": [
+    {
+      "frame": "00045900.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 74
+        },
+        {
+          "kind": "item",
+          "name": "Ligator Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        }
+      ]
+    },
+    {
+      "frame": "00046300.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Orange Potion",
+          "quantity": 1,
+          "tab": "Use",
+          "cut_short": false
+        }
+      ]
+    },
+    {
+      "frame": "00046400.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 74
+        }
+      ]
+    },
+    {
+      "frame": "00046500.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Arrows for Cros",
+          "quantity": 27,
+          "tab": "Use",
+          "cut_short": true
+        }
+      ]
+    },
+    {
+      "frame": "00046600.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Ligator Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        }
+      ]
+    },
+    {
+      "frame": "00046700.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 73
+        }
+      ]
+    },
+    {
+      "frame": "00046800.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Ligator Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "source": "720p",
+  "baseline": "00121000.png",
+  "arrivals": [
+    {
+      "frame": "00122400.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        },
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        },
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        },
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        }
+      ]
+    },
+    {
+      "frame": "00123500.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        }
+      ]
+    },
+    {
+      "frame": "00124300.png",
+      "lines": [
+        {
+          "kind": "exp",
+          "amount": 39,
+          "party": false
+        }
+      ]
+    },
+    {
+      "frame": "00124400.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Orange Potion",
+          "quantity": 1,
+          "tab": "Use",
+          "cut_short": false
+        },
+        {
+          "kind": "mesos",
+          "amount": 43
+        }
+      ]
+    },
+    {
+      "frame": "00124500.png",
+      "lines": [
+        {
+          "kind": "item",
+          "name": "Jr. Necki Skin",
+          "quantity": 1,
+          "tab": "Etc",
+          "cut_short": false
+        }
+      ]
+    },
+    {
+      "frame": "00124600.png",
+      "lines": [
+        {
+          "kind": "mesos",
+          "amount": 47
+        }
+      ]
+    }
+  ]
+}

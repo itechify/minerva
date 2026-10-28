@@ -1,9 +1,8 @@
 import "./errors";
 import { byId, span } from "./dom";
-import type { Character, ExpRate, ExpTracking, PacePoint, PaceTrace } from "./exp-tracking";
-import { percent, rate, sharePercent, whole } from "./figures";
+import type { Character, ExpRate, ExpTracking, Loot, PacePoint, PaceTrace } from "./exp-tracking";
+import { percent, rate, whole } from "./figures";
 import { dragByHandles, followView, heightReporter, pressControls } from "./shell";
-import { soloExpHelp } from "./solo-exp-help";
 
 /** What the shell sends: the figures, the Character playing (none until the Status Bar names
  *  one), whether the window shows at all, whether some map has a Personal Best (the Personal
@@ -14,7 +13,12 @@ type TrackerView = {
   character: Character | null;
   personalBests: boolean;
   personalBestsOpen: boolean;
+  /** One of our windows has been over the Pickup Log for a while. */
+  pickupLogCovered: boolean;
+  /** The Loot section is open, as the player left it. */
+  lootOpen: boolean;
 };
+
 
 const panelEl = byId("panel");
 const openBests = byId("open-bests");
@@ -37,10 +41,16 @@ const sessionExp = byId("session-exp");
 const sessionPercent = byId("session-percent");
 const bestRow = byId("best-row");
 const bestExp = byId("best-exp");
-const bestThisVisit = byId("best-this-visit");
-const share = byId("tracking-share");
-const shareText = document.createElement("span");
-share.append(shareText, soloExpHelp());
+const bestLink = document.querySelector<HTMLButtonElement>("#best-row .best-link")!;
+const mesoTotal = byId("meso-total");
+const mesoRate = byId("meso-rate");
+const pickupCovered = byId("tracking-pickup-covered");
+const bestParty = byId("best-party");
+const loot = byId("loot");
+const lootHead = byId("loot-head");
+const lootBody = byId("loot-body");
+const lootCount = byId("loot-count");
+const lootItems = byId("loot-items");
 const deaths = byId("tracking-deaths");
 const exp = byId("tracking-exp");
 const expFigures = byId("exp-figures");
@@ -85,6 +95,39 @@ function noTimeToLevel(rolling: ExpRate | null) {
   return "not yet";
 }
 
+/** The Loot section, once the Session has started: collapsed, its totals on the header ("1,593+
+ *  mesos 28+ items", a part left out while it is none); open, "(Estimate)" by the label, the
+ *  Mesos row, then every Item with its count, the most picked up first, in a list that scrolls. */
+function renderLoot(l: Loot, open: boolean, started: boolean) {
+  loot.hidden = !started;
+  lootHead.setAttribute("aria-expanded", String(open));
+  loot.classList.toggle("open", open);
+  lootBody.hidden = !open;
+  const totals = [total(l.mesos, "meso"), total(l.itemsTotal, "item")].filter((part) => part !== null);
+  lootCount.replaceChildren(...(open ? [] : totals.flatMap((part, i) => (i === 0 ? [part] : [" ", part]))));
+  mesoTotal.textContent = whole(l.mesos);
+  mesoRate.textContent = l.mesosPerHour === null ? "–" : rate(l.mesosPerHour);
+  lootItems.hidden = l.items.length === 0;
+  lootItems.replaceChildren(
+    ...l.items.map((item) => {
+      const row = document.createElement("li");
+      row.append(span("name", item.name), span("tally", whole(item.count)));
+      return row;
+    }),
+  );
+}
+
+/** One of the Loot header's totals: its figure in Panel Ink, then its word as the label's; none
+ *  while it is zero. */
+function total(n: number, word: string) {
+  if (n === 0) return null;
+  const part = document.createElement("span");
+  // "+", in the words' weight: the header has no "(Estimate)", and the Pickup Log can miss a
+  // pickup but never adds one, so the player picked up at least the figure, possibly more.
+  part.append(span("figure", whole(n)), `+ ${word}${n === 1 ? "" : "s"}`);
+  return part;
+}
+
 /** The Grind Tracker: a line until the Session starts, then Time to Level over the rates
  *  and what else the Session carries; the map's Best row from arriving, before the
  *  Session starts too; the EXP bar's last reading at the foot, from the first reading on.
@@ -99,8 +142,8 @@ function render(view: TrackerView) {
   openBests.setAttribute("aria-pressed", String(personalBestsOpen));
   const started = t.rolling !== null || t.state === "warmingUp" || t.state === "active" || t.state === "paused";
   tracking.dataset.state = t.state;
-  // Rates still settling, held while paused, or the bar out of sight: the figures step back.
-  tracking.classList.toggle("held", t.state !== "active");
+  // Rates still settling in the first minute: the EXP figures step back to the light weight.
+  tracking.classList.toggle("warming", t.state === "warmingUp");
 
   unreadable.hidden = t.state !== "unreadable";
   const why = t.noStatusBar
@@ -139,13 +182,24 @@ function render(view: TrackerView) {
   // Visit set it.
   bestRow.hidden = t.personalBest === null;
   bestExp.textContent = t.personalBest === null ? "" : rate(t.personalBest);
-  bestThisVisit.hidden = !t.personalBestThisVisit;
-
-  const shareOf = t.ceilingShareHundredths;
-  share.hidden = shareOf === null || t.soloExpCeiling === null;
-  if (shareOf !== null && t.soloExpCeiling !== null) {
-    shareText.textContent = `${sharePercent(shareOf)} of this map's solo EXP/h (${whole(t.soloExpCeiling)})`;
+  bestLink.textContent = t.personalBestThisVisit ? "Visit best" : "Best";
+  // Racing the Party Best, while Party EXP is in the last 5 minutes: a small party mark.
+  bestParty.toggleAttribute("hidden", !t.personalBestParty);
+  // The EXP Split, once Party EXP has come in this Session: the shares, on hovering the
+  // Session's EXP/h.
+  if (t.expSplit) {
+    const { ownHundredths: own, partyHundredths: party } = t.expSplit;
+    sessionExp.title = `${percent(party, 0)} of this Session's EXP came from your party, ${percent(own, 0)} from your own kills`;
+  } else {
+    sessionExp.removeAttribute("title");
   }
+
+  // The Session's Loot from the Pickup Log, once it has started, even at none; the mesos' rate
+  // waits for active time.
+  renderLoot(t.loot, view.lootOpen, started);
+  // Said quietly, only while the Session shows figures that a cover would leave low.
+  pickupCovered.hidden = !started || !view.pickupLogCovered;
+
   const died = t.deaths.count;
   deaths.hidden = died === 0;
   // No-break spaces: where the line wraps, the loss reads as one.

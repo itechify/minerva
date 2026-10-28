@@ -1,28 +1,33 @@
 // Reports against entries, and the maintainer's routes: reading and dismissing the reports,
 // taking an entry down and restoring it, looking a name up, and reassigning it to the key its
 // player has now.
+import type { Kind } from "../entries";
 import { type Answer, badRequest, body } from "./http";
 import { hash } from "./keys";
+import { isParty, kindCondition, sqlKind, sqlParty } from "./kinds";
 import { REPORTS, limit } from "./rate-limits";
 
 /** A report's reason is cut to this many characters. */
 const REASON_LENGTH = 500;
 
-/** Record a report against the entry `{ name, map, band }`, with an optional `reason`. */
+/** Record a report against the entry `{ name, map, band, party? }` (the Party Best's if
+ *  `party`, otherwise the Solo Best's), with an optional `reason`. */
 export async function report(env: Env, request: Request): Promise<Answer> {
-  const { name, map, band, reason } = ((await body(request)) ?? {}) as Record<string, unknown>;
+  const { name, map, band, reason, party = false } = ((await body(request)) ?? {}) as Record<string, unknown>;
   if (typeof name !== "string" || typeof map !== "string" || !Number.isInteger(band)) {
-    return badRequest("a report is { name, map, band, reason? }");
+    return badRequest("a report is { name, map, band, party?, reason? }");
   }
+  if (typeof party !== "boolean") return badRequest("a report's party is true or false");
   if (reason !== undefined && typeof reason !== "string") return badRequest("a report's reason is text");
   const reporter = await hash(request.headers.get("cf-connecting-ip") ?? "unknown");
   const limited = await limit(env, `report:${reporter}`, REPORTS);
   if (limited !== undefined) return limited;
   const reported = await env.DB.prepare(
-    `INSERT INTO reports (name_key, map_id, band, exp_per_hour, reason, reported_at)
-     SELECT name_key, map_id, band, exp_per_hour, ?4, ?5 FROM entries WHERE name_key = ?1 AND map_id = ?2 AND band = ?3`,
+    `INSERT INTO reports (name_key, map_id, band, exp_per_hour, reason, reported_at, party)
+     SELECT name_key, map_id, band, exp_per_hour, ?4, ?5, party FROM entries
+     WHERE name_key = ?1 AND map_id = ?2 AND band = ?3 AND party = ?6`,
   )
-    .bind(name.toLowerCase(), map, band, (reason ?? "").slice(0, REASON_LENGTH), Date.now())
+    .bind(name.toLowerCase(), map, band, (reason ?? "").slice(0, REASON_LENGTH), Date.now(), sqlParty(party))
     .run();
   if (reported.meta.changes === 0) return { status: 404, body: { error: "no-entry" } };
   return { status: 201, body: {} };
@@ -32,25 +37,27 @@ export async function report(env: Env, request: Request): Promise<Answer> {
 export async function readReports(env: Env): Promise<Answer> {
   const rows = await env.DB.prepare(
     `SELECT r.id, COALESCE(c.name, r.name_key) AS name, r.map_id AS map, r.band, r.exp_per_hour AS expPerHour,
-            r.reason, r.reported_at AS reportedAt
+            r.reason, r.reported_at AS reportedAt, r.party = 1 AS party
      FROM reports r LEFT JOIN characters c USING (name_key) ORDER BY r.reported_at DESC, r.id DESC`,
-  ).all();
-  return { status: 200, body: { reports: rows.results } };
+  ).all<{ party: number }>();
+  return { status: 200, body: { reports: rows.results.map((r) => ({ ...r, party: isParty(r.party) })) } };
 }
 
-/** Delete `name`'s entry on `map` in the Level Band starting at `band`, its reports, and the
- *  top spot it took, if it took one. The same Visit (the same EXP/h there) uploaded again is
- *  rejected as "removed". */
-export async function deleteEntry(env: Env, name: string, map: string, band: string): Promise<Answer> {
-  const at = [name.toLowerCase(), map, Number(band)];
+/** Delete `name`'s entry on `map` in the Level Band starting at `band`, of the `kind` asked for
+ *  or, with none, both its Solo Best's and its Party Best's, with their reports and the top
+ *  spot taken with it, if one was. The same Visit (the same EXP/h there, of that kind) uploaded
+ *  again is rejected as "removed". */
+export async function deleteEntry(env: Env, name: string, map: string, band: string, kind: Kind | null): Promise<Answer> {
+  const at = [name.toLowerCase(), map, Number(band), sqlKind(kind)];
   const [removed] = await env.DB.batch([
     env.DB.prepare(
-      `INSERT OR IGNORE INTO removed_entries (name_key, map_id, band, exp_per_hour)
-       SELECT name_key, map_id, band, exp_per_hour FROM entries WHERE name_key = ?1 AND map_id = ?2 AND band = ?3`,
+      `INSERT OR IGNORE INTO removed_entries (name_key, map_id, band, exp_per_hour, party)
+       SELECT name_key, map_id, band, exp_per_hour, party FROM entries
+       WHERE name_key = ?1 AND map_id = ?2 AND band = ?3 AND ${kindCondition("?4")}`,
     ).bind(...at),
-    env.DB.prepare("DELETE FROM entries WHERE name_key = ?1 AND map_id = ?2 AND band = ?3").bind(...at),
-    env.DB.prepare("DELETE FROM reports WHERE name_key = ?1 AND map_id = ?2 AND band = ?3").bind(...at),
-    env.DB.prepare("DELETE FROM taken_tops WHERE name_key = ?1 AND map_id = ?2 AND band = ?3").bind(...at),
+    env.DB.prepare(`DELETE FROM entries WHERE name_key = ?1 AND map_id = ?2 AND band = ?3 AND ${kindCondition("?4")}`).bind(...at),
+    env.DB.prepare(`DELETE FROM reports WHERE name_key = ?1 AND map_id = ?2 AND band = ?3 AND ${kindCondition("?4")}`).bind(...at),
+    env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND map_id = ?2 AND band = ?3 AND ${kindCondition("?4")}`).bind(...at),
   ]);
   if (removed.meta.changes === 0) return { status: 404, body: { error: "no-entry" } };
   return { status: 204 };
@@ -60,18 +67,28 @@ export async function deleteEntry(env: Env, name: string, map: string, band: str
  *  kept off the Map Leaderboards until restored. */
 export async function readRemoved(env: Env): Promise<Answer> {
   const rows = await env.DB.prepare(
-    `SELECT COALESCE(c.name, r.name_key) AS name, r.map_id AS map, r.band, r.exp_per_hour AS expPerHour
-     FROM removed_entries r LEFT JOIN characters c USING (name_key) ORDER BY name, map, band`,
-  ).all<{ name: string; map: string; band: number; expPerHour: number }>();
-  return { status: 200, body: { removed: rows.results } };
+    `SELECT COALESCE(c.name, r.name_key) AS name, r.map_id AS map, r.band, r.exp_per_hour AS expPerHour, r.party
+     FROM removed_entries r LEFT JOIN characters c USING (name_key) ORDER BY name, map, band, r.party`,
+  ).all<{ name: string; map: string; band: number; expPerHour: number; party: number }>();
+  return { status: 200, body: { removed: rows.results.map((r) => ({ ...r, party: isParty(r.party) })) } };
 }
 
 /** Restore the entry taken down for `name` on `map` in the Level Band starting at `band`, the
- *  Visit with `expPerHour`: the next upload of that Visit goes up again. */
-export async function restoreEntry(env: Env, name: string, map: string, band: string, expPerHour: string): Promise<Answer> {
+ *  Visit of `kind` (solo, with none) with `expPerHour`: the next upload of that Visit goes up
+ *  again. */
+export async function restoreEntry(
+  env: Env,
+  name: string,
+  map: string,
+  band: string,
+  expPerHour: string,
+  kind: Kind | null,
+): Promise<Answer> {
   if (!/^\d+$/.test(band) || !/^\d+$/.test(expPerHour)) return badRequest("a band and an EXP/h are numbers");
-  const restored = await env.DB.prepare("DELETE FROM removed_entries WHERE name_key = ? AND map_id = ? AND band = ? AND exp_per_hour = ?")
-    .bind(name.toLowerCase(), map, Number(band), Number(expPerHour))
+  const restored = await env.DB.prepare(
+    "DELETE FROM removed_entries WHERE name_key = ? AND map_id = ? AND band = ? AND exp_per_hour = ? AND party = ?",
+  )
+    .bind(name.toLowerCase(), map, Number(band), Number(expPerHour), sqlParty(kind === "party"))
     .run();
   if (restored.meta.changes === 0) return { status: 404, body: { error: "no-removed" } };
   return { status: 204 };

@@ -22,10 +22,13 @@
 //!   allows a wide range of totals); when the bar went from near 100% to as near 0%, it
 //!   is a level-up all the same.
 //! - The Session starts on the first EXP change, from the EXP the bar shows then.
-//! - Active time runs while the EXP keeps changing. A gap of up to [`IDLE_MS`] between
-//!   changes counts; a longer one is a break, which pauses the Session and counts for
-//!   nothing, from the last change to the next, so the rates hold while paused. Once
-//!   the Session has warmed up it stays so, breaks or not.
+//! - Active time runs while the player plays: the EXP keeps changing, or the Pickup Log says
+//!   mesos were picked up (they leave the Pace Trace alone). A gap of up to [`IDLE_MS`]
+//!   between one and the next counts; a longer one is a break, which pauses the Session
+//!   and counts for nothing, from the last to the next, so the rates hold while paused.
+//!   Once the Session has warmed up it stays so, breaks or not.
+//! - The Session's mesos are those the Pickup Log says arrived since the Session started
+//!   (not before the first EXP change), cleared with it; mesos an hour is over its active time.
 //! - A bar that can't be read isn't a break: nothing is known of the EXP then. Once it
 //!   has gone [`UNREADABLE_MS`] without reading whole the Session says so, its figures
 //!   held. If it reads again within [`IDLE_MS`] of the last whole reading, the stretch
@@ -49,6 +52,12 @@
 //!   against the Best row's pace from arriving on the map once that is within reach), the
 //!   forecast (where the bar will be at the Last 5 min pace shown) and the ground a death
 //!   took back.
+//! - The Pickup Log tells the player's own EXP from Party EXP (ADR 0026). Any Rolling Rate
+//!   window, the last 5 minutes of active play, with Party EXP in it is party: the Best row
+//!   and the Pace Trace race the map's Party Best, and a best set then is a Party Best; a
+//!   window with none is solo, and races and sets the Solo Best. The Session never resets for
+//!   it. The log's lines give the EXP Split's shares and the kind of a window, never an amount
+//!   of EXP (ADR 0005).
 //! - The Rolling Rate as shown afresh, over a full 5 minutes of the Visit's play, counts
 //!   towards the Visit's Personal Best on the map (see [`crate::personal_best`]), unless
 //!   the bar can't be read. The core says which map that is, if any: one it is certain
@@ -60,7 +69,9 @@
 
 use crate::ExpBar;
 use crate::bug_report::{Level, Note};
-use crate::personal_best::{Bests, SavedBests, Stamp, VisitBest};
+use crate::loot_items::{ItemTally, Named, LootItem};
+use crate::personal_best::{BestKind, Bests, SavedBests, Stamp, VisitBest};
+use crate::pickup_log::PickupLine;
 use crate::status_bar::StatusBar;
 use serde::{Deserialize, Serialize};
 
@@ -120,6 +131,9 @@ pub struct ExpTracking {
     pub personal_best: Option<u64>,
     /// The Best row's figure was set on this Visit: the row says so.
     pub personal_best_this_visit: bool,
+    /// The Best row races the map's Party Best: the Rolling Rate's window has Party EXP in it
+    /// (GLOSSARY), so the row carries a small party mark. Otherwise it races the Solo Best.
+    pub personal_best_party: bool,
     /// The star on the Rolling Rate's row: the Best row is this Visit's, and the Rolling Rate
     /// is it, as the Grind Tracker writes both (3 significant figures), over a full 5 minutes
     /// of active play on the map with the bar read, as a best counts. It goes as soon as the
@@ -142,6 +156,77 @@ pub struct ExpTracking {
     /// Unreadable because the EXP figures had nowhere to be read: the Status Bar isn't found,
     /// and wasn't since the client area last changed size (ADR 0017).
     pub no_status_bar: bool,
+    /// What the Pickup Log says the player picked up in the Session.
+    pub loot: Loot,
+    /// The EXP Split: how much of the Session's EXP was the player's own and how much Party
+    /// EXP, as the Pickup Log's lines say. `None` until Party EXP has come in this Session. It
+    /// moves with the log, as the bar does, rather than holding with the figures.
+    pub exp_split: Option<ExpSplit>,
+}
+
+/// The Loot (GLOSSARY) of the Session so far: read from the Pickup Log, so it may be
+/// fewer than were picked up, never more (ADR 0026): the mesos, and the Items by name.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Loot {
+    /// The mesos picked up since the Session started, as they arrive.
+    pub mesos: u64,
+    /// Mesos an hour over the Session's active time, held with the other figures. `None`
+    /// until the Session has some active time.
+    pub mesos_per_hour: Option<u64>,
+    /// The Items picked up since the Session started, the most picked up first (#171). No
+    /// per-hour figure for them.
+    pub items: Vec<LootItem>,
+    /// How many Items in all, whichever they are: the Loot header's count while it is collapsed.
+    pub items_total: u64,
+}
+
+/// The EXP Split (GLOSSARY): the shares of the Session's EXP that were the player's own and
+/// Party EXP, in hundredths of a percent, 10,000 together. They come from the Pickup Log's
+/// lines, which undercount: they give the shares, never the amounts (ADR 0005).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpSplit {
+    /// The player's own kills'.
+    pub own_hundredths: u32,
+    /// A partymate's kills' shares and the party bonus together.
+    pub party_hundredths: u32,
+}
+
+/// What the Pickup Log's EXP lines said over a Session, for the EXP Split, and when Party EXP
+/// last came in, for telling a party window from a solo one.
+#[derive(Debug, Default, Clone, Copy)]
+struct PartyPlay {
+    /// The EXP of the player's own kills, as the log's lines add up.
+    own: u64,
+    /// Party EXP: the shares of partymates' kills and the party bonus.
+    party: u64,
+    /// The Session's active time when a line of Party EXP last arrived; `None` if none has.
+    last_party_at: Option<u64>,
+}
+
+impl PartyPlay {
+    /// The lines that arrived at active time `active`.
+    fn take(&mut self, lines: &[PickupLine], active: u64) {
+        for line in lines {
+            match line {
+                PickupLine::Exp { amount, party: false } => self.own += amount,
+                PickupLine::Exp { amount, party: true } | PickupLine::PartyBonus { amount } => {
+                    self.party += amount;
+                    self.last_party_at = Some(active);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// The shares, once Party EXP has come in (and the lines gave some EXP to share).
+    fn split(&self) -> Option<ExpSplit> {
+        self.last_party_at?;
+        let total = self.own + self.party;
+        let party = div_round(i128::from(self.party) * i128::from(HUNDRED_PERCENT), i128::from(total.max(1))) as u32;
+        (total > 0).then_some(ExpSplit { own_hundredths: HUNDRED_PERCENT - party, party_hundredths: party })
+    }
 }
 
 /// The Pace Trace: the Session's EXP over the 5 minutes of active play up to its last
@@ -224,9 +309,10 @@ pub enum TrackingState {
     Waiting,
     /// The first [`WARM_UP_MS`] of active time: the rates are still jumpy.
     WarmingUp,
-    /// Warmed up (once is enough), and the EXP changed within the last [`IDLE_MS`].
+    /// Warmed up (once is enough), and the EXP changed or mesos were picked up within the last
+    /// [`IDLE_MS`].
     Active,
-    /// No EXP change for more than [`IDLE_MS`]: the rates hold until the next change.
+    /// No EXP change nor mesos for more than [`IDLE_MS`]: the rates hold until the next.
     Paused,
     /// The EXP bar hasn't read whole for [`UNREADABLE_MS`]: something covers it, or the
     /// Status Bar isn't found. Whatever the Session was doing, its figures hold until the
@@ -377,6 +463,13 @@ pub(crate) struct Session {
     unread_since: Option<u64>,
     /// The Session the player's reset ended, until the EXP next changes.
     undo: Option<Undo>,
+    /// What the Pickup Log said of the player's kills before the Session started: the first
+    /// kill's lines come before the bar changes. They join the Session's when it starts.
+    before_start: PartyPlay,
+    /// Lines of the Pickup Log that arrived before this (ms of capture time) are no part of the
+    /// Session: a line is read a few captures after it arrives, so one that arrived before a reset,
+    /// an undo or a Character switch may be read after it.
+    lines_from: u64,
     /// The Visit under way. It outlasts Sessions: a reset or a character switch doesn't
     /// move the player.
     visit: Visit,
@@ -462,6 +555,8 @@ struct Against {
     map: Option<String>,
     /// The Character whose Personal Best it is: the Unassigned one for `None`.
     character: Option<String>,
+    /// The kind of the Rolling Rate's window: the Best row races that kind.
+    kind: BestKind,
 }
 
 /// The Best row: the map's Personal Best as it stands, in EXP/h, and whether this Visit set it.
@@ -513,9 +608,14 @@ impl Gained {
 /// A started Session's figures.
 #[derive(Debug)]
 struct Figures {
-    /// When the EXP last changed.
-    last_change_at: u64,
-    /// Active time up to `last_change_at`.
+    /// When the player last played: the EXP last changed, or the Pickup Log last said mesos
+    /// were picked up.
+    last_play_at: u64,
+    /// When the Session started (ms of capture time): the first EXP change.
+    started_at: u64,
+    /// Active time up to `last_play_at`.
+    active_at_play: u64,
+    /// Active time up to the last EXP change, which the Pace Trace ends at: mesos don't move it.
     active_at_change: u64,
     /// Net EXP gained since the start.
     gained: i64,
@@ -533,28 +633,39 @@ struct Figures {
     /// Active time from which the Visit's Personal Best counts: when the Visit started, or
     /// when the player last removed this Visit's best, if later, so the play that set it
     /// isn't counted again.
-    best_from: u64,
+    best_from: [u64; 2],
+    /// The mesos the Pickup Log has said were picked up since the start.
+    mesos: u64,
+    /// The Pickup Log's EXP lines this Session.
+    play: PartyPlay,
+    /// The Items it has said were picked up since the start.
+    items: ItemTally,
 }
 
 impl Figures {
     /// A Session started at `at`.
     fn new(at: u64) -> Self {
         Figures {
-            last_change_at: at,
+            started_at: at,
+            last_play_at: at,
+            active_at_play: 0,
             active_at_change: 0,
             gained: 0,
             marks: vec![Mark { active: 0, gained: 0 }],
             deaths: Deaths::default(),
             warmed_up: false,
             visit_from: 0,
-            best_from: 0,
+            best_from: [0; 2],
+            mesos: 0,
+            play: PartyPlay::default(),
+            items: ItemTally::default(),
         }
     }
 
     /// A Visit started at active time `at`: its share and its best count from then.
     fn start_visit(&mut self, at: u64) {
         self.visit_from = at;
-        self.best_from = at;
+        self.best_from = [at; 2];
     }
 
     /// Whether the Session has warmed up by `now`.
@@ -562,9 +673,9 @@ impl Figures {
         self.warmed_up || self.active(now) >= WARM_UP_MS
     }
 
-    /// How long the EXP has gone unchanged at `now`.
+    /// How long the player has gone without playing at `now`: no EXP change, no mesos.
     fn idle(&self, now: u64) -> u64 {
-        now.saturating_sub(self.last_change_at)
+        now.saturating_sub(self.last_play_at)
     }
 
     /// Whether the player is on a break at `now`.
@@ -572,16 +683,22 @@ impl Figures {
         self.idle(now) > IDLE_MS
     }
 
-    /// Active time at `now`: the idle stretch since the last change counts while it is
+    /// Active time at `now`: the idle stretch since the last play counts while it is
     /// a gap in play, and not at all once it is a break.
     fn active(&self, now: u64) -> u64 {
-        self.active_at_change + if self.paused(now) { 0 } else { self.idle(now) }
+        self.active_at_play + if self.paused(now) { 0 } else { self.idle(now) }
+    }
+
+    /// The player played at `at` without the EXP changing (mesos): no break, if there was one.
+    fn play(&mut self, at: u64) {
+        self.active_at_play = self.active(at);
+        self.last_play_at = self.last_play_at.max(at);
     }
 
     /// Count a change of `gain` EXP at `at`.
     fn change(&mut self, gain: i64, at: u64) {
-        self.active_at_change = self.active(at);
-        self.last_change_at = at;
+        self.play(at);
+        self.active_at_change = self.active_at_play;
         self.gained += gain;
         self.marks.push(Mark { active: self.active_at_change, gained: self.gained });
         let from = self.active_at_change.saturating_sub(2 * ROLLING_MS);
@@ -927,6 +1044,8 @@ impl Session {
         self.character_switched = false;
         self.shown = None;
         self.undo = None;
+        self.before_start = PartyPlay::default();
+        self.lines_from = self.now;
     }
 
     /// The Session has started: it has figures, since the first EXP gain.
@@ -968,16 +1087,55 @@ impl Session {
         self.character_switched = undo.character_switched;
         self.misfits = None;
         self.shown = None;
+        // What arrived while it was set aside is no part of it.
+        self.lines_from = self.now;
+    }
+
+    /// From when the Pickup Log's lines are the Session's own to count, once it has started: a
+    /// line that arrived before the Session started (the first EXP change starts it), or before a
+    /// reset, an undo or a Character switch, is not counted, though it is read after. `None`
+    /// while it is waiting to start.
+    pub fn counts_loot_from(&self) -> Option<u64> {
+        self.figures.as_ref().map(|figures| figures.started_at.max(self.lines_from))
+    }
+
+    /// From when the Pickup Log's EXP lines count: those before the Session starts join it (the
+    /// first kill's lines come before the bar changes), but not those from before a reset or a
+    /// Character switch.
+    pub fn counts_lines_from(&self) -> u64 {
+        self.lines_from
+    }
+
+    /// The Pickup Log said `lines` arrived, in a clean capture at `at_ms`, and `items` are its
+    /// Item lines, named. Mesos and Items are counted once the Session has started (the first
+    /// EXP change starts it, from the EXP the bar shows then). Mesos are play, so they keep the
+    /// Session from pausing, as an EXP change does; they are not an EXP change, so they leave
+    /// the Pace Trace alone. Items are counted with the Session and are not play.
+    pub fn on_loot(&mut self, lines: &[PickupLine], items: Vec<(Named, u32)>, at_ms: u64) {
+        self.tick(at_ms);
+        let Some(figures) = &mut self.figures else { return };
+        let mut mesos = lines.iter().filter_map(|line| match line {
+            PickupLine::Mesos { amount } => Some(*amount),
+            _ => None,
+        });
+        if let Some(first) = mesos.next() {
+            figures.mesos = mesos.fold(figures.mesos.saturating_add(first), u64::saturating_add);
+            figures.play(at_ms);
+        }
+        for (named, quantity) in items {
+            figures.items.add(named, quantity, &mut self.notes);
+        }
     }
 
     /// The player removed `map`'s Best row: this Visit's best if the row is it, otherwise the
     /// best from its history. What is shown is measured afresh against the next best, at once.
     pub fn remove_best(&mut self, map: &str) {
         let character = self.character_name().map(String::from);
-        if self.best_row(map).is_some_and(|row| row.this_visit) {
-            self.remove_this_visit(character.as_deref(), map);
+        let kind = self.best_kind();
+        if self.best_row(map, kind).is_some_and(|row| row.this_visit) {
+            self.remove_this_visit(character.as_deref(), map, kind);
         } else {
-            self.bests.remove(character.as_deref(), map);
+            self.bests.remove(character.as_deref(), map, kind);
         }
         self.shown = None;
     }
@@ -986,8 +1144,8 @@ impl Session {
     /// (the Unassigned one for `None`), this Visit's included: if it was there, what is
     /// shown is measured afresh, at once, as the Best row may name another.
     pub fn remove_visit(&mut self, character: Option<&str>, map: &str, visit: &VisitBest) {
-        let removed = if self.bests.this_visits_best(character, map) == Some(visit) {
-            self.remove_this_visit(character, map)
+        let removed = if self.bests.this_visits_best(character, map, visit.kind) == Some(visit) {
+            self.remove_this_visit(character, map, visit.kind)
         } else {
             self.bests.remove_visit(character, map, visit)
         };
@@ -999,13 +1157,14 @@ impl Session {
     /// Remove this Visit's best on `map`, if it is `character`'s: only the play from now on
     /// counts towards it again, so what set it (a misread, say) isn't counted again. So too
     /// for the Session a reset set aside, should the player undo it. Whether there was one.
-    fn remove_this_visit(&mut self, character: Option<&str>, map: &str) -> bool {
-        let removed = self.bests.remove_this_visit(character, map);
+    /// Only the best of `kind` is removed.
+    fn remove_this_visit(&mut self, character: Option<&str>, map: &str, kind: BestKind) -> bool {
+        let removed = self.bests.remove_this_visit(character, map, kind);
         if removed {
             let now = self.now;
             let undone = self.undo.as_mut().map(|undo| &mut undo.figures);
             for figures in self.figures.iter_mut().chain(undone) {
-                figures.best_from = figures.active(now);
+                figures.best_from[kind.index()] = figures.active(now);
             }
         }
         removed
@@ -1071,6 +1230,36 @@ impl Session {
         self.bests.restore(saved);
     }
 
+    /// A Pickup Log capture at `at_ms` read `arrived` as its new lines, those of them that count
+    /// ([`Session::counts_lines_from`]): their EXP lines tell the player's own EXP from Party EXP,
+    /// for the EXP Split and for telling a party window from a solo one. Nothing here is an
+    /// amount of EXP: that comes from the EXP bar alone (ADR 0005).
+    pub fn on_pickup_log(&mut self, at_ms: u64, arrived: &[PickupLine]) {
+        self.tick(at_ms);
+        let (play, active) = match &mut self.figures {
+            Some(figures) => {
+                let active = figures.active(at_ms);
+                (&mut figures.play, active)
+            }
+            None => (&mut self.before_start, 0),
+        };
+        play.take(arrived, active);
+    }
+
+    /// Whether the Rolling Rate's window, the last 5 minutes of active play, has Party EXP in
+    /// it: any such window is party, and the Best row races the Party Best. With 5 minutes
+    /// gone since the last Party EXP, it is solo again.
+    fn best_kind(&self) -> BestKind {
+        self.figures.as_ref().is_some_and(|figures| {
+            figures.play.last_party_at.is_some_and(|at| at + ROLLING_MS >= figures.active(self.now))
+        }).into()
+    }
+
+    /// The EXP Split as it stands: `None` until Party EXP has come in this Session.
+    fn exp_split(&self) -> Option<ExpSplit> {
+        self.figures.as_ref().and_then(|figures| figures.play.split())
+    }
+
     /// Time passed without a reading.
     pub fn tick(&mut self, at_ms: u64) {
         self.now = self.now.max(at_ms);
@@ -1103,7 +1292,9 @@ impl Session {
                 // A new Session: the one a reset ended is gone for good.
                 self.notes.push(Note::SessionStarted);
                 self.undo = None;
-                self.figures = Some(Figures::new(at));
+                let mut figures = Figures::new(at);
+                figures.play = std::mem::take(&mut self.before_start);
+                self.figures = Some(figures);
             }
         }
         self.figures.as_mut()
@@ -1122,7 +1313,8 @@ impl Session {
         // another ceiling or best (the map's page come, or another Candidate chosen).
         let unreadable = fresh.state == TrackingState::Unreadable;
         let character = self.character_name().map(String::from);
-        let against = Against { visit: self.visit.id, ceiling, map: map.map(String::from), character };
+        let kind = self.best_kind();
+        let against = Against { visit: self.visit.id, ceiling, map: map.map(String::from), character, kind };
         let holds = self.shown.as_ref().is_some_and(|shown| {
             shown.against == against
                 && (unreadable
@@ -1144,16 +1336,18 @@ impl Session {
                 if let Some(map) = map {
                     // The Rolling Rate shown over a full 5 minutes of active play here
                     // counts towards this Visit's best, unless nothing is known of the EXP.
-                    let here = self.figures.as_ref().map(|f| f.rolling_since(self.now, f.best_from));
+                    let here = self.figures.as_ref().map(|f| f.rolling_since(self.now, f.best_from[kind.index()]));
                     let full = here.filter(|h| h.over_ms >= ROLLING_MS && h.exp > 0);
                     let counted = full.filter(|_| !unreadable).map(|here| here.per_hour(1, 1) as u64);
-                    self.bests.on_shown(map, counted, now_unix_ms, &self.stamp());
+                    self.bests.on_shown(map, counted, kind, now_unix_ms, &self.stamp());
                     // Over a full 5 minutes here, the Rolling Rate shown is the one counted,
-                    // against the Character's best (the Unassigned one while none is named).
-                    let row = self.best_row(map);
+                    // against the Character's best of the kind being played (the Unassigned
+                    // one while none is named).
+                    let row = self.best_row(map, kind);
                     let best = row.map(|row| row.exp_per_hour);
                     fresh.personal_best = best;
                     fresh.personal_best_this_visit = row.is_some_and(|row| row.this_visit);
+                    fresh.personal_best_party = kind.is_party() && row.is_some();
                     // The star: Last 5 min is the best this Visit set on the row, as written.
                     fresh.new_best = fresh.personal_best_this_visit
                         && counted.zip(best).is_some_and(|(rate, best)| three_figures(rate) == three_figures(best));
@@ -1168,17 +1362,26 @@ impl Session {
             pace: self.pace(held.personal_best),
             forecast: forecast(self.last, held.rolling),
             lost_from_hundredths: self.lost_from.filter(|&p| self.last.is_some_and(|bar| bar.percent_hundredths < p)),
+            // The mesos as they arrive, like the bar; their rate holds with the figures.
+            loot: Loot {
+                mesos: self.figures.as_ref().map_or(0, |f| f.mesos),
+                items: self.figures.as_ref().map_or_else(Vec::new, |f| f.items.items()),
+                items_total: self.figures.as_ref().map_or(0, |f| f.items.total()),
+                ..held.loot
+            },
+            exp_split: self.exp_split(),
             ..held
         }
     }
 
     /// `map`'s Best row for the Character the Session is for (the Unassigned one while none
-    /// is named), if the map has a best. This Visit's takes it from the history's only once
-    /// it reads higher, as the Grind Tracker writes them.
-    fn best_row(&self, map: &str) -> Option<BestRow> {
+    /// is named), if the map has a best of `kind`. This Visit's takes it from the history's
+    /// only once it reads
+    /// higher, as the Grind Tracker writes them.
+    fn best_row(&self, map: &str, kind: BestKind) -> Option<BestRow> {
         let character = self.character_name();
-        let earlier = self.bests.history_best(character, map).map(|best| best.exp_per_hour);
-        let this_visit = self.bests.this_visits_best(character, map).map(|best| best.exp_per_hour);
+        let earlier = self.bests.history_best(character, map, kind).map(|best| best.exp_per_hour);
+        let this_visit = self.bests.this_visits_best(character, map, kind).map(|best| best.exp_per_hour);
         let row = |exp_per_hour, this_visit| BestRow { exp_per_hour, this_visit };
         match (earlier, this_visit) {
             (Some(earlier), Some(visits)) if three_figures(visits) > three_figures(earlier) => Some(row(visits, true)),
@@ -1279,11 +1482,20 @@ impl Session {
             bar: None,
             personal_best: None,
             personal_best_this_visit: false,
+            personal_best_party: false,
             new_best: false,
             pace: None,
             forecast: Vec::new(),
             lost_from_hundredths: None,
             no_status_bar: false,
+            loot: Loot {
+                mesos: figures.mesos,
+                mesos_per_hour: (average.over_ms > 0)
+                    .then(|| div_round(i128::from(figures.mesos) * i128::from(HOUR_MS), i128::from(average.over_ms)) as u64),
+                items: figures.items.items(),
+                items_total: figures.items.total(),
+            },
+            exp_split: None,
         }
     }
 }

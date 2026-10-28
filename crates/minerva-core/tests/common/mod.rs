@@ -594,3 +594,42 @@ pub fn owl_clickable(state: &PanelState) -> bool {
 pub fn owl_lasts_ms(state: &PanelState) -> Option<Option<u64>> {
     state.owl_bubble.as_ref().map(|owl| owl.lasts_ms)
 }
+
+/// Where made-up Pickup Log readings find the log.
+pub const LOG: ScreenRect = ScreenRect { x: 1500, y: 800, width: 408, height: 160 };
+
+/// A Pickup Log reading, as the capture thread hands it to the core.
+pub fn pickup_reading(at_ms: u64, seen: minerva_core::PickupLogSeen, lines: Vec<minerva_core::PickupLine>) -> minerva_core::PickupLogReading {
+    minerva_core::PickupLogReading { at_ms, seen, rows: vec![], shift: 0, arrived: lines, arrived_at: vec![], chose: false, guessed: false, overflowed: false }
+}
+
+/// A clean reading of lines that arrived at `at_ms`.
+pub fn clean_pickup_reading(at_ms: u64, lines: Vec<minerva_core::PickupLine>) -> minerva_core::PickupLogReading {
+    pickup_reading(at_ms, minerva_core::PickupLogSeen::Clear { area: LOG }, lines)
+}
+
+pub fn picked_up(minerva: &mut Minerva, at_ms: u64, lines: Vec<minerva_core::PickupLine>) -> PanelState {
+    minerva.on_pickup_log_reading(clean_pickup_reading(at_ms, lines)).clone()
+}
+
+/// Start the usual made-up Session by changing the EXP bar from 160 to 266.
+pub fn start_session(minerva: &mut Minerva, baseline_ms: u64, started_ms: u64) -> PanelState {
+    read(minerva, baseline_ms, 160, 381);
+    read(minerva, started_ms, 266, 633)
+}
+
+/// The usual Magician Status Bar, with a name if it read.
+pub fn status_bar_reading(name: Option<&str>, at_ms: u64) -> minerva_core::StatusBarReading {
+    let area = ScreenRect { x: 334, y: 1145, width: 331, height: 55 };
+    minerva_core::StatusBarReading {
+        bar: Some(minerva_core::StatusBar { area, level: Some(13), job: Some("Magician".into()), name: name.map(String::from), exp_figures: None }),
+        at_ms, near_miss: None,
+    }
+}
+
+/// Timestamped PNG frames, oldest first; truth files are left out.
+pub fn pngs_in(path: impl AsRef<Path>) -> Vec<PathBuf> {
+    let mut frames: Vec<_> = std::fs::read_dir(path).unwrap().map(|e| e.unwrap().path()).filter(|p| p.extension().is_some_and(|e| e == "png")).collect();
+    frames.sort();
+    frames
+}

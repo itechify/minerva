@@ -14,11 +14,16 @@ type BestsVisit = {
   /** The level and job that set it, as the Status Bar showed them; `null`: not read. */
   level: number | null;
   job: string | null;
+  /** A Party Best: its 5 minutes had Party EXP in them. Otherwise a Solo Best. */
+  party: boolean;
   ceilingShareHundredths: number | null;
   /** The Visit under way's best: not in the Visit History until the Visit ends, so it can
    *  be removed but not moved yet. */
   thisVisit: boolean;
 };
+
+/** Mirror of `minerva_core::PersonalBestsKind`: a map's Solo Best or its Party Best. */
+type BestsKind = { expPerHour: number; setAtUnixMs: number | null; ceilingShareHundredths: number | null };
 
 /** Mirror of `minerva_core::PersonalBestsMap`. */
 type BestsMap = {
@@ -35,7 +40,10 @@ type BestsMap = {
   /** The Character's best of all maps, which the star marks. */
   bestOfAll: boolean;
   mobLevels: LevelRange | null;
+  /** Its best: the higher of its Solo Best and its Party Best. */
   expPerHour: number;
+  solo: BestsKind | null;
+  party: BestsKind | null;
   soloExpCeiling: number | null;
   ceilingShareHundredths: number | null;
   setAtUnixMs: number | null;
@@ -50,6 +58,8 @@ type Rejected = {
   /** Its Level Band's first level and last: 1 and 9, 10 and 19… */
   lowestLevel: number;
   highestLevel: number;
+  /** It was a Party Best's entry, not a Solo Best's. */
+  party: boolean;
   reason: { overCap: { cap: number } } | { removed: Record<string, never> };
 };
 
@@ -337,7 +347,7 @@ function row(m: BestsMap, marks: MapMarks) {
   // Its lane again under the figure, for a window too narrow for the lanes' own column.
   const under = lane(m);
   under.classList.add("under");
-  exp.append(rate(m.expPerHour), under);
+  exp.append(rate(m.expPerHour), kinds(m), under);
   tr.append(exp, laneCell(m));
 
   const share = cell("% of solo");
@@ -369,6 +379,21 @@ function row(m: BestsMap, marks: MapMarks) {
   return tr;
 }
 
+/** Under a row's figure, which of its two bests it is, and the other: a map with both says
+ *  "Solo" and "Party" each with its figure, one with a Party Best alone says "Party", and one
+ *  with a Solo Best alone says nothing. */
+function kinds(m: BestsMap) {
+  const el = span("kinds", "");
+  if (m.party === null) return el;
+  const part = (kind: BestsKind, name: string) => {
+    const one = span(name === "Party" ? "kind party" : "kind", `${name} ${rate(kind.expPerHour)}`);
+    one.title = `${name} Best, ${rate(kind.expPerHour)} EXP/h`;
+    return one;
+  };
+  el.append(...(m.solo ? [part(m.solo, "Solo")] : []), part(m.party, "Party"));
+  return el;
+}
+
 /** The disclosure's chevron: pointing right while the map is closed, down while open. */
 function chevron() {
   const svg = svgEl("svg", { class: "chevron", viewBox: "0 0 8 8", "aria-hidden": "true" });
@@ -382,7 +407,7 @@ function chevron() {
 function visitKeys(m: BestsMap): string[] {
   const seen = new Map<string, number>();
   return m.visits.map((v) => {
-    const best = [shownKey(), m.id, v.expPerHour, v.setAtUnixMs ?? "-", v.level ?? "-", v.job ?? "-"].join(" ");
+    const best = [shownKey(), m.id, v.expPerHour, v.setAtUnixMs ?? "-", v.level ?? "-", v.job ?? "-", v.party].join(" ");
     const n = seen.get(best) ?? 0;
     seen.set(best, n + 1);
     return `${best} ${n}`;
@@ -405,6 +430,8 @@ function visitRow(m: BestsMap, v: BestsVisit, key: string, place: number, last: 
   first.append(span("sr-only", `${mapName(m)}, visit ${place} of ${m.visits.length}`));
   const level = setBy(v);
   if (level) first.append(span("visit-level", level));
+  // Which kind of best it is, said only of a Party Best.
+  if (v.party) first.append(span("visit-party", "Party Best"));
   tr.append(first, cell(null, "blank"));
 
   const exp = cell(null, "visit-exp");
@@ -805,13 +832,14 @@ function leaderboardSwitch(name: string, t: Toggle) {
   return button;
 }
 
-/** An entry the site kept off, in words: "Sunset Sky, Lv 20–29: over 5× its solo EXP/h". */
+/** An entry the site kept off, in words: "Sunset Sky, Lv 20–29 (Party Best): above 766,080 EXP/h, 5× its solo EXP/h". */
 function rejectedWords(r: Rejected) {
   const map = maps.find((m) => m.id === r.map);
   // Joined around the dash and after "Lv", so a band never breaks across lines.
   const levels = `Lv ${r.lowestLevel}⁠–⁠${r.highestLevel}`;
   const why = "overCap" in r.reason ? `above ${whole(r.reason.overCap.cap)} EXP/h, 5× its solo EXP/h` : "taken down by the site";
-  return `${map ? mapName(map) : `Map ${r.map}`}, ${levels}: ${why}`;
+  const kind = r.party ? " (Party Best)" : "";
+  return `${map ? mapName(map) : `Map ${r.map}`}, ${levels}${kind}: ${why}`;
 }
 
 /** A problem note, as the window's others: the orange dot, then its words, wrapping. */
@@ -976,7 +1004,7 @@ dragByHandles();
 
 /** A Visit as the shell takes it back: by its best, with the level and job that set it. */
 function visitArgs(v: BestsVisit) {
-  return { expPerHour: v.expPerHour, setAtUnixMs: v.setAtUnixMs, level: v.level, job: v.job };
+  return { expPerHour: v.expPerHour, setAtUnixMs: v.setAtUnixMs, level: v.level, job: v.job, party: v.party };
 }
 
 /** Do what the armed button `arm` says, through the core, once clicked again. */

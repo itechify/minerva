@@ -26,6 +26,8 @@ export interface Top {
   nameKey: string;
   name: string;
   expPerHour: number;
+  /** It is the Character's Party Best, not its Solo Best. */
+  party: boolean;
 }
 
 /** A top spot an upload took from another Character. */
@@ -35,6 +37,8 @@ export interface Taken {
   /** The Character that holds it now. */
   name: string;
   expPerHour: number;
+  /** It took the spot with its Party Best, not its Solo Best. */
+  party: boolean;
   /** The Character it was taken from, and what it held. */
   from: string;
   fromExpPerHour: number;
@@ -44,17 +48,18 @@ export interface Taken {
  *  held before. A band nobody held before (its first entry) isn't one, nor is a band the
  *  Character already held, so improving its own best says nothing. Best first. */
 export function takenTops(before: Top[], after: Top[], nameKey: string): Taken[] {
-  const held = new Map(before.map((t) => [`${t.map} ${t.band}`, t]));
+  const held = new Map(before.map((t) => [`${t.map} ${t.band} ${t.party}`, t]));
   const taken: Taken[] = [];
   for (const now of after) {
     if (now.nameKey !== nameKey) continue;
-    const was = held.get(`${now.map} ${now.band}`);
+    const was = held.get(`${now.map} ${now.band} ${now.party}`);
     if (was === undefined || was.nameKey === nameKey) continue;
     taken.push({
       map: now.map,
       band: now.band,
       name: now.name,
       expPerHour: now.expPerHour,
+      party: now.party,
       from: was.name,
       fromExpPerHour: was.expPerHour,
     });
@@ -66,7 +71,7 @@ export function takenTops(before: Top[], after: Top[], nameKey: string): Taken[]
  *  the Character's entry marked, as the app's deep links do (ADR 0015). Two spots never share
  *  one, which matters: Discord folds embeds with the same link into one. */
 function linkTo(taken: Taken): string {
-  const query = new URLSearchParams({ map: taken.map, band: String(taken.band), name: taken.name });
+  const query = new URLSearchParams({ map: taken.map, band: String(taken.band), name: taken.name, kind: taken.party ? "party" : "solo" });
   return `https://owlofminerva.app/leaderboards/map/?${query}`;
 }
 
@@ -112,7 +117,7 @@ function embedFor(taken: Taken, mark: PostedMark | null, photo: string | null): 
     url: linkTo(taken),
     description:
       `${nameOf(taken.name, true)} took #1, levels ${first}–${last}, ` +
-      `with ${rate(taken.expPerHour)} EXP/h, past ${nameOf(taken.from)}'s ${rate(taken.fromExpPerHour)}.`,
+      `with ${rate(taken.expPerHour)} EXP/h${taken.party ? " in a party" : ""}, past ${nameOf(taken.from)}'s ${rate(taken.fromExpPerHour)}.`,
   };
   if (photo !== null) {
     embed.description += PORTRAIT_CREDIT;

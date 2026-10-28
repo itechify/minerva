@@ -4,7 +4,7 @@
 // uploads are here.)
 import { describe, expect, it } from "vitest";
 import type { CharacterAnswer } from "../../entries";
-import { admin, call, entry, FIELD, key, NO_CEILING, optOut, upload } from "./api";
+import { admin, call, entry, FIELD, key, NO_CEILING, optOut, partyEntry, upload } from "./api";
 
 /** A map the test config's ceilings table gives a Map Mark and mob levels. */
 const MARKED = "100000060";
@@ -39,9 +39,23 @@ describe("a Character's page", () => {
       level: 25,
       expPerHour: 90_000,
       setAt: 1_760_000_000_000,
+      party: false,
       mobs: [22, 27],
       mark: { id: "MadeUpTown", name: "Made-up Town", picture: "https://osms.invalid/images/map_marks/MadeUpTown.png" },
     });
+  });
+
+  it("lists a Solo Best and a Party Best on the same map as entries of their own, each ranked among its kind", async () => {
+    await upload("Yara", key("yara"), [entry(MARKED, 55, 50_000), partyEntry(MARKED, 55, 130_000)]);
+    await upload("Zed", key("zed"), [entry(MARKED, 56, 70_000), partyEntry(MARKED, 56, 140_000)]);
+    await upload("Zoe", key("zoe"), [entry(MARKED, 57, 60_000)]);
+
+    const read = await page("Yara");
+
+    expect(read.entries.map((e) => [e.band, e.party, e.rank, e.total, e.expPerHour])).toEqual([
+      [50, true, 2, 2, 130_000],
+      [50, false, 3, 3, 50_000],
+    ]);
   });
 
   it("reads a name whatever its case, and gives it as last uploaded", async () => {

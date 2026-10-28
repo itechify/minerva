@@ -12,6 +12,13 @@
 //!   no Character could be named is Unassigned, as are the bests saved before Characters
 //!   existed (version 1). The player can move an Unassigned Visit to a Character, remove a
 //!   Character with its bests, and merge one Character's into another's.
+//! - A map has two Personal Bests, a Solo Best and a Party Best (GLOSSARY). A Visit's best is
+//!   of the kind of the window it was measured over: a Party Best if the 5 minutes had Party
+//!   EXP in them, otherwise a Solo Best (the Session decides). A Visit has one of each at most
+//!   on a map. A best of no known kind is a Party Best: the bests saved before party play was
+//!   told apart (versions 1 and 2) are, so a player's earlier bests race as Party Bests until
+//!   they set a Solo Best. A Visit's kind is never changed by the player. Both kinds go up as
+//!   entries of their own in each Level Band.
 //! - A map's Personal Best, for a Character (or Unassigned), is the best of its Visits'.
 //!   Each keeps a history of its best Visits on each map, the ones that have ended. The
 //!   Grind Tracker's Best row shows the current Character's (or the Unassigned one's while no
@@ -28,8 +35,9 @@
 //! - A best is dated by the wall clock at the refresh that first showed it, and keeps
 //!   the date in the history.
 //! - Each Character's history of a map (its 9-digit ID) keeps its [`VISITS_KEPT`] best
-//!   Visits, and the best Visit in each [`LevelBand`] even if it isn't among them, so a
-//!   Character that levels up keeps its lower bands' bests. One that is neither is dropped.
+//!   Visits of each kind, and the best Visit of each kind in each [`LevelBand`] even if it
+//!   isn't among them, so a Character that levels up keeps its lower bands' bests, and a party
+//!   run never pushes out what they do alone. One that is neither is dropped.
 //! - They outlive the launch, as the settings do: the core hands them to the shell
 //!   as [`SavedBests`], with a revision so it saves them only when they change, and takes
 //!   them back at startup. What it hands out includes the Visit under way's best, as if
@@ -45,8 +53,9 @@
 use serde::{Deserialize, Serialize};
 
 /// The shape [`SavedBests`] has now. Bumped whenever it changes. Version 1 had no
-/// Characters: its bests read in as Unassigned.
-pub const BESTS_VERSION: u32 = 2;
+/// Characters: its bests read in as Unassigned. Version 2 had no Party Bests: its bests read in
+/// as Party Bests (a best of no known kind is one).
+pub const BESTS_VERSION: u32 = 3;
 
 /// How many Visits' bests each Character's history of a map keeps: the best of them, besides
 /// the best in each [`LevelBand`].
@@ -128,6 +137,30 @@ pub struct MapBests {
     pub visits: Vec<VisitBest>,
 }
 
+/// The kind of play in a Personal Best's five-minute window.
+/// Saved files and uploads keep the existing boolean `party` field.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(from = "bool", into = "bool")]
+pub enum BestKind {
+    #[default]
+    Solo,
+    Party,
+}
+
+impl BestKind {
+    pub fn is_party(self) -> bool { self == Self::Party }
+    pub fn is_solo(&self) -> bool { *self == Self::Solo }
+    pub(crate) fn index(self) -> usize { usize::from(self.is_party()) }
+}
+
+impl From<bool> for BestKind {
+    fn from(party: bool) -> Self { if party { Self::Party } else { Self::Solo } }
+}
+
+impl From<BestKind> for bool {
+    fn from(kind: BestKind) -> Self { kind.is_party() }
+}
+
 /// The best one Visit had on a map, stamped with the level and job the Status Bar showed at
 /// the refresh that set it. The player removes it, or moves it, by all of it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,6 +179,11 @@ pub struct VisitBest {
     /// The Character's job then, as the game writes it ("Magician"); `None` if it wasn't read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub job: Option<String>,
+    /// Party if its window had Party EXP, otherwise Solo. The file leaves `party` out of a
+    /// Solo Best of version 3 or later; a file older than that has none, and every best in it
+    /// is a Party Best (see [`Bests::restore`]).
+    #[serde(rename = "party", default, skip_serializing_if = "BestKind::is_solo")]
+    pub kind: BestKind,
 }
 
 /// A Level Band (GLOSSARY): 10 levels, 1–9, 10–19, 20–29, and so on. Band `n` holds the
@@ -193,8 +231,9 @@ pub(crate) struct Bests {
     /// The history: each Character's (and the Unassigned) best Visits on each map that have
     /// ended, highest first. The Best row shows the first, and the player can remove it.
     history: SavedBests,
-    /// The Visit under way's best on each map it was certain on with a rate to count: one,
-    /// unless the player chose among Candidates. Only `on`'s is the Visit's best.
+    /// The Visit under way's best on each map it was certain on with a rate to count, of each
+    /// kind (Solo and Party): one of a kind, unless the player chose among Candidates. Only
+    /// `on`'s are the Visit's bests.
     visit: Vec<UnderWay>,
     /// The map the Visit under way was last certain on with a rate to count: the one its
     /// best is for, and the only one [`Bests::saved`] hands out a best from this Visit
@@ -210,14 +249,15 @@ impl Bests {
     /// The Rolling Rate was shown afresh with the player certain to be on `map`, at
     /// `now_unix_ms` by the wall clock, the Status Bar showing `stamp`. `rate` is its EXP/h
     /// if it counts towards this Visit's best there: over a full 5 minutes of active play
-    /// all on the map, with the EXP bar read. A best is set when it is first shown: the same
-    /// rate again keeps it, and who set it.
-    pub fn on_shown(&mut self, map: &str, rate: Option<u64>, now_unix_ms: Option<u64>, stamp: &Stamp) {
-        self.changing(|bests| bests.record(map, rate, now_unix_ms, stamp));
+    /// all on the map, with the EXP bar read. It counts towards the Visit's Party Best if
+    /// the window had Party EXP in it (`kind`), otherwise towards its Solo Best. A best is set
+    /// when it is first shown: the same rate again keeps it, and who set it.
+    pub fn on_shown(&mut self, map: &str, rate: Option<u64>, kind: BestKind, now_unix_ms: Option<u64>, stamp: &Stamp) {
+        self.changing(|bests| bests.record(map, rate, kind, now_unix_ms, stamp));
     }
 
     /// As [`Bests::on_shown`], leaving the revision to it.
-    fn record(&mut self, map: &str, rate: Option<u64>, now_unix_ms: Option<u64>, stamp: &Stamp) {
+    fn record(&mut self, map: &str, rate: Option<u64>, kind: BestKind, now_unix_ms: Option<u64>, stamp: &Stamp) {
         // Another Character named (or none, after one was): the Visit's best so far is the
         // one before's, and joins their history now.
         if self.visit.iter().any(|under_way| under_way.character != stamp.character) {
@@ -232,35 +272,36 @@ impl Bests {
         let shown = UnderWay {
             map: map.to_string(),
             character: stamp.character.clone(),
-            best: VisitBest { exp_per_hour: rate, set_at_unix_ms: now_unix_ms, level: stamp.level, job: stamp.job.clone() },
+            best: VisitBest { exp_per_hour: rate, set_at_unix_ms: now_unix_ms, level: stamp.level, job: stamp.job.clone(), kind },
         };
-        match self.visit.iter_mut().find(|under_way| under_way.map == map) {
+        match self.visit.iter_mut().find(|under_way| under_way.map == map && under_way.best.kind == kind) {
             Some(under_way) if under_way.best.exp_per_hour >= rate => {}
             Some(under_way) => *under_way = shown,
             None => self.visit.push(shown),
         }
     }
 
-    /// The Visit under way ended, or another Character was named: its best joins its map's.
+    /// The Visit under way ended, or another Character was named: its bests join its map's.
     pub fn end_visit(&mut self) {
         let on = self.on.take();
-        let ended = self.visit.drain(..).find(|under_way| Some(&under_way.map) == on.as_ref());
-        if let Some(UnderWay { map, character, best }) = ended {
+        let ended: Vec<UnderWay> = self.visit.drain(..).filter(|under_way| Some(&under_way.map) == on.as_ref()).collect();
+        for UnderWay { map, character, best } in ended {
             join(&mut self.history, character.as_deref(), map, best);
         }
     }
 
-    /// The Visit under way's best on the map it is for, if it has one.
-    fn this_visit(&self) -> Option<&UnderWay> {
-        let on = self.on.as_ref()?;
-        self.visit.iter().find(|under_way| &under_way.map == on)
+    /// The Visit under way's bests, a Solo Best and a Party Best at most, on the map it is for.
+    fn this_visit(&self) -> impl Iterator<Item = &UnderWay> {
+        let on = self.on.as_deref();
+        self.visit.iter().filter(move |under_way| on == Some(under_way.map.as_str()))
     }
 
-    /// The Visit under way's best on `map`, if it is `character`'s (the Unassigned one's for
-    /// `None`) and for that map: the one the Visit's best is for.
-    pub fn this_visits_best(&self, character: Option<&str>, map: &str) -> Option<&VisitBest> {
+    /// The Visit under way's best of `kind`, on `map`, if it
+    /// is `character`'s (the Unassigned one's for `None`) and for that map: the one the
+    /// Visit's best is for.
+    pub fn this_visits_best(&self, character: Option<&str>, map: &str, kind: BestKind) -> Option<&VisitBest> {
         self.this_visit()
-            .filter(|under_way| under_way.map == map && under_way.character.as_deref() == character)
+            .find(|under_way| under_way.map == map && under_way.character.as_deref() == character && under_way.best.kind == kind)
             .map(|under_way| &under_way.best)
     }
 
@@ -273,30 +314,31 @@ impl Bests {
         }
     }
 
-    /// `map`'s Personal Best from the history of the Character named `character` (the
-    /// Unassigned one for `None`), the best of the earlier Visits, if it has one: what the
-    /// Best row shows until this Visit beats it.
-    pub fn history_best(&self, character: Option<&str>, map: &str) -> Option<&VisitBest> {
-        self.history.maps_of(character).iter().find(|m| m.id == map).and_then(|m| m.visits.first())
+    /// `map`'s best of `kind`, from the history of the Character
+    /// named `character` (the Unassigned one for `None`), the best of the earlier Visits, if
+    /// it has one: what the Best row shows until this Visit beats it.
+    pub fn history_best(&self, character: Option<&str>, map: &str, kind: BestKind) -> Option<&VisitBest> {
+        self.history.maps_of(character).iter().find(|m| m.id == map).and_then(|m| m.visits.iter().find(|v| v.kind == kind))
     }
 
-    /// Remove `map`'s Personal Best from the history of `character` (the Unassigned one for
-    /// `None`), the best of the earlier Visits. The map's next-best Visit's takes over. This
-    /// Visit's best isn't in the history until the Visit ends: see [`Bests::remove_this_visit`].
-    pub fn remove(&mut self, character: Option<&str>, map: &str) {
-        if let Some(best) = self.history_best(character, map).cloned() {
+    /// Remove `map`'s best of `kind`, from the history of `character`
+    /// (the Unassigned one for `None`), the best of the earlier Visits. The map's next-best
+    /// Visit's of that kind takes over. This Visit's best isn't in the history until the Visit
+    /// ends: see [`Bests::remove_this_visit`].
+    pub fn remove(&mut self, character: Option<&str>, map: &str, kind: BestKind) {
+        if let Some(best) = self.history_best(character, map, kind).cloned() {
             self.remove_visit(character, map, &best);
         }
     }
 
-    /// Remove the Visit under way's best on `map`, if it is `character`'s (the Unassigned
-    /// one's for `None`); whether there was one. Nothing of it joins the history when the
-    /// Visit ends, unless a best is set again.
-    pub fn remove_this_visit(&mut self, character: Option<&str>, map: &str) -> bool {
-        if self.this_visits_best(character, map).is_none() {
+    /// Remove the Visit under way's best of `kind`, on `map`, if it
+    /// is `character`'s (the Unassigned one's for `None`); whether there was one. Nothing of
+    /// it joins the history when the Visit ends, unless a best is set again.
+    pub fn remove_this_visit(&mut self, character: Option<&str>, map: &str, kind: BestKind) -> bool {
+        if self.this_visits_best(character, map, kind).is_none() {
             return false;
         }
-        self.changing(|bests| bests.visit.retain(|under_way| under_way.map != map));
+        self.changing(|bests| bests.visit.retain(|under_way| !(under_way.map == map && under_way.best.kind == kind)));
         true
     }
 
@@ -380,7 +422,7 @@ impl Bests {
     /// Whether some map has a best: in any history, or the Visit under way's. Whether
     /// [`Bests::saved`] hands out any, without making them.
     pub fn any(&self) -> bool {
-        !self.history.unassigned.is_empty() || !self.history.characters.is_empty() || self.this_visit().is_some()
+        !self.history.unassigned.is_empty() || !self.history.characters.is_empty() || self.this_visit().next().is_some()
     }
 
     /// The history: every Character's (and the Unassigned) bests of the Visits that have
@@ -396,15 +438,27 @@ impl Bests {
     }
 
     /// Every map's Visit bests as [`Bests::saved`] hands them out, and where the Visit
-    /// under way's best is among them: whose history it is in (`None`: Unassigned), its
-    /// map, and its place in the map's Visits. `None` if it has none, or the history doesn't
-    /// keep it.
-    pub fn standing(&self) -> (SavedBests, Option<(Option<String>, String, usize)>) {
+    /// under way's bests (its Solo Best and its Party Best) are among them: whose history each
+    /// is in (`None`: Unassigned), its map, and its place in the map's Visits. One the history
+    /// doesn't keep is left out.
+    pub fn standing(&self) -> (SavedBests, Vec<(Option<String>, String, usize)>) {
         let mut saved = self.history.clone();
-        let this_visit = self.this_visit().and_then(|under_way| {
-            let at = join(&mut saved, under_way.character.as_deref(), under_way.map.clone(), under_way.best.clone())?;
-            Some((under_way.character.clone(), under_way.map.clone(), at))
-        });
+        let joined: Vec<&UnderWay> = self
+            .this_visit()
+            .filter(|under_way| {
+                join(&mut saved, under_way.character.as_deref(), under_way.map.clone(), under_way.best.clone()).is_some()
+            })
+            .collect();
+        // Where each is once both have joined: the second may have gone above the first.
+        let this_visit = joined
+            .into_iter()
+            .filter_map(|under_way| {
+                let maps = saved.maps_of(under_way.character.as_deref());
+                let visits = &maps.iter().find(|m| m.id == under_way.map)?.visits;
+                let at = visits.iter().position(|v| *v == under_way.best)?;
+                Some((under_way.character.clone(), under_way.map.clone(), at))
+            })
+            .collect();
         (saved, this_visit)
     }
 
@@ -415,6 +469,11 @@ impl Bests {
     pub fn restore(&mut self, mut saved: SavedBests) {
         if !saved.in_a_known_shape() {
             return;
+        }
+        // Before version 3 no best had a kind: each is a Party Best, as a best of no known kind is.
+        if saved.version < 3 {
+            let maps = saved.unassigned.iter_mut().chain(saved.characters.iter_mut().flat_map(|c| c.maps.iter_mut()));
+            maps.flat_map(|map| map.visits.iter_mut()).for_each(|visit| visit.kind = BestKind::Party);
         }
         saved.version = BESTS_VERSION;
         drop_empty(&mut saved.unassigned);
@@ -456,16 +515,19 @@ fn join(bests: &mut SavedBests, character: Option<&str>, map: String, best: Visi
 }
 
 /// Of a map's Visits, highest first, keep the [`VISITS_KEPT`] best and the best in each
-/// Level Band.
+/// Level Band, of each kind (Solo and Party) on its own: a party run never pushes out what the
+/// Character does alone.
 fn keep(visits: &mut Vec<VisitBest>) {
-    let mut bands: Vec<LevelBand> = Vec::new();
-    let mut place = 0;
+    // Per kind: Solo, then Party.
+    let mut bands: [Vec<LevelBand>; 2] = [Vec::new(), Vec::new()];
+    let mut places = [0usize; 2];
     visits.retain(|visit| {
-        let top = place < VISITS_KEPT;
-        place += 1;
+        let kind = visit.kind.index();
+        let top = places[kind] < VISITS_KEPT;
+        places[kind] += 1;
         let band_best = visit.level.map(LevelBand::of).is_some_and(|band| {
-            let first = !bands.contains(&band);
-            bands.push(band);
+            let first = !bands[kind].contains(&band);
+            bands[kind].push(band);
             first
         });
         top || band_best

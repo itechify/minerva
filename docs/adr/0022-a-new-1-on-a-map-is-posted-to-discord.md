@@ -1,5 +1,5 @@
 ---
-status: accepted, amended by ADR-0024 (a top spot taken is also kept, for Latest to mark, whether or not the webhook is set), by #165 (each spot named is an embed, with its map's Map Mark), by ADR-0027 (each Character it names links to their page), and by ADR-0029 (the Character's portrait from ClassicRank is the thumbnail, the Map Mark moving to the footer)
+status: accepted, amended by ADR-0024 (a top spot taken is also kept, for Latest to mark, whether or not the webhook is set), by #165 (each spot named is an embed, with its map's Map Mark), by #173 (a spot taken with a Party Best says it was in a party; each kind has its own top spot, while Both remains the default board), by ADR-0027 (each Character it names links to their page), and by ADR-0029 (the Character's portrait from ClassicRank is the thumbnail, the Map Mark moving to the footer)
 ---
 
 # A new #1 on a map is posted to Discord
@@ -9,7 +9,7 @@ The Map Leaderboards (ADR 0015) are worth looking at, but nothing tells anyone w
 ## The decision
 
 - **The Worker posts it, from the upload that caused it.** The upload route already has the write in hand; a top spot taken is worked out in the same request and posted to a **Discord webhook**, the URL a Worker secret (`DISCORD_WEBHOOK_URL`, `docs/map-leaderboards-setup.md`). With no secret set, nothing is posted and uploads are unchanged, so a fork or a local run never posts anywhere.
-- **Only a spot *taken* is posted**: the Character holds a map and Level Band's top spot after the write, and **another** Character held it before. That one rule is what keeps the channel worth reading, and it rules out everything that isn't an achievement:
+- **Only a spot *taken* is posted**: the Character holds a map and Level Band's top spot **of that kind** after the write, and **another** Character held it before. Solo and Party boards are checked separately; a Solo top below the Party top still counts. A Party spot says "in a party". The link opens the board of that kind, while the site's default Both board still ranks each Character by their higher entry. That one rule is what keeps the channel worth reading, and it rules out everything that isn't an achievement:
   - the **first entry** in a band nobody had an entry in, which is #1 by being alone;
   - a Character **beating its own best**, which moves no one;
   - a top spot that **fell to someone** because an entry was deleted, opted out or dropped from an upload, which they never took;
@@ -24,13 +24,13 @@ A spot's embed reads:
 ```json
 {
   "title": "Henesys Hunting Ground I",
-  "url": "https://owlofminerva.app/leaderboards/map/?map=010001010&band=20&name=Hakuo",
+  "url": "https://owlofminerva.app/leaderboards/map/?map=010001010&band=20&name=Hakuo&kind=solo",
   "description": "**Hakuo** took #1, levels 20–29, with 153,000 EXP/h, past Egbert's 150,000.",
   "thumbnail": { "url": "https://osmsdataexplorer.com/data/current/images/map_marks/Henesys.png" }
 }
 ```
 
-The map is named from the map names fixture (ADR 0008) through `site/map-names.ts`, which the Worker and the Map Leaderboards' pages now share as they share `site/level-bands.ts`, so a map is named the same wherever it shows. EXP/h is written by `src/figures.ts`'s `rate`, as the panel and the site write rates. A map's name goes in the title as it is written, since a title isn't markdown (the fixture holds one with a `*` in it, "G\* Coconut Season"); a Character's name, in the description, is letters and digits only (ADR 0015), so it never needs escaping either. Each embed's link is its own, since the map and band in it differ, which matters: Discord folds embeds with the same link into one. The Map Mark's picture is OSMS's, as the site shows it; Discord fetches it through its own media proxy, so no one reading the post loads it from OSMS.
+The map is named from the map names fixture (ADR 0008) through `site/map-names.ts`, which the Worker and the Map Leaderboards' pages now share as they share `site/level-bands.ts`, so a map is named the same wherever it shows. EXP/h is written by `src/figures.ts`'s `rate`, as the panel and the site write rates. A map's name goes in the title as it is written, since a title isn't markdown (the fixture holds one with a `*` in it, "G\* Coconut Season"); a Character's name, in the description, is letters and digits only (ADR 0015), so it never needs escaping either. Each embed's link is its own, since the map, band or kind in it differs, which matters: Discord folds embeds with the same link into one. The Map Mark's picture is OSMS's, as the site shows it; Discord fetches it through its own media proxy, so no one reading the post loads it from OSMS.
 
 **Release posts** need no code: a GitHub repo webhook delivering only the *Releases* event to `<discord-webhook>/github` lets Discord render the release itself. It is set up on the repository, not in it.
 

@@ -12,6 +12,8 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: path.join(import.meta.dirname, "../wrangler.jsonc") },
         miniflare: {
+          // A second database, for the test that runs migration 0005 on rows from before it.
+          d1Databases: ["OLD_DB"],
           bindings: {
             TEST_MIGRATIONS: migrations,
             ADMIN_TOKEN: "made-up-maintainer-token",

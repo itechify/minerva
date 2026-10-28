@@ -19,7 +19,9 @@
 //!    reading must be one the bar could show, or the frame is unreadable: each figure in
 //!    the game's shape ("68,063", "71.12%": a glyph merged into its neighbour or lost
 //!    under the pointer breaks it), and a 2 read wherever the mask has a 2's flat foot,
-//!    and nowhere else (ocrs has read the 7 of "71.07%" as a 2).
+//!    and nowhere else (ocrs has read the 7 of "71.07%" as a 2). At a small UI Size ocrs
+//!    reads a 5 as an "S" (the 5 of "55.11%" on a 1280x720 client): it counts as a 5 only
+//!    where the mask has a flat top for it, as a 5 and a 7 have and no other glyph does.
 
 use crate::bug_report::rect_crop;
 use crate::ink::{Component, black_on_white, components, luma, ocr_digit, runs};
@@ -119,6 +121,10 @@ impl ExpBarReader {
         if twos(&exp_text) != prepared.exp_feet || twos(&percent_text) != prepared.percent_feet {
             return None;
         }
+        let topped = |text: &str, tops: usize| !text.contains('S') || flat_tops(text) == tops;
+        if !topped(&exp_text, prepared.exp_tops) || !topped(&percent_text, prepared.percent_tops) {
+            return None;
+        }
         let bar = ExpBar { exp: thousands(&exp_text)?, percent_hundredths: percent(&percent_text)? };
         consistent(bar).then_some(bar)
     }
@@ -135,15 +141,22 @@ fn consistent(bar: ExpBar) -> bool {
     bar.percent_hundredths < 10_000 && (bar.percent_hundredths > 0 || bar.exp < 10_000)
 }
 
+/// How many glyphs of `text`, as ocrs read it, have a flat top: the 5s and 7s (and the "S"s
+/// that are 5s, see [`digits`]).
+fn flat_tops(text: &str) -> usize {
+    text.chars().filter(|c| matches!(c, '5' | '7' | 'S')).count()
+}
+
 /// The digits of a run of them as ocrs read it, with the letters and signs it mistakes for
-/// digits in this font put right (it has read the 5 of "53.05%" as a "$"). `None` if
+/// digits in this font put right (it has read the 5 of "53.05%" as a "$", and at a small UI
+/// Size as an "S", which [`read_rgb`] only lets stand where the mask has a flat top). `None` if
 /// anything else is in it, or nothing is.
 fn digits(text: &str) -> Option<String> {
     let mut out = String::new();
     for c in text.chars() {
         match ocr_digit(c) {
             c @ '0'..='9' => out.push(c),
-            '$' => out.push('5'),
+            '$' | 'S' => out.push('5'),
             ' ' => {}
             _ => return None,
         }
@@ -188,6 +201,9 @@ struct Prepared {
     percent: Rect,
     exp_feet: usize,
     percent_feet: usize,
+    /// How many glyphs of each have a flat top, along the brackets' top row.
+    exp_tops: usize,
+    percent_tops: usize,
 }
 
 /// Bracket colour: yellow-green, (150,198,61) at its core.
@@ -234,7 +250,7 @@ const LABEL_CLEAR: u32 = 3;
 const LABEL_W_PER_H: std::ops::RangeInclusive<f32> = 2.7..=3.5;
 /// Per row of bracket height: a 2's flat foot, along the brackets' bottom row, is at
 /// least this long. No other glyph's is: the rest end in a curve or a stroke, half as
-/// long or less.
+/// long or less. The same goes for the flat top of a 5 or a 7, along their top row.
 const FOOT_PER_H: f32 = 0.6;
 /// The masked figures are enlarged this many times before ocrs reads them. At their
 /// own 11-13 rows, ocrs read the 7 of "1.74%" as a 2 on the 2026-10-07 recording. No
@@ -329,6 +345,8 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
     };
     // The 2s: their flat feet, on the brackets' bottom row.
     let feet = |x0: u32, x1: u32| flat_feet(img, open.y1 - 1, x0..x1, foot);
+    // The 5s and 7s: their flat tops, on the brackets' top row.
+    let tops = |x0: u32, x1: u32| flat_feet(img, open.y0, x0..x1, foot);
     Some(Prepared {
         canvas,
         columns: (ex0, close.x1),
@@ -337,6 +355,8 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
         percent: line(px0, px1),
         exp_feet: feet(ex0, ex1),
         percent_feet: feet(px0, px1),
+        exp_tops: tops(ex0, ex1),
+        percent_tops: tops(px0, px1),
     })
 }
 

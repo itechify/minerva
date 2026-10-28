@@ -10,7 +10,7 @@ use common::osms;
 use common::{CONSTRUCTION_SITE_ID, FakeSource, SUNSET_SKY_ID, frame, HOUR, S, MIN, percent};
 use minerva_core::bug_report::{self, Answer, Event, Note, Recording, ReplayData, MAX_REPORT_BYTES, MAX_TEXT_AND_CROPS_BYTES};
 use minerva_core::{
-    ListedPrice, ScrollTier, ShopCapture, ShopHover, ShopList, ShopNearMiss, Verdict, ShopReading, ShopRow, StatusBar, StatusBarCapture, StatusBarNearMiss, StatusBarReading,
+    ListedPrice, ScrollTier, ShopCapture, ShopHover, ShopList, ShopNearMiss, Verdict, ShopReading, ShopRow, StatusBarCapture, StatusBarNearMiss, StatusBarReading,
     Action, BESTS_VERSION, Minerva, PanelControl, ExpBar, ExpBarPlace, ExpBarReading, Foreground, Frame, GameWindow, ItemCapture, ItemTooltip,
     CharacterBests, DiscordLinkAnswer, ItemTooltipReading, LeaderboardAnswer, LeaderboardCharacter, MapBests, RejectedEntry, RejectedReason, ReportAbout, SavedBests, STATUS_BAR_STRIP, ScreenPoint, ScreenRect, Settings, Size, TitleLines,
     TitleReading, TrackingState, UpdateAnswer, UpdateStatus, VisitBest, Build, DownloadAnswer, UpdateStage,
@@ -173,6 +173,7 @@ fn a_visit_moved_and_characters_removed_and_merged_replay_and_read_in_the_timeli
         set_at_unix_ms: None,
         level: Some(level),
         job: Some("Magician".to_string()),
+        ..VisitBest::default()
     };
     let on_the_site = |visit: VisitBest| vec![MapBests { id: CONSTRUCTION_SITE_ID.into(), visits: vec![visit] }];
     let characters = vec![
@@ -233,6 +234,7 @@ fn showing_a_character_on_the_map_leaderboards_and_each_answer_replay_and_read_i
         set_at_unix_ms: Some(WALL_AT_START - HOUR),
         level: Some(13),
         job: Some("Magician".to_string()),
+        ..VisitBest::default()
     };
     let maps = vec![MapBests { id: CONSTRUCTION_SITE_ID.into(), visits: vec![best] }];
     let characters = vec![CharacterBests { name: "Egbert".into(), maps }];
@@ -248,7 +250,7 @@ fn showing_a_character_on_the_map_leaderboards_and_each_answer_replay_and_read_i
     shell.minerva.send_to_leaderboards_again("Egbert");
     shell.play(35 * S, CONSTRUCTION_SITE, grind);
     let id = upload_for(&shell, "Egbert");
-    let rejected = vec![RejectedEntry { map: CONSTRUCTION_SITE_ID.into(), band: 10, reason: RejectedReason::Removed {} }];
+    let rejected = vec![RejectedEntry { map: CONSTRUCTION_SITE_ID.into(), band: 10, party: false, reason: RejectedReason::Removed {} }];
     shell.minerva.on_leaderboard_answer(id, LeaderboardAnswer::Accepted { rejected });
     shell.play(MIN, CONSTRUCTION_SITE, grind);
     shell.minerva.show_on_leaderboards("Egbert", false);
@@ -413,7 +415,7 @@ fn discord_link_request(shell: &Shell) -> u64 {
 fn linking_discord_its_answers_and_the_prompt_dismissed_replay_and_read_in_the_timeline() {
     // A best, so the Personal Bests window opens.
     let mut shell = Shell::new(FakeSource::osms());
-    let best = VisitBest { exp_per_hour: 5000, set_at_unix_ms: None, level: None, job: None };
+    let best = VisitBest { exp_per_hour: 5000, ..VisitBest::default() };
     let unassigned = vec![MapBests { id: CONSTRUCTION_SITE_ID.into(), visits: vec![best] }];
     shell.minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned, characters: Vec::new() });
     shell.minerva.press(PanelControl::TogglePersonalBests);
@@ -663,6 +665,11 @@ fn the_exp_bars_crops_are_kept_where_they_changed_for_10_minutes_and_for_the_run
 /// A frame of noise as big as the Status Bar strip, which no PNG compresses: about 980 KB.
 fn noise_frame(seed: u64, at_ms: u64) -> Frame {
     let ScreenRect { width, height, .. } = status_bar_strip();
+    noise(width, height, seed, at_ms)
+}
+
+/// A frame of noise `width` by `height`, which no PNG compresses.
+fn noise(width: u32, height: u32, seed: u64, at_ms: u64) -> Frame {
     let mut state = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
     let rgba = (0..width * height * 4)
         .map(|_| {
@@ -731,6 +738,51 @@ fn a_report_stays_under_5_mb_leaving_out_the_oldest_ordinary_crops_first() {
     assert_eq!(recording.report.crops + recording.report.crops_left_out, 13, "the last 10 minutes and the kept ones");
     assert!(recording.crops.contains(&format!("crops/exp-bar-{:010}.png", MIN)), "the kept one stays");
     assert!(recording.crops.contains(&format!("crops/exp-bar-{:010}.png", 20 * MIN)), "the newest stays");
+}
+
+/// 20 minutes of a Pickup Log that guesses every 10 s, each a whole band of noise (over 8 MB of
+/// crops kept for the run, and more than a report keeps), and the EXP figures read once a minute
+/// as noise too, the first a misread: the Bug Report of 0.15.0, 2026-10-26 17:24, kept 13 crops, all
+/// of the log's, and none of the figures'.
+fn log_floods_the_figures() -> (minerva_core::BugReport, Recording) {
+    let mut shell = Shell::new(FakeSource::osms());
+    let first = ExpBar { exp: 1000, percent_hundredths: 500 };
+    shell.at = 30 * S;
+    let figures = noise(224, 32, 999, shell.at);
+    read_figures(&mut shell, figures, first);
+    shell.step();
+    let band = shell.minerva.panel_state().pickup_log_capture.expect("the log is looked for");
+    for n in 0..120u64 {
+        shell.at += 10 * S;
+        let log = noise(band.width, band.height, n, shell.at);
+        let capture = minerva_core::PickupLogCapture { frame: log, origin: ScreenPoint { x: band.x, y: band.y }, ui_size: 1.0 };
+        let reading = common::pickup_reading(shell.at, minerva_core::PickupLogSeen::Clear { area: band }, vec![]);
+        shell.minerva.on_pickup_log_read(capture, minerva_core::PickupLogReading { guessed: true, ..reading });
+        if n % 6 == 5 {
+            let m = n / 6;
+            let bar = if m == 0 { ExpBar { exp: 84_350, percent_hundredths: 4172 } } else { ExpBar { exp: 1000 + m, percent_hundredths: percent(1000 + m, 20_000) } };
+            let figures = noise(224, 32, 1000 + n, shell.at);
+            read_figures(&mut shell, figures, bar);
+        }
+        shell.step();
+    }
+    shell.report()
+}
+
+#[test]
+fn a_flood_of_pickup_log_crops_does_not_crowd_the_exp_figures_out_of_the_report() {
+    let (report, recording) = log_floods_the_figures();
+    let figures: Vec<&String> = recording.crops.iter().filter(|name| name.starts_with("crops/exp-bar-")).collect();
+    let log: Vec<&String> = recording.crops.iter().filter(|name| name.starts_with("crops/pickup-log-")).collect();
+    assert!(report.zip.len() <= MAX_TEXT_AND_CROPS_BYTES, "{} bytes", report.zip.len());
+    assert!(recording.report.crops_left_out > 0, "the report is over budget");
+    // The figures' last 10 minutes (a crop a minute, that changed) and the misread kept for the run.
+    assert!(figures.len() >= 10, "{figures:?}");
+    assert!(figures.contains(&&format!("crops/exp-bar-{:010}.png", 90 * S)), "the misread, kept for the run");
+    assert!(figures.contains(&&format!("crops/exp-bar-{:010}.png", 20 * MIN + 30 * S)), "the latest");
+    // The log gives way, oldest first, but its latest stay.
+    assert!(!log.is_empty() && log.len() < 120, "{} crops", log.len());
+    assert!(log.contains(&&format!("crops/pickup-log-{:010}.png", 20 * MIN + 30 * S)), "the latest");
 }
 
 #[test]
@@ -1285,14 +1337,7 @@ fn status_bar_capture(at_ms: u64) -> StatusBarCapture {
 }
 
 /// The Status Bar read as a level 13 Magician named `name` (`None`: unreadable).
-fn status_bar_reading(name: Option<&str>, at_ms: u64) -> StatusBarReading {
-    let area = ScreenRect { x: 334, y: 1145, width: 331, height: 55 };
-    StatusBarReading {
-        bar: Some(StatusBar { area, level: Some(13), job: Some("Magician".into()), name: name.map(String::from), exp_figures: None }),
-        at_ms,
-        near_miss: None,
-    }
-}
+use common::status_bar_reading;
 
 /// A run with Characters: Egbert's Status Bar read every second with the EXP bar, then the
 /// character select screen, then Bob's, three times to name him.
@@ -1327,6 +1372,41 @@ fn characters_replay_through_the_same_states() {
     assert!(timeline.contains(r#"Status Bar read: level 13, "Magician", ?"#), "{timeline}");
     assert!(timeline.contains(r#"the Status Bar names another character, "Bob": a new Session"#), "{timeline}");
     assert!(recording.lines.iter().any(|line| line.notes.contains(&Note::NameSwitch { name: "Bob".into() })));
+}
+
+#[test]
+fn item_names_cut_short_and_matching_no_item_are_written_down_for_tuning_the_matching() {
+    use minerva_core::{PickupLine, PickupLogReading, PickupLogSeen};
+    let items = item_world(vec![
+        common::items::use_item(2_060_000, "Arrows for Crossbow"),
+        common::items::use_item(2_061_000, "Arrows for Bow"),
+    ]);
+    let mut shell = Shell::new(FakeSource::osms().with_items(items));
+    shell.play(12 * S, CONSTRUCTION_SITE, grind);
+    let line = |name: &str, cut_short| PickupLine::Item { name: name.into(), quantity: 2, tab: "Use".into(), cut_short };
+    let arrived = vec![line("Arrows for", true), line("Zorg Dung", false), line("Arrows for Crossbow", false)];
+    let area = ScreenRect { x: 1500, y: 800, width: 408, height: 160 };
+    shell.minerva.on_pickup_log_reading(PickupLogReading {
+        at_ms: 12 * S + 100,
+        seen: PickupLogSeen::Clear { area },
+        rows: vec![],
+        shift: 0,
+        arrived,
+        arrived_at: vec![],
+        chose: false,
+        guessed: false,
+        overflowed: false,
+    });
+    shell.play(13 * S, CONSTRUCTION_SITE, grind);
+
+    let (_, recording) = shell.report();
+
+    let notes: Vec<&Note> = recording.lines.iter().flat_map(|line| &line.notes).collect();
+    assert!(notes.contains(&&Note::ItemCutShort { name: "Arrows for...".into() }), "{notes:?}");
+    assert!(notes.contains(&&Note::ItemUnmatched { name: "Zorg Dung".into(), lines: 1 }), "{notes:?}");
+    assert_eq!(notes.iter().filter(|note| matches!(note, Note::ItemCutShort { .. } | Note::ItemUnmatched { .. })).count(), 2);
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains(r#"Pickup Log item "Zorg Dung" matches no item"#), "{timeline}");
 }
 
 #[test]
@@ -1576,4 +1656,42 @@ fn a_capture_with_no_shop_found_that_wont_fit_is_left_out_and_the_summary_says_s
     let summary = text_in(&report.zip, "summary.txt");
     let says = format!("Left out: {name}, a whole capture where nothing was found, 9.2 MB as a PNG: too big for the report");
     assert!(summary.contains(&says), "{summary}");
+}
+
+#[test]
+fn a_reports_item_lines_replay_as_loot_through_the_current_item_naming_over_a_window() {
+    use minerva_core::{LootItem, PickupLine, PickupLogSeen};
+    let files = item_world(vec![common::items::etc(4_000_000, "Very Dry Branch"), common::items::etc(4_000_001, "Tree Branch")]).files();
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(12 * S, CONSTRUCTION_SITE, grind);
+    let line = |name: &str, quantity| PickupLine::Item { name: name.into(), quantity, tab: "Etc".into(), cut_short: false };
+    let feed = |shell: &mut Shell, at_ms, seen, arrived| {
+        shell.minerva.on_pickup_log_reading(common::pickup_reading(at_ms, seen, arrived));
+    };
+    let area = common::LOG;
+    feed(&mut shell, 12 * S + 100, PickupLogSeen::Clear { area }, vec![line("Very Dry Branch", 1), line("Very Cir Aranch", 1), PickupLine::Mesos { amount: 5 }]);
+    shell.play(14 * S, CONSTRUCTION_SITE, grind);
+    feed(&mut shell, 14 * S + 100, PickupLogSeen::Clear { area }, vec![line("Zorg Dung", 2)]);
+    shell.play(15 * S, CONSTRUCTION_SITE, grind);
+    // Under a cover nothing arrives, whatever the reading carries.
+    feed(&mut shell, 15 * S + 100, PickupLogSeen::Covered { area }, vec![line("Tree Branch", 9)]);
+    shell.play(20 * S, CONSTRUCTION_SITE, grind);
+    feed(&mut shell, 20 * S + 100, PickupLogSeen::Clear { area }, vec![line("Tree Branch", 1)]);
+    let (_, recording) = shell.report();
+
+    let all = bug_report::loot_of(&recording, Some(&files), 0, u64::MAX);
+    assert_eq!((all.item_lines, all.exact), (4, 2));
+    assert_eq!(all.items, vec![LootItem { name: "Very Dry Branch".into(), count: 2 }, LootItem { name: "Tree Branch".into(), count: 1 }]);
+    assert_eq!(all.items_total, 3);
+    let [corrected] = &all.corrected[..] else { panic!("{:?}", all.corrected) };
+    assert_eq!((corrected.read.as_str(), corrected.item.as_deref(), corrected.lines), ("Very Cir Aranch", Some("Very Dry Branch"), 1));
+    assert_eq!(corrected.plain, None, "the plain edits alone would not have named it");
+    assert_eq!(all.as_read.iter().map(|read| (read.read.as_str(), read.lines)).collect::<Vec<_>>(), vec![("Zorg Dung", 1)]);
+
+    let window = bug_report::loot_of(&recording, Some(&files), 14 * S, 16 * S);
+    assert_eq!((window.item_lines, window.exact, window.corrected.len(), window.as_read.len()), (1, 0, 0, 1));
+    assert_eq!(window.items, vec![]);
+
+    let none = bug_report::loot_of(&recording, None, 0, u64::MAX);
+    assert_eq!(none.exact, 0, "with no item files nothing is named");
 }

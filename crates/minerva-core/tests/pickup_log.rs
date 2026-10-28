@@ -1,0 +1,260 @@
+mod common;
+
+use minerva_core::bug_report::{self, Event};
+use minerva_core::{Action, Foreground, Minerva, ScreenRect, StatusBarReading};
+use minerva_core::{PickupLine, PickupLogCapture, PickupLogReading, PickupLogSeen, ReportAbout, ScreenPoint};
+
+fn character(minerva: &mut Minerva, size: f32) {
+    let mut reading = common::status_bar_reading(Some("Egbert"), 100);
+    let bar = reading.bar.as_mut().unwrap();
+    bar.area = ScreenRect { x: 0, y: 1140, width: (300.0 * size) as u32, height: (55.0 * size) as u32 };
+    bar.level = Some(30);
+    minerva.on_status_bar_reading(reading);
+}
+
+#[test]
+fn pickup_capture_needs_the_tracker_a_character_and_a_visible_overlay() {
+    let mut minerva = common::tracking();
+    assert_eq!(minerva.panel_state().pickup_log_capture, None);
+    character(&mut minerva, 1.0);
+    let band = minerva.panel_state().pickup_log_capture.expect("a band for the log");
+    assert!(band.x <= 1600 && band.x + band.width as i32 == 1920);
+    assert!(band.y <= 835 && band.y + band.height as i32 >= 970);
+    minerva.act(Action::SetGrindTracker { on: false });
+    assert_eq!(minerva.panel_state().pickup_log_capture, None);
+    minerva.act(Action::SetGrindTracker { on: true });
+    minerva.on_foreground(Foreground::OtherApp);
+    assert_eq!(minerva.panel_state().pickup_log_capture, None);
+}
+
+#[test]
+fn the_core_starts_a_new_pickup_stream_only_at_capture_or_character_boundaries() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let first = minerva.panel_state().pickup_log_generation;
+    character(&mut minerva, 1.0);
+    minerva.tick(200);
+    assert_eq!(minerva.panel_state().pickup_log_generation, first);
+    minerva.on_status_bar_reading(common::status_bar_reading(Some("Bob"), 300));
+    let bob = minerva.panel_state().pickup_log_generation;
+    assert!(bob > first);
+    minerva.act(Action::SetGrindTracker { on: false });
+    minerva.act(Action::SetGrindTracker { on: true });
+    let resumed = minerva.panel_state().pickup_log_generation;
+    assert!(resumed > bob);
+    minerva.on_foreground(Foreground::OtherApp);
+    minerva.on_foreground(Foreground::Game);
+    assert!(minerva.panel_state().pickup_log_generation > resumed);
+}
+
+#[test]
+fn a_reading_and_a_stale_capture_are_recorded_and_replay_without_pixels() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    common::start_session(&mut minerva, 110, 150);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let reading = PickupLogReading { rows: vec![5], shift: 1,
+        ..common::pickup_reading(200, PickupLogSeen::Clear { area: region }, vec![PickupLine::Mesos { amount: 1_234 }]) };
+    minerva.on_pickup_log_reading(reading.clone());
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 1_234);
+    minerva.on_foreground(Foreground::OtherApp);
+    let img = image::RgbaImage::new(region.width, region.height);
+    let capture = PickupLogCapture { frame: common::frame(&img, 300), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
+    minerva.on_pickup_log_read(capture, PickupLogReading { at_ms: 300, ..reading });
+    assert_eq!(minerva.panel_state().pickup_log_capture, None);
+    assert_eq!(minerva.panel_state().exp_tracking.loot.mesos, 1_234);
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+    let readings: Vec<_> = recording
+        .lines
+        .iter()
+        .filter_map(|l| match &l.event {
+            Event::PickupLog { reading, stale_region } => Some((reading.at_ms, *stale_region)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(readings, vec![(200, None), (300, Some(region))]);
+    assert_eq!(bug_report::replay(&recording, Some(common::osms::game().files())).divergence, None);
+}
+
+#[test]
+fn a_guess_between_shifts_is_written_down_replays_and_shows_in_the_timeline() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    common::start_session(&mut minerva, 110, 150);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let guessed = PickupLogReading { guessed: true, chose: true, ..common::pickup_reading(200, PickupLogSeen::Clear { area: region }, vec![PickupLine::Mesos { amount: 7 }]) };
+    minerva.on_pickup_log_reading(guessed);
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+    let written = recording.lines.iter().any(|l| matches!(&l.event, Event::PickupLog { reading, .. } if reading.guessed && reading.chose));
+    assert!(written, "the reading says it guessed");
+    assert!(recording.timeline(0).iter().any(|line| line.contains("guessed between shifts")));
+    assert_eq!(bug_report::replay(&recording, Some(common::osms::game().files())).divergence, None);
+}
+
+#[test]
+fn the_status_bar_sizes_the_band_and_no_character_stops_capture() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 2.0);
+    assert_eq!(minerva.panel_state().pickup_log_capture, Some(ScreenRect { x: 1120, y: 240, width: 800, height: 960 }));
+    minerva.on_status_bar_reading(StatusBarReading { at_ms: 200, bar: None, near_miss: None });
+    assert_eq!(minerva.panel_state().pickup_log_capture, None);
+}
+
+#[test]
+fn reports_keep_only_guessed_missing_and_unreadable_log_crops() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let img = image::RgbaImage::new(region.width, region.height);
+    // A second apart, so nothing is throttled: 200 and 800 chose between shapes but colour and
+    // brightness settled it (no crop); 300 guessed; 400 and 500 are the log gone; 600 is a line
+    // that wouldn't read.
+    for at_ms in (200..=800).step_by(100) {
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms * 100), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
+        let seen = if [400, 500].contains(&at_ms) { PickupLogSeen::Nothing } else { PickupLogSeen::Clear { area: region } };
+        let arrived = if at_ms == 600 { vec![PickupLine::Unreadable] } else { vec![] };
+        let reading = PickupLogReading {
+            chose: [200, 300, 800].contains(&at_ms),
+            guessed: at_ms == 300,
+            ..common::pickup_reading(at_ms * 100, seen, arrived)
+        };
+        minerva.on_pickup_log_read(capture, reading);
+    }
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+    let crops: Vec<_> = recording.crops.iter().filter(|p| p.contains("pickup-log")).cloned().collect();
+    assert_eq!(crops, vec!["crops/pickup-log-0000030000.png", "crops/pickup-log-0000040000.png", "crops/pickup-log-0000060000.png"]);
+}
+
+#[test]
+fn the_crop_of_a_line_that_would_not_read_is_the_capture_it_arrived_in_not_where_its_vote_ended() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let img = image::RgbaImage::new(region.width, region.height);
+    // The stack shifts a line in at 1.0 s; its reads vote at 1.4 s, and it is Unreadable. By then
+    // it may have shifted up or faded, so the sample it would become is the frame it arrived in.
+    for at_ms in (900..=1_500).step_by(100) {
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
+        let (shift, arrived, arrived_at) = match at_ms {
+            1_000 => (1, vec![], vec![]),
+            1_400 => (0, vec![PickupLine::Unreadable], vec![1_000]),
+            _ => (0, vec![], vec![]),
+        };
+        let reading = PickupLogReading { shift, arrived_at, ..common::pickup_reading(at_ms, PickupLogSeen::Clear { area: region }, arrived) };
+        minerva.on_pickup_log_read(capture, reading);
+    }
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+
+    let crops: Vec<_> = recording.crops.iter().filter(|p| p.contains("pickup-log")).cloned().collect();
+    assert_eq!(crops, vec!["crops/pickup-log-0000001000.png"]);
+    assert_eq!(bug_report::replay(&recording, Some(common::osms::game().files())).divergence, None);
+}
+
+#[test]
+fn a_window_before_the_log_is_found_does_not_make_an_empty_capture_interesting() {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let img = image::RgbaImage::new(region.width, region.height);
+    for (at_ms, seen) in [(200, PickupLogSeen::Covered { area: region }), (300, PickupLogSeen::Nothing)] {
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
+        minerva.on_pickup_log_read(
+            capture,
+            common::pickup_reading(at_ms, seen, vec![]),
+        );
+    }
+    assert!(minerva.panel_state().pickup_log_capture.is_some());
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+    assert!(recording.crops.iter().all(|p| !p.contains("pickup-log")));
+}
+
+/// Feed the core a whole band, once a second, as read by a reader that finds `seen(at_ms)`; the
+/// names of the Pickup Log crops the Bug Report has kept.
+fn kept_log_crops(seconds: std::ops::RangeInclusive<u64>, seen: impl Fn(u64) -> bool) -> Vec<String> {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let img = image::RgbaImage::new(region.width, region.height);
+    for second in seconds {
+        let at_ms = second * 1000;
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
+        let seen = if seen(second) { PickupLogSeen::Clear { area: region } } else { PickupLogSeen::Nothing };
+        minerva.on_pickup_log_read(capture, common::pickup_reading(at_ms, seen, vec![]));
+    }
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+    recording.crops.into_iter().filter(|p| p.contains("pickup-log")).collect()
+}
+
+#[test]
+fn a_reader_that_finds_nothing_for_a_while_keeps_one_whole_band_capture_now_and_then() {
+    // Nothing is read for 31 s: the capture at the 30th second after the first is kept, whole (a
+    // Bug Report 0.15.0 kept none of 6,652, and the log was never found: ADR 0020).
+    assert_eq!(kept_log_crops(1..=40, |_| false), vec!["crops/pickup-log-0000031000.png"]);
+    // And then not again for a while: the next kept 5 minutes after, not 10 per second.
+    assert_eq!(
+        kept_log_crops(1..=340, |_| false),
+        vec!["crops/pickup-log-0000031000.png", "crops/pickup-log-0000331000.png"]
+    );
+    // Not before: 29 s of nothing keeps none.
+    assert_eq!(kept_log_crops(1..=30, |_| false), Vec::<String>::new());
+}
+
+#[test]
+fn seeing_the_log_starts_the_wait_again() {
+    // Seen at the 20th second, then nothing: the lines that vanished keep their capture at once, and
+    // the 30 s are counted from the first reading of nothing after it, not from the first of all.
+    let seen_at_20 = |second: u64| second == 20;
+    assert_eq!(kept_log_crops(1..=50, seen_at_20), vec!["crops/pickup-log-0000021000.png"]);
+    assert_eq!(
+        kept_log_crops(1..=52, seen_at_20),
+        vec!["crops/pickup-log-0000021000.png", "crops/pickup-log-0000051000.png"]
+    );
+}
+
+/// Feed the core a whole band every 100 ms from 200 ms to `until_ms`, as read by `reading`; the
+/// names of the Pickup Log crops the Bug Report has kept.
+fn log_crops_kept(until_ms: u64, reading: impl Fn(u64, ScreenRect) -> PickupLogReading) -> Vec<String> {
+    let mut minerva = common::tracking();
+    character(&mut minerva, 1.0);
+    let region = minerva.panel_state().pickup_log_capture.unwrap();
+    let img = image::RgbaImage::new(region.width, region.height);
+    for at_ms in (200..=until_ms).step_by(100) {
+        let capture = PickupLogCapture { frame: common::frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ui_size: 1.0 };
+        minerva.on_pickup_log_read(capture, reading(at_ms, region));
+    }
+    let recording = bug_report::read(&minerva.bug_report(&ReportAbout::default()).zip).unwrap();
+    recording.crops.into_iter().filter(|p| p.contains("pickup-log")).collect()
+}
+
+#[test]
+fn a_burst_of_guesses_keeps_one_crop_in_10_seconds_so_it_cannot_flood_the_report() {
+    // A guess at every capture, 10 a second, for 25 s: a crop at the first, and at each 10 s after
+    // (the Bug Report of 0.15.0, 2026-10-26 17:24, kept 3,850 of them and no EXP figures).
+    let guessing = |at_ms, region| PickupLogReading { guessed: true, ..common::pickup_reading(at_ms, PickupLogSeen::Clear { area: region }, vec![]) };
+    assert_eq!(
+        log_crops_kept(25_000, guessing),
+        vec!["crops/pickup-log-0000000200.png", "crops/pickup-log-0000010200.png", "crops/pickup-log-0000020200.png"]
+    );
+}
+
+#[test]
+fn each_cause_has_its_own_10_seconds() {
+    // Guessing at every capture, and a line that wouldn't read at 0.5 s and 0.6 s: the first
+    // unreadable arrival isn't shut out by the guess before it, the second is held back by the first.
+    let reading = |at_ms, region| {
+        let arrived = if [500, 600].contains(&at_ms) { vec![PickupLine::Unreadable] } else { vec![] };
+        PickupLogReading { guessed: true, ..common::pickup_reading(at_ms, PickupLogSeen::Clear { area: region }, arrived) }
+    };
+    assert_eq!(log_crops_kept(1_000, reading), vec!["crops/pickup-log-0000000200.png", "crops/pickup-log-0000000500.png"]);
+}
+
+#[test]
+fn a_log_that_vanishes_again_and_again_keeps_one_crop_in_10_seconds() {
+    // Seen, then gone, every 2 s for 25 s: the lines that vanished are kept at 2 s, 12 s, 22 s.
+    let reading = |at_ms: u64, region| {
+        let seen = if at_ms % 2000 < 200 { PickupLogSeen::Nothing } else { PickupLogSeen::Clear { area: region } };
+        common::pickup_reading(at_ms, seen, vec![])
+    };
+    let kept = log_crops_kept(25_000, reading);
+    assert_eq!(kept, vec!["crops/pickup-log-0000002000.png", "crops/pickup-log-0000012000.png", "crops/pickup-log-0000022000.png"]);
+}
