@@ -1,0 +1,23 @@
+# DESIGN.md and GLOSSARY.md keep their prose wrapped at 120 columns, so a grep of them prints a
+# line rather than a whole section. scripts/wrap-docs.py wraps them without changing how they
+# render; the check names each line it would wrap.
+name: Docs check
+
+on:
+  pull_request:
+    paths:
+      - DESIGN.md
+      - GLOSSARY.md
+      - scripts/wrap-docs.py
+      - .github/workflows/docs-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  wrapped:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: DESIGN.md and GLOSSARY.md are wrapped
+        run: python3 scripts/wrap-docs.py --check DESIGN.md GLOSSARY.md
