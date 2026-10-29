@@ -21,8 +21,9 @@
 //! - **The answers**: taken in, with the over-cap and removed entries listed, but neither is a
 //!   failure; a name claimed by another key says so (and the player asks on Discord), and is
 //!   tried again now and then and at each change, since the maintainer can only hand the name
-//!   to a key it refused; rate-limited waits as long as the site says; anything else (offline,
-//!   say) is tried again quietly, later each time.
+//!   to a key it refused; blocked by the maintainer (ADR 0031) says so, and sends nothing more
+//!   of theirs this launch, unless the player sends them again; rate-limited waits as long as the
+//!   site says; anything else (offline, say) is tried again quietly, later each time.
 //! - **Removing a Character**, or merging one into another, takes the one gone off the site.
 //! - **Bests lost**: a launch whose bests file didn't read starts with none, and sending what is
 //!   here then would take every shown Character's entries off the site. So each Character
@@ -31,7 +32,7 @@
 //!   the player sends them again, having confirmed: what is here then replaces what the site
 //!   holds, with no deletion first. (Turning them off and on does too, deleting first.) One
 //!   shown after isn't held: turning it on asks with the count.
-//! - **Problems** (held, a name claimed, an upload tried again) the window says as problems,
+//! - **Problems** (held, blocked, a name claimed, an upload tried again) the window says as problems,
 //!   and the player can send them again at once rather than wait.
 
 use crate::personal_best::{LevelBand, SavedBests, VisitBest, band_bests};
@@ -152,6 +153,9 @@ pub fn read_leaderboard_answer(status: u16, retry_after: Option<&str>, body: &st
             if status == 409 && refusal.error == "claimed" {
                 return LeaderboardAnswer::Claimed {};
             }
+            if status == 403 && refusal.error == "blocked" {
+                return LeaderboardAnswer::Blocked {};
+            }
             let mut why = format!("HTTP {status}");
             if !refusal.error.is_empty() {
                 why += &format!(": {}", refusal.error);
@@ -174,6 +178,9 @@ pub enum LeaderboardAnswer {
     Deleted {},
     /// Another Leaderboard Key holds the name (409 `claimed`).
     Claimed {},
+    /// The maintainer blocked uploads from this key, its Account or the name (403 `blocked`,
+    /// ADR 0031).
+    Blocked {},
     /// Too many uploads lately (429): try again in `retry_after_secs`.
     RateLimited { retry_after_secs: u64 },
     /// The site couldn't be reached, or answered otherwise: why, in words.
@@ -266,8 +273,8 @@ pub struct LeaderboardToggle {
     pub offered: bool,
     pub status: LeaderboardStatus,
     /// Where they stand is a problem, which the window says as one, and which the player can
-    /// send again: [`LeaderboardStatus::Retrying`], [`LeaderboardStatus::Claimed`] or
-    /// [`LeaderboardStatus::Held`].
+    /// send again: [`LeaderboardStatus::Retrying`], [`LeaderboardStatus::Claimed`],
+    /// [`LeaderboardStatus::Blocked`] or [`LeaderboardStatus::Held`].
     pub problem: bool,
     /// When an upload of theirs last went through (ms since the Unix epoch); `None` if none
     /// has yet.
@@ -290,6 +297,9 @@ pub enum LeaderboardStatus {
     Retrying,
     /// Another Leaderboard Key holds the name: the player asks on Discord.
     Claimed,
+    /// The maintainer blocked their uploads: nothing more is sent this launch, and the player
+    /// asks on Discord if it was a mistake.
+    Blocked,
     /// Nothing is sent: the bests file didn't read at a launch since they were shown, so the
     /// site may hold more of theirs than is here. Sending them again sends what is here.
     Held,
@@ -310,6 +320,9 @@ struct UploadStanding {
     failures: u32,
     /// Another key holds the name, as the last answer said.
     claimed: bool,
+    /// The site refused their upload as blocked this launch: nothing more goes up but the
+    /// deletion, until the player sends them again or Minerva starts again.
+    blocked: bool,
     rejected: Vec<RejectedEntry>,
 }
 
@@ -412,6 +425,7 @@ impl Leaderboards {
         standing.wait = None;
         standing.failures = 0;
         standing.claimed = false;
+        standing.blocked = false;
     }
 
     /// Linked to an Account just now: each Character whose name another key held goes up again
@@ -461,8 +475,9 @@ impl Leaderboards {
             self.show(&name, true);
         }
         for standing in &mut self.standings {
-            // Held, nothing goes but the deletion the player asks for by turning them off.
-            if standing.in_flight.is_some() || (standing.saved.shown && standing.saved.held) {
+            // Held or blocked, nothing goes but the deletion the player asks for by turning them
+            // off.
+            if standing.in_flight.is_some() || (standing.saved.shown && (standing.saved.held || standing.blocked)) {
                 continue;
             }
             let wanted = standing.saved.shown.then(|| entries(history, &standing.saved.name, now_unix_ms));
@@ -515,6 +530,12 @@ impl Leaderboards {
                 standing.failures = 0;
                 standing.wait = Some(Wait { until_ms: self.now_ms + CLAIMED_RETRY_MS, wanted, rate_limited: false });
             }
+            (LeaderboardAnswer::Blocked {}, Some(_)) => {
+                standing.confirmed = None;
+                standing.blocked = true;
+                standing.failures = 0;
+                standing.wait = None;
+            }
             (LeaderboardAnswer::RateLimited { retry_after_secs }, wanted) => {
                 standing.failures += 1;
                 let until_ms = self.now_ms + retry_after_secs.max(1).saturating_mul(1000);
@@ -546,6 +567,7 @@ impl Leaderboards {
         let status = match standing {
             None => LeaderboardStatus::Off,
             Some(standing) if standing.saved.shown && standing.saved.held => LeaderboardStatus::Held,
+            Some(standing) if standing.saved.shown && standing.blocked => LeaderboardStatus::Blocked,
             Some(standing) if standing.claimed => LeaderboardStatus::Claimed,
             Some(standing) if standing.failures > 0 => LeaderboardStatus::Retrying,
             Some(standing) if standing.in_flight.is_some() || !standing.saved.shown || standing.confirmed.is_none() => {
@@ -560,7 +582,7 @@ impl Leaderboards {
             maps: maps.len(),
             offered: on || !maps.is_empty(),
             status,
-            problem: matches!(status, LeaderboardStatus::Retrying | LeaderboardStatus::Claimed | LeaderboardStatus::Held),
+            problem: matches!(status, LeaderboardStatus::Retrying | LeaderboardStatus::Claimed | LeaderboardStatus::Blocked | LeaderboardStatus::Held),
             uploaded_at_unix_ms: standing.and_then(|standing| standing.saved.uploaded_at_unix_ms),
             rejected,
         }
@@ -569,7 +591,7 @@ impl Leaderboards {
 
 impl UploadStanding {
     fn new(saved: LeaderboardCharacter) -> Self {
-        Self { saved, confirmed: None, in_flight: None, wait: None, failures: 0, claimed: false, rejected: Vec::new() }
+        Self { saved, confirmed: None, in_flight: None, wait: None, failures: 0, claimed: false, blocked: false, rejected: Vec::new() }
     }
 }
 
