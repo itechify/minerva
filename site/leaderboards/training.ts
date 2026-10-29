@@ -46,6 +46,9 @@ const areasNav = byId("train-areas");
 const table = byId("train-table");
 const rows = byId<HTMLTableSectionElement>("train-rows");
 const pedestal = byId("train-pedestal");
+const pedestalTitle = byId("train-pedestal-title");
+const pedestalSteps = byId<HTMLOListElement>("train-pedestal-steps");
+const pedestalCredit = byId("train-pedestal-credit");
 /** The Level Bands, once read. */
 let bands: BandsAnswer | null = null;
 /** Whether the open band shows all its maps: Show all was pressed. Another band or area
@@ -152,11 +155,11 @@ function drawTable(answer: TrainingAnswer) {
 
 /** The band's EXP/h Pedestal in the area the table shows, once someone has an entry there. */
 function drawExpPedestal(answer: TrainingAnswer, area: string | null) {
-  const shown = expPedestal(answer, names, link, area);
+  const shown = expPedestal(answer, names, link.kind, area);
   pedestal.hidden = shown === null;
   if (shown === null) return;
-  byId("train-pedestal-title").textContent = shown.title;
-  drawPedestal(byId<HTMLOListElement>("train-pedestal-steps"), byId("train-pedestal-credit"), shown);
+  pedestalTitle.textContent = shown.title;
+  drawPedestal(pedestalSteps, pedestalCredit, shown);
 }
 
 /** The row under a long band's first 15: Show all, which shows the rest in place and

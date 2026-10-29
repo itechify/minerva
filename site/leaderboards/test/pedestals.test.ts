@@ -3,7 +3,7 @@
 // steps, 1st to 3rd, a step no one stands asking for yours.
 import { describe, expect, it } from "vitest";
 import type { MapMark, PedestalEntry, PodiumsAnswer, TrainingAnswer } from "../../entries.ts";
-import { expPedestal, mapNames, podiumsPedestal, type TrainingLink } from "../leaderboards.ts";
+import { expPedestal, mapNames, podiumsPedestal } from "../leaderboards.ts";
 import { OCT_3 } from "./common.ts";
 
 const names = mapNames([
@@ -77,10 +77,8 @@ describe("a Level Band's EXP/h Pedestal", () => {
     },
   };
 
-  const LINK: TrainingLink = { band: 20, area: null, kind: null };
-
   it("stands the band's three highest EXP/h in every area, each with their job, level and map", () => {
-    const pedestal = expPedestal(BAND_20, names, LINK, null)!;
+    const pedestal = expPedestal(BAND_20, names, null, null)!;
 
     expect(pedestal.title).toBe("Highest EXP/h at Lv 20–29");
     expect(pedestal.steps.map((s) => s.stood?.name)).toEqual(["Ann", "Ben", "Cal"]);
@@ -99,7 +97,7 @@ describe("a Level Band's EXP/h Pedestal", () => {
   });
 
   it("stands only the area's in an area, saying so, and links each map at the kind shown", () => {
-    const pedestal = expPedestal(BAND_20, names, { ...LINK, area: "Rith", kind: "party" }, "Rith")!;
+    const pedestal = expPedestal(BAND_20, names, "party", "Rith")!;
 
     expect(pedestal.title).toBe("Highest EXP/h in Lith Harbor at Lv 20–29");
     expect(pedestal.steps.map((s) => s.stood?.name ?? null)).toEqual(["Ben", "Cal", null]);
@@ -108,7 +106,7 @@ describe("a Level Band's EXP/h Pedestal", () => {
   });
 
   it("is none where no one has an entry", () => {
-    expect(expPedestal({ ...BAND_20, pedestal: { all: [], areas: {} } }, names, LINK, null)).toBeNull();
-    expect(expPedestal(BAND_20, names, LINK, "KerningCity")).toBeNull();
+    expect(expPedestal({ ...BAND_20, pedestal: { all: [], areas: {} } }, names, null, null)).toBeNull();
+    expect(expPedestal(BAND_20, names, null, "KerningCity")).toBeNull();
   });
 });

@@ -123,7 +123,7 @@ export interface TrainingAnswer {
   pedestal: TrainingPedestal;
 }
 
-/** A Character on the Podiums Pedestal: how many Podiums they hold, places in a Level Band's
+/** A Character on the Podiums Pedestal: how many podiums they hold, places in a Level Band's
  *  top 3 on a map, counted as their page counts them (a Solo Best's and a Party Best's
  *  each). */
 export interface PodiumsStep {
@@ -133,7 +133,7 @@ export interface PodiumsStep {
 }
 
 /** GET /api/podiums: the Podiums Pedestal (ADR 0024, amended): the three Characters with the
- *  most Podiums, most first, a tie going to whoever holds more #1s, then more #2s, then
+ *  most podiums, most first, a tie going to whoever holds more #1s, then more #2s, then
  *  whoever set their first podium entry first. Fewer while fewer have one. */
 export interface PodiumsAnswer {
   characters: PodiumsStep[];

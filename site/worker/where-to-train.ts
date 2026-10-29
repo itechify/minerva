@@ -10,7 +10,7 @@ import { boardOf, isParty } from "./kinds";
 import { PORTRAIT_COLUMNS, PORTRAIT_JOIN, type PortraitColumns, portraitIn } from "./portraits";
 
 /** How many Characters a Pedestal stands. */
-const PEDESTAL = 3;
+const STEPS = 3;
 
 /** Whether the middle half of a map's spawns is at any of the band's levels. */
 function isFor(row: Ceiling, band: number): boolean {
@@ -62,7 +62,7 @@ export async function readTraining(env: Env, first: string, kind: Kind | null): 
        FROM ${boardOf(kind)} e
        WHERE e.band = ?)
      SELECT r.*, c.name, ${PORTRAIT_COLUMNS} FROM ranked r JOIN characters c USING (name_key) ${PORTRAIT_JOIN}
-     WHERE r.rank <= ${PEDESTAL} ORDER BY r.exp_per_hour DESC, r.set_at, r.name_key`,
+     WHERE r.rank <= ${STEPS} ORDER BY r.exp_per_hour DESC, r.set_at, r.name_key, r.map_id`,
   )
     .bind(band)
     .all<PortraitColumns & {
@@ -91,11 +91,8 @@ export async function readTraining(env: Env, first: string, kind: Kind | null): 
   // there beat it, and it isn't on the Pedestal; so each map's top 3, highest first, is
   // enough to stand it.
   const pedestal: TrainingPedestal = { all: [], areas: {} };
-  const stood = new Map<PedestalEntry[], Set<string>>();
   const stand = (on: PedestalEntry[], r: (typeof rows.results)[number]) => {
-    const names = stood.get(on) ?? stood.set(on, new Set()).get(on)!;
-    if (on.length === PEDESTAL || names.has(r.name)) return;
-    names.add(r.name);
+    if (on.length === STEPS || on.some((e) => e.name === r.name)) return;
     on.push({
       name: r.name,
       job: r.job,

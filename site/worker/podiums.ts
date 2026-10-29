@@ -1,12 +1,12 @@
 // The Podiums Pedestal on the Map Leaderboards page (ADR 0024, amended): the three Characters
-// with the most Podiums, places in a Level Band's top 3 on a map, counted as a Character's page
+// with the most podiums, places in a Level Band's top 3 on a map, counted as a Character's page
 // counts them (ADR 0027): each kind of entry ranked on its own, so a Solo Best's place and a
 // Party Best's each count.
 import type { PodiumsAnswer } from "../entries";
 import type { Answer } from "./http";
 import { PORTRAIT_COLUMNS, PORTRAIT_JOIN, type PortraitColumns, portraitIn } from "./portraits";
 
-/** GET /api/podiums: the three with the most Podiums, most first; a tie goes to whoever
+/** GET /api/podiums: the three with the most podiums, most first; a tie goes to whoever
  *  holds more #1s, then more #2s, then whoever set their first podium entry first. */
 export async function readPodiums(env: Env): Promise<Answer> {
   const rows = await env.DB.prepare(

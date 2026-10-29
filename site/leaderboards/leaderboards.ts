@@ -742,11 +742,10 @@ export interface PedestalStep {
   stood: Stood | null;
 }
 
-/** A Pedestal (ADR 0024, amended): its title, its three steps, 1st to 3rd (the page stands
- *  them 2nd, 1st, 3rd), the link a step no one stands shows, and whether its steps show
- *  portraits, so the page credits ClassicRank under it. */
+/** A Pedestal (ADR 0024, amended): its three steps, 1st to 3rd (the page stands them 2nd,
+ *  1st, 3rd), the link a step no one stands shows, and whether its steps show portraits, so
+ *  the page credits ClassicRank under it. */
 export interface Pedestal {
-  title: string;
   steps: [PedestalStep, PedestalStep, PedestalStep];
   empty: { text: string; href: string };
   portraits: boolean;
@@ -755,16 +754,15 @@ export interface Pedestal {
 /** What a step no one stands says, and where it goes. */
 const YOURS_HERE = { text: "Yours could be here", href: PUT_YOURS.href };
 
-function pedestalOf(title: string, stood: Stood[]): Pedestal {
+function pedestalOf(stood: Stood[]): Pedestal {
   const step = (place: Medal): PedestalStep => ({ place, stood: stood[place - 1] ?? null });
-  return { title, steps: [step(1), step(2), step(3)], empty: YOURS_HERE, portraits: stood.some((s) => s.portrait !== null) };
+  return { steps: [step(1), step(2), step(3)], empty: YOURS_HERE, portraits: stood.some((s) => s.portrait !== null) };
 }
 
-/** The Podiums Pedestal, from GET /api/podiums: the three with the most Podiums, each counted
+/** The Podiums Pedestal, from GET /api/podiums: the three with the most podiums, each counted
  *  as their page counts them. */
 export function podiumsPedestal(answer: PodiumsAnswer): Pedestal {
   return pedestalOf(
-    "Most podiums",
     answer.characters.map((c) => ({
       name: c.name,
       nameHref: characterLinkTo(c.name),
@@ -779,18 +777,24 @@ export function podiumsPedestal(answer: PodiumsAnswer): Pedestal {
   );
 }
 
-/** The EXP/h Pedestal for the band GET /api/bands/<band> answered, in `area` (by its Map
- *  Mark's ID; `null`, every area), as Where to train shows it (`trainingTable`'s area, not the
- *  link's, which may name one the band has no maps in); each map linking to its page at the
- *  band and the link's kind, with the entry marked. `null` where no one has an entry. */
-export function expPedestal(answer: TrainingAnswer, names: MapNames, link: TrainingLink, area: string | null): Pedestal | null {
+/** The EXP/h Pedestal for the band GET /api/bands/<band> answered, of the `kind` Where to train
+ *  shows, in `area` (by its Map Mark's ID; `null`, every area), as Where to train shows it
+ *  (`trainingTable`'s area, not the link's, which may name one the band has no maps in); with
+ *  its title, "Highest EXP/h in Lith Harbor at Lv 20–29"; each map linking to its page at the
+ *  band and the kind, with the entry marked. `null` where no one has an entry. */
+export function expPedestal(
+  answer: TrainingAnswer,
+  names: MapNames,
+  kind: Kind | null,
+  area: string | null,
+): (Pedestal & { title: string }) | null {
   const entries = area === null ? answer.pedestal.all : (answer.pedestal.areas[area] ?? []);
   if (entries.length === 0) return null;
   const marks = new Map(answer.maps.map((m) => [m.map, m.mark]));
   const areaName = area === null ? null : ([...marks.values()].find((m) => m?.id === area)?.name ?? null);
   const at = bandLevels(answer.band);
-  return pedestalOf(
-    areaName === null ? `Highest EXP/h at ${at}` : `Highest EXP/h in ${areaName} at ${at}`,
+  const title = areaName === null ? `Highest EXP/h at ${at}` : `Highest EXP/h in ${areaName} at ${at}`;
+  const pedestal = pedestalOf(
     entries.map((e) => {
       const mark = marks.get(e.map) ?? null;
       return {
@@ -803,13 +807,14 @@ export function expPedestal(answer: TrainingAnswer, names: MapNames, link: Train
         who: { text: `${e.job} Lv ${e.level}`, jobClass: classOf(e.job) },
         map: {
           name: placeOf(names, e.map).name,
-          href: linkTo({ map: e.map, band: answer.band, name: e.name, kind: link.kind }),
+          href: linkTo({ map: e.map, band: answer.band, name: e.name, kind }),
           mark: mark === null ? null : { name: mark.name, picture: mark.picture },
         },
         party: e.party,
       };
     }),
   );
+  return { ...pedestal, title };
 }
 
 /** What Where to train says before a band is picked. */

@@ -1823,6 +1823,7 @@ button.icon-button:active {
   padding-top: 56px;
 }
 .lb-section h2,
+.lb-podiums h2,
 .lb-train h2,
 .lb-questions h2,
 .lb-board h2 {
@@ -3862,7 +3863,7 @@ button.button {
   padding-left: 12px;
 }
 
-/* The Pedestals (ADR 0024, amended): three steps on a podium, 2nd, 1st and 3rd from the left,
+/* The Pedestals (ADR 0024, amended): three steps, 2nd, 1st and 3rd from the left,
    each a Character standing on a block in Inset, the 1st's the tallest, with the step's crown
    and place on it. The list keeps 1st to 3rd for assistive tech; only the order on screen
    changes. The crowns stay 14px on the blocks: the blocks are never filled with the metal. */
@@ -3872,8 +3873,6 @@ button.button {
 }
 .lb-podiums h2 {
   margin-bottom: 0;
-  font-size: 23px;
-  line-height: 30px;
 }
 .lb-pedestal-said {
   margin-top: 2px;
@@ -3890,9 +3889,6 @@ button.button {
 /* While the steps come, their room: a step's portrait, name and figure over the 1st's block. */
 .lb-pedestal.lb-waiting {
   min-height: 236px;
-}
-.lb-pedestal[hidden] {
-  display: none;
 }
 .lb-stand {
   display: flex;
@@ -3989,9 +3985,6 @@ button.button {
 /* The band's EXP/h Pedestal, under Where to train's choices and over its table. */
 .lb-train-pedestal {
   margin-top: 24px;
-}
-.lb-train-pedestal[hidden] {
-  display: none;
 }
 .lb-pedestal-title {
   margin: 0;
