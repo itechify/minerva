@@ -12,12 +12,12 @@ pub fn path(app: &AppHandle) -> tauri::Result<PathBuf> {
 }
 
 /// The saved settings, or the defaults when there are none. An unreadable file is kept
-/// beside it as `settings.json.bad` for diagnosis.
+/// beside it as `settings.json.bad` for diagnosis ([`crate::files::set_aside`]).
 pub fn load(path: &Path) -> Settings {
     let Ok(text) = fs::read_to_string(path) else { return Settings::default() };
     serde_json::from_str(&text).unwrap_or_else(|e| {
         error!("settings unreadable ({e}); using defaults");
-        let _ = fs::rename(path, path.with_extension("json.bad"));
+        let _ = crate::files::set_aside(path, &path.with_extension("json.bad"));
         Settings::default()
     })
 }

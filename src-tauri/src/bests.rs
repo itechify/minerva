@@ -133,14 +133,39 @@ mod tests {
     }
 
     #[test]
+    fn a_file_set_aside_again_keeps_the_one_set_aside_before() {
+        // A later version's bests, set aside by this one; then this launch's own, saved and
+        // set aside by another; then a third.
+        let path = file("again");
+        let later = serde_json::to_string_pretty(&SavedBests { version: BESTS_VERSION + 1, ..sunset_sky_bests() }).unwrap();
+        fs::write(&path, &later).unwrap();
+        load(&path);
+        fs::write(&path, r#"{ "version": 1, "maps": ["#).unwrap();
+        load(&path);
+        fs::write(&path, "third").unwrap();
+        load(&path);
+
+        assert_eq!(fs::read_to_string(path.with_extension("json.bad")).unwrap(), later);
+        assert_eq!(fs::read_to_string(path.with_extension("json.2.bad")).unwrap(), r#"{ "version": 1, "maps": ["#);
+        assert_eq!(fs::read_to_string(path.with_extension("json.3.bad")).unwrap(), "third");
+    }
+
+    /// `path` held open by another program that lets no one else read, move or delete it,
+    /// while it is held.
+    fn held(path: &Path) -> fs::File {
+        use std::os::windows::fs::OpenOptionsExt;
+        fs::OpenOptions::new().read(true).share_mode(0).open(path).unwrap()
+    }
+
+    #[test]
     fn an_unreadable_file_that_cannot_be_set_aside_is_not_written_over() {
         let path = file("kept");
         let unreadable = r#"{ "version": 1, "maps": ["#;
         fs::write(&path, unreadable).unwrap();
-        // A folder in the way of setting it aside.
-        fs::create_dir(path.with_extension("json.bad")).unwrap();
+        let holder = held(&path);
         let (launch, bests) = BestsFile::load(path.clone());
         assert_eq!(bests, SavedBests::default());
+        drop(holder);
 
         // The launch's bests aren't saved over it.
         launch.save(&sunset_sky_bests()).unwrap();
@@ -189,8 +214,9 @@ mod tests {
         assert!(lost(&path));
         let path = file("lost-kept");
         fs::write(&path, r#"{ "version": 1, "maps": ["#).unwrap();
-        fs::create_dir(path.with_extension("json.bad")).unwrap();
+        let holder = held(&path);
         assert!(lost(&path));
+        drop(holder);
         let path = file("lost-later-shape");
         save(&path, &SavedBests { version: BESTS_VERSION + 1, ..sunset_sky_bests() }).unwrap();
         assert!(lost(&path));
