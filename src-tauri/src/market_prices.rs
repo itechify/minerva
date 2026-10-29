@@ -56,8 +56,8 @@ fn take_import(path: &Path) -> Option<MarketImport> {
             Err(e) => format!("unreadable ({e})"),
         },
     };
-    match fs::rename(&taken, path.with_extension("json.bad")) {
-        Ok(()) => error!("market import {name} {why}; set aside"),
+    match crate::files::set_aside(&taken, &path.with_extension("json.bad")) {
+        Ok(to) => error!("market import {name} {why}; set aside as {}", to.display()),
         Err(e) => error!("market import {name} {why}, and not set aside ({e})"),
     }
     None
@@ -185,6 +185,19 @@ mod tests {
         assert_eq!(taken.len(), 1, "the one that reads");
         assert_eq!(names_in(&dir), ["broken.json.bad", "later.json.bad"]);
         assert_eq!(fs::read(dir.join("broken.json.bad")).unwrap(), b"not json");
+    }
+
+    #[test]
+    fn an_import_set_aside_under_a_name_set_aside_before_keeps_both() {
+        let dir = imports("bad-again", &[("broken.json", "not json")]);
+        take_imports(&dir);
+        fs::write(dir.join("broken.json"), "nor this").unwrap();
+
+        take_imports(&dir);
+
+        assert_eq!(names_in(&dir), ["broken.json.2.bad", "broken.json.bad"]);
+        assert_eq!(fs::read(dir.join("broken.json.bad")).unwrap(), b"not json");
+        assert_eq!(fs::read(dir.join("broken.json.2.bad")).unwrap(), b"nor this");
     }
 
     #[test]

@@ -1615,7 +1615,9 @@
                   <summary>Why are my Personal Bests gone?</summary>
                   <p>
                     If Minerva can't read their file, it renames it <code>personal-bests.json.bad</code> and starts with no
-                    bests. If it can't rename the file, it leaves it as it is and saves no bests until the next launch.
+                    bests. If that name is already taken, it uses <code>personal-bests.json.2.bad</code>, then
+                    <code>personal-bests.json.3.bad</code>, and so on. It never writes over a file it renamed earlier.
+                    If it can't rename the file, it leaves it as it is and saves no bests until the next launch.
                     The file is <a href="#kept">beside your settings</a>.
                   </p>
                   <p>

@@ -36,6 +36,19 @@ pub fn write_atomically(path: &Path, contents: &[u8]) -> std::io::Result<()> {
     std::fs::rename(&tmp, path)
 }
 
+/// Move `from` aside to `to` (`<name>.bad`), or, where something is there already (a file
+/// set aside before), to the first of `<name>.2.bad`, `<name>.3.bad`… that is free: setting a
+/// file aside never writes over another. Where it went.
+pub fn set_aside(from: &Path, to: &Path) -> std::io::Result<PathBuf> {
+    let extension = to.extension().unwrap_or_default().to_string_lossy();
+    let free = (1..)
+        .map(|n| if n == 1 { to.to_path_buf() } else { to.with_extension(format!("{n}.{extension}")) })
+        .find(|name| matches!(std::fs::symlink_metadata(name), Err(e) if e.kind() == ErrorKind::NotFound))
+        .expect("a free name");
+    std::fs::rename(from, &free)?;
+    Ok(free)
+}
+
 /// What a [`GuardedJsonFile`] keeps: the core's saved shape of it, which says its version.
 pub trait JsonShape: Serialize + DeserializeOwned + Default {
     /// What it holds, in errors ("personal bests").
@@ -63,8 +76,8 @@ impl<T: JsonShape> GuardedJsonFile<T> {
     /// What is saved at `path`, or the default when there is no file yet. A file that is
     /// there but doesn't read (reading it fails, it isn't UTF-8 JSON as the core saves it, or
     /// it was saved in a shape this version doesn't read, by a later one) is logged and set
-    /// aside as `<name>.json.bad` for diagnosis, and there is nothing. If it can't be set
-    /// aside, it is left as it was: [`GuardedJsonFile::save`] never writes over it.
+    /// aside as `<name>.json.bad` for diagnosis ([`set_aside`]), and there is nothing. If it
+    /// can't be set aside, it is left as it was: [`GuardedJsonFile::save`] never writes over it.
     pub fn load(path: PathBuf) -> (Self, T) {
         let found = |lost, left| Self { path: path.clone(), lost, left, shape: PhantomData };
         let why = match std::fs::read(&path) {
@@ -77,9 +90,9 @@ impl<T: JsonShape> GuardedJsonFile<T> {
             },
         };
         let what = T::WHAT;
-        let left = match std::fs::rename(&path, path.with_extension("json.bad")) {
-            Ok(()) => {
-                error!("{what} {why}; set aside, starting with none");
+        let left = match set_aside(&path, &path.with_extension("json.bad")) {
+            Ok(to) => {
+                error!("{what} {why}; set aside as {}, starting with none", to.display());
                 false
             }
             Err(e) => {

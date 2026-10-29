@@ -62,7 +62,7 @@ impl KeyFile {
             Ok(text) if is_key(text.trim()) => text.trim().to_string(),
             Ok(_) => {
                 error!("the Leaderboard Key's file doesn't hold one: set aside, and another made");
-                fs::rename(&self.path, self.path.with_extension("bad")).map_err(|e| format!("setting the key aside: {e}"))?;
+                crate::files::set_aside(&self.path, &self.path.with_extension("bad")).map_err(|e| format!("setting the key aside: {e}"))?;
                 make(&self.path)?
             }
             Err(e) if e.kind() == ErrorKind::NotFound => make(&self.path)?,
@@ -261,6 +261,17 @@ mod tests {
     }
 
     #[test]
+    fn a_key_file_set_aside_again_keeps_the_one_set_aside_before() {
+        let path = file("edited-again");
+        fs::write(&path, "not a key").unwrap();
+        KeyFile::new(path.clone()).key().unwrap();
+        fs::write(&path, "nor this").unwrap();
+        KeyFile::new(path.clone()).key().unwrap();
+        assert_eq!(fs::read_to_string(path.with_extension("bad")).unwrap(), "not a key");
+        assert_eq!(fs::read_to_string(path.with_extension("2.bad")).unwrap(), "nor this");
+    }
+
+    #[test]
     fn the_settings_set_aside_leave_the_key_as_it_was() {
         let path = file("settings");
         let key = KeyFile::new(path.clone()).key().unwrap();
@@ -269,5 +280,16 @@ mod tests {
         crate::settings::load(&settings);
         assert!(settings.with_extension("json.bad").exists());
         assert_eq!(KeyFile::new(path).key().unwrap(), key);
+    }
+
+    #[test]
+    fn settings_set_aside_again_keep_the_ones_set_aside_before() {
+        let settings = file("settings-again").with_file_name("settings.json");
+        fs::write(&settings, "{ not json").unwrap();
+        crate::settings::load(&settings);
+        fs::write(&settings, "{ nor this").unwrap();
+        crate::settings::load(&settings);
+        assert_eq!(fs::read_to_string(settings.with_extension("json.bad")).unwrap(), "{ not json");
+        assert_eq!(fs::read_to_string(settings.with_extension("json.2.bad")).unwrap(), "{ nor this");
     }
 }
