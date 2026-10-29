@@ -5,6 +5,15 @@ export interface Answer {
   headers?: Record<string, string>;
   /** `Set-Cookie` values, one header each. */
   cookies?: string[];
+  /** What the maintainer's log keeps of a write under /api/admin/ beside its action (ADR
+   *  0031): the Character and the Account it touched, and a detail. Never sent. */
+  logged?: Logged;
+}
+
+export interface Logged {
+  nameKey?: string;
+  accountId?: number;
+  detail?: string;
 }
 
 export function json(answer: Answer, cacheControl: string): Response {

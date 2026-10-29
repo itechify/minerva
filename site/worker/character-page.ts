@@ -3,24 +3,26 @@
 // page works out the rest (its header and the #1s and podiums) from these.
 import { type CharacterAnswer, type CharacterEntry, isName } from "../entries";
 import { ceilingsOf, markOf } from "./ceilings";
+import { SHOWN } from "./blocks";
 import { type Answer, badRequest } from "./http";
 import { isParty } from "./kinds";
 import { PORTRAIT_COLUMNS, PORTRAIT_JOIN, type PortraitColumns, portraitIn } from "./portraits";
 
-/** What a name with no entries reads as, whatever the reason: never uploaded, opted out, or
- *  every entry taken down. The page tells none of them apart, so neither does this. */
+/** What a name with no entries reads as, whatever the reason: never uploaded, opted out,
+ *  every entry taken down, or blocked (ADR 0031). The page tells none of them apart, so
+ *  neither does this. */
 const NO_ENTRIES: Answer = { status: 404, body: { error: "not-found" } };
 
 export async function readCharacterPage(env: Env, name: string): Promise<Answer> {
   if (!isName(name)) return badRequest("a Character's name is 1 to 16 letters and digits");
   const rows = await env.DB.prepare(
-    `WITH places AS (SELECT DISTINCT map_id, band FROM entries WHERE name_key = ?1),
+    `WITH places AS (SELECT DISTINCT map_id, band FROM ${SHOWN} WHERE name_key = ?1),
        ranked AS (
          SELECT e.name_key, e.map_id, e.band, e.job, e.level, e.exp_per_hour, e.set_at, e.party,
                 ROW_NUMBER() OVER (PARTITION BY e.map_id, e.band, e.party
                                    ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank,
                 COUNT(*) OVER (PARTITION BY e.map_id, e.band, e.party) AS total
-         FROM entries e JOIN places p ON p.map_id = e.map_id AND p.band = e.band)
+         FROM ${SHOWN} e JOIN places p ON p.map_id = e.map_id AND p.band = e.band)
      SELECT r.*, c.name, ${PORTRAIT_COLUMNS} FROM ranked r JOIN characters c USING (name_key) ${PORTRAIT_JOIN}
      WHERE r.name_key = ?1 ORDER BY r.band DESC, r.exp_per_hour DESC, r.map_id, r.party`,
   )

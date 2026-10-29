@@ -3,15 +3,41 @@
 // (ADR 0027), Accounts (ADR 0023) and maplestory.market's prices for the app (ADR 0030); and
 // once a day, Characters' portraits from ClassicRank (ADR 0029).
 import { readCharacterPage } from "./character-page";
-import { confirmLinkToken, deleteAccount, linkState, mintLinkToken, readAccount, readLinkToken, unlinkPc } from "./accounts";
+import {
+  confirmLinkToken,
+  deleteAccount,
+  deleteAccountAsMaintainer,
+  linkState,
+  mintLinkToken,
+  readAccount,
+  readAccountAsMaintainer,
+  readLinkToken,
+  unlinkPc,
+  unlinkPcAsMaintainer,
+  usernameOf,
+} from "./accounts";
+import { keepLine, readLog } from "./admin-log";
+import { block, readBlocks, unblock } from "./blocks";
 import { callback, start } from "./discord";
 import { type Answer, badRequest, json } from "./http";
 import { isMaintainerToken } from "./keys";
-import { readMarket } from "./market";
+import { pullNow, readMarket } from "./market";
 import { withKind } from "./kinds";
 import { readLatest } from "./latest";
 import { optOut, readBand, readMap, readMaps, upload } from "./leaderboards";
-import { deleteEntry, dismissReport, findAccounts, readCharacter, readRemoved, readReports, reassign, report, restoreEntry } from "./moderation";
+import {
+  deleteAllEntries,
+  deleteEntry,
+  dismissReport,
+  findAccounts,
+  readCharacter,
+  readRemoved,
+  readReports,
+  reassign,
+  report,
+  restoreEntry,
+} from "./moderation";
+import { readOverview } from "./overview";
 import { refreshPortraits } from "./portraits";
 import { endSession, isMaintainerAccount, sameOrigin, sessionAccount } from "./sessions";
 import { readBands, readTraining } from "./where-to-train";
@@ -145,40 +171,68 @@ async function routeLink(request: Request, url: URL, path: string[], env: Env): 
 }
 
 /** The maintainer's routes, under /api/admin/: with the ADMIN_TOKEN secret, or signed in
- *  with a maintainer's Discord account. */
+ *  with a maintainer's Discord account. Each write that goes through is kept in the log as
+ *  made by "token" or the maintainer's Discord username (ADR 0031). */
 async function routeAdmin(request: Request, url: URL, path: string[], env: Env): Promise<Answer> {
+  let actor = "token";
   if (!(await isMaintainerToken(request, env))) {
     const account = await signedIn(request, env);
     if (account === WRONG_ORIGIN) return WRONG_ORIGIN;
     if (typeof account !== "number" || !(await isMaintainerAccount(env, account))) {
       return { status: 401, body: { error: "not-maintainer" } };
     }
+    actor = (await usernameOf(env, account)) ?? "maintainer";
   }
+  /** `action`'s answer, its line kept in the log if it went through. */
+  const logged = async (action: string, answer: Promise<Answer>): Promise<Answer> => {
+    const done = await answer;
+    if (done.status >= 200 && done.status < 300) await keepLine(env, actor, action, done.logged);
+    return done;
+  };
   const method = request.method;
   switch (true) {
+    case path.length === 1 && path[0] === "overview" && method === "GET":
+      return readOverview(env);
     case path.length === 1 && path[0] === "reports" && method === "GET":
       return readReports(env);
     case path.length === 2 && path[0] === "reports" && method === "DELETE":
-      return dismissReport(env, path[1]);
+      return logged("dismiss", dismissReport(env, path[1]));
+    case path.length === 2 && path[0] === "entries" && method === "DELETE":
+      return logged("take-all-down", deleteAllEntries(env, path[1]));
     case path.length === 4 && path[0] === "entries" && method === "DELETE": {
-      return withKind(url, (kind) => deleteEntry(env, path[1], path[2], path[3], kind));
+      return logged("take-down", withKind(url, (kind) => deleteEntry(env, path[1], path[2], path[3], kind)));
     }
     case path.length === 1 && path[0] === "removed" && method === "GET":
       return readRemoved(env);
     case path.length === 5 && path[0] === "removed" && method === "DELETE": {
-      return withKind(url, (kind) => restoreEntry(env, path[1], path[2], path[3], path[4], kind));
+      return logged("restore", withKind(url, (kind) => restoreEntry(env, path[1], path[2], path[3], path[4], kind)));
     }
     case path.length === 2 && path[0] === "characters" && method === "GET":
       return readCharacter(env, path[1]);
     case path.length === 3 && path[0] === "characters" && path[2] === "reassign" && method === "POST":
-      return reassign(env, request, path[1]);
+      return logged("reassign", reassign(env, request, path[1]));
+    case path.length === 3 && path[0] === "characters" && path[2] === "block" && method === "POST":
+      return logged("block", block(env, request, path[1]));
+    case path.length === 1 && path[0] === "blocks" && method === "GET":
+      return readBlocks(env);
+    case path.length === 2 && path[0] === "blocks" && method === "DELETE":
+      return logged("unblock", unblock(env, path[1]));
     case path.length === 1 && path[0] === "accounts" && method === "GET":
       return findAccounts(env, url.searchParams.get("username"));
+    case path.length === 2 && path[0] === "accounts" && method === "GET":
+      return readAccountAsMaintainer(env, path[1]);
+    case path.length === 2 && path[0] === "accounts" && method === "DELETE":
+      return logged("delete-account", deleteAccountAsMaintainer(env, path[1]));
+    case path.length === 4 && path[0] === "accounts" && path[2] === "pcs" && method === "DELETE":
+      return logged("unlink-pc", unlinkPcAsMaintainer(env, path[1], path[3]));
+    case path.length === 1 && path[0] === "log" && method === "GET":
+      return readLog(env, url.searchParams.get("before"));
     // The daily refresh of portraits, at once: after the deploy that sets the ClassicRank key,
     // so the boards don't wait for the next morning's (ADR 0029).
     case path.length === 1 && path[0] === "portraits" && method === "POST":
-      await refreshPortraits(env, Date.now());
-      return { status: 204 };
+      return logged("refresh-portraits", refreshPortraits(env, Date.now()).then(() => ({ status: 204 })));
+    case path.length === 1 && path[0] === "market" && method === "POST":
+      return logged("pull-market", pullNow(env));
     default:
       return NOT_FOUND;
   }

@@ -20,7 +20,7 @@ export async function touchKey(env: Env, keyHash: string, now: number): Promise<
 }
 
 /** The Discord username `account` signs in with. */
-function usernameOf(env: Env, account: number): Promise<string | null> {
+export function usernameOf(env: Env, account: number): Promise<string | null> {
   return env.DB.prepare("SELECT username FROM logins WHERE account_id = ? AND provider = 'discord'")
     .bind(account)
     .first<string>("username");
@@ -90,6 +90,54 @@ export async function deleteAccount(env: Env, account: number): Promise<Answer> 
   return { status: 204, cookies: clearedCookies() };
 }
 
+/** Whether Account `id` (as a route's path gives it) is one. */
+async function isAccount(env: Env, id: string): Promise<boolean> {
+  if (!/^\d+$/.test(id)) return false;
+  return (await env.DB.prepare("SELECT 1 AS yes FROM accounts WHERE id = ?").bind(Number(id)).first<number>("yes")) !== null;
+}
+
+const NO_ACCOUNT: Answer = { status: 404, body: { error: "no-account" } };
+
+/** What the maintainer sees of Account `id` (ADR 0031): its username, its PCs as the account
+ *  page lists them, every name it holds, and the Block made on it, if one was. */
+export async function readAccountAsMaintainer(env: Env, id: string): Promise<Answer> {
+  if (!(await isAccount(env, id))) return NO_ACCOUNT;
+  const account = Number(id);
+  const read = (await readAccount(env, account)).body as { username: string | null; pcs: unknown[] };
+  const [created, names, blocked] = await env.DB.batch<Record<string, unknown>>([
+    env.DB.prepare("SELECT created_at FROM accounts WHERE id = ?").bind(account),
+    env.DB.prepare("SELECT name FROM characters WHERE account_id = ? ORDER BY name_key").bind(account),
+    env.DB.prepare("SELECT id, blocked_at AS blockedAt, note FROM blocks WHERE account_id = ? ORDER BY id LIMIT 1").bind(account),
+  ]);
+  return {
+    status: 200,
+    body: {
+      id: account,
+      username: read.username,
+      createdAt: created.results[0].created_at,
+      pcs: read.pcs,
+      characters: names.results.map((r) => r.name),
+      blocked: blocked.results[0] ?? null,
+    },
+  };
+}
+
+/** The maintainer unlinking PC `pc` from Account `id`, as its player would. */
+export async function unlinkPcAsMaintainer(env: Env, id: string, pc: string): Promise<Answer> {
+  if (!(await isAccount(env, id))) return NO_ACCOUNT;
+  const answer = await unlinkPc(env, Number(id), pc);
+  return answer.status === 204 ? { ...answer, logged: { accountId: Number(id) } } : answer;
+}
+
+/** The maintainer deleting Account `id`, as its player would, the maintainer's own cookies
+ *  left alone. */
+export async function deleteAccountAsMaintainer(env: Env, id: string): Promise<Answer> {
+  if (!(await isAccount(env, id))) return NO_ACCOUNT;
+  const username = await usernameOf(env, Number(id));
+  await deleteAccount(env, Number(id));
+  return { status: 204, logged: { accountId: Number(id), detail: username ?? "" } };
+}
+
 /** The app asking, with its key, for a one-time link token, and the page that confirms it.
  *  Counted as a write against the key's rate limit. */
 export async function mintLinkToken(env: Env, request: Request, url: URL): Promise<Answer> {
@@ -136,7 +184,7 @@ export async function readLinkToken(env: Env, account: number, token: string): P
 
 /** Link a token's key to `account`, as the player confirmed on the site: the token is used
  *  up, the key joins the Account (leaving any other it was linked to), and the names it
- *  claimed join the Account with it. */
+ *  claimed join the Account with it, and the Account's Block, if it has one. */
 export async function confirmLinkToken(env: Env, account: number, token: string): Promise<Answer> {
   const now = Date.now();
   const keyHash = await env.DB.prepare("DELETE FROM link_tokens WHERE token_hash = ? AND expires_at > ? RETURNING key_hash")
@@ -149,6 +197,9 @@ export async function confirmLinkToken(env: Env, account: number, token: string)
        ON CONFLICT (key_hash) DO UPDATE SET account_id = ?2, linked_at = ?3, last_used_at = ?3`,
     ).bind(keyHash, account, now),
     env.DB.prepare("UPDATE characters SET account_id = ? WHERE key_hash = ?").bind(account, keyHash),
+    // A key linked to a blocked Account is kept in its Block, so deleting the Account later
+    // doesn't free it (ADR 0031).
+    env.DB.prepare("INSERT OR IGNORE INTO block_keys (block_id, key_hash) SELECT id, ?1 FROM blocks WHERE account_id = ?2").bind(keyHash, account),
   ]);
   return { status: 200, body: { characters: await namesClaimedBy(env, keyHash) } };
 }
