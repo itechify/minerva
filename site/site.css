@@ -3501,6 +3501,19 @@ button.button {
 .lb-section .lb-search {
   margin-top: 18px;
 }
+/* A Block's "Block the name too", a checkbox under the note rather than a field of its own. */
+.lb-search .account-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-weight: 400;
+}
+.lb-search .account-check input {
+  width: auto;
+  margin: 0;
+  box-shadow: none;
+}
 /* Who's signed in, in the window's bar beside the version, once a page has asked. */
 .window-signed-in {
   margin: 0;

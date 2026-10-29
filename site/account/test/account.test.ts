@@ -118,7 +118,7 @@ describe("the admin page", () => {
   it("says a name looked up is blocked, with the Block's note", () => {
     const lines = characterLines({ ...looked, name: "Cid", refusedAt: null, account: null, entries: [], blocked: { id: 1, blockedAt: OCT_21, note: "Botting" } });
 
-    expect(lines.at(-1)).toBe("Blocked 21 Oct 2026: Botting. Its entries are hidden.");
+    expect(lines[lines.length - 1]).toBe("Blocked 21 Oct 2026: Botting. Its entries are hidden.");
   });
 
   it("lists a name's entry with where it was set and by whom", () => {

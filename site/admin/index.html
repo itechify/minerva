@@ -1,7 +1,9 @@
 <!doctype html>
-<!-- The maintainer's page (ADR 0023): signed in with a Discord account the Worker lists as a
-     maintainer's (MAINTAINER_DISCORD_IDS). Reports, each deleted or dismissed, and
-     Characters, a name looked up and reassigned. Everyone else is told it's the
+<!-- The maintainer's page (ADR 0023, ADR 0031): signed in with a Discord account the Worker
+     lists as a maintainer's (MAINTAINER_DISCORD_IDS). Overview, the counts and two buttons;
+     Reports, each deleted or dismissed; Characters, a name looked up, its entries taken down,
+     reassigned or blocked, and every Block; Accounts, one looked up, a PC unlinked or the
+     Account deleted; and Log, what the maintainer did. Everyone else is told it's the
      maintainer's. It reads /api/admin/ from the browser (admin/admin.ts). -->
 <html lang="en">
   <head>
@@ -33,10 +35,29 @@
             <noscript><p class="lb-said">Moderation needs JavaScript.</p></noscript>
             <p id="signed-out" hidden><a class="button" href="/api/auth/discord?return=%2Fadmin%2F">Sign in with Discord</a></p>
             <div class="account-actions" id="views" role="tablist" aria-label="Moderation" hidden>
-              <button class="button small secondary" id="show-reports" type="button" role="tab" aria-selected="true" aria-controls="reports">Reports</button>
+              <button class="button small secondary" id="show-overview" type="button" role="tab" aria-selected="true" aria-controls="overview">Overview</button>
+              <button class="button small secondary" id="show-reports" type="button" role="tab" aria-selected="false" aria-controls="reports">Reports</button>
               <button class="button small secondary" id="show-characters" type="button" role="tab" aria-selected="false" aria-controls="characters">Characters</button>
+              <button class="button small secondary" id="show-accounts" type="button" role="tab" aria-selected="false" aria-controls="accounts">Accounts</button>
+              <button class="button small secondary" id="show-log" type="button" role="tab" aria-selected="false" aria-controls="log">Log</button>
             </div>
           </header>
+
+          <section class="lb-section stop" id="overview" data-mini="Overview" role="tabpanel" aria-labelledby="overview-title" hidden>
+            <h2 id="overview-title">Overview</h2>
+            <p class="lb-said" id="overview-said" aria-live="polite"></p>
+            <ul class="account-lines" id="overview-lines"></ul>
+            <ul class="account-list">
+              <li class="account-item">
+                <span class="account-words"><strong>Portraits</strong><span id="portraits-said"></span></span>
+                <div class="account-actions"><button class="button small secondary" id="refresh-portraits" type="button">Refresh portraits</button></div>
+              </li>
+              <li class="account-item">
+                <span class="account-words"><strong>Market prices</strong><span id="market-said"></span></span>
+                <div class="account-actions"><button class="button small secondary" id="pull-market" type="button">Pull market prices</button></div>
+              </li>
+            </ul>
+          </section>
 
           <section class="lb-section stop" id="reports" data-mini="Reports" role="tabpanel" aria-labelledby="reports-title" hidden>
             <h2 id="reports-title">Reports</h2>
@@ -57,6 +78,7 @@
             <div id="character" hidden>
               <ul class="account-lines" id="character-lines"></ul>
               <div class="account-actions">
+                <button class="button small secondary" id="open-account" type="button">Open Account</button>
                 <button class="button small secondary" id="reassign-refused" type="button">Reassign to refused key</button>
               </div>
               <form class="lb-search" id="account-form" action="javascript:void 0">
@@ -64,6 +86,57 @@
                 <input id="account-query" type="search" autocomplete="off" spellcheck="false" />
               </form>
               <ul class="account-list" id="account-list"></ul>
+              <h3 class="account-subhead" id="entries-title">Entries</h3>
+              <p class="lb-said" id="entries-said" aria-live="polite"></p>
+              <ul class="account-list" id="entry-list" aria-labelledby="entries-title"></ul>
+              <div class="account-actions">
+                <button class="button small secondary" id="take-all-down" type="button">Take all down</button>
+              </div>
+              <h3 class="account-subhead" id="block-title">Block</h3>
+              <p class="lb-said" id="block-said" aria-live="polite"></p>
+              <form class="lb-search" id="block-form" action="javascript:void 0">
+                <label for="block-note">Note, only you see it</label>
+                <input id="block-note" type="text" autocomplete="off" maxlength="500" />
+                <label class="account-check"><input id="block-name" type="checkbox" /> Block the name too</label>
+              </form>
+              <div class="account-actions">
+                <button class="button small secondary" id="block" type="button">Block</button>
+                <button class="button small secondary" id="unblock" type="button">Unblock</button>
+              </div>
+              <h3 class="account-subhead" id="character-log-title">Log</h3>
+              <ul class="account-list" id="character-log" aria-labelledby="character-log-title"></ul>
+            </div>
+            <h3 class="account-subhead" id="blocks-title">Blocked</h3>
+            <p class="lb-said" id="blocks-said" aria-live="polite"></p>
+            <ul class="account-list" id="block-list" aria-labelledby="blocks-title"></ul>
+          </section>
+
+          <section class="lb-section stop" id="accounts" data-mini="Accounts" role="tabpanel" aria-labelledby="accounts-title" hidden>
+            <h2 id="accounts-title">Accounts</h2>
+            <form class="lb-search" id="find-form" action="javascript:void 0">
+              <label for="find-query">Discord username</label>
+              <input id="find-query" type="search" autocomplete="off" spellcheck="false" />
+            </form>
+            <ul class="account-list" id="found-list"></ul>
+            <p class="lb-said" id="opened-said" aria-live="polite"></p>
+            <div id="opened" hidden>
+              <ul class="account-lines" id="opened-lines"></ul>
+              <h3 class="account-subhead" id="pcs-title">PCs</h3>
+              <ul class="account-list" id="pc-list" aria-labelledby="pcs-title"></ul>
+              <h3 class="account-subhead" id="opened-characters-title">Characters</h3>
+              <ul class="account-list" id="opened-characters" aria-labelledby="opened-characters-title"></ul>
+              <div class="account-actions">
+                <button class="button small secondary" id="delete-account" type="button">Delete Account</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="lb-section stop" id="log" data-mini="Log" role="tabpanel" aria-labelledby="log-title" hidden>
+            <h2 id="log-title">Log</h2>
+            <p class="lb-said" id="log-said" aria-live="polite"></p>
+            <ul class="account-list" id="log-list" aria-labelledby="log-title"></ul>
+            <div class="account-actions">
+              <button class="button small secondary" id="log-older" type="button" hidden>Older</button>
             </div>
           </section>
         </div>
