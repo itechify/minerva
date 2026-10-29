@@ -43,5 +43,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm site:build
       # The Map Leaderboards API (site/worker), type-checked and tested against a local D1, and
-      # what the Map Leaderboards pages show (site/leaderboards).
-      - run: pnpm site:test
+      # what the Map Leaderboards pages show (site/leaderboards). An uncaught exception in workerd
+      # fails the step even when every test passes: it is something a test let out of its
+      # made-up world, such as a fetch to the real network (test/discord-webhook.ts).
+      - name: pnpm site:test
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm site:test 2>&1 | tee "$RUNNER_TEMP/site-test.log"
+          if grep -q "uncaught exception" "$RUNNER_TEMP/site-test.log"; then
+            echo "::error::pnpm site:test printed $(grep -c "uncaught exception" "$RUNNER_TEMP/site-test.log") uncaught exception line(s); see the log above."
+            exit 1
+          fi
