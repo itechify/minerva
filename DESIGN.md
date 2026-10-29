@@ -153,7 +153,7 @@ typography:
     fontSize: "13px"
     fontWeight: 400
     lineHeight: "17px"
-    fontFeature: "tabular-nums"
+    fontFeature: "\"tnum\" 1"
   body-small:
     fontFamily: "Maplestory, Arial, \"Segoe UI\", system-ui, sans-serif"
     fontSize: "12px"
@@ -914,6 +914,7 @@ the text.
   Grab cursor, grabbing while dragged; pan to the paper margin so edge rings stay whole. Double-click resets. Rings,
   route rings and arrowheads keep screen size. Off-box marks clip, no indicators; lighting a row never pans. No zoom
   control or figure. New maps reset; same-map zoom and centre survive section toggles and width changes.
+  While panning, hover lighting clears and the Mark Card hides; hover returns on release.
 - **Spawn points:** every Spawn Point OSMS places on the map, under everything else, as the minimap dots mobs: a Mob Dot
   Red dot (radius 2.25, a 0.75 mob-edge stroke) on a white halo a pixel wider (85% white), in screen pixels whatever the
   zoom, answering the pointer within 5px. A busy map wears dozens, as its minimap does. Resting on a mob's row in the
@@ -1298,7 +1299,7 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   saying what the one shown ranks in a small white window under it (Inset Edge, 4px corners, a soft shadow, 13px Ink) at
   the pointer, the keyboard's focus or a tap, until Escape. They stand beside the page's title from 1000px, their tabs
   level with the art's top; under that, after Where to train. Both stay quiet, as the tables are: never a metal fill, a
-  glow or a trophy.
+  glow or a trophy. Each Pedestal's credit sits directly under its own steps.
 - **Character page** (`site/character`, ADR 0027, read from the site's API by script): every name the Map Leaderboards
   show links to it, a name at rest in its own words' colour and weight, Portal Blue and underlined under the pointer, so
   the boards read as before. It opens as a map's page does: the way back, the Character's name in Site Title (written
