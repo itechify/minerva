@@ -1100,7 +1100,9 @@ A wide comparison window on the panel's glass, following live bests.
 - **Confirmations and pickers:** an armed button uses the problem palette; only one is armed at a time. It keeps its
   place as rows reorder. A Visit's Remove? occupies the tag and ×'s combined space, so nothing shifts. Move and merge
   choices open as unboxed lines under their source, destination text buttons right-aligned. Manage's lines are 4px
-  apart. Confirmation and ownership semantics belong to ADRs 0015, 0016 and 0018 and the FAQ.
+  apart. A second click within 400ms of the first is ignored, and an armed removal cancels on any other click, when the
+  window hides, or when its Visit disappears. Confirmation and ownership semantics belong to ADRs 0015, 0016 and 0018
+  and the FAQ.
 - **Share:** always visible under a Character's picker, absent for Unassigned: a 21px light-steel button with a 22×12px
   switch track before its 12px bold label. White knob left on Disabled Grey when off, right on Edit Blue when on.
   Quiet status words follow in 12px Panel Ink Steel; problems get their own notes above the table.
@@ -1194,7 +1196,9 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   topic choices form two columns of bold Portal Blue links, underlined on hover (one column on phones, 44px taps).
   Its search label is 14px bold Ink Steel, above the white Frame Navy field, inset shadow, 16px, up to 26em. Search
   hides empty groups, opens matching questions and shows one polite 14px Ink Steel feedback line. The minimap skips
-  hidden groups. Search instructions belong to the FAQ.
+  hidden groups. Every typed word must match in the question or answer; Escape or an empty field shows every question
+  again, folding those it opened, and an address naming a hidden question or group clears the filter. Search
+  instructions belong to the FAQ.
 - **Reference in answers:** the facts and the files as definition lists (a bold label over its line, 2px then 12px
   apart), the placements and a Bug Report's contents as lists, the steps numbered in bold Ink Steel.
 - **Toolbar legend:** inside an answer, one row per toolbar button: the app's own game-blue icon button at 21px (Game
