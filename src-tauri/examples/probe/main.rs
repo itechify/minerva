@@ -8,13 +8,16 @@
 //! With a path, the last client area captured is saved there for inspection; as a sample in
 //! `samples/minimap` it is read exactly as the probe read it.
 //!
-//! `cargo run -p minerva --example probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>]`
+//! `cargo run -p minerva --example probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>] [--force]`
 //! Record mode: capture each named rectangle of the game's client area (physical px,
 //! relative to its top-left corner) at its own rate, until stopped (Ctrl+C) or for `n`
 //! seconds, saving every crop as `<out-dir>/<name>/<ms>.png`. `<ms>` is zero-padded
 //! milliseconds since the recording started, so names sort in time order. For example
-//! `exp-bar=1015,1150,200,22@1 pickup-log=1630,830,285,135@10`. Nothing is read or
-//! fetched: it only finds the game window and copies screen pixels.
+//! `exp-bar=1015,1150,200,22@1 pickup-log=1630,830,285,135@10`. First it looks for the
+//! Minimap Title in a capture of the whole client area, as the app does (ADR 0021), and
+//! refuses to record without one, as the crops would be of whatever covers the game; `--force`
+//! records anyway. Nothing else is read, and nothing is fetched: it only finds the game window
+//! and copies screen pixels.
 //!
 //! `cargo run -p minerva --example probe item <out-dir> "<item name>" [--desc <tag>] [--delay <s>]`
 //! Item mode, for `samples/item-tooltip`: count down (3 s by default) while the player
@@ -39,11 +42,13 @@
 //! Where to train (ADR 0024). A map with no Map Summary, or a ceiling of 0, is left out. No
 //! game window is needed.
 //!
-//! `cargo run -p minerva --example probe replay <report.zip> [--all] [--osms <osms-set.json>] [--items <osms-items.json>]`
+//! `cargo run -p minerva --example probe replay <report.zip> [--all] [--stats] [--from-ms <ms>] [--to-ms <ms>] [--osms <osms-set.json>] [--items <osms-items.json>]`
 //! Replay mode, for a Bug Report (ADR 0009): print what it holds and its timeline (from 10
 //! minutes before it was saved, every line the core made something of before that; with
-//! `--all`, every line), then feed its inputs to a new core and say whether it goes
-//! through the same states. The report has no OSMS set, only its fingerprint: the replay
+//! `--all`, every line); with `--stats`, then each reader's readings, arrivals, misses (in
+//! windows) and where it found what it reads, and the crops kept and dropped by kind, of what
+//! was captured from `--from-ms` to `--to-ms` (ms since launch, as the timeline gives); then
+//! feed its inputs to a new core and say whether it goes through the same states. The report has no OSMS set, only its fingerprint: the replay
 //! fetches OSMS's live one, or reads the one given (an `osms-set.json` from the cache of
 //! the PC the report came from). So with the Item Card's OSMS item files (ADR 0010),
 //! fetched live only if the run had them, or read from the `osms-items.json` given. No game
@@ -81,11 +86,11 @@ type Mode = (&'static str, fn(&[String]) -> Result<(), String>, Option<&'static 
 
 const MODES: [Mode; 7] = [
     ("loot", loot, Some("probe loot <report.zip> [--items <osms-items.json>] [--from-ms <ms>] [--to-ms <ms>]")),
-    ("record", record, Some("probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>]")),
+    ("record", record, Some("probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>] [--force]")),
     ("osms", |_| osms(), None),
     ("ceilings", ceilings, Some("probe ceilings <out.json> [--osms <osms-set.json>]")),
     ("update-manifest", update_manifest, Some("probe update-manifest <out> [--bundle-dir <dir>] [--base-url <url>]")),
-    ("replay", replay, Some("probe replay <report.zip> [--all] [--osms <osms-set.json>]")),
+    ("replay", replay, Some("probe replay <report.zip> [--all] [--stats] [--from-ms <ms>] [--to-ms <ms>] [--osms <osms-set.json>] [--items <osms-items.json>]")),
     ("item", item, Some("probe item <out-dir> \"<item name>\" [--desc <tag>] [--delay <seconds>]")),
 ];
 
@@ -299,15 +304,19 @@ fn update_manifest(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// `<report.zip> [--all] [--osms <osms-set.json>] [--items <osms-items.json>]`
+/// `<report.zip> [--all] [--stats] [--from-ms <ms>] [--to-ms <ms>] [--osms <osms-set.json>] [--items <osms-items.json>]`
 fn replay(args: &[String]) -> Result<(), String> {
     use minerva_core::bug_report;
     let mut rest = args.iter();
     let path = rest.next().ok_or("no Bug Report")?;
-    let (mut all, mut set_file, mut items_file) = (false, None, None);
+    let (mut all, mut stats, mut set_file, mut items_file) = (false, false, None, None);
+    let (mut from_ms, mut to_ms) = (0, u64::MAX);
     while let Some(arg) = rest.next() {
         match arg.as_str() {
             "--all" => all = true,
+            "--stats" => stats = true,
+            "--from-ms" => from_ms = rest.next().and_then(|s| s.parse().ok()).ok_or("--from-ms needs milliseconds")?,
+            "--to-ms" => to_ms = rest.next().and_then(|s| s.parse().ok()).ok_or("--to-ms needs milliseconds")?,
             "--osms" => set_file = Some(rest.next().ok_or("--osms needs a file")?),
             "--items" => items_file = Some(rest.next().ok_or("--items needs a file")?),
             other => return Err(format!("unknown argument {other:?}")),
@@ -334,6 +343,10 @@ fn replay(args: &[String]) -> Result<(), String> {
         println!("{line}");
     }
     println!();
+    if stats {
+        print_stats(&bug_report::stats_of(&recording, from_ms, to_ms), from_ms, to_ms);
+        println!();
+    }
     let files = match set_file {
         Some(file) => {
             let json = std::fs::read(file).map_err(|e| format!("{file}: {e}"))?;
@@ -381,6 +394,43 @@ fn replay(args: &[String]) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Print what [`minerva_core::bug_report::stats_of`] counted, reader by reader.
+fn print_stats(stats: &minerva_core::bug_report::ReportStats, from_ms: u64, to_ms: u64) {
+    let counts = |counts: &[(&str, u64)]| counts.iter().map(|(kind, n)| format!("{n} {kind}")).collect::<Vec<_>>().join(", ");
+    let at = |ms: u64| format!("{ms} ms ({}:{:02}:{:02}.{:03})", ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000);
+    let window = if to_ms == u64::MAX { format!("from {from_ms} ms") } else { format!("{from_ms} to {to_ms} ms") };
+    println!("Stats of what was captured {window}:");
+    for reader in &stats.readers {
+        if reader.readings.is_empty() {
+            println!("{}: no readings", reader.reader);
+            continue;
+        }
+        println!("{} ({}): {}", reader.reader, reader.readings.iter().map(|(_, n)| n).sum::<u64>(), counts(&reader.readings));
+        if !reader.arrivals.is_empty() {
+            println!("  arrived: {}", counts(&reader.arrivals));
+        }
+        if !reader.misses.is_empty() {
+            println!("  misses (a window runs to the last before the next reading):");
+        }
+        for miss in &reader.misses {
+            println!("    {} to {}: {}", at(miss.from_ms), at(miss.to_ms), counts(&miss.misses));
+        }
+        for (i, change) in reader.areas.iter().enumerate() {
+            let a = change.area;
+            let moved = if i == 0 { "found at" } else { "moved to" };
+            println!("  {}: {moved} {}x{} at ({}, {})", at(change.at_ms), a.width, a.height, a.x, a.y);
+        }
+    }
+    if stats.crops.is_empty() {
+        println!("Crops: none");
+    } else {
+        println!("Crops, kept and dropped (gone after 10 minutes, or left out to keep the report small):");
+    }
+    for crop in &stats.crops {
+        println!("  {}: {} kept, {} dropped", crop.kind, crop.kept, crop.dropped);
+    }
 }
 
 /// `<report.zip> [--items <osms-items.json>] [--from-ms <ms>] [--to-ms <ms>]`
@@ -535,13 +585,15 @@ fn record(args: &[String]) -> Result<(), String> {
     let (out, rest) = args.split_first().ok_or("no output directory")?;
     let out = PathBuf::from(out);
     let start = Instant::now();
-    let mut seconds = None;
+    let (mut seconds, mut force) = (None, false);
     let mut tracks = Vec::new();
     let mut rest = rest.iter();
     while let Some(arg) = rest.next() {
         if arg == "--seconds" {
             let n: f64 = rest.next().and_then(|s| s.parse().ok()).ok_or("--seconds needs a number")?;
             seconds = Some(Duration::from_secs_f64(n));
+        } else if arg == "--force" {
+            force = true;
         } else {
             tracks.push(parse_track(arg, &out, start)?);
         }
@@ -553,6 +605,15 @@ fn record(args: &[String]) -> Result<(), String> {
     gamewin::look_for(GAME_WINDOW_TITLE);
     let mut client = gamewin::find_game_client().ok_or(format!("No visible \"{GAME_WINDOW_TITLE}\" window found."))?;
     println!("Game client area: {client:?}");
+    // The window is found by its title even while another window covers it: then the crops
+    // would be of that one.
+    if !force && TitleReader::bundled().read(&capture_title(client, 0)?).found.is_none() {
+        return Err(format!(
+            "No Minimap Title in a capture of the \"{GAME_WINDOW_TITLE}\" window: the game may be covered, or not on a map, \
+             and the crops would be of whatever is in front. Bring the game in front on a map and run again, or add \
+             --force to record anyway."
+        ));
+    }
     for t in &tracks {
         let r = t.rect;
         if r.x + r.width > client.width || r.y + r.height > client.height {

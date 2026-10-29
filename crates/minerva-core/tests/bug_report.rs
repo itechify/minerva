@@ -1719,3 +1719,142 @@ fn a_reports_item_lines_replay_as_loot_through_the_current_item_naming_over_a_wi
     let none = bug_report::loot_of(&recording, None, 0, u64::MAX);
     assert_eq!(none.exact, 0, "with no item files nothing is named");
 }
+
+/// A run whose readers each read, miss and move: the title lost for two readings at 0:03, found
+/// again, then found elsewhere unreadable at 0:06 and lost at 0:07; the EXP bar not whole at 0:03
+/// and read in a Status Bar capture at 0:09; the Pickup Log's guess between shifts at 0:09.5; the
+/// Status Bar not found from 0:10, a reading of it left at 0:11; the Pickup Log's lines of every
+/// kind at 0:13, then covered and gone; an Item Card press with no tooltip; then play on past 10 minutes, so the EXP bar's crop goes.
+fn run_with_every_reader() -> (Recording, ScreenRect) {
+    use minerva_core::{PickupLine, PickupLogCapture, PickupLogReading, PickupLogSeen};
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(2 * S, CONSTRUCTION_SITE, grind);
+    let moved = ScreenRect { x: 100, ..common::TITLE_FOUND };
+    let read = Some(TitleLines { street: CONSTRUCTION_SITE.0.into(), map: CONSTRUCTION_SITE.1.into() });
+    for (second, lines, found) in [
+        (3, None, None),
+        (4, None, None),
+        (5, read.clone(), Some(common::TITLE_FOUND)),
+        (6, None, Some(moved)),
+        (7, None, None),
+        (8, read.clone(), Some(moved)),
+    ] {
+        shell.at = second * S;
+        shell.minerva.on_reading(TitleReading { lines, found, at_ms: shell.at });
+        if second == 3 {
+            shell.minerva.on_exp_bar_reading(ExpBarReading { bar: None, at_ms: shell.at, place: None });
+        }
+        shell.step();
+    }
+    shell.at = 9 * S;
+    let bar = grind(shell.at).expect("a reading");
+    let figures = exp_bar_frame(bar.exp, shell.at);
+    read_figures(&mut shell, figures, bar);
+    shell.step();
+    // The Pickup Log, looked for while the Status Bar is found.
+    shell.at = 9 * S + 500;
+    let band = shell.minerva.panel_state().pickup_log_capture.expect("the log is looked for");
+    let capture = PickupLogCapture { frame: noise(band.width, band.height, 7, shell.at), origin: ScreenPoint { x: band.x, y: band.y }, ui_size: 1.0 };
+    let guess = common::pickup_reading(shell.at, PickupLogSeen::Clear { area: common::LOG }, vec![]);
+    shell.minerva.on_pickup_log_read(capture, PickupLogReading { guessed: true, ..guess });
+    shell.step();
+    shell.at = 10 * S;
+    shell.minerva.on_status_bar_reading(StatusBarReading { bar: None, at_ms: shell.at, near_miss: None });
+    shell.step();
+    shell.at = 11 * S;
+    let capture = status_bar_capture(shell.at);
+    shell.minerva.on_game_window(Some(common::window_on_wide_screen(common::GAME)));
+    shell.minerva.on_status_bar_read(capture, status_bar_reading(Some("Egbert"), shell.at), None);
+    shell.step();
+    shell.at = 12 * S;
+    shell.minerva.on_status_bar_reading(StatusBarReading { bar: None, at_ms: shell.at, near_miss: None });
+    shell.step();
+
+    let area = common::LOG;
+    let every_kind = vec![
+        PickupLine::Exp { amount: 30, party: false },
+        PickupLine::Exp { amount: 12, party: true },
+        PickupLine::PartyBonus { amount: 3 },
+        PickupLine::Mesos { amount: 41 },
+        PickupLine::Item { name: "Tree Branch".into(), quantity: 1, tab: "Etc".into(), cut_short: false },
+        PickupLine::Unreadable,
+    ];
+    for (second, seen, arrived) in
+        [(13, PickupLogSeen::Clear { area }, every_kind), (14, PickupLogSeen::Covered { area }, vec![]), (15, PickupLogSeen::Nothing, vec![])]
+    {
+        shell.at = second * S;
+        shell.minerva.on_pickup_log_reading(common::pickup_reading(shell.at, seen, arrived));
+        shell.step();
+    }
+    let pointer = ScreenPoint { x: 500, y: 500 };
+    shell.minerva.on_item_tooltip_reading(Some(ItemTooltipReading { tooltip: ItemTooltip::None, pointer, at_ms: 15 * S + 500 }));
+    shell.at = 16 * S;
+    shell.step();
+    shell.play(11 * MIN, CONSTRUCTION_SITE, grind);
+    (shell.report().1, moved)
+}
+
+#[test]
+fn a_reports_stats_count_each_readers_readings_misses_areas_and_crops() {
+    use bug_report::{AreaChange, CropStats, MissWindow};
+    let (recording, moved) = run_with_every_reader();
+
+    let stats = bug_report::stats_of(&recording, 0, 16 * S);
+
+    let miss = |from_ms, to_ms, misses: &[(&'static str, u64)]| MissWindow { from_ms, to_ms, misses: misses.to_vec() };
+    let area = |at_ms, area| AreaChange { at_ms, area };
+    let readers: Vec<&str> = stats.readers.iter().map(|reader| reader.reader).collect();
+    assert_eq!(readers, ["Minimap Title", "EXP bar", "Status Bar", "Player Shop", "Pickup Log", "Item Tooltip"]);
+    let [title, exp_bar, status_bar, shop, log, tooltip] = &stats.readers[..] else { unreachable!() };
+
+    // Read every 350 ms to 0:02, the last four the same as the first; a reading the same as a
+    // miss is a miss.
+    assert_eq!(title.readings, [("read", 7), ("not found", 3), ("unreadable", 1)]);
+    assert_eq!(title.misses, [miss(3 * S, 4 * S, &[("not found", 2)]), miss(6 * S, 7 * S, &[("unreadable", 1), ("not found", 1)])]);
+    assert_eq!(title.areas, [area(350, common::TITLE_FOUND), area(6 * S, moved)], "found where it was is no move");
+
+    let figures = ScreenRect { x: 1000, y: 1100, width: 224, height: 32 };
+    assert_eq!(exp_bar.readings, [("read", 3), ("not whole", 1)]);
+    assert_eq!(exp_bar.misses, [miss(3 * S, 3 * S, &[("not whole", 1)])]);
+    assert_eq!(exp_bar.areas, [area(9 * S, figures)]);
+
+    // The reading left neither ends the run of misses nor is in it.
+    assert_eq!(status_bar.readings, [("read", 1), ("not found", 2), ("left", 1)]);
+    assert_eq!(status_bar.misses, [miss(10 * S, 12 * S, &[("not found", 2)])]);
+    assert_eq!(status_bar.areas, [area(9 * S, ScreenRect { x: 334, y: 1145, width: 331, height: 55 })]);
+
+    assert_eq!(*shop, bug_report::ReaderStats { reader: "Player Shop", ..Default::default() });
+
+    assert_eq!(log.readings, [("clear (guessed)", 1), ("clear", 1), ("covered", 1), ("nothing", 1)]);
+    let kinds = [("EXP", 1), ("party EXP", 1), ("party bonus", 1), ("mesos", 1), ("item", 1), ("unreadable", 1)];
+    assert_eq!(log.arrivals, kinds);
+    assert_eq!(log.misses, [miss(14 * S, 15 * S, &[("covered", 1), ("nothing", 1)])]);
+    assert_eq!(log.areas, [area(9 * S + 500, common::LOG)]);
+
+    assert_eq!(tooltip.readings, [("not found", 1)]);
+    assert_eq!(tooltip.misses, [miss(15 * S + 500, 15 * S + 500, &[("not found", 1)])]);
+    assert!(tooltip.areas.is_empty());
+
+    // The EXP figures' crop went after 10 minutes; the Pickup Log's guess is kept for the run.
+    let crop = |kind: &str, kept, dropped| CropStats { kind: kind.into(), kept, dropped };
+    assert_eq!(stats.crops, [crop("exp-bar", 0, 1), crop("pickup-log", 1, 0), crop("status-bar", 1, 0)]);
+}
+
+#[test]
+fn a_reports_stats_over_a_window_count_only_what_was_captured_in_it() {
+    use bug_report::{AreaChange, MissWindow};
+    let (recording, moved) = run_with_every_reader();
+
+    let stats = bug_report::stats_of(&recording, 4 * S, 6 * S);
+
+    let title = &stats.readers[0];
+    // The run of misses from 0:03 is cut where the window starts; where the title was found is
+    // said at the first reading in the window that found it.
+    assert_eq!(title.readings, [("not found", 1), ("read", 1), ("unreadable", 1)]);
+    let miss = |at_ms, kind| MissWindow { from_ms: at_ms, to_ms: at_ms, misses: vec![(kind, 1)] };
+    assert_eq!(title.misses, [miss(4 * S, "not found"), miss(6 * S, "unreadable")]);
+    let area = |at_ms, area| AreaChange { at_ms, area };
+    assert_eq!(title.areas, [area(5 * S, common::TITLE_FOUND), area(6 * S, moved)]);
+    assert!(stats.readers[4].readings.is_empty(), "no Pickup Log readings then");
+    assert!(stats.crops.is_empty(), "{:?}", stats.crops);
+}
