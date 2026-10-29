@@ -17,7 +17,7 @@ use crate::errors::error;
 use crate::{Command, http};
 use minerva_core::{
     DiscordLinkAnswer, DiscordLinkRequest, LeaderboardAnswer, LeaderboardUpload, MarketAnswer, MarketAsk, SITE_URL, link_page,
-    read_leaderboard_answer, read_link_state, read_link_token, read_market_answer,
+    read_leaderboard_answer, read_leaderboard_pull, read_link_state, read_link_token, read_market_answer,
 };
 use std::fs;
 use std::io::ErrorKind;
@@ -125,8 +125,8 @@ impl Uploader {
         Self { key, client, made: 0, link_request_made: 0, market_ask_made: 0, commands }
     }
 
-    /// Make each of `uploads` (the core's under way) not made yet, in the background; each
-    /// answer comes back to the core loop as [`Command::LeaderboardAnswer`].
+    /// Make each of `uploads` (the core's under way, pulls among them) not made yet, in the
+    /// background; each answer comes back to the core loop as [`Command::LeaderboardAnswer`].
     pub fn sync(&mut self, uploads: &[LeaderboardUpload]) {
         let made = self.made;
         for upload in uploads.iter().filter(|upload| upload.id > made) {
@@ -143,12 +143,14 @@ impl Uploader {
             let url = format!("{}{}", site(), upload.path());
             let (method, body) = match upload.body() {
                 Some(body) => (reqwest::Method::PUT, Some(body)),
+                None if upload.pull => (reqwest::Method::GET, None),
                 None => (reqwest::Method::DELETE, None),
             };
+            let read = if upload.pull { read_leaderboard_pull } else { read_leaderboard_answer };
             let client = self.client.clone();
             http::answer_in_background(self.commands.clone(), async move {
                 let answer = match http::send(&client, method, &url, &key, body).await {
-                    Ok(reply) => read_leaderboard_answer(reply.status, reply.retry_after.as_deref(), &reply.body),
+                    Ok(reply) => read(reply.status, reply.retry_after.as_deref(), &reply.body),
                     Err(why) => LeaderboardAnswer::Failed { why },
                 };
                 Command::LeaderboardAnswer { id, answer }

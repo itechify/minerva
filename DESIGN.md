@@ -1057,14 +1057,17 @@ A wide comparison window on the panel's glass, following live bests.
   choice. Its light buttons are 21px tall and 12px bold; the selected Character is Selection Periwinkle, the Character
   playing marked "playing" in 11px regular Panel Ink Steel. Manage shares the picker's row at the right (or Unassigned's
   Assign all to…); a 12px Panel Ink Steel note only for an empty list or for Unassigned. Under the picker, a Character's
-  Share; then what Manage opens, upload problems, the table, and 12px Panel Ink Steel notes at up to 75ch. The notes
-  explain the shared bar scale, notches, current-Visit dot and any missing figures. The % of solo EXP/h header has the
-  shared ? help button. There is no map count, sharing-status line or attribution footer.
+  Share, with where they stand beside it in plain words when that isn't a problem ("Up to date: uploaded…", and how many
+  maps' bests came back from the site this launch); then what Manage opens, upload problems, the table, and 12px Panel
+  Ink Steel notes at up to 75ch. The notes explain the shared bar scale, notches, current-Visit dot and any missing
+  figures. The % of solo EXP/h header has the shared ? help button. There is no map count, sharing-status line or
+  attribution footer.
 - **Manage:** 12px Panel Ink Steel with an 8px chevron at the picker row's end, Portal Blue and underlined on hover.
   Open lines sit unboxed on glass, 4px apart; explanation before merge, Remove 8px after. See Confirmations and pickers.
 - **Upload problems:** below Manage, even when Manage is folded: Problem Cream, Problem Amber edge, Problem Brown
   12px/16px words wrapping at up to 75ch, with the 8px orange dot and a remedy text button at the end. Where the words
-  name that button, its name is bold. Keep Level Bands whole on a line. Sharing states and recovery: ADR 0015 and the FAQ's Map Leaderboards answers.
+  name that button, its name is bold. Keep Level Bands whole on a line. Sharing states and recovery: ADR 0015 and the
+  FAQ's Map Leaderboards answers.
 - **Table:** set into the body on near-opaque Window Lavender (95%), edged in Inset Edge with a 4px radius, as the Grind
   Tracker's figures are, so the densest reading holds over any scene. 13px/17px, 5px of padding above and below each
   row, rows parted by Panel Rules. Columns: Map (its 19px Map Mark, then its name in bold, opening its MeowDB page in

@@ -419,6 +419,24 @@ impl Bests {
         merged
     }
 
+    /// Take back Visits of the Character named `name` that the Map Leaderboards held (#206):
+    /// each of `visits`, a map and its Visit's best, joins their Visits on its map as any Visit
+    /// does, unless one there has its EXP/h and date already. How many maps had one join.
+    pub fn take_back(&mut self, name: &str, visits: Vec<(String, VisitBest)>) -> usize {
+        let mut maps: Vec<String> = Vec::new();
+        self.changing(|bests| {
+            for (map, visit) in visits {
+                let there = bests.history.maps_of(Some(name)).iter().find(|m| m.id == map).is_some_and(|m| {
+                    m.visits.iter().any(|v| v.exp_per_hour == visit.exp_per_hour && v.set_at_unix_ms == visit.set_at_unix_ms)
+                });
+                if !there && join(&mut bests.history, Some(name), map.clone(), visit).is_some() && !maps.contains(&map) {
+                    maps.push(map);
+                }
+            }
+        });
+        maps.len()
+    }
+
     /// Whether some map has a best: in any history, or the Visit under way's. Whether
     /// [`Bests::saved`] hands out any, without making them.
     pub fn any(&self) -> bool {

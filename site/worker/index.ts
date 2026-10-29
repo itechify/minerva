@@ -24,7 +24,7 @@ import { isMaintainerToken } from "./keys";
 import { pullNow, readMarket } from "./market";
 import { withKind } from "./kinds";
 import { readLatest } from "./latest";
-import { optOut, readBand, readMap, readMaps, upload } from "./leaderboards";
+import { optOut, pull, readBand, readMap, readMaps, upload } from "./leaderboards";
 import {
   deleteAllEntries,
   deleteEntry,
@@ -44,9 +44,14 @@ import { endSession, isMaintainerAccount, sameOrigin, sessionAccount } from "./s
 import { readBands, readTraining } from "./where-to-train";
 
 /** The Map Leaderboards' reads, which read no key or cookie, a Character's page's among them
- *  (the app's writes under /api/characters aren't GETs). Each reads Characters from `SHOWN`
- *  (blocks.ts), never `entries`, so a Block hides them; blocks.test.ts checks every one. */
+ *  (the app's calls under /api/characters/<name>/entries aren't: see `KEY_READ`). Each reads
+ *  Characters from `SHOWN` (blocks.ts), never `entries`, so a Block hides them; blocks.test.ts
+ *  checks every one. */
 export const PUBLIC_READS = ["/api/maps", "/api/bands", "/api/latest", "/api/pedestals", "/api/characters"];
+
+/** The app's pull of a Character's entries (#206): a GET under a public read's path, but it reads a
+ *  key, so it's never cached. */
+const KEY_READ = /^\/api\/characters\/[^/]+\/entries$/;
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -55,7 +60,8 @@ export default {
     const answer = await route(request, url, env, ctx);
     // The Map Leaderboards' reads may be cached a minute; nothing else, since everything else
     // reads a key or a cookie.
-    const isPublicRead = request.method === "GET" && PUBLIC_READS.some((path) => url.pathname.startsWith(path));
+    const isPublicRead =
+      request.method === "GET" && PUBLIC_READS.some((path) => url.pathname.startsWith(path)) && !KEY_READ.test(url.pathname);
     return json(answer, isPublicRead ? "public, max-age=60" : "no-store");
   },
   // The daily cron trigger (site/wrangler.jsonc): every Character's portrait, asked for again
@@ -92,6 +98,8 @@ async function route(request: Request, url: URL, env: Env, ctx: ExecutionContext
       return readCharacterPage(env, path[1]);
     case path.length === 1 && path[0] === "market" && method === "GET":
       return readMarket(env, request, url);
+    case path.length === 3 && path[0] === "characters" && path[2] === "entries" && method === "GET":
+      return pull(env, request, path[1]);
     case path.length === 3 && path[0] === "characters" && path[2] === "entries" && method === "PUT":
       return upload(env, request, path[1], ctx);
     case path.length === 3 && path[0] === "characters" && path[2] === "entries" && method === "DELETE":

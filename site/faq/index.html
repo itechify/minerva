@@ -174,6 +174,12 @@
                       A small file from GitHub that names the newest release. Minerva gets it when it starts, every 6
                       hours while it runs, and when you ask. <a href="#self-update">See how it updates</a>.
                     </dd>
+                    <dt>Your characters' bests</dt>
+                    <dd>
+                      The bests the Map Leaderboards hold of a character you share. Minerva asks for them with your
+                      Leaderboard Key before it first sends that character's bests from this PC, and after your bests file
+                      didn't load. It adds any your PC doesn't have. <a href="#bests-gone">See why</a>.
+                    </dd>
                     <dt>Market prices</dt>
                     <dd>
                       The Going rate and Cheapest now for each item whose card you open, and for the Player Shop listings
@@ -1293,7 +1299,8 @@
                     character's <strong>Share</strong>. Your browser opens the site, which signs you in with Discord and
                     asks before it links this PC. Your Personal Bests then say <strong>Linked to Discord as</strong> your
                     username. On a new PC, or after reinstalling Windows, link that PC to the same Discord and it can
-                    upload your characters again. You don't need to ask anyone.
+                    upload your characters again. It gets their bests from the site first, so it starts with their best
+                    on each map. You don't need to ask anyone.
                   </p>
                   <p>
                     The site keeps your Discord user ID and username, and shows neither. Linking is optional, and Minerva
@@ -1623,10 +1630,12 @@
                     The file is <a href="#kept">beside your settings</a>.
                   </p>
                   <p>
-                    A character you show on the <a href="#leaderboard-appear">Map Leaderboards</a> keeps their entries
-                    there. Minerva sends nothing of theirs, because what's left on your PC would replace those entries,
-                    and a note in your Personal Bests tells you so. To send what's on your PC now instead, click
-                    <strong>Send what's here</strong> on the note, then click again to confirm.
+                    A character you share on the <a href="#leaderboard-appear">Map Leaderboards</a> keeps their entries
+                    there. Minerva gets those entries back and adds them to your Personal Bests before it sends anything
+                    of theirs. Each one is that character's best on a map in one Level Band, so the visits under it stay
+                    lost. Until the site answers, Minerva sends nothing of theirs and a note in your Personal Bests says
+                    so. Press <strong>Sync</strong> on the note to try again now. Turn <strong>Share</strong> off and on
+                    again to send only what's on your PC. That replaces their entries on the site.
                   </p>
                 </details>
                 <details class="qa" id="refresh">

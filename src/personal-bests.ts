@@ -76,6 +76,8 @@ type Toggle = {
   uploadedAtUnixMs: number | null;
   /** The entries the site kept off, while they're shown there. */
   rejected: Rejected[];
+  /** How many maps had a visit come back from the site this launch (#206): 0 if none did. */
+  mapsFromSite: number;
 };
 
 /** Mirror of `minerva_core::PersonalBestsCharacter`: one of the picker's choices. */
@@ -572,9 +574,8 @@ let managing = false;
 /** What a click armed, until a second click does it, a click anywhere else, the window
  *  hiding or its button going: one at a time. A Visit's × (`remove:<visit>`), its Move
  *  (`move:<visit>`, and `move:<visit>><name>` once a Character is clicked); a Character's
- *  Remove (`remove-character:<name>`) and Merge (`merge:<name>`, and `merge:<name>><into>`),
- *  and held uploads' Send (`send:<name>`); and Unassigned's Assign all (`assign:`, and
- *  `assign:><name>`). */
+ *  Remove (`remove-character:<name>`) and Merge (`merge:<name>`, and `merge:<name>><into>`);
+ *  and Unassigned's Assign all (`assign:`, and `assign:><name>`). */
 let armed: string | null = null;
 /** When the button now armed was armed (`performance.now()`): a second click within
  *  [`SECOND_CLICK_MS`] of it is a double-click's, and is ignored, so a double-click never
@@ -697,13 +698,15 @@ function when(unixMs: number) {
 }
 
 /** What the switch says beside it of where the Character stands with the Map Leaderboards,
- *  when it isn't a problem (those are notes of their own). */
+ *  when it isn't a problem (those are notes of their own), and how many maps' bests came back
+ *  from the site this launch. */
 function standing(t: Toggle): string {
+  const back = t.mapsFromSite > 0 ? ` Got bests on ${mapsText(t.mapsFromSite)} back from the site.` : "";
   switch (t.status) {
     case "sending":
-      return t.on ? "Uploading…" : "Taking them off…";
+      return (t.on ? "Uploading…" : "Taking them off…") + back;
     case "upToDate":
-      return t.uploadedAtUnixMs === null ? "Up to date." : `Up to date: uploaded ${when(t.uploadedAtUnixMs)}.`;
+      return (t.uploadedAtUnixMs === null ? "Up to date." : `Up to date: uploaded ${when(t.uploadedAtUnixMs)}.`) + back;
     default:
       return "";
   }
@@ -886,23 +889,18 @@ function renderProblems() {
     again.textContent = "Send again";
     again.title = t.on ? `Upload ${name}'s bests now, rather than waiting` : `Take ${name}'s bests off the site now, rather than waiting`;
     if (t.status === "held") {
-      const send = textButton(
-        `send:${name}`,
-        true,
-        "Send what's here",
-        `Replace ${name}'s entries on the site with ${mapsText(t.maps)}?`,
-        `Upload ${name}'s bests as they are here, in place of what the site holds`,
-      );
+      again.textContent = "Sync";
+      again.title = `Get ${name}'s bests from the site now, then upload them with this PC's`;
       problemsEl.append(
         problemNote(
           [
-            `Your bests file didn't load at one launch, so the site may have bests of ${name}'s that this PC doesn't. `,
-            "Minerva won't send theirs until you press ",
-            Object.assign(document.createElement("strong"), { textContent: "Send what's here" }),
+            `Your bests file didn't load at one launch, and Minerva couldn't get ${name}'s bests back from the site yet. `,
+            "It won't send theirs until it has. It keeps trying. To try now, press ",
+            Object.assign(document.createElement("strong"), { textContent: "Sync" }),
             ".",
             ...(discord.offered ? [" To keep your characters' names yours if this PC's files are ever lost, ", linkButton("link Discord", true), "."] : []),
           ],
-          send,
+          again,
         ),
       );
     } else if (t.status === "claimed") {
@@ -1046,8 +1044,6 @@ function act(arm: string) {
     invoke("personal_bests_remove_character", { name: key });
   } else if (what === "merge" && target) {
     invoke("personal_bests_merge_characters", { from: key, into: target });
-  } else if (what === "send") {
-    invoke("personal_bests_send_again", { name: key });
   }
 }
 

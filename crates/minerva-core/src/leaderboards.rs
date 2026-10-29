@@ -25,15 +25,22 @@
 //!   of theirs this launch, unless the player sends them again; rate-limited waits as long as the
 //!   site says; anything else (offline, say) is tried again quietly, later each time.
 //! - **Removing a Character**, or merging one into another, takes the one gone off the site.
+//! - **Pulled first** (#206): since an upload replaces what the site holds, a Character whose
+//!   bests here may be far fewer than the site's has the site's entries pulled (`GET`) before
+//!   anything of theirs goes up: one held (below), or one never uploaded from this install (a new
+//!   PC, or a Character met for the first time, whose name no key may hold yet). Each entry
+//!   joins their Visits on its map as any Visit does, unless one there has its EXP/h and date
+//!   already, and the toggle says how many maps had one come back. Then what is here goes up. A pull that fails is tried again as an upload is, and nothing of theirs goes up
+//!   meanwhile.
 //! - **Bests lost**: a launch whose bests file didn't read starts with none, and sending what is
 //!   here then would take every shown Character's entries off the site. So each Character
-//!   shown then is held: nothing of theirs goes up, at that launch or any after (the file saved
-//!   from then on holds only the bests set since), and the toggle says why, as a problem, until
-//!   the player sends them again, having confirmed: what is here then replaces what the site
-//!   holds, with no deletion first. (Turning them off and on does too, deleting first.) One
-//!   shown after isn't held: turning it on asks with the count.
-//! - **Problems** (held, blocked, a name claimed, an upload tried again) the window says as problems,
-//!   and the player can send them again at once rather than wait.
+//!   shown then is held, at that launch and any after (the file saved from then on holds only
+//!   the bests set since), until their entries are pulled from the site and merged in. While
+//!   that fails, the toggle says why, as a problem, and sending them again pulls at once.
+//!   Turning them off and on sends what is here, deleting first.
+//! - **Problems** (held with the pull failing, blocked, a name claimed, an upload tried again) the
+//!   window says as problems, and the player can send them again at once rather than wait (held,
+//!   that pulls at once).
 
 use crate::personal_best::{LevelBand, SavedBests, VisitBest, band_bests};
 use crate::SITE_URL;
@@ -75,7 +82,8 @@ pub struct LeaderboardEntry {
 
 /// An upload the shell is to make, from when the core asks for it until the shell tells it
 /// the answer: a Character's whole set of entries (`PUT`), or, with `entries` `None`, taking
-/// them all off the site (`DELETE`, opting out).
+/// them all off the site (`DELETE`, opting out), or, with `pull`, getting the set the site
+/// holds of them (`GET`), to merge in before sending (see the module's "Pulled first").
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LeaderboardUpload {
@@ -84,6 +92,10 @@ pub struct LeaderboardUpload {
     /// The Character's name.
     pub name: String,
     pub entries: Option<Vec<LeaderboardEntry>>,
+    /// It gets their entries from the site, sending nothing: `entries` is `None`. Its answer
+    /// is read by [`read_leaderboard_pull`].
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pull: bool,
 }
 
 impl LeaderboardUpload {
@@ -92,7 +104,7 @@ impl LeaderboardUpload {
         format!("api/characters/{}/entries", encoded(&self.name))
     }
 
-    /// What to `PUT` there: the API's body. `None` for a `DELETE`.
+    /// What to `PUT` there: the API's body. `None` for a `DELETE` or a pull's `GET`.
     pub fn body(&self) -> Option<String> {
         #[derive(Serialize)]
         struct Body<'a> {
@@ -120,12 +132,6 @@ pub fn read_leaderboard_answer(status: u16, retry_after: Option<&str>, body: &st
         reason: String,
         cap: Option<u64>,
     }
-    #[derive(Deserialize, Default)]
-    struct Refusal {
-        #[serde(default)]
-        error: String,
-        detail: Option<String>,
-    }
     match status {
         // Taken: it went through, whatever the body says of what was kept off.
         200 => {
@@ -144,28 +150,53 @@ pub fn read_leaderboard_answer(status: u16, retry_after: Option<&str>, body: &st
             LeaderboardAnswer::Accepted { rejected }
         }
         204 => LeaderboardAnswer::Deleted {},
-        429 => {
-            let retry_after_secs = retry_after.and_then(|s| s.trim().parse().ok()).unwrap_or(60);
-            LeaderboardAnswer::RateLimited { retry_after_secs }
-        }
-        _ => {
-            let refusal: Refusal = serde_json::from_str(body).unwrap_or_default();
-            if status == 409 && refusal.error == "claimed" {
-                return LeaderboardAnswer::Claimed {};
-            }
-            if status == 403 && refusal.error == "blocked" {
-                return LeaderboardAnswer::Blocked {};
-            }
-            let mut why = format!("HTTP {status}");
-            if !refusal.error.is_empty() {
-                why += &format!(": {}", refusal.error);
-            }
-            if let Some(detail) = refusal.detail {
-                why += &format!(" ({detail})");
-            }
-            LeaderboardAnswer::Failed { why }
-        }
+        _ => refused(status, retry_after, body),
     }
+}
+
+/// What the Map Leaderboards' answer to a pull means, from its HTTP `status`, its `Retry-After`
+/// header and its `body`: the entries the site holds of the Character (none for a name no key
+/// holds), or why there are none to have.
+pub fn read_leaderboard_pull(status: u16, retry_after: Option<&str>, body: &str) -> LeaderboardAnswer {
+    #[derive(Deserialize)]
+    struct Held {
+        entries: Vec<LeaderboardEntry>,
+    }
+    match (status, serde_json::from_str::<Held>(body)) {
+        (200, Ok(held)) => LeaderboardAnswer::Pulled { entries: held.entries },
+        (200, Err(e)) => LeaderboardAnswer::Failed { why: format!("HTTP 200, but not entries ({e})") },
+        _ => refused(status, retry_after, body),
+    }
+}
+
+/// What an answer that isn't the site doing as asked means: too many lately, a name another key
+/// holds, blocked, or anything else as words.
+fn refused(status: u16, retry_after: Option<&str>, body: &str) -> LeaderboardAnswer {
+    #[derive(Deserialize, Default)]
+    struct Refusal {
+        #[serde(default)]
+        error: String,
+        detail: Option<String>,
+    }
+    if status == 429 {
+        let retry_after_secs = retry_after.and_then(|s| s.trim().parse().ok()).unwrap_or(60);
+        return LeaderboardAnswer::RateLimited { retry_after_secs };
+    }
+    let refusal: Refusal = serde_json::from_str(body).unwrap_or_default();
+    if status == 409 && refusal.error == "claimed" {
+        return LeaderboardAnswer::Claimed {};
+    }
+    if status == 403 && refusal.error == "blocked" {
+        return LeaderboardAnswer::Blocked {};
+    }
+    let mut why = format!("HTTP {status}");
+    if !refusal.error.is_empty() {
+        why += &format!(": {}", refusal.error);
+    }
+    if let Some(detail) = refusal.detail {
+        why += &format!(" ({detail})");
+    }
+    LeaderboardAnswer::Failed { why }
 }
 
 /// What the Map Leaderboards answered an upload, as the shell tells it.
@@ -176,6 +207,8 @@ pub enum LeaderboardAnswer {
     Accepted { rejected: Vec<RejectedEntry> },
     /// The entries were deleted (204).
     Deleted {},
+    /// A pull's: the entries the site holds of the Character (200), none for a name no key holds.
+    Pulled { entries: Vec<LeaderboardEntry> },
     /// Another Leaderboard Key holds the name (409 `claimed`).
     Claimed {},
     /// The maintainer blocked uploads from this key, its Account or the name (403 `blocked`,
@@ -248,11 +281,12 @@ pub struct LeaderboardCharacter {
     /// Shown; `false`: taken off, and their entries not yet deleted from the site.
     pub shown: bool,
     /// When an upload of theirs last went through, by the wall clock (ms since the Unix epoch).
+    /// `None`: none has from this install, so the site's are pulled first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uploaded_at_unix_ms: Option<u64>,
     /// Their uploads are held: the bests file didn't read at a launch since they were shown, so
-    /// what is here may be far less than the site holds. Until the player sends them again, or
-    /// turns them off and on.
+    /// what is here may be far less than the site holds. Until the site's are pulled and merged
+    /// in, or the player turns them off and on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub held: bool,
 }
@@ -281,6 +315,9 @@ pub struct LeaderboardToggle {
     pub uploaded_at_unix_ms: Option<u64>,
     /// The entries the site didn't take at the last upload, while they're shown there.
     pub rejected: Vec<RejectedListing>,
+    /// How many maps had a Visit come back from the site this launch, when their entries were
+    /// pulled: 0 if none did.
+    pub maps_from_site: usize,
 }
 
 /// Where a Character stands with the Map Leaderboards.
@@ -301,7 +338,8 @@ pub enum LeaderboardStatus {
     /// asks on Discord if it was a mistake.
     Blocked,
     /// Nothing is sent: the bests file didn't read at a launch since they were shown, so the
-    /// site may hold more of theirs than is here. Sending them again sends what is here.
+    /// site may hold more of theirs than is here, and getting those from the site failed. It is
+    /// tried again quietly; sending them again tries at once.
     Held,
 }
 
@@ -324,15 +362,22 @@ struct UploadStanding {
     /// deletion, until the player sends them again or Minerva starts again.
     blocked: bool,
     rejected: Vec<RejectedEntry>,
+    /// Their entries were pulled from the site this launch.
+    pulled: bool,
+    /// How many maps had a Visit come back from the site when they were.
+    maps_from_site: usize,
 }
 
 #[derive(Debug, Clone)]
 struct Wait {
     until_ms: u64,
-    /// What was to be sent then.
+    /// What was to be sent then: nothing, for a pull.
     wanted: Option<Vec<LeaderboardEntry>>,
     /// The site said how long: a change doesn't cut it short.
     rate_limited: bool,
+    /// It was a pull that didn't go through: only the next pull waits, never an upload or the
+    /// deletion (turned off meanwhile, say).
+    pull: bool,
 }
 
 /// Every Character shown on the Map Leaderboards, or being taken off, and every one met.
@@ -411,8 +456,9 @@ impl Leaderboards {
     }
 
     /// The player sent the Character named `name` again: whatever stood in the way (a wait
-    /// after a failure, a name another key held, uploads held since bests were lost), what is
-    /// here goes up at the next tick, replacing what the site holds of them. Taken off, their
+    /// after a failure, a name another key held), what is here goes up at the next tick,
+    /// replacing what the site holds of them. Held, their entries are pulled from the site at
+    /// the next tick instead, and sent with what is here once merged in. Taken off, their
     /// deletion goes again the same way. Nothing changes while an upload of theirs is under
     /// way.
     pub fn send_again(&mut self, name: &str) {
@@ -420,7 +466,6 @@ impl Leaderboards {
         if standing.in_flight.is_some() {
             return;
         }
-        standing.saved.held = false;
         standing.confirmed = None;
         standing.wait = None;
         standing.failures = 0;
@@ -446,7 +491,8 @@ impl Leaderboards {
     }
 
     /// The Personal Bests saved at earlier launches couldn't be read at this one: hold the
-    /// uploads of every Character shown. Who was met can't be told from them either.
+    /// uploads of every Character shown, until their entries are pulled from the site. Who was
+    /// met can't be told from them either.
     pub fn bests_lost(&mut self) {
         if self.met_from_bests {
             self.met = None;
@@ -475,9 +521,16 @@ impl Leaderboards {
             self.show(&name, true);
         }
         for standing in &mut self.standings {
-            // Held or blocked, nothing goes but the deletion the player asks for by turning them
-            // off.
-            if standing.in_flight.is_some() || (standing.saved.shown && (standing.saved.held || standing.blocked)) {
+            // Blocked, nothing goes but the deletion the player asks for by turning them off.
+            if standing.in_flight.is_some() || (standing.saved.shown && standing.blocked) {
+                continue;
+            }
+            // Their entries pulled from the site first, held or not, then what is here goes up.
+            if standing.to_pull() {
+                if !standing.wait.as_ref().is_some_and(|wait| self.now_ms < wait.until_ms) {
+                    self.last_id += 1;
+                    standing.in_flight = Some(LeaderboardUpload { id: self.last_id, name: standing.saved.name.clone(), entries: None, pull: true });
+                }
                 continue;
             }
             let wanted = standing.saved.shown.then(|| entries(history, &standing.saved.name, now_unix_ms));
@@ -485,24 +538,34 @@ impl Leaderboards {
                 Some(entries) => standing.confirmed.as_ref() != Some(entries),
                 None => true,
             };
+            // A pull that failed holds up nothing but the next pull, unless the site said how long.
             let waiting = standing.wait.as_ref().is_some_and(|wait| {
-                self.now_ms < wait.until_ms && (wait.rate_limited || wait.wanted == wanted)
+                (!wait.pull || wait.rate_limited) && self.now_ms < wait.until_ms && (wait.rate_limited || wait.wanted == wanted)
             });
             if due && !waiting {
                 self.last_id += 1;
-                standing.in_flight = Some(LeaderboardUpload { id: self.last_id, name: standing.saved.name.clone(), entries: wanted });
+                standing.in_flight =
+                    Some(LeaderboardUpload { id: self.last_id, name: standing.saved.name.clone(), entries: wanted, pull: false });
             }
         }
     }
 
-    /// The site answered upload `id` with `answer`, the wall clock at `wall_clock`.
-    pub fn answer(&mut self, id: u64, answer: LeaderboardAnswer, wall_clock: Option<u64>) {
-        let Some(at) = self.standings.iter().position(|standing| standing.in_flight.as_ref().is_some_and(|u| u.id == id)) else {
-            return;
-        };
+    /// The site answered upload `id` with `answer`, the wall clock at `wall_clock`. A pull's
+    /// entries, to merge into the Character's bests: whose, and what. Merged, what is here then
+    /// goes up, held or not.
+    pub fn answer(&mut self, id: u64, answer: LeaderboardAnswer, wall_clock: Option<u64>) -> Option<(String, Vec<LeaderboardEntry>)> {
+        let at = self.standings.iter().position(|standing| standing.in_flight.as_ref().is_some_and(|u| u.id == id))?;
         let standing = &mut self.standings[at];
-        let Some(upload) = standing.in_flight.take() else { return };
-        match (answer, upload.entries) {
+        let LeaderboardUpload { name, entries, pull, .. } = standing.in_flight.take()?;
+        match (answer, entries) {
+            (LeaderboardAnswer::Pulled { entries }, None) if pull => {
+                standing.pulled = true;
+                standing.saved.held = false;
+                standing.wait = None;
+                standing.failures = 0;
+                standing.claimed = false;
+                return Some((name, entries));
+            }
             (LeaderboardAnswer::Accepted { rejected }, Some(entries)) => {
                 standing.confirmed = Some(entries);
                 standing.saved.uploaded_at_unix_ms = wall_clock.or(standing.saved.uploaded_at_unix_ms);
@@ -513,7 +576,7 @@ impl Leaderboards {
             }
             // Deleted: nothing of theirs is left there. Shown again meanwhile, their set goes up
             // at the next tick.
-            (LeaderboardAnswer::Deleted {}, None) => {
+            (LeaderboardAnswer::Deleted {}, None) if !pull => {
                 if standing.saved.shown {
                     standing.confirmed = None;
                 } else {
@@ -521,14 +584,14 @@ impl Leaderboards {
                 }
             }
             // Another key holds the name, so nothing of theirs is there to delete.
-            (LeaderboardAnswer::Claimed {}, None) if !standing.saved.shown => {
+            (LeaderboardAnswer::Claimed {}, None) if !pull && !standing.saved.shown => {
                 self.standings.remove(at);
             }
             (LeaderboardAnswer::Claimed {}, wanted) => {
                 standing.confirmed = None;
                 standing.claimed = true;
                 standing.failures = 0;
-                standing.wait = Some(Wait { until_ms: self.now_ms + CLAIMED_RETRY_MS, wanted, rate_limited: false });
+                standing.wait = Some(Wait { until_ms: self.now_ms + CLAIMED_RETRY_MS, wanted, rate_limited: false, pull });
             }
             (LeaderboardAnswer::Blocked {}, Some(_)) => {
                 standing.confirmed = None;
@@ -539,14 +602,23 @@ impl Leaderboards {
             (LeaderboardAnswer::RateLimited { retry_after_secs }, wanted) => {
                 standing.failures += 1;
                 let until_ms = self.now_ms + retry_after_secs.max(1).saturating_mul(1000);
-                standing.wait = Some(Wait { until_ms, wanted, rate_limited: true });
+                standing.wait = Some(Wait { until_ms, wanted, rate_limited: true, pull });
             }
             // Failed, or an answer that doesn't fit the upload: tried again, later each time.
             (_, wanted) => {
                 standing.failures += 1;
                 let backoff = FIRST_RETRY_MS.saturating_mul(1 << (standing.failures - 1).min(16)).min(MOST_RETRY_MS);
-                standing.wait = Some(Wait { until_ms: self.now_ms + backoff, wanted, rate_limited: false });
+                standing.wait = Some(Wait { until_ms: self.now_ms + backoff, wanted, rate_limited: false, pull });
             }
+        }
+        None
+    }
+
+    /// `maps` maps had a Visit come back from the site when the Character named `name`'s entries
+    /// were pulled and merged in, as the toggle says.
+    pub fn came_back(&mut self, name: &str, maps: usize) {
+        if let Some(standing) = self.standings.iter_mut().find(|standing| standing.saved.name == name) {
+            standing.maps_from_site = maps;
         }
     }
 
@@ -566,7 +638,9 @@ impl Leaderboards {
         let standing = self.standings.iter().find(|standing| standing.saved.name == name);
         let status = match standing {
             None => LeaderboardStatus::Off,
-            Some(standing) if standing.saved.shown && standing.saved.held => LeaderboardStatus::Held,
+            // Held while their entries are being pulled is only sending; it is a problem once
+            // pulling fails. A name another key holds is said as that.
+            Some(standing) if standing.saved.shown && standing.saved.held && standing.failures > 0 => LeaderboardStatus::Held,
             Some(standing) if standing.saved.shown && standing.blocked => LeaderboardStatus::Blocked,
             Some(standing) if standing.claimed => LeaderboardStatus::Claimed,
             Some(standing) if standing.failures > 0 => LeaderboardStatus::Retrying,
@@ -585,13 +659,32 @@ impl Leaderboards {
             problem: matches!(status, LeaderboardStatus::Retrying | LeaderboardStatus::Claimed | LeaderboardStatus::Blocked | LeaderboardStatus::Held),
             uploaded_at_unix_ms: standing.and_then(|standing| standing.saved.uploaded_at_unix_ms),
             rejected,
+            maps_from_site: standing.map_or(0, |standing| standing.maps_from_site),
         }
     }
 }
 
 impl UploadStanding {
     fn new(saved: LeaderboardCharacter) -> Self {
-        Self { saved, confirmed: None, in_flight: None, wait: None, failures: 0, claimed: false, blocked: false, rejected: Vec::new() }
+        Self {
+            saved,
+            confirmed: None,
+            in_flight: None,
+            wait: None,
+            failures: 0,
+            claimed: false,
+            blocked: false,
+            rejected: Vec::new(),
+            pulled: false,
+            maps_from_site: 0,
+        }
+    }
+
+    /// Their entries are to be pulled from the site before anything of theirs goes up: shown,
+    /// and held, or never uploaded from this install (a new PC, say, whose first upload would
+    /// otherwise replace what the site holds of them with what little is here).
+    fn to_pull(&self) -> bool {
+        self.saved.shown && !self.pulled && (self.saved.held || self.saved.uploaded_at_unix_ms.is_none())
     }
 }
 
