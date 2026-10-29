@@ -262,11 +262,13 @@ const PLACES: Record<Medal, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
 /** A Pedestal's three steps in `steps` (an <ol>), 1st to 3rd, the order assistive tech reads
  *  them and Tab goes through them, the ranking's own; site.css stands them 2nd, 1st, 3rd, each
  *  on its block, the 1st's the tallest, with its crown and place. On a step stand the
- *  Character's portrait, their name (a link to their page) and what they stand it for; on the
- *  EXP/h Pedestal, the map (a link to its page at the band, with their entry marked) and their
- *  job and level go under its block, so the steps carry no more than Most podiums' do. A step
+ *  Character's portrait and name (a link to their page); under its block, what they stand it
+ *  for ("3 podiums", or "380,000 EXP/h" and a Party Best's mark), and on Highest EXP/h the map
+ *  (a link to its page at the band, with their entry marked) and their job and level. A step
  *  no one stands asks for yours. */
 export function drawPedestal(steps: HTMLOListElement, pedestal: Pedestal) {
+  // With a Party Best on it, every step keeps a line for the mark, so their lines stay level.
+  const partyLine = pedestal.steps.some((s) => s.stood?.party);
   steps.replaceChildren(
     ...pedestal.steps.map(({ place, stood }) => {
       const step = make("li", `lb-stand lb-stand-${place}`);
@@ -282,19 +284,12 @@ export function drawPedestal(steps: HTMLOListElement, pedestal: Pedestal) {
       } else {
         if (stood.portrait !== null) who.append(portraitImage(stood.portrait, BAND_PORTRAIT));
         who.append(characterLink(stood.name, stood.nameHref, "lb-stand-name"));
-        const figure = make("span", "lb-stand-figure");
-        // The figure and what it counts never part; a Party mark may go to the next line.
-        const amount = make("span", "lb-stand-amount");
-        amount.append(make("strong", "lb-stand-value", stood.value), ` ${stood.label}`);
-        figure.append(amount);
-        if (stood.party) figure.append(partyMark());
-        who.append(figure);
       }
       const block = make("div", "lb-stand-block");
       block.setAttribute("aria-hidden", "true");
       block.append(crown(place), PLACES[place]);
       step.append(who, block);
-      if (stood !== null && (stood.map !== null || stood.who !== null)) step.append(floorOf(stood));
+      if (stood !== null) step.append(floorOf(stood, partyLine));
       return step;
     }),
   );
@@ -365,10 +360,23 @@ function restackOnto(steps: HTMLOListElement, before: Map<string, Map<string, DO
   }
 }
 
-/** What goes under a step's block on the EXP/h Pedestal: the map, with its Map Mark, then the
- *  job, with its icon, and the level. */
-function floorOf(stood: Stood): HTMLElement {
+/** What goes under a step's block: what its Character stands it for, on a line of its own
+ *  under it the Party mark for a Party Best (`partyLine`, that line kept empty on the other
+ *  steps), then on Highest EXP/h the map, with its Map Mark, then the job, with its icon, and
+ *  the level. */
+function floorOf(stood: Stood, partyLine: boolean): HTMLElement {
   const floor = make("div", "lb-stand-floor");
+  const figure = make("span", "lb-stand-figure");
+  // The figure and what it counts never part.
+  const amount = make("span", "lb-stand-amount");
+  amount.append(make("strong", "lb-stand-value", stood.value), ` ${stood.label}`);
+  figure.append(amount);
+  if (partyLine) {
+    const kind = make("span", "lb-stand-kind");
+    if (stood.party) kind.append(partyMark());
+    figure.append(kind);
+  }
+  floor.append(figure);
   if (stood.map !== null) {
     const map = make("a", "lb-stand-map", stood.map.name);
     map.href = stood.map.href;

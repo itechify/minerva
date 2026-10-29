@@ -12,7 +12,7 @@ const tabs = [...byId("pedestal-tabs").querySelectorAll<HTMLButtonElement>("[rol
 const panels: Record<PedestalKind, HTMLElement> = { podiums: byId("pedestal-panel-podiums"), exp: byId("pedestal-panel-exp") };
 const stepsOf: Record<PedestalKind, HTMLOListElement> = { podiums: byId("pedestal-podiums"), exp: byId("pedestal-exp") };
 const said = byId("pedestal-said");
-const credit = byId("pedestal-credit");
+const creditOf: Record<PedestalKind, HTMLElement> = { podiums: byId("pedestal-credit-podiums"), exp: byId("pedestal-credit-exp") };
 const help = byId<HTMLButtonElement>("pedestal-help");
 const about = byId("pedestal-about");
 
@@ -88,8 +88,10 @@ function load() {
       });
     }
     choices = pedestalChoices(answer, names);
-    for (const choice of choices) drawPedestal(stepsOf[choice.kind], choice.pedestal);
-    credit.hidden = !choices.some((c) => c.pedestal.portraits);
+    for (const choice of choices) {
+      drawPedestal(stepsOf[choice.kind], choice.pedestal);
+      creditOf[choice.kind].hidden = !choice.pedestal.portraits;
+    }
     mark();
   });
 }

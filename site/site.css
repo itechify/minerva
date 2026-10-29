@@ -4084,8 +4084,18 @@ button.button {
   font-size: 14px;
   line-height: 20px;
 }
-/* Under a step's block on the EXP/h Pedestal: the map it was set on, then the job and level,
-   quieter than the step itself, the three steps' lines side by side. */
+/* The Party mark's line under a figure, as tall on a step without one. */
+.lb-stand-kind {
+  display: block;
+  height: 19px;
+  margin-top: 2px;
+}
+.lb-stand-kind .lb-party {
+  margin-left: 0;
+}
+/* Under a step's block: what its Character stands it for, then on Highest EXP/h the map it was
+   set on and the job and level, quieter than the step itself, the three steps' lines side by
+   side. */
 .lb-stand-floor {
   display: flex;
   flex-direction: column;
