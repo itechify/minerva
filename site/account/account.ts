@@ -74,11 +74,13 @@ export interface LogLine {
   detail: string;
 }
 
-/** The Block that reaches a Character, as its lookup gives it. */
+/** The Block that reaches a Character or an Account, as its lookup gives it: `name` is the
+ *  Character it was made on. */
 export interface BlockReaching {
   id: number;
   blockedAt: number;
   note: string;
+  name: string;
 }
 
 /** GET /api/admin/characters/<name>'s answer. */
@@ -218,18 +220,51 @@ function count(n: number, one: string, many: string): string {
  *  refused for it (the key "Reassign to refused key" moves it to), and its Block. */
 export function characterLines(character: CharacterAnswer): string[] {
   const lines = [
-    `${character.name}: ${count(character.entries.length, "entry", "entries")}, claimed ${day(character.claimedAt)}.`,
+    `${count(character.entries.length, "entry", "entries")}, claimed ${day(character.claimedAt)}.`,
     character.account === null ? "No Account." : `Account: ${character.account.username ?? "(no username)"}.`,
-    character.refusedAt === null ? "No other key refused." : `Another key was last refused ${day(character.refusedAt)}.`,
+    character.refusedAt === null
+      ? "No other PC has been refused the name."
+      : `Another PC tried to upload as ${character.name} on ${day(character.refusedAt)} and was refused. Reassign to refused key gives that PC the name.`,
   ];
-  if (character.blocked !== null) lines.push(blockedLine(character.blocked));
+  if (character.blocked !== null) lines.push(blockedLine(character.blocked, character.name));
   return lines;
 }
 
-/** A Block that reaches a Character or an Account: "Blocked 3 Oct 2026: Botting." Its entries
- *  are hidden while it stands. */
-export function blockedLine(block: BlockReaching): string {
-  return `Blocked ${day(block.blockedAt)}${block.note === "" ? "" : `: ${block.note}`}. Its entries are hidden.`;
+/** A Block that reaches a Character or an Account, `subject` the one looked up: "Blocked 3 Oct
+ *  2026: Botting.", or, made on another Character, "Blocked 3 Oct 2026 by the Block on
+ *  Speedhax: Botting." */
+export function blockedLine(block: BlockReaching, subject: string | null): string {
+  const on = block.name === subject ? "" : ` by the Block on ${block.name}`;
+  return `Blocked ${day(block.blockedAt)}${on}${block.note === "" ? "" : `: ${block.note}`}.`;
+}
+
+/** What Unblock asks before it lifts `block`, from `subject`: it says so when the Block was
+ *  made on another Character, since lifting it frees every Character it reaches. */
+export function unblockAsk(block: BlockReaching, subject: string | null): string {
+  return block.name === subject
+    ? `Unblock ${block.name}? Click again`
+    : `Lift the Block on ${block.name}? It frees every Character it reaches. Click again`;
+}
+
+/** What a call the page made came to, when it didn't go through: words for the codes the API
+ *  answers with, or `null` for the site not answering (the page says it can't reach it). */
+export function failureText(status: number, error: string | null): string | null {
+  if (status === 401) return "You've been signed out. Reload the page to sign in again.";
+  if (status === 404) return "That's gone already. The page shows what's there now.";
+  switch (error) {
+    case "market-off":
+      return "Off: the Worker has no maplestory.market key.";
+    case "blocked":
+      return "A Block reaches it already.";
+    case "no-linked-key":
+      return "That Account has no PC linked to reassign to.";
+    case "no-refused-key":
+      return "No other PC has been refused the name since it was last reassigned.";
+    case "wrong-origin":
+      return "That change has to come from owlofminerva.app itself. Reload the page and try again.";
+    default:
+      return null;
+  }
 }
 
 /** An entry as the maintainer's lookup lists it: where, how fast, and when it was set. */
@@ -254,6 +289,16 @@ export function blockListLine(block: Block): { what: string; when: string } {
   };
 }
 
+/** A log line's detail in words: an entry's map and band ("100000000 30 solo") as the page
+ *  names them, anything else as it is. */
+export function detailWords(detail: string, mapName: (map: string) => string): string {
+  const entry = /^(\d{9}) (\d+) (solo and party|solo|party)$/.exec(detail);
+  if (entry === null) return detail;
+  const [first, last] = levelsOf(Number(entry[2]));
+  const kind = entry[3] === "solo" ? "Solo Best" : entry[3] === "party" ? "Party Best" : "both bests";
+  return `${mapName(entry[1])}, levels ${first}–${last}, ${kind}`;
+}
+
 /** What each of the log's actions reads as. */
 const ACTIONS: Record<string, string> = {
   dismiss: "Dismissed a report",
@@ -270,20 +315,23 @@ const ACTIONS: Record<string, string> = {
 };
 
 /** A line of the log as the Log view lists it: what was done to whom, and by whom when. */
-export function logLine(line: LogLine): { what: string; when: string } {
+export function logLine(line: LogLine, mapName: (map: string) => string): { what: string; when: string } {
   const whom = [line.name, line.account === null ? null : `Account ${line.account.username ?? line.account.id}`].filter((w) => w !== null);
   const what = [ACTIONS[line.action] ?? line.action, ...whom].join(" · ");
-  return { what: line.detail === "" ? what : `${what} (${line.detail})`, when: `${momentText(line.at)} by ${line.by}` };
+  const detail = detailWords(line.detail, mapName);
+  return { what: detail === "" ? what : `${what} (${detail})`, when: `${momentText(line.at)} by ${line.by}` };
 }
 
 /** An Account as the Accounts view shows it, opened. */
 export function accountLines(account: AccountDetail): string[] {
-  const lines = [
-    `${account.username ?? "(no username)"}: ${count(account.pcs.length, "PC", "PCs")}, since ${day(account.createdAt)}.`,
-    account.characters.length === 0 ? "No Characters." : `Characters: ${listed(account.characters)}.`,
-  ];
-  if (account.blocked !== null) lines.push(blockedLine(account.blocked));
+  const lines = [`${count(account.pcs.length, "PC", "PCs")} linked, signed in with Discord since ${day(account.createdAt)}.`];
+  if (account.blocked !== null) lines.push(blockedLine(account.blocked, null));
   return lines;
+}
+
+/** What the Overview opens on: the open reports, if there are any. */
+export function reportsWaiting(o: Overview): string {
+  return o.reports === 0 ? "No open reports." : `${count(o.reports, "open report", "open reports")} to read.`;
 }
 
 /** The Overview's counts, a line each. */
@@ -291,7 +339,7 @@ export function overviewLines(o: Overview): string[] {
   return [
     `${count(o.characters, "Character", "Characters")} with ${count(o.entries, "entry", "entries")}.`,
     `${count(o.accounts, "Account", "Accounts")}, with ${count(o.pcs, "PC", "PCs")} linked.`,
-    `${count(o.reports, "open report", "open reports")}, ${count(o.removed, "entry", "entries")} taken down, ${count(o.blocks, "Block", "Blocks")}.`,
+    `${count(o.removed, "entry", "entries")} taken down, ${count(o.blocks, "Block", "Blocks")}.`,
     `New bests: ${whole(o.newBests.day)} in the last day, ${whole(o.newBests.week)} in the last week.`,
     `Top spots taken: ${whole(o.topsTaken.day)} in the last day, ${whole(o.topsTaken.week)} in the last week.`,
   ];
@@ -300,17 +348,19 @@ export function overviewLines(o: Overview): string[] {
 /** When the portraits were last had: off without ClassicRank's key. */
 export function portraitsLine(o: Overview): string {
   if (!o.portraits.on) return "Off: the Worker has no ClassicRank key.";
-  return o.portraits.checkedAt === null ? "Never asked yet." : `Last asked ${momentText(o.portraits.checkedAt)}.`;
+  return o.portraits.checkedAt === null ? "Never asked ClassicRank yet." : `Last asked ClassicRank ${momentText(o.portraits.checkedAt)}.`;
 }
 
-/** When each of maplestory.market's tables was last pulled: off without its key. */
-export function marketLine(o: Overview): string {
-  if (!o.market.on) return "Off: the Worker has no maplestory.market key.";
+/** When each of maplestory.market's tables was last pulled, a line each: off without its key. */
+export function marketLines(o: Overview): string[] {
+  if (!o.market.on) return ["Off: the Worker has no maplestory.market key."];
   const table = (label: string, pull: Pull | null) =>
     pull === null
-      ? `${label} never asked`
-      : `${label} pulled ${pull.pulledAt === null ? "never" : momentText(pull.pulledAt)}, last asked ${momentText(pull.triedAt)}`;
-  return `${table("Going rates", o.market.prices)}. ${table("Listings", o.market.listed)}.`;
+      ? `${label}: never asked for.`
+      : pull.pulledAt === null
+        ? `${label}: never pulled. Last asked for ${momentText(pull.triedAt)}.`
+        : `${label}: pulled ${momentText(pull.pulledAt)}.${pull.triedAt > pull.pulledAt ? ` Last asked for ${momentText(pull.triedAt)}.` : ""}`;
+  return [table("Going rates", o.market.prices), table("Listings", o.market.listed)];
 }
 
 /** An Account the admin page found: its username, and how many PCs it linked. */

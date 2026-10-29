@@ -12,7 +12,11 @@ import {
   linkQuestion,
   listed,
   logLine,
-  marketLine,
+  detailWords,
+  failureText,
+  marketLines,
+  reportsWaiting,
+  unblockAsk,
   overviewLines,
   pcDates,
   portraitsLine,
@@ -106,19 +110,28 @@ describe("the admin page", () => {
   it("shows a name looked up: its entries, its Account and the last key refused", () => {
     const lines = characterLines({ ...looked, name: "Egbert", refusedAt: OCT_21, account: { id: 1, username: "egberticus" }, entries: [entry] });
 
-    expect(lines).toEqual(["Egbert: 1 entry, claimed 3 Oct 2026.", "Account: egberticus.", "Another key was last refused 21 Oct 2026."]);
+    expect(lines).toEqual([
+      "1 entry, claimed 3 Oct 2026.",
+      "Account: egberticus.",
+      "Another PC tried to upload as Egbert on 21 Oct 2026 and was refused. Reassign to refused key gives that PC the name.",
+    ]);
   });
 
   it("shows a name with no Account and no key refused", () => {
     const lines = characterLines({ ...looked, name: "Bob", refusedAt: null, account: null, entries: [entry, entry, entry] });
 
-    expect(lines).toEqual(["Bob: 3 entries, claimed 3 Oct 2026.", "No Account.", "No other key refused."]);
+    expect(lines).toEqual(["3 entries, claimed 3 Oct 2026.", "No Account.", "No other PC has been refused the name."]);
   });
 
-  it("says a name looked up is blocked, with the Block's note", () => {
-    const lines = characterLines({ ...looked, name: "Cid", refusedAt: null, account: null, entries: [], blocked: { id: 1, blockedAt: OCT_21, note: "Botting" } });
+  it("says a name looked up is blocked, with the Block's note, and which Character it was made on", () => {
+    const block = { id: 1, blockedAt: OCT_21, note: "Botting", name: "Cid" };
+    const own = characterLines({ ...looked, name: "Cid", refusedAt: null, account: null, entries: [], blocked: block });
+    const other = characterLines({ ...looked, name: "Cidalt", refusedAt: null, account: null, entries: [], blocked: block });
 
-    expect(lines[lines.length - 1]).toBe("Blocked 21 Oct 2026: Botting. Its entries are hidden.");
+    expect(own[own.length - 1]).toBe("Blocked 21 Oct 2026: Botting.");
+    expect(other[other.length - 1]).toBe("Blocked 21 Oct 2026 by the Block on Cid: Botting.");
+    expect(unblockAsk(block, "Cid")).toBe("Unblock Cid? Click again");
+    expect(unblockAsk(block, "Cidalt")).toBe("Lift the Block on Cid? It frees every Character it reaches. Click again");
   });
 
   it("lists a name's entry with where it was set and by whom", () => {
@@ -139,20 +152,27 @@ describe("the admin page", () => {
   it("lists a line of the log: what was done to whom, and by whom", () => {
     const line = { id: 9, at: OCT_21, by: "token", action: "take-down", name: "Egbert", account: null, detail: "010004042 30 solo" };
 
-    expect(logLine(line).what).toBe("Took an entry down · Egbert (010004042 30 solo)");
-    expect(logLine(line).when).toMatch(/^21 Oct, .* by token$|^21 Oct 2026, .* by token$/);
-    expect(logLine({ ...line, action: "delete-account", name: null, account: { id: 3, username: null }, detail: "bob" }).what).toBe(
+    const mapName = () => "Over the Wall";
+
+    expect(logLine(line, mapName).what).toBe("Took an entry down · Egbert (Over the Wall, levels 30–39, Solo Best)");
+    expect(logLine(line, mapName).when).toMatch(/^21 Oct, .* by token$|^21 Oct 2026, .* by token$/);
+    expect(logLine({ ...line, action: "delete-account", name: null, account: { id: 3, username: null }, detail: "bob" }, mapName).what).toBe(
       "Deleted an Account · Account 3 (bob)",
     );
+    expect(detailWords("010004042 30 solo and party", mapName)).toBe("Over the Wall, levels 30–39, both bests");
+    expect(detailWords("the name too; Botting", mapName)).toBe("the name too; Botting");
   });
 
   it("shows an Account opened: its PCs, its Characters and its Block", () => {
     const pc = { id: 3, linkedAt: OCT_3, lastUsedAt: OCT_21, characters: ["Egbert"] };
 
     expect(accountLines({ id: 1, username: "egberticus", createdAt: OCT_3, pcs: [pc], characters: ["Egbert", "Bob"], blocked: null })).toEqual([
-      "egberticus: 1 PC, since 3 Oct 2026.",
-      "Characters: Egbert and Bob.",
+      "1 PC linked, signed in with Discord since 3 Oct 2026.",
     ]);
+    const blocked = { id: 1, blockedAt: OCT_21, note: "", name: "Egbert" };
+    expect(accountLines({ id: 1, username: "egberticus", createdAt: OCT_3, pcs: [], characters: [], blocked })[1]).toBe(
+      "Blocked 21 Oct 2026 by the Block on Egbert.",
+    );
   });
 
   it("gives the Overview's counts, and says a source is off without its key", () => {
@@ -173,12 +193,21 @@ describe("the admin page", () => {
     expect(overviewLines(overview)).toEqual([
       "1,204 Characters with 8,410 entries.",
       "30 Accounts, with 1 PC linked.",
-      "0 open reports, 5 entries taken down, 1 Block.",
+      "5 entries taken down, 1 Block.",
       "New bests: 12 in the last day, 90 in the last week.",
       "Top spots taken: 3 in the last day, 20 in the last week.",
     ]);
     expect(portraitsLine(overview)).toBe("Off: the Worker has no ClassicRank key.");
-    expect(marketLine(overview)).toBe("Going rates never asked. Listings never asked.");
+    expect(marketLines(overview)).toEqual(["Going rates: never asked for.", "Listings: never asked for."]);
+    expect(reportsWaiting(overview)).toBe("No open reports.");
+    expect(reportsWaiting({ ...overview, reports: 1 })).toBe("1 open report to read.");
+  });
+
+  it("says what went wrong in words, or leaves it to the page to say it can't reach the site", () => {
+    expect(failureText(401, "not-maintainer")).toBe("You've been signed out. Reload the page to sign in again.");
+    expect(failureText(404, "no-entry")).toBe("That's gone already. The page shows what's there now.");
+    expect(failureText(409, "market-off")).toBe("Off: the Worker has no maplestory.market key.");
+    expect([failureText(0, null), failureText(500, null)]).toEqual([null, null]);
   });
 
   it("lists an Account found with its PCs, or that it has none", () => {

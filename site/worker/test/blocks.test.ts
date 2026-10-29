@@ -88,6 +88,8 @@ describe("a Block", () => {
     await block("Eve");
 
     expect(await blocks()).toContainEqual(expect.objectContaining({ name: "Eve", account: expect.objectContaining({ username: "eve_blocked" }), keys: 2 }));
+    const id = ((await (await admin("/accounts?username=eve_blocked")).json()) as { accounts: { id: number }[] }).accounts[0].id;
+    expect(((await (await admin(`/accounts/${id}`)).json()) as { blocked: unknown }).blocked).toMatchObject({ name: "Eve" });
     await link(key("eve-pc3"), player);
     expect((await upload("Eve", key("eve-pc3"), [entry(MAPS[3], 31, 310_000)])).status).toBe(403);
     const pcs = ((await (await asSignedIn(player, "/api/account")).json()) as { pcs: { id: number }[] }).pcs;
@@ -123,7 +125,7 @@ describe("a Block", () => {
     expect(reports.reports.map((r) => r.name)).not.toContain("Hal");
     expect(await blocks()).toContainEqual(expect.objectContaining({ name: "Hal", note: "Botting, per three reports", blocksName: false }));
     const looked = (await (await admin("/characters/hal")).json()) as { blocked: { note: string } | null; entries: unknown[] };
-    expect(looked.blocked).toMatchObject({ note: "Botting, per three reports" });
+    expect(looked.blocked).toMatchObject({ note: "Botting, per three reports", name: "Hal" });
     expect(looked.entries).toHaveLength(1);
   });
 

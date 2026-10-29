@@ -36,14 +36,27 @@ export async function isBlocked(env: Env, nameKey: string, keyHash: string, acco
 /** The refusal of an upload a Block reaches. */
 export const BLOCKED: Answer = { status: 403, body: { error: "blocked" } };
 
+/** A Block as a Character's or an Account's lookup gives it: when it was made, its note, and
+ *  the Character it was made on, by its name as it is now. */
+export interface Reaching {
+  id: number;
+  blockedAt: number;
+  note: string;
+  name: string;
+}
+
+/** A Block's columns as `Reaching` has them, from `blocks b`. */
+export const REACHING_COLUMNS = `b.id, b.blocked_at AS blockedAt, b.note,
+  COALESCE((SELECT m.name FROM characters m WHERE m.name_key = b.name_key), b.name_key) AS name`;
+
 /** The Block that reaches `nameKey`, the oldest if more than one does, or `null`. */
-export async function blockReaching(env: Env, nameKey: string): Promise<{ id: number; blockedAt: number; note: string } | null> {
+export async function blockReaching(env: Env, nameKey: string): Promise<Reaching | null> {
   return env.DB.prepare(
-    `SELECT b.id, b.blocked_at AS blockedAt, b.note FROM characters c JOIN blocks b ON ${REACHES}
+    `SELECT ${REACHING_COLUMNS} FROM characters c JOIN blocks b ON ${REACHES}
      WHERE c.name_key = ? ORDER BY b.id LIMIT 1`,
   )
     .bind(nameKey)
-    .first<{ id: number; blockedAt: number; note: string }>();
+    .first<Reaching>();
 }
 
 /** Block `name`, with `{ name?: boolean, note?: string }`: its Account, the key that claimed

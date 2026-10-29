@@ -1,6 +1,7 @@
 // Accounts (ADR 0023): the Leaderboard Keys linked to each, the account page's reads and
 // writes, and linking a key, which the app starts with a one-time token and the player
 // confirms on the site while signed in.
+import { REACHING_COLUMNS } from "./blocks";
 import { type Answer, badRequest } from "./http";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
@@ -107,7 +108,7 @@ export async function readAccountAsMaintainer(env: Env, id: string): Promise<Ans
   const [created, names, blocked] = await env.DB.batch<Record<string, unknown>>([
     env.DB.prepare("SELECT created_at FROM accounts WHERE id = ?").bind(account),
     env.DB.prepare("SELECT name FROM characters WHERE account_id = ? ORDER BY name_key").bind(account),
-    env.DB.prepare("SELECT id, blocked_at AS blockedAt, note FROM blocks WHERE account_id = ? ORDER BY id LIMIT 1").bind(account),
+    env.DB.prepare(`SELECT ${REACHING_COLUMNS} FROM blocks b WHERE b.account_id = ? ORDER BY b.id LIMIT 1`).bind(account),
   ]);
   return {
     status: 200,
