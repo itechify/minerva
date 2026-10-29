@@ -21,8 +21,8 @@ The island-level grouping a street belongs to (e.g. "Maple Island", "Victoria Is
 _Avoid_: continent, world
 
 **Map Name**:
-The specific name of a map (e.g. "Henesys Hunting Ground I"). Not guaranteed unique on its own; a map is identified by
-its street name and map name together.
+The name the game shows for a map (e.g. "Henesys Hunting Ground I"). Even with its Street Name it may name several maps;
+the map's ID tells them apart.
 _Avoid_: title, map title
 
 **Minimap Title**:
@@ -44,9 +44,7 @@ one they are on.
 Map and mob data cached earlier and shown, with its date, because its source can't be reached right now.
 
 **Refresh**:
-The Settings window's button under Game Data that has OSMS's map set and item files fetched afresh now, rather than at
-the next daily ask, for what a patch brought. It says what it came to: up to date, OSMS unreachable, or Minerva needing
-an update.
+The Settings window's Game Data button for fetching OSMS's map set and item files afresh.
 
 **UI Size**:
 How large the game draws its windows and text, which its UI Size setting (Default Ratio, sharpened or not, or Ideal
@@ -125,10 +123,8 @@ Minerva knows only which map the player is on, never where on it they stand.
 _Avoid_: position, proximity
 
 **Search**:
-The search view the 🔍 or the search hotkey (Ctrl+Shift+F by default) opens over the panel: the mobs, maps, NPCs and
-items whose name holds what the player types, a section for each, with each kind's best five. A mob leads to the maps it
-spawns on, to pick a Hunting Target; a map becomes the Destination; an NPC leads to its map, or to a list of its maps
-when it stands on several, to pick the Destination; an item shows its Item Card.
+One name search over mobs, maps, items and NPCs, in a view over the panel. Its matches lead to a Hunting Target, a
+Destination or an Item Card.
 _Avoid_: mob search, item search
 
 **Hunting Target**:
@@ -137,10 +133,8 @@ from the player's current map, then that they have arrived, until they leave tha
 _Avoid_: waypoint, goal
 
 **Destination**:
-A map the player picked in Search to go to, with no mob in mind: the map itself, or the map of an NPC they picked, which
-the Navigation section then shows with the map. Minerva shows the way there as for a Hunting Target, in its place: there
-is one or the other, whichever the player picked last. Picked on the map the player is on, it says they are there at
-once.
+A map the player picked in Search to go to, either for itself or for an NPC on it, with no mob in mind. It takes the
+Hunting Target's place.
 _Avoid_: waypoint, goal, target (alone)
 
 **Ship**:
@@ -161,36 +155,24 @@ The hunting figures for a map as a whole, such as the EXP-per-hour ceiling and m
 ### Tracking
 
 **Grind Tracker**:
-The window beside the panel, on unless the player turns it off in Settings, that measures a Session from the EXP bar:
-Time to Level, the Rolling Rate and Session rates, how the Rolling Rate compares with the Personal Best, the Pace Trace,
-deaths, and where the EXP bar will be at the Rolling Rate. Its window bar opens the Personal Bests window. The player
-closes it with its ×, and opens it again from the panel; closing it doesn't stop the Session, but turning it off stops
-reading the EXP figures, and the Session with it.
+The window beside the panel that shows the Session's EXP rates, Time to Level, Pace Trace, deaths and Loot, and compares
+the Rolling Rate with the Personal Best.
 _Avoid_: EXP tracking, EXP tracker
 
 **Session**:
-The stretch of play Minerva measures rates over, from the first EXP gain until the player resets it or switches
-Character. A reset can be undone until the next EXP gain. Idle stretches pause it rather than count against it, and so
-does a stretch when the EXP bar can't be read; what the EXP did over one too long to be a gap in play isn't counted
-either. A misread that leads Minerva to learn the level's total wrong doesn't end it: the total is learned again. The
-switch is by name: another name on the Status Bar, read three times in a row after the bar was out of sight, is another
-Character, and a new Session at once; the EXP bar's readings in between are set aside, as they may be the other's. While
-no name can be read, readings in a row that fit another level after the EXP bar was out of sight are the switch instead.
-The level the Status Bar shows is the one the Session learns the total of, and a level-up it shows is counted at once.
+The stretch of play Minerva measures rates over, from the first EXP change, gain or loss, until the player resets it or
+switches Character. Idle stretches pause it; a reset can be undone until the next EXP change.
 _Avoid_: run, grind (the Grind Tracker measures a Session; "grind" alone names nothing)
 
 **Character**:
-Who is playing: one of the player's characters in the game, known by the name the Status Bar shows (Classic World is one
-world, so a name is one character). Minerva learns a Character the first time it reads the name three times in a row
-(one reading of a bar drawn afresh can drop a letter); their level and job are as the Status Bar last showed them, and
-change, while the name doesn't.
+One of the player's characters in the game, known by their in-game name on the Status Bar. A player may have many
+Characters; an Account may link their names for uploads.
 _Avoid_: player (the person, who may have many), account, toon
 
 **Status Bar**:
-The game's bar pinned to the bottom of the client area: the Character's level in orange tiles after "LV.", their job and
-name, then HP, MP and the EXP bar with its figures ("EXP 266 [6.33%]"). The game's, not ours. Minerva finds it by
-itself, with no setup step, and reads the Character and the EXP figures from it every second.
-_Avoid_: HUD, bottom bar, EXP bar (the gauge in it), EXP Bar Region (the mark there once was around the figures)
+The game's bar at the bottom of the client area, showing the Character's level, job and name, HP, MP and the EXP bar
+with its figures.
+_Avoid_: HUD, bottom bar, EXP bar (the gauge in it)
 
 **Rolling Rate**:
 A rate measured over the last few minutes of active play in a session, as opposed to the average over the whole session.
@@ -203,12 +185,8 @@ reach of its pace, it races that too.
 _Avoid_: graph, chart, sparkline
 
 **Personal Best**:
-The highest Rolling Rate, in EXP/h, a Character has had over a full 5 minutes of active play on one map: the best in
-their Visit History of the map, or the Visit under way's once it beats that. Each is stamped with the Character, level
-and job the Status Bar showed at the refresh that set it. The Grind Tracker's Best row shows the Character playing's
-(the Unassigned one while no name is read) as it stands, from arriving on the map and from the refresh that sets a new
-one, labelled "Visit best" while the Visit under way set it; a star marks the Rolling Rate while it is that best (ADR
-0018). A map has two, its Solo Best and its Party Best.
+A Character's highest Rolling Rate in EXP/h over a full 5 minutes of active play on one map, including the Visit under
+way. A map has two kinds, its Solo Best and Party Best.
 _Avoid_: record, high score, PB, max
 
 **Solo Best**:
@@ -236,25 +214,13 @@ keeps the best Visit in each, and a Map Leaderboard ranks each on its own.
 _Avoid_: bracket, tier, level range
 
 **Unassigned**:
-The Personal Bests no Character is known for: those saved before Minerva read Characters, and any set while the Status
-Bar's name couldn't be read. They stand apart in the Personal Bests window, the Grind Tracker races them while no name
-is read, and the player can move each to a Character, or assign them all to one at once. They are never uploaded.
+Personal Bests with no known Character, kept apart from each Character's bests and never uploaded. The player can assign
+them to a Character.
 _Avoid_: unknown character, shared bests
 
 **Personal Bests window**:
-Every map's Personal Best side by side for one Character at a time, in a window over the game that the Grind Tracker
-opens and closes, to compare maps: each with its mob levels and how close the best came to the map's solo EXP/h ceiling.
-Its picker shows the Character playing until the player picks another, or Unassigned. Each map opens to its Visit
-History, the Visit under way's best among them, each Visit with the level that set it. It shows the bests as they stand,
-the Visit under way's included, and keeps up with them while it is open. It shows each map's Solo Best and Party Best.
-In it the player moves any Visit to another Character, assigns every Unassigned Visit to one, and, under a Character's
-Manage, removes them with their bests or merges them into another (a name changed in the game shows as a new Character),
-each after confirming. Under a Character's name, their switch "Share" uploads their bests to the Map Leaderboards and
-takes them off again, at a click, its tooltip saying the site is public; it starts on for a Character Minerva meets for
-the first time with a best that can go up, and stays off once turned off. Upload problems show under Manage whether it
-is open or not, each with Send again. An opened map's Visit History links to its Map Leaderboard. Beside the Share, Link
-Discord links this PC to the player's Account, or says whose Discord it is linked to; it asks once, quietly, a player
-sharing a Character who hasn't linked, until they link or say not now.
+The window over the game for comparing one Character's Solo Bests and Party Bests across maps, or the Unassigned ones,
+with each map's Visit History.
 _Avoid_: leaderboard (the site's are Map Leaderboards), records, best list, Personal Bests page
 
 **Visit**:
@@ -263,56 +229,32 @@ closing Minerva does.
 _Avoid_: stay, trip
 
 **Visit History**:
-A Character's best Visits on a map that have ended (or the Unassigned ones), highest first: the first is its Personal
-Best. It keeps the 10 best of each kind (Solo and Party), and the best in each Level Band of each kind even if it isn't
-among them, so a Character that levels up keeps their lower bands' bests. The Visit under way's best joins it when the
-Visit ends, or when another Character is named. The player can remove any Visit in it that came from a bug, and the
-Visit under way's best before it joins.
+A Character's best ended Visits on a map, or the Unassigned ones: the 10 best of each kind, Solo and Party, and the best
+of each kind in each Level Band. Its highest is the Personal Best.
 _Avoid_: runs, attempts, records
 
 **Map Leaderboard**:
-A map's page on owlofminerva.app where players' Personal Bests stand side by side, each Level Band ranked on its own by
-EXP/h, ties going to whoever set it first. An entry is one Character's best Visit of a kind on the map in the band,
-their Solo Best or their Party Best: its name, job, exact level, EXP/h, date and whether it is a Party Best. A page
-ranks each Character once by their higher entry, or only the Solo Bests or only the Party Bests (ADR 0015, amended); an
-entry of no known kind, as every one from before the site told them apart, is a Party Best. The site mirrors what the
-player uploads from Minerva, and keeps off an entry above 5× the map's solo ceiling (ADR 0015). The Map Leaderboards
-page leads to them through Where to train, a search by name, and Latest, the 10 newest entries on every map (ADR 0024).
-Each name in them opens that Character's page (ADR 0027).
+A map's page on owlofminerva.app ranking Characters' Personal Bests by EXP/h within each Level Band. It ranks Solo
+Bests, Party Bests or each Character's higher entry; ties go to whoever set it first.
 _Avoid_: leaderboard (alone), ranking, high scores, hiscores
 
 **Where to train**:
-The Map Leaderboards page's table of the maps for one Level Band: each map whose middle half of spawns is at the band's
-levels, and each map with an entry in it, with its Map Mark, mob levels and the band's #1 there, the maps with entries
-first, in every area or one picked by its Map Mark (ADR 0024).
+The Map Leaderboards page's table of maps for one Level Band: maps whose middle half of spawns is at the band's levels,
+and maps with an entry in it.
 _Avoid_: best maps, recommended maps, map ranking
 
 **Pedestal**:
-Three Characters standing on steps on the Map Leaderboards page, 2nd, 1st and 3rd from the left, each with their
-Portrait and name (a link to their Character page); a step no one stands asks for yours (ADR 0024, amended). The page
-has two, beside its title (after Where to train on a narrow page), and shows one at a time, picked by its tab, a "?"
-beside them saying what the one shown ranks. Most podiums stands the three with the most podiums, places in a Level
-Band's top 3 on a map, counted as their Character page counts them (each kind of entry ranked on its own); a tie goes to
-more #1s, then more #2s, then whoever set their first podium entry first. Highest EXP/h stands the three highest EXP/h
-on any map at any level, each Character by their best entry, each with their job, level and map; a tie goes to whoever
-set it first. They rank Characters, never players or Accounts.
+Three Characters standing on steps on the Map Leaderboards page, ranked by Most podiums (places in a map and Level
+Band's top 3, each kind apart) or Highest EXP/h on any map at any level.
 _Avoid_: hall of fame, top players, podium (that is one place in a band's top 3)
 
 **Character page**:
-A Character's page on owlofminerva.app (`/character/?name=`), which every name the Map Leaderboards show links to, and a
-new #1's post on Discord: every entry of theirs a Level Band at a time, highest first, each with its rank there, and
-over them the job and level of their newest entry, the #1s they hold (one per map, Level Band and kind of entry), their
-podiums (places in a band's top 3), how many maps they're on and their best EXP/h (ADR 0027); a Party Best has a small
-party mark, and ranks among the band's Party Bests as a Solo Best does among its Solo Bests. It shows what their entries
-show map by map, and their Portrait with a link to their ClassicRank profile (ADR 0029): no ceiling, and nothing that
-ties one Character to another or to an Account. A name with no entries, whatever the reason, shows the owl lost.
+A Character's page on owlofminerva.app showing their Map Leaderboard entries and ranks by Level Band, their #1s,
+podiums, maps and best EXP/h, with their Portrait. It ties no Characters or Accounts together.
 _Avoid_: profile, player page, Personal Bests page
 
 **Portrait**:
-A Character's photo from ClassicRank, beside their name on a Map Leaderboard, on their Character page and in a new #1's
-post on Discord (ADR 0029). The site's Worker asks ClassicRank for it by name when the Character uploads and every day,
-so it goes within a day of the player hiding their character there. A question-mark figure shows where ClassicRank has
-no photo of them.
+A Character's photo from ClassicRank, shown with their name on the site and in a Top spot taken post on Discord.
 _Avoid_: avatar, picture, profile picture
 
 **Top spot taken**:
@@ -322,25 +264,18 @@ empty band, or a Character beating their own best, isn't one.
 _Avoid_: record, new record, crown
 
 **Leaderboard Key**:
-The secret each install of Minerva makes on its first upload to the Map Leaderboards and keeps in a file of its own
-beside the settings (`leaderboard-key`), sent with every upload. The shell keeps it, never the core, so no Bug Report
-holds it. A Character's first upload ties its name to the key; later uploads for the name must carry it, and another
-key's are refused as claimed. Never shown to the player; the site keeps only its hash. A lost one is replaced by linking
-the new one to the name's Account, if the old one was linked, or else by the maintainer reassigning the name.
+The secret identity of one Minerva install for Map Leaderboard uploads. A Character's first upload claims their name for
+that key; keys linked to the same Account can also upload for it.
 _Avoid_: password, token, account
 
 **Account**:
-An optional sign-in on owlofminerva.app, with Discord, that the player links their PCs' Leaderboard Keys to (ADR 0023),
-each from that PC's Personal Bests window (Link Discord). A name its linked keys claimed may be written by any key
-linked to it, so the name follows the player to a new PC. Never needed to upload. The site keeps the Discord user ID and
-username, never shown. The maintainer signs in to one to moderate at `/admin/`.
+An optional Discord sign-in on owlofminerva.app linking a player's PCs' Leaderboard Keys, so their claimed names follow
+them between PCs. Uploading needs no Account.
 _Avoid_: profile, login (alone), user
 
 **Block**:
-The maintainer keeping a player off the Map Leaderboards until they lift it, from `/admin/` (ADR 0031). It reaches the
-Character's Account and every Leaderboard Key linked to it, the key that claimed the name, and, if asked, the name
-itself. Uploads it reaches are refused, and the Personal Bests window says so; every Character it reaches is hidden from
-the site, its entries kept for when it's lifted. Taking a single entry down is a take-down, not a Block.
+The maintainer's bar on Map Leaderboard uploads through a Character's Account and its linked Leaderboard Keys, the key
+that claimed the name, and optionally the name itself. It hides their entries until lifted.
 _Avoid_: ban, suspension
 
 **Time to Level**:
@@ -381,31 +316,22 @@ bullet (a crafted item's maker sits above it), then its picture and figures. It 
 and the Mob Card are Minerva's own.
 
 **Item Card**:
-The card the hotkey (Ctrl+Shift+I by default) shows at the pointer for the item whose Item Tooltip the game shows there,
-or Search shows beside the panel for an item picked there: what a shop pays for it, maplestory.market's Going rate and
-Cheapest now for it, and the market prices the player keeps for it on their Market Lines (typed into the card), with
-buttons that open its page on maplestory.market. It stays until the player closes it or presses the hotkey again, where
-the player drags it by its bar, and its name opens the item's MeowDB page. When items that don't look alike share the
-name, it first lists them, with their pictures, for the player to pick.
+Minerva's window of information and prices for an item picked from an Item Tooltip or Search: what a shop pays, Going
+rate, Cheapest now and the player's Market Lines.
 _Avoid_: item tooltip (the game's), price check, popup
 
 **Market Line**:
-One of the market prices the player keeps for every item, under a name they give it ("Your price", "Typical", "Lowest
-ask"). Every Item Card lists every line, in the player's order, under maplestory.market's figures, each with the item's
-price on it or "Not set"; the player adds, renames and removes lines on the card. A player starts with none (before ADR
-0030, with one, "Your price").
+One named set of market prices the player keeps across items ("Your price", "Typical", "Lowest ask"). Every Item Card
+lists every line, with that item's price or "Not set"; a player starts with none.
 
 **Going rate** and **Cheapest now**:
-maplestory.market's figures for an item, on its Item Card above the Market Lines (ADR 0030): its established price (the
-3-day average sale, or with too few sales the median asking price), and the cheapest listing for one. Asked of the
-site's Worker as the card shows, kept only while Minerva runs, and off with Settings' "Prices from maplestory.market".
-Not Market Lines: the player can't type on them.
+maplestory.market's two item prices: its established price (the 3-day average sale, or a fallback to the median asking
+price), and the cheapest listing for one. They are read-only figures on the Item Card, separate from Market Lines.
 _Avoid_: column, field, price type
 
 **Market Import**:
-A file of prices a tool of the player's own leaves in the `market-imports` folder beside `market-prices.json`, for their
-Market Lines. Minerva takes each in within a couple of seconds, at launch if it was closed, onto the lines of the same
-IDs, the newest price winning, and deletes it. It adds a line it names, but removes nothing.
+A file of prices from the player's own tool for their Market Lines. It adds lines and newer prices to existing lines,
+removing nothing.
 _Avoid_: sync, feed (the tool's business, not Minerva's)
 
 **Player Shop**:
@@ -429,13 +355,8 @@ listing's price) must be for it to be a deal. Set in Settings; 0 by default, so 
 _Avoid_: threshold, discount
 
 **Deal Badge**:
-The mark beside a Player Shop listing while the Deal Finder is on: how far below the Deal Line its price is and the
-line's price ("−32% · 1,470") for a deal, coloured as the game grades items (blue for a good deal, purple for a great
-one, 20% or more below the line, gold for a steal, 40% or more), how far off it is ("+12%") for none, "no price" when
-the Deal Line has none for the item, and "?" when the listing can't be read for sure. A listing whose name the shop cut
-short, so it could be several items, is named by its picture's Scroll Tier when it is a scroll's, or by its Item Tooltip
-while the player hovers it, until the list changes. While the pointer or the game's tooltip covers its listing, it keeps
-what was read there before, marked with an orange dot. A click on it opens the item's Item Card.
+The mark beside a Player Shop listing showing how its price compares with the Deal Line and whether it meets the Deal
+Margin, or why it can't be compared.
 _Avoid_: tag, label, highlight
 
 **Item Lookup**:
@@ -447,23 +368,16 @@ _Avoid_: item search (Search is the search view's)
 ### Over the game
 
 **Owl Bubble**:
-The owl at the top centre of the game window, saying one line at a time in a speech bubble, clear of what Minerva reads
-(ADR 0025). Item Lookup's line comes first, for a few seconds; otherwise the update's line, "A newer version of Minerva
-is available!", once a launch for a version a check Minerva made by itself found. That one stays until the player clicks
-it (opening Help & Setup's About & Credits), dismisses it with its ×, or chooses to update. Each line has a mood (news,
-a problem, or waiting) that picks the bubble's look and the owl's pose.
+The owl's speech bubble at the top centre of the game window, with one line about Item Lookup, an Item Card that
+couldn't show, or a newer Minerva version.
 _Avoid_: alert, toast, notification, popup
 
 ### Settings
 
 **Settings window**:
-The window over the game where the player changes Minerva: its hotkeys (rebound by pressing the new keys, or turned
-off), the Deal Margin, the Grind Tracker's switch, Game Data's Refresh and "Check for updates". The panel's gear opens
-it beside the panel and closes it again, as its × does, and setup's Change hotkeys opens it; the player drags it
-anywhere, and it keeps that spot. It has the keyboard as it opens, and again when the player clicks a Change or the Deal
-Margin field; clicking back into the game gives the keyboard back, and the window stays open. Every change is saved at
-once. Each launch starts with it closed.
-_Avoid_: settings view (the panel's, before the window), settings page, preferences, options
+The window over the game where the player changes Minerva's settings, opened from the panel's gear or setup's Change
+hotkeys.
+_Avoid_: settings view, settings page, preferences, options
 
 ### Reporting bugs
 
@@ -474,25 +388,18 @@ nothing, the latest such capture whole. Fed back to the core, it goes through th
 _Avoid_: log, diagnostics, dump, trace (to the player; "trace" is its record of inputs, in the code)
 
 **Near miss**:
-What a reader that found nothing came closest with, written down with its reading for a Bug Report (#133): for the
-Player Shop, the stack of band rows of any width with the most rows; for the Status Bar, the row of level tiles with the
-most in it, and the LV box round them if it was measured. "No near miss" is an answer too. A Bug Report keeps the latest
-Deal Finder capture with one over the latest without.
+What a reader that found nothing came closest to recognising, kept with its reading for a Bug Report.
 
 ### Updating
 
 **Update Check**:
-Minerva asking its feed (`latest.json` on GitHub's newest release) which version is the latest: at launch, every 6 hours
-while "Check for updates" is on, and whenever the player presses Check for updates. It sends only the version. It comes
-to up to date, a newer version (shown in the tray and Help & Setup, never on the panels, and said by the Owl Bubble when
-Minerva's own check found it), or "Couldn't check", which is also what one unanswered for 2 minutes comes to (ADR 0019).
+Minerva's ask of its release feed for the latest version: up to date, a newer version, or "Couldn't check". It installs
+nothing.
 _Avoid_: ping, poll, auto-update (nothing installs by itself)
 
 **Update when I quit**:
-The player's choice, when Help & Setup asks before updating during a Session, to have the newer version download now and
-install when they choose Quit Minerva, without starting it again. It lasts for this run. Quit Minerva chosen while it is
-still downloading waits for it; chosen again, it quits without it. The other answers are Update now (install and start
-it again) and Later (nothing more for now).
+The player's choice to download a newer version now and install it when they choose Quit Minerva, without starting
+Minerva again. It lasts for this run.
 
 **Notify-only**:
 A build that only says a newer version is out, with its release page, and never installs one: the portable `.exe` and
