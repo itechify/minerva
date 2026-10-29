@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "check": "node scripts/check.mjs",
     "site:dev": "vite --config site/vite.config.ts",
     "site:build": "tsc && vite build --config site/vite.config.ts",
     "site:local": "node scripts/site-local.mjs",
