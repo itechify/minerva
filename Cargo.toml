@@ -23,6 +23,8 @@ opt-level = 3
 panic = "abort"
 strip = true
 
+# Backtraces keep their file and line, and the core's tests run ~20% faster than with full
+# debug info (measured in the PR that set it).
 [profile.dev]
 debug = "line-tables-only"
 
