@@ -3911,13 +3911,14 @@ button.button {
 .lb-pedestal-said {
   margin-top: 2px;
 }
-/* Two rows every step shares (subgrid): its Character, as tall as the tallest step's, and its
-   block's row, as tall as the 1st's. Each step's Character is set down onto its own block, so
-   the blocks alone make the podium's outline, however much one step's words wrap. */
+/* Three rows every step shares (subgrid): its Character, as tall as the tallest step's; its
+   block's row, as tall as the 1st's; and under the blocks, on the EXP/h Pedestal, where and as
+   whom they set it. Each step's Character is set down onto its own block, so the blocks alone
+   make the podium's outline, however much one step's words wrap. */
 .lb-pedestal {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: auto 72px;
+  grid-template-rows: auto 72px auto;
   max-width: 34em;
   margin: 16px 0 0;
   padding: 0;
@@ -3930,7 +3931,7 @@ button.button {
 .lb-stand {
   --rise: 38px;
   display: grid;
-  grid-row: span 2;
+  grid-row: span 3;
   grid-template-rows: subgrid;
   min-width: 0;
   margin: 0;
@@ -3987,6 +3988,29 @@ button.button {
   font-size: 14px;
   line-height: 20px;
 }
+/* Under a step's block on the EXP/h Pedestal: the map it was set on, then the job and level,
+   quieter than the step itself, the three steps' lines side by side. */
+.lb-stand-floor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 6px 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+/* On a phone a step is too narrow for every job and its level on one line: each step gives its
+   level a line of its own, so all three read alike. */
+@media (max-width: 640px) {
+  .lb-stand-floor .lb-stand-level {
+    display: block;
+  }
+}
+.lb-pedestal + .lb-credit {
+  margin-top: 14px;
+}
 /* A figure and what it counts ("380,000 EXP/h") never part, nor does a level ("Lv 27"). */
 .lb-stand-amount,
 .lb-stand-level {
@@ -4033,13 +4057,6 @@ button.button {
 }
 .lb-stand-block .lb-crown {
   margin-top: 3px;
-}
-/* On a phone a step is too narrow for a job and its level on one line: every step gives its
-   level a line of its own, so none splits it and all three read alike. */
-@media (max-width: 640px) {
-  .lb-stand-level {
-    display: block;
-  }
 }
 /* The band's EXP/h Pedestal, under Where to train's maps. */
 .lb-train-pedestal {

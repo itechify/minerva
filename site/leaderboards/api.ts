@@ -13,6 +13,7 @@ import {
   type Medal,
   type Pedestal,
   type PortraitSlot,
+  type Stood,
   type Said,
   type Words,
 } from "./leaderboards.ts";
@@ -260,10 +261,11 @@ const PLACES: Record<Medal, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
 
 /** A Pedestal's three steps in `steps` (an <ol>), 1st to 3rd, the order assistive tech reads
  *  them and Tab goes through them, the ranking's own; site.css stands them 2nd, 1st, 3rd, each
- *  on its block, the 1st's the tallest, with its crown and place. A step shows the Character's portrait, their name (a link to their page)
- *  and what they stand it for, and on the EXP/h Pedestal their job and level and the map (a
- *  link to its page at the band, with their entry marked). A step no one stands asks for
- *  yours. `credit` shows while any step has a portrait. */
+ *  on its block, the 1st's the tallest, with its crown and place. On a step stand the
+ *  Character's portrait, their name (a link to their page) and what they stand it for; on the
+ *  EXP/h Pedestal, the map (a link to its page at the band, with their entry marked) and their
+ *  job and level go under its block, so the steps carry no more than Most podiums' do. A step
+ *  no one stands asks for yours. `credit` shows while any step has a portrait. */
 export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedestal: Pedestal) {
   steps.replaceChildren(
     ...pedestal.steps.map(({ place, stood }) => {
@@ -287,28 +289,36 @@ export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedes
         if (stood.detail !== null) figure.title = stood.detail;
         if (stood.party) figure.append(partyMark());
         who.append(figure);
-        if (stood.who !== null) {
-          const job = jobWithIcon(stood.who.job, stood.who.jobClass, "lb-stand-job", false);
-          job.append(" ", make("span", "lb-stand-level", stood.who.level));
-          who.append(job);
-        }
-        if (stood.map !== null) {
-          const map = make("a", "lb-stand-map", stood.map.name);
-          map.href = stood.map.href;
-          const line = make("span", "lb-stand-where");
-          if (stood.map.mark !== null) line.append(markImage(stood.map.mark, true));
-          line.append(map);
-          who.append(line);
-        }
       }
       const block = make("div", "lb-stand-block");
       block.setAttribute("aria-hidden", "true");
       block.append(crown(place), PLACES[place]);
       step.append(who, block);
+      if (stood !== null && (stood.map !== null || stood.who !== null)) step.append(floorOf(stood));
       return step;
     }),
   );
   credit.hidden = !pedestal.portraits;
+}
+
+/** What goes under a step's block on the EXP/h Pedestal: the map, with its Map Mark, then the
+ *  job, with its icon, and the level. */
+function floorOf(stood: Stood): HTMLElement {
+  const floor = make("div", "lb-stand-floor");
+  if (stood.map !== null) {
+    const map = make("a", "lb-stand-map", stood.map.name);
+    map.href = stood.map.href;
+    const line = make("span", "lb-stand-where");
+    if (stood.map.mark !== null) line.append(markImage(stood.map.mark, true));
+    line.append(map);
+    floor.append(line);
+  }
+  if (stood.who !== null) {
+    const job = jobWithIcon(stood.who.job, stood.who.jobClass, "lb-stand-job", false);
+    job.append(" ", make("span", "lb-stand-level", stood.who.level));
+    floor.append(job);
+  }
+  return floor;
 }
 
 /** A step no one stands: its portrait's square, outlined and empty. Decoration. */
