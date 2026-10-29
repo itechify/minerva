@@ -1,9 +1,11 @@
-# Builds the Minerva site and tests its Worker on a pull request that could change them, so
-# a broken build shows before a release would publish it. The build fails while a screenshot the page shows
+# Builds the Minerva site and tests its Worker on a pull request that could change them, and on
+# main (docs/releasing.md reads main's check), so a broken build shows before a release would publish it. The build fails while a screenshot the page shows
 # hasn't been taken (site/screenshots/README.md).
 name: Site check
 
 on:
+  push:
+    branches: [main]
   pull_request:
     paths:
       - site/**

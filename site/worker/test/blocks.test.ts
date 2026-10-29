@@ -4,7 +4,8 @@
 // kept for when it's lifted. (D1 starts empty for each test file.)
 import { describe, expect, it } from "vitest";
 import type { LatestAnswer } from "../../entries";
-import { admin, call, entry, key, names, optOut, report, upload } from "./api";
+import { PUBLIC_READS } from "../index";
+import { admin, call, entry, key, names, optOut, partyEntry, report, upload } from "./api";
 import { asSignedIn, link, signIn, withMadeUpDiscord } from "./accounts";
 
 withMadeUpDiscord();
@@ -77,6 +78,35 @@ describe("a Block", () => {
     expect((await call("/api/characters/Dot")).status).toBe(200);
     expect((await unblock("Cal")).status).toBe(204);
     expect(await shown()).toEqual({ band: ["Cal", "Calalt", "Dot"], latest: ["Dot", "Calalt", "Cal"], characters: 3, best: "Cal", page: 200 });
+  });
+
+  it("hides its Character from every public read", async () => {
+    const map = "100000109";
+    // Every public GET, by the PUBLIC_READS prefix it's cached under. A read added under a new
+    // prefix fails the first expect until it's listed here.
+    const reads: Record<string, string[]> = {
+      "/api/maps": ["/api/maps", `/api/maps/${map}`, `/api/maps/${map}/bands/30`, `/api/maps/${map}/bands/30?kind=party`],
+      "/api/bands": ["/api/bands", "/api/bands/30", "/api/bands/30?kind=party"],
+      "/api/latest": ["/api/latest", "/api/latest?kind=party"],
+      "/api/pedestals": ["/api/pedestals"],
+      "/api/characters": ["/api/characters/Vex"],
+    };
+    expect(Object.keys(reads).sort()).toEqual([...PUBLIC_READS].sort());
+    const showing = async () => {
+      const seen: string[] = [];
+      for (const path of Object.values(reads).flat()) {
+        if ((await (await call(path)).text()).includes("Vex")) seen.push(path);
+      }
+      return seen;
+    };
+    await upload("Vex", key("vex"), [entry(map, 31, 9_000_000), partyEntry(map, 32, 9_000_000)]);
+    const before = await showing();
+
+    await block("Vex");
+
+    // Every read names them before the Block, but the lists of maps and of bands, which name nobody.
+    expect(before).toEqual(Object.values(reads).flat().filter((path) => !["/api/maps", `/api/maps/${map}`, "/api/bands"].includes(path)));
+    expect(await showing()).toEqual([]);
   });
 
   it("reaches the Account and its keys, so unlinking or deleting it frees nothing, and a PC linked later is blocked too", async () => {
