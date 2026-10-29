@@ -26,7 +26,7 @@ type GameData = { fetchedAtUnixMs: number | null; refresh: Refresh | null };
 
 /** What the shell sends: the window while it is open (`null`: closed, and the page draws
  *  nothing), and the settings it changes as they are now. */
-type SettingsPage = {
+export type SettingsPage = {
   window: SettingsWindow | null;
   hotkeys: Hotkeys;
   unavailableHotkeys: string[];
