@@ -22,6 +22,14 @@
 //!    and nowhere else (ocrs has read the 7 of "71.07%" as a 2). At a small UI Size ocrs
 //!    reads a 5 as an "S" (the 5 of "55.11%" on a 1280x720 client): it counts as a 5 only
 //!    where the mask has a flat top for it, as a 5 and a 7 have and no other glyph does.
+//! 5. A 2 read where the mask has no foot for it is a 7 read as a 2: on the 2026-10-29 Bug
+//!    Report, ocrs read the 7 of "74.02%" as a 2 on nearly every frame from 74.00% on.
+//!    Enlarged 1.25 times instead, ocrs reads most of those as 7s. So such a frame is read
+//!    again at that size, and the second reading stands only if it is the first with some
+//!    2s as 7s and nothing else changed (the thousands comma may read as a point either
+//!    time), with a flat top in the mask for each 5 and 7. It is never read at 1.25x alone:
+//!    there ocrs drops a glyph now and then ("53.34%" read "3.34%"), which leaves the game's
+//!    shape. A 5 has a flat top too, but no sample or Bug Report has had ocrs read a 5 as a 2.
 
 use crate::bug_report::rect_crop;
 use crate::ink::{Component, black_on_white, components, luma, ocr_digit, runs};
@@ -114,20 +122,57 @@ impl ExpBarReader {
         if at.pointer_over(prepared.columns, prepared.rows) {
             return None;
         }
-        let lines = self.recogniser.read_lines(&prepared.canvas, &[prepared.exp, prepared.percent])?;
+        let (exp_text, percent_text) = self.read_figures(&prepared, UPSCALE)?;
+        if twos(&exp_text) <= prepared.exp_feet && twos(&percent_text) <= prepared.percent_feet {
+            return prepared.bar(&exp_text, &percent_text);
+        }
+        // A 2 with no foot: read again at the size that reads such a 7 as a 7.
+        let (exp_again, percent_again) = self.read_figures(&prepared, SEVENS_UPSCALE)?;
+        let sevens = sevens_for_twos(&exp_text, &exp_again) && sevens_for_twos(&percent_text, &percent_again);
+        let topped = flat_tops(&exp_again) == prepared.exp_tops && flat_tops(&percent_again) == prepared.percent_tops;
+        if !sevens || !topped {
+            return None;
+        }
+        prepared.bar(&exp_again, &percent_again)
+    }
+
+    /// ocrs's reading of the EXP and the percentage, enlarged `upscale` times.
+    fn read_figures(&self, prepared: &Prepared, upscale: f32) -> Option<(String, String)> {
+        let scaled = |v: u32| (v as f32 * upscale).round() as u32;
+        let (w, h) = prepared.canvas.dimensions();
+        let canvas = image::imageops::resize(&prepared.canvas, scaled(w), scaled(h), image::imageops::FilterType::Triangle);
+        let line = |r: Rect| Rect { x: scaled(r.x), y: scaled(r.y), w: scaled(r.w), h: scaled(r.h) };
+        let lines = self.recogniser.read_lines(&canvas, &[line(prepared.exp), line(prepared.percent)])?;
         let text = |i: usize| lines.get(i)?.as_ref().map(|l| l.to_string());
-        let (exp_text, percent_text) = (text(0)?, text(1)?);
-        let twos = |text: &str| text.chars().filter(|&c| c == '2').count();
-        if twos(&exp_text) != prepared.exp_feet || twos(&percent_text) != prepared.percent_feet {
+        Some((text(0)?, text(1)?))
+    }
+}
+
+impl Prepared {
+    /// The figures `exp_text` and `percent_text` read as, if the bar could show them.
+    fn bar(&self, exp_text: &str, percent_text: &str) -> Option<ExpBar> {
+        if twos(exp_text) != self.exp_feet || twos(percent_text) != self.percent_feet {
             return None;
         }
         let topped = |text: &str, tops: usize| !text.contains('S') || flat_tops(text) == tops;
-        if !topped(&exp_text, prepared.exp_tops) || !topped(&percent_text, prepared.percent_tops) {
+        if !topped(exp_text, self.exp_tops) || !topped(percent_text, self.percent_tops) {
             return None;
         }
-        let bar = ExpBar { exp: thousands(&exp_text)?, percent_hundredths: percent(&percent_text)? };
+        let bar = ExpBar { exp: thousands(exp_text)?, percent_hundredths: percent(percent_text)? };
         consistent(bar).then_some(bar)
     }
+}
+
+fn twos(text: &str) -> usize {
+    text.chars().filter(|&c| c == '2').count()
+}
+
+/// Whether `again` is `first` with some of its 2s read as 7s, and nothing else read
+/// otherwise but a thousands comma read as a point, or a point as a comma.
+fn sevens_for_twos(first: &str, again: &str) -> bool {
+    let separator = |c: char| matches!(c, ',' | '.');
+    first.chars().count() == again.chars().count()
+        && first.chars().zip(again.chars()).all(|(a, b)| a == b || (a, b) == ('2', '7') || (separator(a) && separator(b)))
 }
 
 /// The figures at `place` in a Status Bar capture; `None` if the capture doesn't hold them.
@@ -191,7 +236,7 @@ fn percent(text: &str) -> Option<u32> {
     shaped.then(|| format!("{whole}{decimals}").parse().ok()).flatten()
 }
 
-/// The figures, masked and boxed for ocrs, and how many 2s each shows.
+/// The figures, masked and boxed for ocrs (at their own size), and how many 2s each shows.
 struct Prepared {
     canvas: GrayImage,
     /// Where the figures are, from the EXP's first column to the "]", and the brackets' rows.
@@ -256,7 +301,11 @@ const FOOT_PER_H: f32 = 0.6;
 /// own 11-13 rows, ocrs read the 7 of "1.74%" as a 2 on the 2026-10-07 recording. No
 /// size stops its misreads for good: on the 2026-10-11 Bug Report's frames, 1.5x to 4x
 /// each misread some, as did spacing the glyphs apart; step 4 catches them.
-const UPSCALE: u32 = 2;
+const UPSCALE: f32 = 2.0;
+/// A frame where ocrs read a 7 as a 2 is read again enlarged this many times (step 5). On
+/// the 2026-10-29 Bug Report's frames, 1.25x read 28 of 29 such frames whole, and 1.5x to
+/// 3x read one or none.
+const SEVENS_UPSCALE: f32 = 1.25;
 
 /// The "[" and "]" of the figures: the rightmost pair of bracket-shaped components
 /// (4-connected runs of bracket-coloured pixels, their bounds ends exclusive) with the same
@@ -335,14 +384,7 @@ fn prepare(img: &RgbImage) -> Option<Prepared> {
         let skip = (open.x0..open.x1).contains(&(cx0 + x));
         if skip { 0.0 } else { ink(img.get_pixel(cx0 + x, y0 + y).0) }
     });
-    let (w, h) = (canvas.width() * UPSCALE, canvas.height() * UPSCALE);
-    let canvas = image::imageops::resize(&canvas, w, h, image::imageops::FilterType::Triangle);
-    let line = |x0: u32, x1: u32| Rect {
-        x: (x0 - cx0 + PAD) * UPSCALE,
-        y: PAD * UPSCALE,
-        w: (x1 - x0) * UPSCALE,
-        h: ch * UPSCALE,
-    };
+    let line = |x0: u32, x1: u32| Rect { x: x0 - cx0 + PAD, y: PAD, w: x1 - x0, h: ch };
     // The 2s: their flat feet, on the brackets' bottom row.
     let feet = |x0: u32, x1: u32| flat_feet(img, open.y1 - 1, x0..x1, foot);
     // The 5s and 7s: their flat tops, on the brackets' top row.
