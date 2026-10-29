@@ -44,8 +44,9 @@ import { endSession, isMaintainerAccount, sameOrigin, sessionAccount } from "./s
 import { readBands, readTraining } from "./where-to-train";
 
 /** The Map Leaderboards' reads, which read no key or cookie, a Character's page's among them
- *  (the app's writes under /api/characters aren't GETs). */
-const PUBLIC_READS = ["/api/maps", "/api/bands", "/api/latest", "/api/pedestals", "/api/characters"];
+ *  (the app's writes under /api/characters aren't GETs). Each reads Characters from `SHOWN`
+ *  (blocks.ts), never `entries`, so a Block hides them; blocks.test.ts checks every one. */
+export const PUBLIC_READS = ["/api/maps", "/api/bands", "/api/latest", "/api/pedestals", "/api/characters"];
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {

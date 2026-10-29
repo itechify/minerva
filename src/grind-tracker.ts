@@ -7,7 +7,7 @@ import { dragByHandles, followView, heightReporter, pressControls } from "./shel
 /** What the shell sends: the figures, the Character playing (none until the Status Bar names
  *  one), whether the window shows at all, whether some map has a Personal Best (the Personal
  *  Bests button shows), and whether the Personal Bests window is open (the button shows as on). */
-type TrackerView = {
+export type TrackerView = {
   shown: boolean;
   tracking: ExpTracking;
   character: Character | null;

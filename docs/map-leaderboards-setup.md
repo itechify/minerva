@@ -1,6 +1,6 @@
 # Setting up the Map Leaderboards API
 
-The Map Leaderboards API, and the Accounts beside it, run on the site's Worker with a D1 database (ADR 0015, ADR 0023). The Site workflow (`.github/workflows/site.yml`) applies the database's migrations and deploys the Worker, but a few steps are done by hand on the Cloudflare account, once, before its first deploy. Do them in this order. Wrangler is a dev dependency, so after `pnpm install` each command runs as `pnpm exec wrangler ...`, from the repo root, signed in to the account in `site/wrangler.jsonc` (`pnpm exec wrangler login`).
+The Map Leaderboards API, and the Accounts beside it, run on the site's Worker with a D1 database (ADR 0015, ADR 0023). The Site workflow (`.github/workflows/site.yml`) applies the database's migrations and deploys the Worker when a release is published, or when it's run by hand; merging to `main` deploys nothing. But a few steps are done by hand on the Cloudflare account, once, before its first deploy. Do them in this order. Wrangler is a dev dependency, so after `pnpm install` each command runs as `pnpm exec wrangler ...`, from the repo root, signed in to the account in `site/wrangler.jsonc` (`pnpm exec wrangler login`).
 
 ## 1. Create the database, and commit its ID
 
