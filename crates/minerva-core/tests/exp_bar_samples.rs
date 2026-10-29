@@ -14,11 +14,16 @@
 //!   ("160__3.81--kerning-city-window"), or `unreadable[--variant].png`. The
 //!   `--window` ones are client (1005, h-56) 240x32 cropped from the window samples in
 //!   `samples/minimap`. The unreadable ones are frames ocrs once misread, named for
-//!   what they show and how it went wrong ("unreadable--68012-71.07-seven-as-two"):
+//!   what they show and how it went wrong ("unreadable--26777-27.98-sevens-merged"):
 //!   a Bug Report's EXP Bar Region crops (2026-10-11, client (1010, 1143) 396x33 of a
 //!   1920x1200 client), each of a misread that ended the Session as a character
 //!   switch, or could have. Those are crops of the EXP Bar Region players once marked
-//!   (ADR 0005), from before the figures were found in the Status Bar.
+//!   (ADR 0005), from before the figures were found in the Status Bar. The
+//!   `seven-as-two` ones from it were unreadable too, as ocrs reads their 7 as a 2: read
+//!   again at another size (step 5 of the reader), they read whole.
+//!   "178008__74.02--seven-as-two-live" is a Bug Report's crop of the figures found in the
+//!   Status Bar (2026-10-29, a 1920x1200 client): ocrs read the 7 of "74.xx%" as a 2 on
+//!   nearly every frame from 74.00% on, until the Grind Tracker showed it unreadable.
 //!   "82517__53.05--five-as-dollar" is a Bug Report's crop of the figures found in the
 //!   Status Bar (2026-10-21, a 1920x1200 client): ocrs read its "53.05%" as "$3.05%",
 //!   so every frame of it read as unreadable.
@@ -164,7 +169,7 @@ fn every_single_sample_reads_as_its_filename_names() {
 }
 
 /// What a sample shows: its named reading, or for an unreadable one, what its name says the
-/// figures were ("unreadable--68012-71.07-seven-as-two" -> 68,012 at 71.07%).
+/// figures were ("unreadable--26777-27.98-sevens-merged" -> 26,777 at 27.98%).
 fn shows(name: &str) -> Option<ExpBar> {
     let shown = name.strip_prefix("unreadable--").map_or_else(|| name.to_string(), |rest| rest.replacen('-', "__", 1));
     let (exp, percent) = shown.split_once("__")?;
