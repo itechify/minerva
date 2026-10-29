@@ -34,7 +34,7 @@ type OwlBubble = { line: OwlLine; mood: "news" | "problem" | "waiting"; clickabl
 
 /** What the shell sends: what the owl says, if anything, and the hotkey the player pressed,
  * for Item Lookup's line to name. */
-type OwlView = { bubble: OwlBubble | null; hotkey: string };
+export type OwlView = { bubble: OwlBubble | null; hotkey: string };
 
 const owlEl = byId("owl-bubble");
 const bubbleEl = byId("bubble");

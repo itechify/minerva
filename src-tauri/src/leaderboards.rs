@@ -31,7 +31,7 @@ pub fn key_path(app: &AppHandle) -> tauri::Result<PathBuf> {
 }
 
 /// The site the uploads go to: owlofminerva.app, or in a debug build the one
-/// `MINERVA_SITE_URL` names (`http://localhost:8787/` for `wrangler dev`).
+/// `MINERVA_SITE_URL` names (the URL `pnpm site:local` prints, for a local Worker).
 fn site() -> String {
     let given = if cfg!(debug_assertions) { std::env::var("MINERVA_SITE_URL").ok() } else { None };
     let site = given.unwrap_or_else(|| SITE_URL.to_string());

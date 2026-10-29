@@ -1,6 +1,6 @@
 # Setting up the Map Leaderboards API
 
-The Map Leaderboards API, and the Accounts beside it, run on the site's Worker with a D1 database (ADR 0015, ADR 0023). The Site workflow (`.github/workflows/site.yml`) applies the database's migrations and deploys the Worker, but a few steps are done by hand on the Cloudflare account, once, before its first deploy. Do them in this order. Wrangler is a dev dependency, so after `pnpm install` each command runs as `pnpm exec wrangler ...`, from the repo root, signed in to the account in `site/wrangler.jsonc` (`pnpm exec wrangler login`).
+The Map Leaderboards API, and the Accounts beside it, run on the site's Worker with a D1 database (ADR 0015, ADR 0023). The Site workflow (`.github/workflows/site.yml`) applies the database's migrations and deploys the Worker when a release is published, or when it's run by hand; merging to `main` deploys nothing. But a few steps are done by hand on the Cloudflare account, once, before its first deploy. Do them in this order. Wrangler is a dev dependency, so after `pnpm install` each command runs as `pnpm exec wrangler ...`, from the repo root, signed in to the account in `site/wrangler.jsonc` (`pnpm exec wrangler login`).
 
 ## 1. Create the database, and commit its ID
 
@@ -22,7 +22,7 @@ The maintainer's routes (`/api/admin/...`: reading reports, deleting an entry, r
 pnpm exec wrangler secret put ADMIN_TOKEN --config site/wrangler.jsonc
 ```
 
-Paste a long random string (say `openssl rand -hex 32`) and keep it in a password manager. It stays across deploys. Without it, the maintainer's routes refuse everyone. For `wrangler dev`, put `ADMIN_TOKEN=...` in `site/.dev.vars`, which is gitignored.
+Paste a long random string (say `openssl rand -hex 32`) and keep it in a password manager. It stays across deploys. Without it, the maintainer's routes refuse everyone. For a local run (`pnpm site:local`, which runs `wrangler dev`), put `ADMIN_TOKEN=...` in `site/.dev.vars`, which is gitignored.
 
 ## 4. Set the Discord webhook (optional)
 
@@ -34,7 +34,7 @@ In Discord, on the Minerva server: **#map-leaderboards → Edit Channel → Inte
 pnpm exec wrangler secret put DISCORD_WEBHOOK_URL --config site/wrangler.jsonc
 ```
 
-Paste the URL. For `wrangler dev`, put `DISCORD_WEBHOOK_URL=...` in `site/.dev.vars`, which is gitignored; leave it out and nothing is posted. To stop the posts, delete the webhook in Discord or `pnpm exec wrangler secret delete DISCORD_WEBHOOK_URL --config site/wrangler.jsonc`.
+Paste the URL. For a local run, put `DISCORD_WEBHOOK_URL=...` in `site/.dev.vars`, which is gitignored; leave it out and nothing is posted. While it's there, `pnpm site:local --seed` refuses to run, so its made-up Characters never reach that channel. To stop the posts, delete the webhook in Discord or `pnpm exec wrangler secret delete DISCORD_WEBHOOK_URL --config site/wrangler.jsonc`.
 
 ## 5. Set up signing in with Discord
 
@@ -52,7 +52,7 @@ Accounts (ADR 0023) sign in with Discord: players to link their PCs, the maintai
    pnpm exec wrangler secret put DISCORD_CLIENT_SECRET --config site/wrangler.jsonc
    ```
 
-For `wrangler dev`, put `DISCORD_CLIENT_SECRET=...` in `site/.dev.vars`. Sign in at `http://localhost:5173/admin/` with `pnpm site:dev` and `wrangler dev` both running.
+For a local run, put `DISCORD_CLIENT_SECRET=...` in `site/.dev.vars`. Sign in at `http://localhost:5173/admin/` with `pnpm site:local` running and `pnpm site:dev` started with the `MINERVA_WORKER_PORT` it prints.
 
 ## 6. Set the ClassicRank key (optional)
 
@@ -62,7 +62,7 @@ Characters' portraits come from ClassicRank's API (ADR 0029), which the Worker a
 pnpm exec wrangler secret put CLASSICRANK_KEY --config site/wrangler.jsonc
 ```
 
-Paste the key. Check it with `curl -i -H "Authorization: Bearer <key>" https://classicrank.com/api/v1`: the `X-Read-Key` header says `accepted`, and the answer's `your_key` gives its tier. Portraits show from each Character's next upload, and for everyone at the next daily run (the cron trigger in `site/wrangler.jsonc`, 05:17 UTC). Until then the boards show the question-mark figure, so once the deploy with the key is live, run the refresh at once: `curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/portraits`, which answers 204 when it's done. For `wrangler dev`, put `CLASSICRANK_KEY=...` in `site/.dev.vars`; an unknown key there is served as ClassicRank's keyless tier, which is enough to try it. To stop the portraits, `pnpm exec wrangler secret delete CLASSICRANK_KEY --config site/wrangler.jsonc`: from then on the answers carry none, and the pages show none.
+Paste the key. Check it with `curl -i -H "Authorization: Bearer <key>" https://classicrank.com/api/v1`: the `X-Read-Key` header says `accepted`, and the answer's `your_key` gives its tier. Portraits show from each Character's next upload, and for everyone at the next daily run (the cron trigger in `site/wrangler.jsonc`, 05:17 UTC). Until then the boards show the question-mark figure, so once the deploy with the key is live, run the refresh at once: `curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" https://owlofminerva.app/api/admin/portraits`, which answers 204 when it's done. For a local run, put `CLASSICRANK_KEY=...` in `site/.dev.vars`, or start `pnpm site:local --key`, which gives it a made-up one; an unknown key is served as ClassicRank's keyless tier, which is enough to try it. To stop the portraits, `pnpm exec wrangler secret delete CLASSICRANK_KEY --config site/wrangler.jsonc`: from then on the answers carry none, and the pages show none.
 
 ## 7. Set the maplestory.market key (optional)
 
@@ -88,7 +88,7 @@ From then on, **never publish the site from a ref older than the API**: an older
 
 ## Afterwards
 
-- **A new migration** goes in `site/migrations` as the next `NNNN_<what>.sql` (`pnpm exec wrangler d1 migrations create minerva-leaderboards <what> --config site/wrangler.jsonc`). The Site workflow applies it before the deploy that needs it. Try it locally first: `pnpm exec wrangler d1 migrations apply minerva-leaderboards --local --config site/wrangler.jsonc`.
+- **A new migration** goes in `site/migrations` as the next `NNNN_<what>.sql` (`pnpm exec wrangler d1 migrations create minerva-leaderboards <what> --config site/wrangler.jsonc`). The Site workflow applies it before the deploy that needs it. Try it locally first: `pnpm site:local` applies it to its local D1 when it starts (after `pnpm site:local stop`, if one is running).
 - **The ceilings table** (`site/worker/osms-ceilings.json`) is written again when OSMS's set changes, as `probe osms` is run: `cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json`.
 - **A lost Leaderboard Key.** The player says on Discord that their Character's name is "claimed". If they have an Account, ask for its Discord username and that they link their new PC to it; at `/admin/`, under **Characters**, look the name up and **Reassign** it to their Account. Otherwise, ask them to try again from Minerva (toggling the upload off and on), then **Reassign to refused key** there, or with the maintainer's token:
 

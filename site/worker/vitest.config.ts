@@ -1,6 +1,6 @@
 // The Worker's tests (`pnpm site:test`), run in workerd against a local D1 with the
 // migrations applied, a made-up ceilings table, a made-up maintainer token, a made-up Discord
-// application, a made-up ClassicRank and a made-up maplestory.market.
+// application and webhook, a made-up ClassicRank and a made-up maplestory.market.
 import path from "node:path";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
@@ -17,8 +17,9 @@ export default defineConfig(async () => {
           bindings: {
             TEST_MIGRATIONS: migrations,
             ADMIN_TOKEN: "made-up-maintainer-token",
-            // A made-up Discord webhook. The tests take the posts to it off the global
-            // fetch (test/announce.test.ts); nothing leaves the test.
+            // A made-up Discord webhook. The tests take the posts to it off the global fetch and
+            // answer them from a made-up webhook (test/discord-webhook.ts); nothing leaves the
+            // test.
             DISCORD_WEBHOOK_URL: "https://discord.invalid/api/webhooks/made-up/webhook",
             // A made-up Discord application, and a made-up maintainer's Discord ID. The tests
             // take Discord's answers off the global fetch (test/accounts.ts).
@@ -49,6 +50,6 @@ export default defineConfig(async () => {
       }),
     ],
     // Run from the repo root with --config, Vite's root would be the whole repo.
-    test: { root: import.meta.dirname, setupFiles: [path.join(import.meta.dirname, "test/apply-migrations.ts"), path.join(import.meta.dirname, "test/classicrank.ts")] },
+    test: { root: import.meta.dirname, setupFiles: [path.join(import.meta.dirname, "test/apply-migrations.ts"), path.join(import.meta.dirname, "test/classicrank.ts"), path.join(import.meta.dirname, "test/discord-webhook.ts")] },
   };
 });

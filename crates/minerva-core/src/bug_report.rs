@@ -1727,6 +1727,264 @@ pub fn loot_of(recording: &Recording, items: Option<&ItemFiles>, from_ms: u64, t
     loot
 }
 
+/// What one reader's readings in a Bug Report come to.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReaderStats {
+    /// The reader: "Minimap Title", "EXP bar", "Status Bar", "Player Shop", "Pickup Log" or
+    /// "Item Tooltip".
+    pub reader: &'static str,
+    /// Its readings by what they came to, in the order first seen. A reading the trace says is
+    /// the same as the one before counts as what that one came to; one for a region no longer
+    /// captured is "left".
+    pub readings: Vec<(&'static str, u64)>,
+    /// The Pickup Log's lines that arrived, by kind; none for the other readers.
+    pub arrivals: Vec<(&'static str, u64)>,
+    /// Its misses (a reading that found nothing, or couldn't read what it found), in windows: a
+    /// window runs from a miss to the last before the reader next read something. A reading
+    /// left, or no reading at all, neither ends a window nor is in one.
+    pub misses: Vec<MissWindow>,
+    /// Where it first found what it reads, and each time that moved after; none for the Item
+    /// Tooltip, which goes where the pointer is.
+    pub areas: Vec<AreaChange>,
+}
+
+/// A run of one reader's misses.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MissWindow {
+    /// When the first and the last of them were captured (ms since launch).
+    pub from_ms: u64,
+    pub to_ms: u64,
+    /// How many of each kind, in the order first seen.
+    pub misses: Vec<(&'static str, u64)>,
+}
+
+/// Where a reader found what it reads, from a capture on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AreaChange {
+    pub at_ms: u64,
+    pub area: ScreenRect,
+}
+
+/// How many crops of a kind a Bug Report kept, and how many it had and dropped: gone after
+/// [`RECENT_CROPS_MS`], or left out to keep it small.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CropStats {
+    /// As crops of it are named: "minimap-title", "exp-bar", "pickup-log"...
+    pub kind: String,
+    pub kept: u64,
+    pub dropped: u64,
+}
+
+/// What a Bug Report's readings and crops come to, reader by reader.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReportStats {
+    pub readers: Vec<ReaderStats>,
+    /// By kind, in name order.
+    pub crops: Vec<CropStats>,
+}
+
+/// Add one to `label`'s count.
+fn count(counts: &mut Vec<(&'static str, u64)>, label: &'static str) {
+    match counts.iter_mut().find(|(seen, _)| *seen == label) {
+        Some((_, n)) => *n += 1,
+        None => counts.push((label, 1)),
+    }
+}
+
+/// What a reading came to, for [`stats_of`].
+#[derive(Clone, Copy)]
+enum Came {
+    Read(&'static str),
+    Missed(&'static str),
+    /// Neither: left, or no reading.
+    Aside(&'static str),
+}
+
+/// One reader's tally as the trace goes by.
+struct Tally {
+    stats: ReaderStats,
+    /// What the last reading taken in came to, which one the same as it comes to too.
+    last: Option<Came>,
+    window: Option<MissWindow>,
+    area: Option<ScreenRect>,
+}
+
+impl Tally {
+    fn new(reader: &'static str) -> Self {
+        Tally { stats: ReaderStats { reader, ..ReaderStats::default() }, last: None, window: None, area: None }
+    }
+
+    /// A reading captured at `at_ms` that came to `outcome` (`None`: the same as the one
+    /// before), finding what it reads at `area`; counted if `counted`.
+    fn reading(&mut self, at_ms: u64, outcome: Option<Came>, area: Option<ScreenRect>, counted: bool) {
+        // The same as a reading the trace no longer holds, where a run over a day cut it.
+        let outcome = outcome.or(self.last).unwrap_or(Came::Aside("the same as one before the trace"));
+        if !matches!(outcome, Came::Aside(_)) {
+            self.last = Some(outcome);
+        }
+        let moved = area.filter(|&area| self.area != Some(area) || self.stats.areas.is_empty());
+        self.area = area.or(self.area);
+        if !counted {
+            // Outside the window asked for: a run of misses going on is cut there.
+            self.end_window();
+            return;
+        }
+        if let Some(area) = moved {
+            self.stats.areas.push(AreaChange { at_ms, area });
+        }
+        match outcome {
+            Came::Read(label) => {
+                count(&mut self.stats.readings, label);
+                self.end_window();
+            }
+            Came::Missed(label) => {
+                count(&mut self.stats.readings, label);
+                let window = self.window.get_or_insert(MissWindow { from_ms: at_ms, to_ms: at_ms, misses: Vec::new() });
+                window.to_ms = at_ms;
+                count(&mut window.misses, label);
+            }
+            Came::Aside(label) => count(&mut self.stats.readings, label),
+        }
+    }
+
+    fn end_window(&mut self) {
+        if let Some(window) = self.window.take() {
+            self.stats.misses.push(window);
+        }
+    }
+
+    fn done(mut self) -> ReaderStats {
+        self.end_window();
+        self.stats
+    }
+}
+
+/// A crop's kind and when its frame was captured, from its name
+/// (`crops/<kind>-<10-digit ms>[@x,y].png`).
+fn crop_kind(name: &str) -> Option<(&str, u64)> {
+    let name = name.strip_prefix("crops/")?;
+    (0..name.len()).filter(|&i| name.as_bytes()[i] == b'-').find_map(|i| {
+        let digits = name.get(i + 1..i + 11)?;
+        let at_ms = digits.bytes().all(|b| b.is_ascii_digit()).then(|| digits.parse().ok())??;
+        Some((&name[..i], at_ms))
+    })
+}
+
+/// Count a Bug Report's readings, reader by reader, and its crops, kind by kind: those captured
+/// between `from_ms` and `to_ms` (ms since launch, as the timeline gives them), and the whole
+/// captures where a reader found nothing taken then.
+pub fn stats_of(recording: &Recording, from_ms: u64, to_ms: u64) -> ReportStats {
+    use crate::pickup_log::{PickupLine, PickupLogSeen};
+    use Came::{Aside, Missed, Read};
+    let window = from_ms..=to_ms;
+    let [mut title, mut exp_bar, mut status_bar, mut shop, mut log, mut tooltip] =
+        ["Minimap Title", "EXP bar", "Status Bar", "Player Shop", "Pickup Log", "Item Tooltip"].map(Tally::new);
+    let mut crops: Vec<CropStats> = Vec::new();
+    let mut crop = |name: &str, kept: bool| {
+        let Some((kind, _)) = crop_kind(name) else { return };
+        let i = crops.iter().position(|crop| crop.kind == kind).unwrap_or_else(|| {
+            crops.push(CropStats { kind: kind.to_string(), ..CropStats::default() });
+            crops.len() - 1
+        });
+        *(if kept { &mut crops[i].kept } else { &mut crops[i].dropped }) += 1;
+    };
+    let mut named = BTreeSet::new();
+    for line in &recording.lines {
+        let at_ms = line.event.at_ms().unwrap_or(line.t);
+        let counted = window.contains(&at_ms);
+        match &line.event {
+            Event::Title { stale_region: Some(_), .. } => title.reading(at_ms, Some(Aside("left")), None, counted),
+            Event::Title { same: true, .. } => title.reading(at_ms, None, None, counted),
+            Event::Title { lines, found, .. } => {
+                let outcome = match (lines, found) {
+                    (Some(_), _) => Read("read"),
+                    (None, Some(_)) => Missed("unreadable"),
+                    (None, None) => Missed("not found"),
+                };
+                title.reading(at_ms, Some(outcome), *found, counted);
+            }
+            Event::ExpBar { bar, place, .. } => {
+                let outcome = if bar.is_some() { Read("read") } else { Missed("not whole") };
+                exp_bar.reading(at_ms, Some(outcome), place.map(|place| place.area), counted);
+            }
+            Event::StatusBar { stale_region: Some(_), .. } => status_bar.reading(at_ms, Some(Aside("left")), None, counted),
+            Event::StatusBar { same: true, .. } => status_bar.reading(at_ms, None, None, counted),
+            Event::StatusBar { bar, near_miss, .. } => {
+                let outcome = match (bar, near_miss) {
+                    (Some(_), _) => Read("read"),
+                    (None, Some(_)) => Missed("near miss"),
+                    (None, None) => Missed("not found"),
+                };
+                status_bar.reading(at_ms, Some(outcome), bar.as_ref().map(|bar| bar.area), counted);
+            }
+            Event::PlayerShop { stale_region: Some(_), .. } => shop.reading(at_ms, Some(Aside("left")), None, counted),
+            Event::PlayerShop { same: true, .. } => shop.reading(at_ms, None, None, counted),
+            Event::PlayerShop { shop: list, near_miss, .. } => {
+                let outcome = match (list, near_miss) {
+                    (Some(_), _) => Read("read"),
+                    (None, Some(_)) => Missed("near miss"),
+                    (None, None) => Missed("not found"),
+                };
+                shop.reading(at_ms, Some(outcome), list.as_ref().map(|list| list.area), counted);
+            }
+            Event::PickupLog { stale_region: Some(_), .. } => log.reading(at_ms, Some(Aside("left")), None, counted),
+            Event::PickupLog { reading, .. } => {
+                let (outcome, area) = match reading.seen {
+                    PickupLogSeen::Clear { area } => {
+                        let label = match (reading.guessed, reading.overflowed) {
+                            (false, false) => "clear",
+                            (true, false) => "clear (guessed)",
+                            (false, true) => "clear (overflowed)",
+                            (true, true) => "clear (guessed, overflowed)",
+                        };
+                        (Read(label), Some(area))
+                    }
+                    PickupLogSeen::Covered { area } => (Missed("covered"), Some(area)),
+                    PickupLogSeen::Nothing => (Missed("nothing"), None),
+                };
+                log.reading(at_ms, Some(outcome), area, counted);
+                for arrived in reading.arrived.iter().filter(|_| counted) {
+                    let kind = match arrived {
+                        PickupLine::Exp { party: false, .. } => "EXP",
+                        PickupLine::Exp { party: true, .. } => "party EXP",
+                        PickupLine::PartyBonus { .. } => "party bonus",
+                        PickupLine::Mesos { .. } => "mesos",
+                        PickupLine::Item { .. } => "item",
+                        PickupLine::Unreadable => "unreadable",
+                    };
+                    count(&mut log.stats.arrivals, kind);
+                }
+            }
+            Event::ItemTooltip { reading } => {
+                let outcome = match reading {
+                    Some(ItemTooltipReading { tooltip: ItemTooltip::Found { name: Some(_), .. }, .. }) => Read("read"),
+                    Some(ItemTooltipReading { tooltip: ItemTooltip::Found { name: None, .. }, .. }) => Missed("unreadable"),
+                    Some(ItemTooltipReading { tooltip: ItemTooltip::None, .. }) => Missed("not found"),
+                    None => Aside("no reading"),
+                };
+                tooltip.reading(reading.as_ref().map_or(at_ms, |reading| reading.at_ms), Some(outcome), None, counted);
+            }
+            _ => {}
+        }
+        for name in line.crop.iter().chain(&line.tooltip_crop) {
+            named.insert(name.as_str());
+            if counted {
+                crop(name, recording.crops.contains(name));
+            }
+        }
+    }
+    // The whole captures where a reader found nothing, which no line names.
+    let whole = recording.crops.iter().filter(|name| !named.contains(name.as_str())).map(|name| (name.as_str(), true));
+    let left_out = recording.report.captures_left_out.iter().map(|left| (left.name.as_str(), false));
+    for (name, kept) in whole.chain(left_out) {
+        if crop_kind(name).is_some_and(|(_, at_ms)| window.contains(&at_ms)) {
+            crop(name, kept);
+        }
+    }
+    crops.sort_by(|a, b| a.kind.cmp(&b.kind));
+    ReportStats { readers: [title, exp_bar, status_bar, shop, log, tooltip].map(Tally::done).into(), crops }
+}
+
 /// Feed a Bug Report's inputs to a new core, with what `with` holds where the report had
 /// it, and compare what it writes down with the report's trace. A set's fingerprint isn't compared, but what the core makes of it is:
 /// a set other than the run's makes it diverge where that shows, as do a trace that

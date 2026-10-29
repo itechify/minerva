@@ -68,7 +68,7 @@ type ShownItemCard = { card: number; unfoldFrom?: "left" | "right" } & (
 );
 
 /** What the shell sends: the card, and whether it shows at all. */
-type CardView = { shown: boolean; card: ShownItemCard | null };
+export type CardView = { shown: boolean; card: ShownItemCard | null };
 
 const cardEl = byId("card");
 const title = byId("title");

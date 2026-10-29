@@ -12,7 +12,10 @@
     "check": "node scripts/check.mjs",
     "site:dev": "vite --config site/vite.config.ts",
     "site:build": "tsc && vite build --config site/vite.config.ts",
-    "site:test": "tsc -p site/worker && vitest run --config site/worker/vitest.config.ts && vitest run --config site/leaderboards/vitest.config.ts && vitest run --config site/account/vitest.config.ts && vitest run --config site/character/vitest.config.ts"
+    "site:local": "node scripts/site-local.mjs",
+    "site:test": "tsc -p site/worker && vitest run --config site/worker/vitest.config.ts && vitest run --config site/leaderboards/vitest.config.ts && vitest run --config site/account/vitest.config.ts && vitest run --config site/character/vitest.config.ts",
+    "shot": "node scripts/shot.mjs",
+    "preview:window": "node scripts/preview-window.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2"
