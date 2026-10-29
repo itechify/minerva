@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended by ADR-0031 (`/admin/` gains Overview, Accounts and Log views and Blocks; a name looked up lists its entries, its Block and its lines in the log)
 ---
 
 # Optional Accounts, signed in with Discord

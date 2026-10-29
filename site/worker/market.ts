@@ -72,9 +72,19 @@ export async function readMarket(env: Env, request: Request, url: URL, now = Dat
   };
 }
 
+/** The maintainer's Pull market prices (ADR 0031): both tables pulled at once, whatever their
+ *  age. */
+export async function pullNow(env: Env, now = Date.now()): Promise<Answer> {
+  const key = env.MM_API_KEY;
+  if (!key) return { status: 409, body: { error: "market-off" } };
+  await Promise.all((Object.keys(SOURCES) as Source[]).map((source) => pullIfDue(env, key, source, now, true)));
+  return { status: 204 };
+}
+
 /** Pull `source` again if the copy kept is an hour old (or there is none) and nobody asked for
- *  it in the last minute. Never throws: a read gives what is kept whatever comes of it. */
-async function pullIfDue(env: Env, key: string, source: Source, now: number): Promise<void> {
+ *  it in the last minute, or at once with `atOnce`. Never throws: a read gives what is kept
+ *  whatever comes of it. */
+async function pullIfDue(env: Env, key: string, source: Source, now: number, atOnce = false): Promise<void> {
   try {
     // Claim the pull, so reads at the same moment don't all ask.
     const claim = await env.DB.prepare(
@@ -82,7 +92,7 @@ async function pullIfDue(env: Env, key: string, source: Source, now: number): Pr
        ON CONFLICT (source) DO UPDATE SET tried_at = ?2
        WHERE (market_pulls.pulled_at IS NULL OR market_pulls.pulled_at <= ?2 - ?3) AND market_pulls.tried_at <= ?2 - ?4`,
     )
-      .bind(source, now, PULL_EVERY_MS, ASK_AGAIN_MS)
+      .bind(source, now, atOnce ? 0 : PULL_EVERY_MS, atOnce ? 0 : ASK_AGAIN_MS)
       .run();
     if (claim.meta.changes !== 1) return;
     const response = await fetch(SOURCES[source], {

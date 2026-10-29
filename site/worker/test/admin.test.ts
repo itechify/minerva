@@ -72,7 +72,7 @@ describe("the maintainer, signed in", () => {
 
     const read = await (await admin("/characters/edda")).json();
 
-    expect(read).toMatchObject({ name: "Edda", account: { username: "edda" }, entries: 1 });
+    expect(read).toMatchObject({ name: "Edda", account: { username: "edda" }, entries: [{ map: FIELD, band: 100, party: false }] });
     expect((read as { refusedAt: number | null }).refusedAt).not.toBeNull();
   });
 

@@ -1,7 +1,10 @@
 <!doctype html>
-<!-- The maintainer's page (ADR 0023): signed in with a Discord account the Worker lists as a
-     maintainer's (MAINTAINER_DISCORD_IDS). Reports, each deleted or dismissed, and
-     Characters, a name looked up and reassigned. Everyone else is told it's the
+<!-- The maintainer's page (ADR 0023, ADR 0031): signed in with a Discord account the Worker
+     lists as a maintainer's (MAINTAINER_DISCORD_IDS). Overview, the open reports, the counts,
+     two buttons and every Block; Reports, each deleted or dismissed; Characters, a name looked
+     up, reassigned, its entries taken down, or blocked; Accounts, one looked up, a PC unlinked
+     or the Account deleted; and Log, what the maintainer did. Each view, and the Character or
+     Account open in it, is in the address (#/characters/Egbert). Everyone else is told it's the
      maintainer's. It reads /api/admin/ from the browser (admin/admin.ts). -->
 <html lang="en">
   <head>
@@ -33,37 +36,127 @@
             <noscript><p class="lb-said">Moderation needs JavaScript.</p></noscript>
             <p id="signed-out" hidden><a class="button" href="/api/auth/discord?return=%2Fadmin%2F">Sign in with Discord</a></p>
             <div class="account-actions" id="views" role="tablist" aria-label="Moderation" hidden>
-              <button class="button small secondary" id="show-reports" type="button" role="tab" aria-selected="true" aria-controls="reports">Reports</button>
-              <button class="button small secondary" id="show-characters" type="button" role="tab" aria-selected="false" aria-controls="characters">Characters</button>
+              <button class="button small secondary" id="show-overview" type="button" role="tab" aria-selected="true" aria-controls="overview">Overview</button>
+              <button class="button small secondary" id="show-reports" type="button" role="tab" aria-selected="false" aria-controls="reports" tabindex="-1">Reports</button>
+              <button class="button small secondary" id="show-characters" type="button" role="tab" aria-selected="false" aria-controls="characters" tabindex="-1">Characters</button>
+              <button class="button small secondary" id="show-accounts" type="button" role="tab" aria-selected="false" aria-controls="accounts" tabindex="-1">Accounts</button>
+              <button class="button small secondary" id="show-log" type="button" role="tab" aria-selected="false" aria-controls="log" tabindex="-1">Log</button>
             </div>
           </header>
 
-          <section class="lb-section stop" id="reports" data-mini="Reports" role="tabpanel" aria-labelledby="reports-title" hidden>
-            <h2 id="reports-title">Reports</h2>
+          <section class="lb-section stop" id="overview" data-mini="Overview" role="tabpanel" aria-labelledby="show-overview" hidden>
+            <p class="account-lead" id="waiting" aria-live="polite"></p>
+            <ul class="account-lines" id="overview-lines"></ul>
+            <ul class="account-list">
+              <li class="account-item">
+                <span class="account-words"><strong>Portraits</strong><span id="portraits-said"></span></span>
+                <div class="account-actions"><button class="button small secondary" id="refresh-portraits" type="button">Refresh portraits</button></div>
+              </li>
+              <li class="account-item">
+                <span class="account-words" id="market-words"><strong>Market prices</strong></span>
+                <div class="account-actions"><button class="button small secondary" id="pull-market" type="button">Pull market prices</button></div>
+              </li>
+            </ul>
+            <p class="lb-said" id="overview-said" aria-live="polite"></p>
+            <h2 class="account-subhead" id="blocks-title">Blocked</h2>
+            <p class="lb-said" id="blocks-said" aria-live="polite"></p>
+            <ul class="account-list" id="block-list" aria-labelledby="blocks-title"></ul>
+          </section>
+
+          <section class="lb-section stop" id="reports" data-mini="Reports" role="tabpanel" aria-labelledby="show-reports" hidden>
             <p class="lb-said" id="reports-said" aria-live="polite"></p>
-            <ul class="account-list" id="report-list"></ul>
-            <h3 class="account-subhead" id="removed-title">Taken down</h3>
+            <ul class="account-list" id="report-list" aria-label="Reports"></ul>
+            <h2 class="account-subhead" id="removed-title">Taken down</h2>
             <p class="lb-said" id="removed-said" aria-live="polite"></p>
             <ul class="account-list" id="removed-list" aria-labelledby="removed-title"></ul>
           </section>
 
-          <section class="lb-section stop" id="characters" data-mini="Characters" role="tabpanel" aria-labelledby="characters-title" hidden>
-            <h2 id="characters-title">Characters</h2>
+          <section class="lb-section stop" id="characters" data-mini="Characters" role="tabpanel" aria-labelledby="show-characters" hidden>
             <form class="lb-search" id="character-form" action="javascript:void 0">
-              <label for="character-name">Character's name</label>
+              <label for="character-name">Character's name, then Enter</label>
               <input id="character-name" type="search" autocomplete="off" spellcheck="false" maxlength="16" />
             </form>
             <p class="lb-said" id="character-said" aria-live="polite"></p>
             <div id="character" hidden>
+              <h2 class="account-name" id="character-heading" tabindex="-1"><span id="character-title"></span><span class="tag" id="character-tag" hidden></span></h2>
               <ul class="account-lines" id="character-lines"></ul>
+
+              <h3 class="account-subhead" id="name-title">Name</h3>
+              <p class="lb-said" id="name-said" aria-live="polite"></p>
               <div class="account-actions">
+                <button class="button small secondary" id="open-account" type="button">Open Account</button>
                 <button class="button small secondary" id="reassign-refused" type="button">Reassign to refused key</button>
               </div>
               <form class="lb-search" id="account-form" action="javascript:void 0">
-                <label for="account-query">Reassign to an Account, by Discord username</label>
+                <label for="account-query">Or reassign to an Account, by Discord username, then Enter</label>
                 <input id="account-query" type="search" autocomplete="off" spellcheck="false" />
               </form>
-              <ul class="account-list" id="account-list"></ul>
+              <ul class="account-list" id="account-list" aria-label="Accounts found"></ul>
+
+              <h3 class="account-subhead" id="entries-title">Entries</h3>
+              <p class="lb-said" id="entries-said" aria-live="polite"></p>
+              <ul class="account-list" id="entry-list" aria-labelledby="entries-title"></ul>
+              <div class="account-actions">
+                <button class="button small secondary" id="take-all-down" type="button">Take all down</button>
+              </div>
+
+              <h3 class="account-subhead" id="block-title">Block</h3>
+              <p class="lb-said" id="block-said" aria-live="polite"></p>
+              <div class="account-actions">
+                <button class="button small secondary" id="block-open" type="button" aria-expanded="false" aria-controls="block-fields">Block…</button>
+                <button class="button small secondary" id="unblock" type="button">Unblock</button>
+              </div>
+              <div id="block-fields" hidden>
+                <form class="lb-search" id="block-form" action="javascript:void 0">
+                  <label for="block-note">Why, for you alone (optional)</label>
+                  <textarea id="block-note" rows="2" maxlength="500"></textarea>
+                  <label class="account-check"><input id="block-name" type="checkbox" /> Block the name too, whatever PC uploads it</label>
+                </form>
+                <div class="account-actions">
+                  <button class="button small secondary" id="block" type="button">Block</button>
+                </div>
+              </div>
+
+              <h3 class="account-subhead" id="character-log-title">Log</h3>
+              <p class="lb-said" id="character-log-said"></p>
+              <ul class="account-list" id="character-log" aria-labelledby="character-log-title"></ul>
+            </div>
+          </section>
+
+          <section class="lb-section stop" id="accounts" data-mini="Accounts" role="tabpanel" aria-labelledby="show-accounts" hidden>
+            <form class="lb-search" id="find-form" action="javascript:void 0">
+              <label for="find-query">Discord username, or part of it, then Enter</label>
+              <input id="find-query" type="search" autocomplete="off" spellcheck="false" />
+            </form>
+            <ul class="account-list" id="found-list" aria-label="Accounts found"></ul>
+            <p class="lb-said" id="opened-said" aria-live="polite"></p>
+            <div id="opened" hidden>
+              <h2 class="account-name" id="opened-heading" tabindex="-1"><span id="opened-title"></span><span class="tag" id="opened-tag" hidden>Blocked</span></h2>
+              <ul class="account-lines" id="opened-lines"></ul>
+              <div class="account-actions" id="opened-block" hidden>
+                <button class="button small secondary" id="opened-unblock" type="button">Unblock</button>
+              </div>
+              <h3 class="account-subhead" id="pcs-title">PCs</h3>
+              <ul class="account-list" id="pc-list" aria-labelledby="pcs-title"></ul>
+              <h3 class="account-subhead" id="opened-characters-title">Characters</h3>
+              <p class="lb-said" id="opened-characters-said"></p>
+              <ul class="account-list" id="opened-characters" aria-labelledby="opened-characters-title"></ul>
+              <h3 class="account-subhead" id="delete-title">Delete</h3>
+              <p class="lb-said">
+                Deleting the Account removes its sign-in and its PCs' links, as the player's own Delete does. Each name
+                stays with the key that claimed it, and its entries stay. It can't be undone.
+              </p>
+              <div class="account-actions">
+                <button class="button small secondary" id="delete-account" type="button">Delete Account</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="lb-section stop" id="log" data-mini="Log" role="tabpanel" aria-labelledby="show-log" hidden>
+            <p class="lb-said" id="log-said" aria-live="polite"></p>
+            <ul class="account-list" id="log-list" aria-label="Log"></ul>
+            <div class="account-actions">
+              <button class="button small secondary" id="log-older" type="button" hidden>Older</button>
             </div>
           </section>
         </div>

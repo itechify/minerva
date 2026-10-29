@@ -2367,6 +2367,7 @@ impl Event {
                     }
                     LeaderboardAnswer::Deleted {} => "deleted".to_string(),
                     LeaderboardAnswer::Claimed {} => "the name is claimed by another key".to_string(),
+                    LeaderboardAnswer::Blocked {} => "blocked by the maintainer".to_string(),
                     LeaderboardAnswer::RateLimited { retry_after_secs } => format!("rate-limited for {retry_after_secs} s"),
                     LeaderboardAnswer::Failed { why } => format!("failed: {why}"),
                 };
