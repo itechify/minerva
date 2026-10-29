@@ -242,6 +242,10 @@ fn showing_a_character_on_the_map_leaderboards_and_each_answer_replay_and_read_i
     shell.play(10 * S, CONSTRUCTION_SITE, grind);
 
     shell.minerva.show_on_leaderboards("Egbert", true);
+    // What the site holds of him first: nothing.
+    shell.play(15 * S, CONSTRUCTION_SITE, grind);
+    let id = upload_for(&shell, "Egbert");
+    shell.minerva.on_leaderboard_answer(id, LeaderboardAnswer::Pulled { entries: Vec::new() });
     shell.play(20 * S, CONSTRUCTION_SITE, grind);
     let id = upload_for(&shell, "Egbert");
     shell.minerva.on_leaderboard_answer(id, LeaderboardAnswer::Failed { why: "offline".into() });
@@ -266,14 +270,16 @@ fn showing_a_character_on_the_map_leaderboards_and_each_answer_replay_and_read_i
     let timeline = recording.timeline(0);
     for said in [
         "\"Egbert\" shown on the Map Leaderboards",
-        "Map Leaderboards upload 1 asked: \"Egbert\"'s 1 entries",
-        "Map Leaderboards upload 1 for \"Egbert\": failed: offline",
-        "\"Egbert\" sent to the Map Leaderboards again",
+        "Map Leaderboards upload 1 asked: getting \"Egbert\"'s entries from the site",
+        "Map Leaderboards upload 1 for \"Egbert\": pulled: 0 entries",
         "Map Leaderboards upload 2 asked: \"Egbert\"'s 1 entries",
-        "Map Leaderboards upload 2 for \"Egbert\": taken but for 010003080 band 10 removed",
+        "Map Leaderboards upload 2 for \"Egbert\": failed: offline",
+        "\"Egbert\" sent to the Map Leaderboards again",
+        "Map Leaderboards upload 3 asked: \"Egbert\"'s 1 entries",
+        "Map Leaderboards upload 3 for \"Egbert\": taken but for 010003080 band 10 removed",
         "\"Egbert\" taken off the Map Leaderboards",
-        "Map Leaderboards upload 3 asked: deleting \"Egbert\"'s entries",
-        "Map Leaderboards upload 3 for \"Egbert\": deleted",
+        "Map Leaderboards upload 4 asked: deleting \"Egbert\"'s entries",
+        "Map Leaderboards upload 4 for \"Egbert\": deleted",
     ] {
         assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
     }
@@ -463,15 +469,21 @@ fn bests_lost_at_launch_replay_holding_the_uploads_and_read_in_the_timeline() {
     shell.minerva.restore_bests(SavedBests::default());
     shell.minerva.bests_lost();
     shell.play(20 * S, CONSTRUCTION_SITE, grind);
-    assert_eq!(shell.minerva.panel_state().leaderboard_uploads, []);
+    // Nothing of his goes up: what the site holds of him is asked for first.
+    let uploads = &shell.minerva.panel_state().leaderboard_uploads;
+    assert!(uploads.len() == 1 && uploads[0].pull, "{uploads:?}");
 
     let (_, recording) = shell.report();
     let replay = bug_report::replay(&recording, Some(osms::game().files()));
     assert_eq!(replay.divergence, None);
     assert_eq!(replay.lines, recording.lines.len());
-    let said = "Personal Bests file unreadable: uploads to the Map Leaderboards held";
     let timeline = recording.timeline(0);
-    assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
+    for said in [
+        "Personal Bests file unreadable: uploads to the Map Leaderboards held",
+        "Map Leaderboards upload 1 asked: getting \"Egbert\"'s entries from the site",
+    ] {
+        assert!(timeline.iter().any(|line| line.contains(said)), "{said} in {timeline:#?}");
+    }
 }
 
 #[test]

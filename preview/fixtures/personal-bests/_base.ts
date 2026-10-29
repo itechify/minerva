@@ -49,7 +49,7 @@ export const owlbert: Character = {
     map("100000005", "Quiet Lane", "Bramble Field", 39_900, 41_000),
     map("100000006", "Lantern Road", "Stone Garden 2", 22_400, null, { mobLevels: { lowest: 15, highest: 19 } }),
   ],
-  leaderboard: { on: true, maps: 4, offered: true, status: "upToDate", problem: false, uploadedAtUnixMs: NOW - 3_600_000, rejected: [] },
+  leaderboard: { on: true, maps: 4, offered: true, status: "upToDate", problem: false, uploadedAtUnixMs: NOW - 3_600_000, rejected: [], mapsFromSite: 0 },
 };
 
 export const view = (characters: Character[], more: Partial<BestsView> = {}) =>

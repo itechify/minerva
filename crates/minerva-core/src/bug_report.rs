@@ -477,7 +477,7 @@ impl Line {
 }
 
 /// An upload to the Map Leaderboards the core asked for, as a line writes it down: its id,
-/// whose, and how many entries (`None`: deleting them).
+/// whose, and how many entries (`None`: deleting them, or for a pull, getting them).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AskedUpload {
@@ -485,6 +485,9 @@ pub struct AskedUpload {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entries: Option<usize>,
+    /// It gets the entries the site holds (#206).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pull: bool,
 }
 
 /// What the shell knows of the run that the core doesn't, for a Bug Report.
@@ -1023,7 +1026,7 @@ impl Recorder {
             let last_upload = self.last.upload_id;
             for upload in outcome.state.leaderboard_uploads.iter().filter(|u| u.id > last_upload) {
                 let entries = upload.entries.as_ref().map(Vec::len);
-                line.uploads.push(AskedUpload { id: upload.id, name: upload.name.clone(), entries });
+                line.uploads.push(AskedUpload { id: upload.id, name: upload.name.clone(), entries, pull: upload.pull });
                 self.last.upload_id = self.last.upload_id.max(upload.id);
             }
             if let Some(request) = outcome.state.discord_link_requests.iter().find(|r| r.id > self.last.discord_link_id) {
@@ -2341,6 +2344,7 @@ impl Line {
             out.push(changes);
         }
         out.extend(self.uploads.iter().map(|upload| match upload.entries {
+            _ if upload.pull => format!("Map Leaderboards upload {} asked: getting {:?}'s entries from the site", upload.id, upload.name),
             Some(entries) => format!("Map Leaderboards upload {} asked: {:?}'s {entries} entries", upload.id, upload.name),
             None => format!("Map Leaderboards upload {} asked: deleting {:?}'s entries", upload.id, upload.name),
         }));
@@ -2624,6 +2628,7 @@ impl Event {
                         format!("taken but for {}", rejected.join(", "))
                     }
                     LeaderboardAnswer::Deleted {} => "deleted".to_string(),
+                    LeaderboardAnswer::Pulled { entries } => format!("pulled: {} entries", entries.len()),
                     LeaderboardAnswer::Claimed {} => "the name is claimed by another key".to_string(),
                     LeaderboardAnswer::Blocked {} => "blocked by the maintainer".to_string(),
                     LeaderboardAnswer::RateLimited { retry_after_secs } => format!("rate-limited for {retry_after_secs} s"),

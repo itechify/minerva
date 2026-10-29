@@ -79,7 +79,7 @@ pub use item_tooltip::{ItemCapture, ItemTooltip, ItemTooltipReader, ItemTooltipR
 pub use discord_link::{DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest, DiscordLinkView, link_page, read_link_state, read_link_token};
 pub use leaderboards::{
     LeaderboardAnswer, LeaderboardCharacter, LeaderboardEntry, LeaderboardStatus, LeaderboardToggle, LeaderboardUpload,
-    RejectedEntry, RejectedListing, RejectedReason, read_leaderboard_answer,
+    RejectedEntry, RejectedListing, RejectedReason, read_leaderboard_answer, read_leaderboard_pull,
 };
 pub use map_data::{
     HiddenPortal, MapData, MapDataStatus, MapSummary, Mob, PerParty, Portal, PortalKind,
@@ -1538,8 +1538,8 @@ impl Minerva {
 
     /// The player sent the Character named `name` to the Map Leaderboards again from the
     /// Personal Bests window, where they stood with a problem: an upload tried again, a name
-    /// another key held, or uploads held since the bests file didn't read (having confirmed,
-    /// since what is here then replaces what the site holds). It goes up at the next tick.
+    /// another key held, or uploads held since the bests file didn't read, whose entries the site
+    /// couldn't be asked for. It goes up at the next tick; held, their entries are pulled then.
     pub fn send_to_leaderboards_again(&mut self, name: &str) -> &PanelState {
         self.record(Event::SendToLeaderboardsAgain { name: name.to_string() });
         self.leaderboards.send_again(name);
@@ -1548,11 +1548,28 @@ impl Minerva {
 
     /// The shell made upload `id` of [`PanelState::leaderboard_uploads`], and the Map
     /// Leaderboards answered `answer` (or it couldn't be made: [`LeaderboardAnswer::Failed`]).
-    /// An answer to an upload no longer under way changes nothing.
+    /// A pull's entries join the Character's Visits, each as the Visit it was. An answer to an
+    /// upload no longer under way changes nothing.
     pub fn on_leaderboard_answer(&mut self, id: u64, answer: LeaderboardAnswer) -> &PanelState {
         let name = self.leaderboards.uploads().into_iter().find(|upload| upload.id == id).map(|upload| upload.name);
         self.record(Event::LeaderboardAnswer { id, name: name.unwrap_or_default(), answer: answer.clone() });
-        self.leaderboards.answer(id, answer, self.wall_clock);
+        if let Some((name, entries)) = self.leaderboards.answer(id, answer, self.wall_clock) {
+            let visits = entries
+                .into_iter()
+                .map(|e| {
+                    let visit = VisitBest {
+                        exp_per_hour: e.exp_per_hour,
+                        set_at_unix_ms: Some(e.set_at),
+                        level: Some(e.level),
+                        job: Some(e.job),
+                        kind: e.party.into(),
+                    };
+                    (e.map, visit)
+                })
+                .collect();
+            let maps = self.session.take_back_bests(&name, visits);
+            self.leaderboards.came_back(&name, maps);
+        }
         self.sync_panel()
     }
 

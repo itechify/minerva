@@ -104,13 +104,20 @@ fn turning_a_character_on_uploads_their_best_in_each_level_band() {
         status: LeaderboardStatus::Off,
         uploaded_at_unix_ms: None,
         rejected: Vec::new(),
+        maps_from_site: 0,
     };
     assert_eq!(toggle(minerva.panel_state(), "Egbert"), off);
     assert_eq!(minerva.panel_state().leaderboard_uploads, []);
 
     minerva.show_on_leaderboards("Egbert", true);
+    // Never uploaded from this install: what the site holds of him comes first.
     let state = minerva.tick(50).clone();
-    let upload = LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: Some(egberts_entries()) };
+    let pull = LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: None, pull: true };
+    assert_eq!(state.leaderboard_uploads, [pull]);
+    assert_eq!(toggle(&state, "Egbert"), LeaderboardToggle { on: true, status: LeaderboardStatus::Sending, ..off.clone() });
+
+    let state = none_on_site(&mut minerva, 100).clone();
+    let upload = LeaderboardUpload { id: 2, name: "Egbert".to_string(), entries: Some(egberts_entries()), pull: false };
     assert_eq!(state.leaderboard_uploads, [upload]);
     assert_eq!(toggle(&state, "Egbert"), LeaderboardToggle { on: true, status: LeaderboardStatus::Sending, ..off });
 }
@@ -132,7 +139,8 @@ fn a_maps_solo_best_and_party_best_are_entries_of_their_own() {
     minerva.restore_bests(SavedBests { version: BESTS_VERSION, unassigned: Vec::new(), characters: vec![egbert] });
     minerva.on_wall_clock(WALL);
     minerva.show_on_leaderboards("Egbert", true);
-    let state = minerva.tick(50).clone();
+    minerva.tick(50);
+    let state = none_on_site(&mut minerva, 100).clone();
     // By Level Band, a band's Solo Best before its Party Best.
     let entries = vec![
         entry(SUNSET_SKY_ID, 13, 5000, 9),
@@ -140,7 +148,7 @@ fn a_maps_solo_best_and_party_best_are_entries_of_their_own() {
         entry(SUNSET_SKY_ID, 25, 8000, 2),
         party_entry(SUNSET_SKY_ID, 23, 9000, 3),
     ];
-    assert_eq!(state.leaderboard_uploads, [LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: Some(entries) }]);
+    assert_eq!(state.leaderboard_uploads, [LeaderboardUpload { id: 2, name: "Egbert".to_string(), entries: Some(entries), pull: false }]);
 }
 
 /// The entries of the uploads under way, by whose they are: `None` to delete them.
@@ -148,13 +156,33 @@ fn sent(state: &PanelState) -> Vec<(String, Option<Vec<LeaderboardEntry>>)> {
     state.leaderboard_uploads.iter().map(|u| (u.name.clone(), u.entries.clone())).collect()
 }
 
-/// The shell makes every upload under way, and the site takes each: the core ticks after.
-fn all_taken(minerva: &mut Minerva, at_ms: u64) {
-    for upload in minerva.panel_state().leaderboard_uploads.clone() {
-        let answer = if upload.entries.is_some() { taken() } else { LeaderboardAnswer::Deleted {} };
-        minerva.on_leaderboard_answer(upload.id, answer);
+/// The shell makes every pull under way, and the site holds nothing of any of them: the core
+/// ticks after, at `at_ms`.
+fn none_on_site(minerva: &mut Minerva, at_ms: u64) -> &PanelState {
+    for upload in minerva.panel_state().leaderboard_uploads.clone().into_iter().filter(|upload| upload.pull) {
+        minerva.on_leaderboard_answer(upload.id, LeaderboardAnswer::Pulled { entries: Vec::new() });
     }
-    minerva.tick(at_ms);
+    minerva.tick(at_ms)
+}
+
+/// The shell makes every upload under way, and the site takes each, holding nothing of anyone
+/// pulled: the core ticks after, and those pulled go up then, and are taken.
+fn all_taken(minerva: &mut Minerva, at_ms: u64) {
+    loop {
+        let uploads = minerva.panel_state().leaderboard_uploads.clone();
+        for upload in &uploads {
+            let answer = match (upload.pull, &upload.entries) {
+                (true, _) => LeaderboardAnswer::Pulled { entries: Vec::new() },
+                (false, Some(_)) => taken(),
+                (false, None) => LeaderboardAnswer::Deleted {},
+            };
+            minerva.on_leaderboard_answer(upload.id, answer);
+        }
+        minerva.tick(at_ms);
+        if !uploads.iter().any(|upload| upload.pull) {
+            break;
+        }
+    }
 }
 
 #[test]
@@ -164,8 +192,10 @@ fn a_new_best_goes_up_when_its_visit_ends_not_while_it_rises() {
     player.arrive(SUNSET_SAMPLE);
     player.minerva.show_on_leaderboards("Egbert", true);
     let at = player.at;
-    // Nothing has ended yet: an empty set, which claims the name.
-    assert_eq!(sent(player.minerva.tick(at)), [("Egbert".to_string(), Some(Vec::new()))]);
+    player.minerva.tick(at);
+    // Nothing has ended yet: once the site says it holds nothing of him, an empty set, which
+    // claims the name.
+    assert_eq!(sent(none_on_site(&mut player.minerva, at)), [("Egbert".to_string(), Some(Vec::new()))]);
     all_taken(&mut player.minerva, at);
 
     player.hunt(6 * MIN, 20);
@@ -378,7 +408,9 @@ fn blocked_nothing_more_goes_up_this_launch_but_the_deletion_and_the_next_launch
     again.restore_bests(saved_bests());
     again.press(PanelControl::TogglePersonalBests);
     again.on_wall_clock(WALL);
-    let state = again.tick(50).clone();
+    again.tick(50);
+    // Never uploaded, so pulled first.
+    let state = none_on_site(&mut again, 50).clone();
     assert_eq!(sent(&state), [egbert(egberts_entries())]);
     assert_eq!(standing(&state), (LeaderboardStatus::Sending, false));
 
@@ -481,9 +513,11 @@ fn a_visit_ends(player: &mut Player) -> Vec<(String, Option<Vec<LeaderboardEntry
 #[test]
 fn a_character_met_for_the_first_time_is_shared_once_they_have_a_best_that_can_go_up() {
     let mut player = Player::clocked(tracking());
-    let sent = a_visit_ends(&mut player);
+    // What the site holds of him first, then his set.
+    assert_eq!(a_visit_ends(&mut player), [("Egbert".to_string(), None)]);
     player.press(PanelControl::TogglePersonalBests);
-    assert_eq!(sent, [egbert(vec![egberts_new_entry(&player)])]);
+    let at = player.at;
+    assert_eq!(sent(none_on_site(&mut player.minerva, at)), [egbert(vec![egberts_new_entry(&player)])]);
     let on = toggle(player.minerva.panel_state(), "Egbert");
     assert_eq!((on.on, on.offered, on.status), (true, true, LeaderboardStatus::Sending));
     assert_eq!(player.minerva.settings().map_leaderboards_met, Some(vec!["Egbert".to_string()]));
@@ -592,7 +626,7 @@ fn each_map_links_to_its_map_leaderboard_at_the_band_of_the_character_playing() 
 
 #[test]
 fn an_upload_is_the_apis_put_of_the_whole_set_or_its_delete() {
-    let put = LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: Some(vec![entry(SUNSET_SKY_ID, 23, 9000, 3)]) };
+    let put = LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: Some(vec![entry(SUNSET_SKY_ID, 23, 9000, 3)]), pull: false };
     assert_eq!(put.path(), "api/characters/Egbert/entries");
     let body: serde_json::Value = serde_json::from_str(&put.body().unwrap()).unwrap();
     let expected = serde_json::json!({ "entries": [
@@ -642,7 +676,8 @@ fn the_sites_answers_read_as_what_they_mean() {
 fn egbert_uploading() -> (Minerva, u64) {
     let mut minerva = launched();
     minerva.show_on_leaderboards("Egbert", true);
-    let id = minerva.tick(50).leaderboard_uploads[0].id;
+    minerva.tick(50);
+    let id = none_on_site(&mut minerva, 50).leaderboard_uploads[0].id;
     (minerva, id)
 }
 
@@ -696,14 +731,35 @@ fn lost_bests(shown: &[&str]) -> Player {
     player
 }
 
+/// Whose entries the pulls under way get from the site.
+fn pulls(state: &PanelState) -> Vec<String> {
+    state.leaderboard_uploads.iter().filter(|u| u.pull).map(|u| u.name.clone()).collect()
+}
+
+/// The site answers the pull under way of the Character named `name` with `answer`.
+fn pull_answered(minerva: &mut Minerva, name: &str, answer: LeaderboardAnswer) -> PanelState {
+    let uploads = minerva.panel_state().leaderboard_uploads.clone();
+    let pull = uploads.iter().find(|u| u.pull && u.name == name).unwrap_or_else(|| panic!("no pull of {name}'s"));
+    minerva.on_leaderboard_answer(pull.id, answer).clone()
+}
+
+/// Of the uploads under way, Egbert's, as [`sent`] says them.
+fn egberts_sent(state: &PanelState) -> Vec<(String, Option<Vec<LeaderboardEntry>>)> {
+    sent(state).into_iter().filter(|(name, _)| name == "Egbert").collect()
+}
+
 /// As [`lost_bests`], then Egbert sets a best on Sunset Sky, and the Visit ends: his only best,
-/// and the Personal Bests window open. The capture time then.
+/// and the Personal Bests window open. The pulls asked for at launch are still under way. The
+/// capture time then.
 fn a_best_after_the_bests_were_lost(shown: &[&str]) -> (Player, u64) {
     let mut player = lost_bests(shown);
     player.arrive(SUNSET_SAMPLE);
     let at = player.at;
-    // An empty set would delete every entry they have on the site.
-    assert_eq!(sent(player.minerva.tick(at)), []);
+    // What the site holds of each is asked for first: an empty set would delete every entry
+    // they have there.
+    let state = player.minerva.tick(at).clone();
+    assert_eq!(pulls(&state), shown);
+    assert!(state.leaderboard_uploads.iter().all(|u| u.pull));
     player.hunt(6 * MIN, 20);
     player.arrive(CONSTRUCTION_SAMPLE);
     player.press(PanelControl::TogglePersonalBests);
@@ -717,19 +773,83 @@ fn egberts_new_entry(player: &Player) -> LeaderboardEntry {
     LeaderboardEntry { map: SUNSET_SKY_ID.to_string(), level: 13, job: "Magician".to_string(), exp_per_hour: 7200, set_at, party: false }
 }
 
-#[test]
-fn bests_that_couldnt_be_read_hold_every_shown_characters_uploads_and_the_toggle_says_why() {
-    let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert", "Bob"]);
-    // His new best is all the bests there are: sent, the rest of his entries would go.
-    let state = player.minerva.tick(at).clone();
-    assert_eq!(sent(&state), []);
-    let held = toggle(&state, "Egbert");
-    assert_eq!((held.on, held.status), (true, LeaderboardStatus::Held));
-    assert_eq!(sent(player.minerva.tick(at + 60 * MIN)), []);
+/// Whose uploads are held, as kept with the settings.
+fn held(minerva: &Minerva) -> Vec<(String, bool)> {
+    minerva.settings().map_leaderboards.into_iter().map(|c| (c.name, c.held)).collect()
 }
 
 #[test]
-fn held_uploads_stay_held_at_the_next_launch() {
+fn bests_that_couldnt_be_read_send_nothing_while_the_sites_entries_are_pulled() {
+    let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert", "Bob"]);
+    // His new best is all the bests there are: sent now, the rest of his entries would go.
+    let state = player.minerva.tick(at).clone();
+    assert_eq!(pulls(&state), ["Egbert", "Bob"]);
+    assert_eq!(state.leaderboard_uploads.len(), 2);
+    // Not a problem yet, just under way.
+    assert_eq!(standing(&state), (LeaderboardStatus::Sending, false));
+    assert_eq!(held(&player.minerva), [("Egbert".to_string(), true), ("Bob".to_string(), true)]);
+}
+
+#[test]
+fn the_entries_pulled_join_the_bests_then_all_of_them_go_up_and_the_toggle_says_how_many_maps_came_back() {
+    let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert", "Bob"]);
+    let new = egberts_new_entry(&player);
+    // The site holds his three entries from before: two on Sunset Sky, one on the Construction
+    // Site.
+    let state = pull_answered(&mut player.minerva, "Egbert", LeaderboardAnswer::Pulled { entries: egberts_entries() });
+    assert_eq!(toggle(&state, "Egbert").maps_from_site, 2);
+    let sunset: Vec<u64> = player.minerva.bests().maps_of(Some("Egbert"))[0].visits.iter().map(|v| v.exp_per_hour).collect();
+    assert_eq!(sunset, [9000, 7200, 5000]);
+    // Held no more: what is here now holds everything the site did.
+    assert_eq!(held(&player.minerva), [("Egbert".to_string(), false), ("Bob".to_string(), true)]);
+
+    // His new best tops Levels 10–19.
+    let state = player.minerva.tick(at + S).clone();
+    let entries = vec![new, entry(SUNSET_SKY_ID, 23, 9000, 3), entry(CONSTRUCTION_SITE_ID, 31, 6000, 1)];
+    assert_eq!(egberts_sent(&state), [egbert(entries)]);
+    assert_eq!(toggle(&state, "Egbert").status, LeaderboardStatus::Sending);
+}
+
+#[test]
+fn a_pull_that_fails_keeps_them_held_says_why_and_is_tried_again_later_each_time() {
+    let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert"]);
+    player.minerva.tick(at);
+    let offline = LeaderboardAnswer::Failed { why: "owlofminerva.app couldn't be reached".to_string() };
+    let state = pull_answered(&mut player.minerva, "Egbert", offline);
+    assert_eq!(standing(&state), (LeaderboardStatus::Held, true));
+    assert_eq!(held(&player.minerva), [("Egbert".to_string(), true)]);
+    // Nothing goes up meanwhile, and the pull waits.
+    assert_eq!(player.minerva.tick(at + 20 * S).leaderboard_uploads, []);
+    assert_eq!(pulls(player.minerva.tick(at + 31 * S)), ["Egbert"]);
+}
+
+#[test]
+fn a_held_character_sent_again_is_pulled_at_once() {
+    let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert"]);
+    player.minerva.tick(at);
+    pull_answered(&mut player.minerva, "Egbert", LeaderboardAnswer::Failed { why: "HTTP 502".to_string() });
+    assert_eq!(player.minerva.tick(at + S).leaderboard_uploads, []);
+
+    player.minerva.send_to_leaderboards_again("Egbert");
+    let state = player.minerva.tick(at + 2 * S).clone();
+    // The site's first, never what is here in place of them.
+    assert_eq!(pulls(&state), ["Egbert"]);
+    assert_eq!(state.leaderboard_uploads.len(), 1);
+    assert_eq!(held(&player.minerva), [("Egbert".to_string(), true)]);
+}
+
+#[test]
+fn a_pull_of_a_name_another_key_holds_says_so_and_sends_nothing() {
+    let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert"]);
+    player.minerva.tick(at);
+    let state = pull_answered(&mut player.minerva, "Egbert", LeaderboardAnswer::Claimed {});
+    assert_eq!(standing(&state), (LeaderboardStatus::Claimed, true));
+    assert_eq!(player.minerva.tick(at + 10 * MIN).leaderboard_uploads, []);
+    assert_eq!(held(&player.minerva), [("Egbert".to_string(), true)]);
+}
+
+#[test]
+fn held_uploads_stay_held_at_the_next_launch_until_pulled() {
     let player = lost_bests(&["Egbert", "Bob"]);
     // The bests file the shell saves from now on reads at the next launch, but holds only
     // this launch's bests.
@@ -739,46 +859,74 @@ fn held_uploads_stay_held_at_the_next_launch() {
     again.on_wall_clock(WALL + DAY);
     again.press(PanelControl::TogglePersonalBests);
     let state = again.tick(0).clone();
-    assert_eq!(sent(&state), []);
-    assert_eq!((toggle(&state, "Egbert").status, toggle(&state, "Bob").status), (LeaderboardStatus::Held, LeaderboardStatus::Held));
+    assert_eq!(pulls(&state), ["Egbert", "Bob"]);
+    assert_eq!(state.leaderboard_uploads.len(), 2);
 }
 
 #[test]
 fn turning_a_held_character_off_and_on_sends_what_is_here_now() {
     let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert", "Bob"]);
+    player.minerva.tick(at);
     player.minerva.show_on_leaderboards("Egbert", false);
-    assert_eq!(sent(player.minerva.tick(at)), [("Egbert".to_string(), None)]);
-    all_taken(&mut player.minerva, at);
+    pull_answered(&mut player.minerva, "Egbert", LeaderboardAnswer::Failed { why: "HTTP 502".to_string() });
+    assert_eq!(egberts_sent(player.minerva.tick(at + S)), [("Egbert".to_string(), None)]);
+    let deletion = player.minerva.panel_state().leaderboard_uploads.iter().find(|u| u.name == "Egbert").unwrap().id;
+    player.minerva.on_leaderboard_answer(deletion, LeaderboardAnswer::Deleted {});
     player.minerva.show_on_leaderboards("Egbert", true);
-    let state = player.minerva.tick(at + S).clone();
-    assert_eq!(sent(&state), [egbert(vec![egberts_new_entry(&player)])]);
+    // Shown afresh: the site's first, which hold nothing of his now, then what is here as it is.
+    assert_eq!(pulls(player.minerva.tick(at + 2 * S)), ["Bob", "Egbert"], "Bob's still under way");
+    let state = pull_answered(&mut player.minerva, "Egbert", LeaderboardAnswer::Pulled { entries: Vec::new() });
+    assert_eq!(toggle(&state, "Egbert").maps_from_site, 0);
+    let state = player.minerva.tick(at + 3 * S).clone();
+    assert_eq!(egberts_sent(&state), [egbert(vec![egberts_new_entry(&player)])]);
     assert_eq!(toggle(&state, "Egbert").status, LeaderboardStatus::Sending);
-    // Bob's are still held.
-    let held: Vec<(String, bool)> = player.minerva.settings().map_leaderboards.into_iter().map(|c| (c.name, c.held)).collect();
-    assert_eq!(held, [("Bob".to_string(), true), ("Egbert".to_string(), false)]);
+    assert_eq!(held(&player.minerva), [("Bob".to_string(), true), ("Egbert".to_string(), false)]);
 }
 
 #[test]
-fn a_held_character_sent_again_has_what_is_here_replace_their_entries_without_deleting_them_first() {
-    let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert", "Bob"]);
-    assert_eq!(standing(player.minerva.tick(at)), (LeaderboardStatus::Held, true));
+fn a_character_never_uploaded_from_this_install_has_the_sites_entries_pulled_first() {
+    // A new PC: Egbert's bests here are a few, and the site holds one on the Northern Top too.
+    let mut minerva = launched();
+    minerva.show_on_leaderboards("Egbert", true);
+    assert_eq!(pulls(minerva.tick(50)), ["Egbert"]);
+    let northern = entry(NORTHERN_TOP_ID, 33, 7500, 6);
+    let state = pull_answered(&mut minerva, "Egbert", LeaderboardAnswer::Pulled { entries: vec![northern.clone()] });
+    assert_eq!(toggle(&state, "Egbert").maps_from_site, 1);
 
-    // One upload of what is here, which replaces the set on the site: no deletion before it.
-    player.minerva.send_to_leaderboards_again("Egbert");
-    let state = player.minerva.tick(at + S).clone();
-    assert_eq!(sent(&state), [egbert(vec![egberts_new_entry(&player)])]);
-    assert!(toggle(&state, "Egbert").on);
-    assert_eq!(standing(&state), (LeaderboardStatus::Sending, false));
-    // Bob's are still held.
-    let held: Vec<(String, bool)> = player.minerva.settings().map_leaderboards.into_iter().map(|c| (c.name, c.held)).collect();
-    assert_eq!(held, [("Egbert".to_string(), false), ("Bob".to_string(), true)]);
+    let state = minerva.tick(100).clone();
+    let mut entries = egberts_entries();
+    entries.push(northern);
+    assert_eq!(sent(&state), [egbert(entries)]);
 }
 
 #[test]
-fn a_character_shown_after_the_bests_were_lost_is_not_held() {
-    let (mut player, at) = a_best_after_the_bests_were_lost(&["Bob"]);
-    player.minerva.show_on_leaderboards("Egbert", true);
-    assert_eq!(sent(player.minerva.tick(at)), [egbert(vec![egberts_new_entry(&player)])]);
+fn entries_the_bests_hold_already_dont_come_back_twice() {
+    let mut minerva = launched();
+    minerva.show_on_leaderboards("Egbert", true);
+    minerva.tick(50);
+    let revision = minerva.bests_revision();
+    let state = pull_answered(&mut minerva, "Egbert", LeaderboardAnswer::Pulled { entries: egberts_entries() });
+    assert_eq!(toggle(&state, "Egbert").maps_from_site, 0);
+    assert_eq!(minerva.bests_revision(), revision);
+    assert_eq!(sent(minerva.tick(100)), [egbert(egberts_entries())]);
+}
+
+#[test]
+fn a_pull_is_the_apis_get_and_its_answer_reads_as_the_entries_held() {
+    let pull = LeaderboardUpload { id: 1, name: "Egbert".to_string(), entries: None, pull: true };
+    assert_eq!(pull.path(), "api/characters/Egbert/entries");
+    assert_eq!(pull.body(), None);
+    let read = minerva_core::read_leaderboard_pull;
+    let body = format!(
+        r#"{{ "entries": [ {{ "map": "{SUNSET_SKY_ID}", "level": 23, "job": "Magician", "expPerHour": 9000, "setAt": {}, "party": true }} ] }}"#,
+        WALL - 3 * DAY
+    );
+    assert_eq!(read(200, None, &body), LeaderboardAnswer::Pulled { entries: vec![party_entry(SUNSET_SKY_ID, 23, 9000, 3)] });
+    assert_eq!(read(200, None, r#"{ "entries": [] }"#), LeaderboardAnswer::Pulled { entries: Vec::new() });
+    assert_eq!(read(409, None, r#"{ "error": "claimed" }"#), LeaderboardAnswer::Claimed {});
+    assert_eq!(read(429, Some("12"), ""), LeaderboardAnswer::RateLimited { retry_after_secs: 12 });
+    assert!(matches!(read(200, None, "<html>"), LeaderboardAnswer::Failed { .. }));
+    assert!(matches!(read(502, None, ""), LeaderboardAnswer::Failed { .. }));
 }
 
 #[test]

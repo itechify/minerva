@@ -294,6 +294,30 @@ export async function optOut(env: Env, request: Request, name: string): Promise<
   return { status: 204 };
 }
 
+/** A Character's entries as the site holds them, for the app to merge back in before it uploads
+ *  (#206): only to the key that holds the name, or a key linked to its Account, as a write is,
+ *  so it counts against the key's writes and a refused key is kept for the maintainer. A name no
+ *  key holds has none, and stays unclaimed. Every entry, shown or not: they're the player's own. */
+export async function pull(env: Env, request: Request, name: string): Promise<Answer> {
+  const claimed = await claim(env, request, name, Date.now(), "leave");
+  if (claimed === null) return { status: 200, body: { entries: [] } };
+  if (!("nameKey" in claimed)) return claimed;
+  const rows = await env.DB.prepare(
+    "SELECT map_id, level, job, exp_per_hour, set_at, party FROM entries WHERE name_key = ? ORDER BY map_id, band, party",
+  )
+    .bind(claimed.nameKey)
+    .all<{ map_id: string; level: number; job: string; exp_per_hour: number; set_at: number; party: number }>();
+  const entries = rows.results.map((r) => ({
+    map: r.map_id,
+    level: r.level,
+    job: r.job,
+    expPerHour: r.exp_per_hour,
+    setAt: r.set_at,
+    party: isParty(r.party),
+  }));
+  return { status: 200, body: { entries } };
+}
+
 interface Row extends PortraitColumns {
   name_key: string;
   name: string;

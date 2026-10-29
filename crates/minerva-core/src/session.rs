@@ -1203,6 +1203,17 @@ impl Session {
         }
     }
 
+    /// Visits of the Character named `name` came back from the Map Leaderboards: as
+    /// [`crate::personal_best::Bests::take_back`], what is shown measured afresh if any joined.
+    /// How many maps had one join.
+    pub fn take_back_bests(&mut self, name: &str, visits: Vec<(String, crate::VisitBest)>) -> usize {
+        let maps = self.bests.take_back(name, visits);
+        if maps > 0 {
+            self.shown = None;
+        }
+        maps
+    }
+
     /// The panel confirmed another map: a new Visit starts, as of the latest time seen.
     /// The share of the map's ceiling counts only the play since.
     pub fn arrive(&mut self) {

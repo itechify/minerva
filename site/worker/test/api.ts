@@ -58,6 +58,11 @@ export function upload(name: string, withKey: string, entries: Entry[]): Promise
   });
 }
 
+/** The app pulling `name`'s entries, as the site holds them, with its key (#206). */
+export function pull(name: string, withKey?: string): Promise<Response> {
+  return call(`/api/characters/${encodeURIComponent(name)}/entries`, withKey === undefined ? {} : { headers: bearer(withKey) });
+}
+
 /** The app opting `name` out: all its entries go. */
 export function optOut(name: string, withKey: string): Promise<Response> {
   return call(`/api/characters/${encodeURIComponent(name)}/entries`, { method: "DELETE", headers: bearer(withKey) });
