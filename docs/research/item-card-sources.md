@@ -4,7 +4,7 @@ Checked on 11 October 2026, against OSMS Data Explorer's `data/current` (its "Pu
 
 ## Answer
 
-OSMS's item files give every item's shop price, kind, quests and recipes, read as plainly as its map files. No market price source meets ADR 0010's test any more: BasilMarket.net gave players' prices through the JSON its own search downloads, but it began refusing automated access the same day (below). MesoWatch's terms welcome links, so the card links to it. No source that meets the test has enough drop data yet; MapleClassic Wiki is the one to watch (#78).
+OSMS's item files supply shop prices, kinds, quests and recipes. The Item Card gets Going rate and Cheapest now from maplestory.market through the site's Worker and links to the item's page there (ADR 0030; `site/worker/market.ts`). The drop-source review below found no qualifying source with enough data; MapleClassic Wiki was the one to watch (#78).
 
 ## OSMS's item files
 
@@ -27,18 +27,9 @@ The site loads them all at startup from `https://osmsdataexplorer.com/data/curre
 - **Not there:** drop tables (no file has them; drops are server-side), NPC shop stock, and any market or player-trade price.
 - **Pictures:** `data/current/images/items/<8-digit id>.png`.
 
-## BasilMarket.net
+## Rejected market sources (11 October 2026)
 
-**Since 11 October 2026 (about 18:00 UTC), BasilMarket refuses automated access.** `/api/price-index` answers 403 to Minerva's user agent and to curl, with the body "Automated access to BasilMarket isn't allowed, including AI crawlers and scrapers. If you're a person and you're seeing this, let us know in the BasilMarket Discord.", and the headers `x-robots-tag: noai, noimageai` and `tdm-reservation: 1`. Its `robots.txt` now disallows `/` for a list of AI crawlers and `/api/` (among others) for everyone. Browsers still get the list. What follows was true earlier that day.
-
-A fan-made revival of the original BasilMarket, run by a registered LLC (unnamed), launched 10 September 2026 for MapleStory Classic World. Contact is its Discord (`discord.gg/RezJphGE3t`).
-
-- **Data:** players record sales: trades completed on the site, and sales seen in Free Market shop screenshots they upload. "Only sales set the recommended price … With no sales at all, the NPC shop price is shown" (`/prices`).
-- **`/api/price-index`:** the list the site's "What's it worth?" box downloads: 539 KB uncompressed, `{builtAt, items: [{n, s, i, t, v, b, k}]}`. `n` name (unique), `s` page slug, `i` the game's item ID as `"01302006.png"`, `t` type, `v` recommended price or `null`, `b` its basis (`sales` 65, `fm-sales` 206, `npc` 1,034, `none` 3,787 of 5,092), `k` sales behind it. Cached publicly for 5 minutes. No login, token or challenge. 210 of the 271 items with sales are in OSMS's `items.json`; most of the rest are Cash items.
-- **`/api/market/sightings?item=<name>`:** one item's asking and sale figures (percentiles, counts, last seen), with the rows behind them, which carry players' usernames and shop names.
-- **Terms (`/terms`):** nothing on automated access, scraping, APIs or reuse. "You keep ownership of what you post, and you give BasilMarket permission to show it on the site, in the app and in Discord." "Provided as is, with no guarantee … that any price or stat is correct." No `robots.txt`, privacy page or API docs.
-- **MesoWatch** (`meso.watch`): prices read from public stream VODs, a median of observed sales. Its terms forbid any "script, crawler or AI system" collecting the price table or data files, and reuse without written permission, but say "Share a link to the site" and welcome search indexing. Search engines list only its home page and terms: one page with a search box, whose address doesn't change for an item (checked in a browser by the project's owner), so it can't be opened at an item.
-- **Others:** MeowDB's Free Market and classicfreemarket.com forbid scraping; kerning.gg, EvilEyeFM and mapleclassicfm.com have no JSON source. Nexon's Open API doesn't cover GMS or market prices.
+[BasilMarket](https://basilmarket.net) began refusing automated access that day. [MesoWatch](https://meso.watch) permits links but forbids automated collection and reuse without permission; it has no item-specific links. MeowDB's Free Market and classicfreemarket.com forbid scraping; kerning.gg, EvilEyeFM and mapleclassicfm.com had no JSON source. Nexon's Open API did not cover GMS market prices. These sources were rejected under ADR 0010; ADR 0030 records the later choice of maplestory.market.
 
 ## maplestory.market
 
