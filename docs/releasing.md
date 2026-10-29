@@ -37,6 +37,8 @@ How a Minerva version is numbered, made and published as a GitHub Release. Follo
 - **The updater's signing key is at hand** (#125): the minisign private key and its password, from the password manager. Every installer is signed with it, and installed copies only take an update it signed. If it's lost, they can never update again.
 - **Tools:** `gh` is signed in to an account that can push to `itechify/minerva`. Cargo is on `PATH`; in Git Bash, `export PATH="$HOME/.cargo/bin:$PATH"`.
 
+Before step 1, tell the user how each item above stands: ran and passed, already true, or skipped and why.
+
 ## 1. Bump the version
 
 From an up-to-date `main`, on a branch named for the version:
@@ -57,17 +59,18 @@ git commit -am "Version X.Y.Z"
 
 ## 2. Merge into main
 
-Merge without fast-forwarding, so the version has its own merge commit to tag, then push:
+Merge without fast-forwarding, so the version has its own merge commit to tag, then push. This works from a worktree too, where `main` is checked out elsewhere:
 
 ```bash
-git switch main && git pull --ff-only origin main
+git fetch origin
+git switch --detach origin/main
 git merge --no-ff t3code/version-X.Y.Z -m "Merge version X.Y.Z"
-git push origin main
+git push origin HEAD:main
 ```
 
 ## 3. Build the release files
 
-On the merge commit, with nothing uncommitted, set the signing key in the shell, then build:
+On the merge commit, with nothing uncommitted, set the signing key in the shell, then build. The key and its password come from the user: ask them to set the two variables in the shell themselves, or to say where the key's file is. Never write the key or its password to a file, in the home directory or the repo, and never print them.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -88,7 +91,7 @@ Tauri builds the optimised app and both installers, and signs each installer, wr
 | `target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi` | as is |
 | `target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi.sig` | as is |
 | `target/release/bundle/latest.json` | as is |
-| `target/release/minerva.exe` | `minerva-X.Y.Z-portable.exe` (copy and rename) |
+| `target/release/minerva.exe` | `minerva-X.Y.Z-portable.exe` (copied beside it under `target/release/`) |
 | `THIRD-PARTY-NOTICES.md` | as is |
 
 ### The update smoke test
@@ -130,7 +133,7 @@ git push origin vX.Y.Z
 
 ## 5. Write the release notes
 
-Write them for players, not developers, in the shape of the previous releases. A feature's "More on the site" links to its row on the home page (`#map`, `#item-card`), or to the FAQ question that answers it (`/faq/#zoom`). Put them in a file outside the repo, say `notes.md`:
+Write them for players, not developers, in the shape of the previous releases. A feature's "More on the site" links to its row on the home page (`#map`, `#item-card`), or to the FAQ question that answers it (`/faq/#zoom`). Write them to `C:/Users/itech/Coding/_artifacts/minerva/notes-X.Y.Z.md`, then run the `humanizer` skill on them before publishing:
 
 ```markdown
 <One sentence: what this version gives the player.>
@@ -154,7 +157,7 @@ Your settings, hotkeys and Personal Bests carry over from <previous version>.
 
 Quit the running Minerva first (its owl in the notification area: **Quit Minerva**). The files aren't code-signed, so Windows SmartScreen may say it "protected your PC": choose **More info**, then **Run anyway**.
 
-Map and mob data, map pictures and mob animations: [OSMS Data Explorer](https://osmsdataexplorer.com). Pages: [NiaMeowDB](https://meowdb.com). Title and item recognition: [ocrs](https://github.com/robertknight/ocrs) (model under CC BY-SA 4.0). Typeface: Maplestory by NEXON. See THIRD-PARTY-NOTICES.md, attached, and About & Credits in Help & Setup.
+<The credits: one short clause per source, taken from About & Credits in `setup.html`, its list under Credits, with each source linked.> See THIRD-PARTY-NOTICES.md, attached, and About & Credits in Help & Setup.
 ```
 
 To list what changed since the last release, run `git log --first-parent vPREVIOUS..vX.Y.Z` for the merges and `gh pr view <n>` for each PR.
@@ -162,14 +165,14 @@ To list what changed since the last release, run `git log --first-parent vPREVIO
 ## 6. Publish
 
 ```bash
-cp target/release/minerva.exe minerva-X.Y.Z-portable.exe
-gh release create vX.Y.Z --verify-tag --title "Minerva X.Y.Z" --notes-file notes.md \
+cp target/release/minerva.exe target/release/minerva-X.Y.Z-portable.exe
+gh release create vX.Y.Z --verify-tag --title "Minerva X.Y.Z" --notes-file "C:/Users/itech/Coding/_artifacts/minerva/notes-X.Y.Z.md" \
   target/release/bundle/nsis/Minerva_X.Y.Z_x64-setup.exe \
   target/release/bundle/nsis/Minerva_X.Y.Z_x64-setup.exe.sig \
   target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi \
   target/release/bundle/msi/Minerva_X.Y.Z_x64_en-US.msi.sig \
   target/release/bundle/latest.json \
-  minerva-X.Y.Z-portable.exe \
+  target/release/minerva-X.Y.Z-portable.exe \
   THIRD-PARTY-NOTICES.md
 ```
 
