@@ -2,6 +2,8 @@
 
 Each directory here holds frames of the game that a test feeds to the core and checks the reading of. Every file in one must read as its name (or its readings file) says, or as unreadable, never as something else. A frame the core ever read wrong becomes a sample here: a Bug Report's `crops/` has it already, cut and named as the directory's rule says. Names may only come from the maintainer's own Characters, or from players who agree to it in the Bug Report flow; any other player's name or chat is cut or painted out before a frame is committed.
 
+To check many new frames at once, tile them into contact sheets, each frame labelled with its file name: `python scripts/contact-sheet.py <folder-or-png>... [--out <folder>] [--tile <px>]` writes them to `_scratch/contact/` (it needs Pillow). Look over every sheet for a name or chat these rules don't allow. A whole client area shrunk to a tile can hide a name, so give those a larger `--tile`.
+
 ## `minimap`
 
 Every file in `samples/minimap` must be recognised against the map names fixture, `crates/minerva-core/tests/fixtures/osms-map-names.json`; there, a `--window` sample's client area is fed whole, and the title is found in it wherever it is (ADR 0021). Each is also fed scaled to other UI Sizes, where it must read as its map or as unreadable, never as another (`tests/minimap_samples.rs`). A title ever read wrong becomes a sample there: a Bug Report's `crops/minimap-title-<ms>.png` is one already.
