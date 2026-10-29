@@ -2371,8 +2371,16 @@ html.lb-band .lb-train,
   line-height: 18px;
   color: var(--ink-2);
 }
-/* The date a #1 was set on never breaks across lines ("22 / Oct"). */
+/* The date a #1 was set on, on a line of its own under who set it, so no line ends on a dot; it
+   never breaks across lines ("22 / Oct"), and nor does their job and level ("Cleric Lv 26"). */
 .lb-train-date {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.lb-train-job {
   white-space: nowrap;
 }
 /* Latest: an entry that took a map's top spot says so under it. */
@@ -3863,13 +3871,39 @@ button.button {
   padding-left: 12px;
 }
 
-/* The Pedestals (ADR 0024, amended): three steps, 2nd, 1st and 3rd from the left,
-   each a Character standing on a block in Inset, the 1st's the tallest, with the step's crown
-   and place on it. The list keeps 1st to 3rd for assistive tech; only the order on screen
+/* The page's top: its title, then Where to train, then Most podiums, as the page reads on a
+   narrow page, so the band choices come before anyone's podiums. On a wide one Most podiums
+   stands beside the title, in the room the title art leaves, standing on the lede's line, and
+   Where to train runs full width under both. */
+@media (min-width: 1000px) {
+  .lb-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22em;
+    grid-template-areas:
+      "head podiums"
+      "train train";
+    column-gap: 40px;
+    max-width: 60em;
+  }
+  .lb-top > .lb-head {
+    grid-area: head;
+  }
+  .lb-top > .lb-train {
+    grid-area: train;
+  }
+  .lb-top > .lb-podiums {
+    grid-area: podiums;
+    align-self: end;
+    padding: 40px 0 8px;
+  }
+}
+/* The Pedestals (ADR 0024, amended): three steps, 2nd, 1st and 3rd from the left, each a
+   Character standing on a block in Inset, the 1st's the tallest, with the step's crown and
+   place on it. The list keeps 1st to 3rd for assistive tech and Tab; only the order on screen
    changes. The crowns stay 14px on the blocks: the blocks are never filled with the metal. */
 .lb-podiums {
   max-width: 60em;
-  padding-top: 32px;
+  padding-top: 48px;
 }
 .lb-podiums h2 {
   margin-bottom: 0;
@@ -3877,10 +3911,13 @@ button.button {
 .lb-pedestal-said {
   margin-top: 2px;
 }
+/* Two rows every step shares (subgrid): its Character, as tall as the tallest step's, and its
+   block's row, as tall as the 1st's. Each step's Character is set down onto its own block, so
+   the blocks alone make the podium's outline, however much one step's words wrap. */
 .lb-pedestal {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: end;
+  grid-template-rows: auto 72px;
   max-width: 34em;
   margin: 16px 0 0;
   padding: 0;
@@ -3891,37 +3928,52 @@ button.button {
   min-height: 236px;
 }
 .lb-stand {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  --rise: 38px;
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
   min-width: 0;
   margin: 0;
   text-align: center;
 }
 .lb-stand-1 {
+  --rise: 72px;
   order: 2;
 }
 .lb-stand-2 {
+  --rise: 52px;
   order: 1;
 }
 .lb-stand-3 {
   order: 3;
 }
 .lb-stand-who {
+  position: relative;
+  top: calc(72px - var(--rise));
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
+  min-width: 0;
   padding: 0 6px 8px;
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-2);
 }
-.lb-stand-who .lb-portrait {
+.lb-stand-who .lb-portrait,
+.lb-stand-empty {
   max-width: 100%;
   height: auto;
   aspect-ratio: 1;
   margin-bottom: 4px;
+}
+/* A step no one stands keeps its portrait's square, outlined and empty, over the link to put
+   yours there. */
+.lb-stand-empty {
+  box-sizing: border-box;
+  width: 96px;
+  border: 1px dashed var(--inset-edge);
+  border-radius: 2px;
 }
 .lb-stand-name {
   max-width: 100%;
@@ -3934,6 +3986,11 @@ button.button {
 .lb-stand-figure {
   font-size: 14px;
   line-height: 20px;
+}
+/* A figure and what it counts ("380,000 EXP/h") never part, nor does a level ("Lv 27"). */
+.lb-stand-amount,
+.lb-stand-level {
+  white-space: nowrap;
 }
 .lb-stand-value {
   color: var(--ink);
@@ -3957,8 +4014,10 @@ button.button {
 .lb-stand-block {
   box-sizing: border-box;
   display: flex;
+  align-self: end;
   align-items: flex-start;
   justify-content: center;
+  height: var(--rise);
   padding-top: 8px;
   border: 1px solid var(--inset-edge);
   border-radius: 4px 4px 0 0;
@@ -3970,21 +4029,21 @@ button.button {
 }
 .lb-stand-1 .lb-stand-block {
   position: relative;
-  height: 72px;
   margin: 0 -1px;
-}
-.lb-stand-2 .lb-stand-block {
-  height: 52px;
-}
-.lb-stand-3 .lb-stand-block {
-  height: 38px;
 }
 .lb-stand-block .lb-crown {
   margin-top: 3px;
 }
-/* The band's EXP/h Pedestal, under Where to train's choices and over its table. */
+/* On a phone a step is too narrow for a job and its level on one line: every step gives its
+   level a line of its own, so none splits it and all three read alike. */
+@media (max-width: 640px) {
+  .lb-stand-level {
+    display: block;
+  }
+}
+/* The band's EXP/h Pedestal, under Where to train's maps. */
 .lb-train-pedestal {
-  margin-top: 24px;
+  margin-top: 40px;
 }
 .lb-pedestal-title {
   margin: 0;

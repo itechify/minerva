@@ -727,8 +727,9 @@ export interface Stood {
   value: string;
   label: string;
   detail: string | null;
-  /** "Magician Lv 25", and the job's class, whose icon goes beside it. */
-  who: { text: string; jobClass: JobClass | null } | null;
+  /** Their job ("Magician") and the job's class, whose icon goes beside it, and their level
+   *  ("Lv 25"), which a narrow step puts on a line of its own, never splitting it. */
+  who: { job: string; jobClass: JobClass | null; level: string } | null;
   /** The map, with its Map Mark (`null` for a map without one), and its page at the band
    *  with the entry marked. */
   map: { name: string; href: string; mark: { name: string; picture: string } | null } | null;
@@ -804,7 +805,7 @@ export function expPedestal(
         value: rate(e.expPerHour),
         label: "EXP/h",
         detail: null,
-        who: { text: `${e.job} Lv ${e.level}`, jobClass: classOf(e.job) },
+        who: { job: e.job, jobClass: classOf(e.job), level: `Lv ${e.level}` },
         map: {
           name: placeOf(names, e.map).name,
           href: linkTo({ map: e.map, band: answer.band, name: e.name, kind }),

@@ -89,7 +89,7 @@ describe("a Level Band's EXP/h Pedestal", () => {
       value: "280,000",
       label: "EXP/h",
       detail: null,
-      who: { text: "Magician Lv 25", jobClass: "magician" },
+      who: { job: "Magician", jobClass: "magician", level: "Lv 25" },
       map: { name: "Pig Field", href: "/leaderboards/map/?map=100000000&band=20&name=Ben", mark: { name: "Lith Harbor", picture: HARBOR.picture } },
       party: true,
     });

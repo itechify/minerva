@@ -1,8 +1,9 @@
 <!doctype html>
-<!-- The Map Leaderboards page: the Podiums Pedestal, the three Characters with the most
-     places in a band's top 3; Where to train, a Level Band's maps with the best players got
-     on each, under the band's EXP/h Pedestal; find a map by its name (from the map names
-     fixture, as the panel names maps); and Latest, the newest bests (ADR 0024). A map's own page is
+<!-- The Map Leaderboards page: Where to train, a Level Band's maps with the best players got
+     on each, over the band's EXP/h Pedestal; the Podiums Pedestal, the three Characters with
+     the most places in a band's top 3, beside the page's title on a wide page and after Where
+     to train on a narrow one; find a map by its name (from the map names fixture, as the panel
+     names maps); and Latest, the newest bests (ADR 0024). A map's own page is
      leaderboards/map/. Both read the site's API (ADR 0015) from the browser, so without
      script the page says it needs it. -->
 <html lang="en">
@@ -59,54 +60,59 @@
 
       <main class="window-body" id="main">
         <div class="part" data-street="Map Leaderboards">
-          <header class="lb-head stop" id="top" data-mini="Map Leaderboards">
-            <h1>
-              <img class="page-title" src="../art/map-leaderboards.png" alt="Map Leaderboards" width="440" height="278" fetchpriority="high" />
-            </h1>
-            <p class="lede">
-              Minerva players' <a href="/faq/#personal-bests">Personal Bests</a>, ranked on each map by
-              <strong>Level Band</strong>. Pick your band to see where to train, or find a map to see what players at
-              your level get there.
-            </p>
-          </header>
+          <!-- The title, Where to train and Most podiums: one grid on a wide page (site.css). -->
+          <div class="lb-top">
+            <header class="lb-head stop" id="top" data-mini="Map Leaderboards">
+              <h1>
+                <img class="page-title" src="../art/map-leaderboards.png" alt="Map Leaderboards" width="440" height="278" fetchpriority="high" />
+              </h1>
+              <p class="lede">
+                Minerva players' <a href="/faq/#personal-bests">Personal Bests</a>, ranked on each map by
+                <strong>Level Band</strong>. Pick your band to see where to train, or find a map to see what players at
+                your level get there.
+              </p>
+            </header>
 
-          <!-- The three steps keep their room while they come, so Where to train doesn't jump. -->
-          <section class="lb-podiums stop" id="podiums" data-mini="Most podiums" aria-labelledby="podiums-title">
-            <h2 id="podiums-title">Most podiums</h2>
-            <p class="lb-said lb-pedestal-said">A podium is a place in a Level Band's top 3 on any map.</p>
-            <ol class="lb-pedestal lb-waiting" id="podiums-steps"></ol>
-            <p class="lb-said" id="podiums-said" aria-live="polite" hidden></p>
-            <p class="lb-credit" id="podiums-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
-          </section>
+            <section class="lb-train stop" id="where-to-train" data-mini="Where to train" aria-labelledby="train-title">
+              <h2 id="train-title">Where to train</h2>
+              <nav class="lb-bands" id="train-bands" aria-label="Level Bands"></nav>
+              <nav class="lb-kinds" id="train-kinds" aria-label="Solo or party entries" hidden></nav>
+              <nav class="lb-areas" id="train-areas" aria-label="Areas, by their Map Marks" hidden></nav>
+              <p class="lb-said" id="train-said" aria-live="polite">Loading the Level Bands…</p>
+              <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
+              <!-- The roles keep the table a table to assistive tech on a phone, where its rows
+                   are cards (display: grid). -->
+              <table class="lb-train-table" id="train-table" role="table" hidden>
+                <caption class="lb-caption" id="train-caption"></caption>
+                <thead role="rowgroup">
+                  <tr role="row">
+                    <th scope="col" role="columnheader" class="lb-train-map">Map</th>
+                    <th scope="col" role="columnheader" class="lb-train-mobs">Mob levels</th>
+                    <th scope="col" role="columnheader" class="lb-train-best">Players' best</th>
+                    <th scope="col" role="columnheader" class="lb-train-entries">Entries</th>
+                  </tr>
+                </thead>
+                <tbody id="train-rows" role="rowgroup"></tbody>
+              </table>
+              <!-- Under the maps, the band's EXP/h Pedestal, in the area shown, once someone has an entry
+                   there. -->
+              <div class="lb-train-pedestal" id="train-pedestal" hidden>
+                <h3 class="lb-pedestal-title" id="train-pedestal-title"></h3>
+                <ol class="lb-pedestal" id="train-pedestal-steps" aria-labelledby="train-pedestal-title"></ol>
+                <p class="lb-credit" id="train-pedestal-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
+              </div>
+            </section>
 
-          <section class="lb-train stop" id="where-to-train" data-mini="Where to train" aria-labelledby="train-title">
-            <h2 id="train-title">Where to train</h2>
-            <nav class="lb-bands" id="train-bands" aria-label="Level Bands"></nav>
-            <nav class="lb-kinds" id="train-kinds" aria-label="Solo or party entries" hidden></nav>
-            <nav class="lb-areas" id="train-areas" aria-label="Areas, by their Map Marks" hidden></nav>
-            <!-- The band's EXP/h Pedestal, in the area shown, once someone has an entry there. -->
-            <div class="lb-train-pedestal" id="train-pedestal" hidden>
-              <h3 class="lb-pedestal-title" id="train-pedestal-title"></h3>
-              <ol class="lb-pedestal" id="train-pedestal-steps" aria-labelledby="train-pedestal-title"></ol>
-              <p class="lb-credit" id="train-pedestal-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
-            </div>
-            <p class="lb-said" id="train-said" aria-live="polite">Loading the Level Bands…</p>
-            <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
-            <!-- The roles keep the table a table to assistive tech on a phone, where its rows
-                 are cards (display: grid). -->
-            <table class="lb-train-table" id="train-table" role="table" hidden>
-              <caption class="lb-caption" id="train-caption"></caption>
-              <thead role="rowgroup">
-                <tr role="row">
-                  <th scope="col" role="columnheader" class="lb-train-map">Map</th>
-                  <th scope="col" role="columnheader" class="lb-train-mobs">Mob levels</th>
-                  <th scope="col" role="columnheader" class="lb-train-best">Players' best</th>
-                  <th scope="col" role="columnheader" class="lb-train-entries">Entries</th>
-                </tr>
-              </thead>
-              <tbody id="train-rows" role="rowgroup"></tbody>
-            </table>
-          </section>
+            <!-- Beside the title on a wide page (site.css), after Where to train on a narrow one, so
+                 the band choices come first. The steps keep their room while they come. -->
+            <section class="lb-podiums stop" id="podiums" data-mini="Most podiums" aria-labelledby="podiums-title">
+              <h2 id="podiums-title">Most podiums</h2>
+              <p class="lb-said lb-pedestal-said">A podium is a place in a Level Band's top 3 on any map.</p>
+              <ol class="lb-pedestal lb-waiting" id="podiums-steps"></ol>
+              <p class="lb-said" id="podiums-said" aria-live="polite" hidden></p>
+              <p class="lb-credit" id="podiums-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
+            </section>
+          </div>
 
           <div class="lb-columns">
             <section class="lb-section lb-find stop" id="find" data-mini="Find a map" aria-labelledby="find-title">
