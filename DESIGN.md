@@ -1063,8 +1063,8 @@ A wide comparison window on the panel's glass, following live bests.
 - **Manage:** 12px Panel Ink Steel with an 8px chevron at the picker row's end, Portal Blue and underlined on hover.
   Open lines sit unboxed on glass, 4px apart; explanation before merge, Remove 8px after. See Confirmations and pickers.
 - **Upload problems:** below Manage, even when Manage is folded: Problem Cream, Problem Amber edge, Problem Brown
-  12px/16px words wrapping at up to 75ch, with the 8px orange dot and a remedy text button at the end. Keep Level Bands
-  whole on a line. Sharing states and recovery: ADR 0015 and the FAQ's Map Leaderboards answers.
+  12px/16px words wrapping at up to 75ch, with the 8px orange dot and a remedy text button at the end. Where the words
+  name that button, its name is bold. Keep Level Bands whole on a line. Sharing states and recovery: ADR 0015 and the FAQ's Map Leaderboards answers.
 - **Table:** set into the body on near-opaque Window Lavender (95%), edged in Inset Edge with a 4px radius, as the Grind
   Tracker's figures are, so the densest reading holds over any scene. 13px/17px, 5px of padding above and below each
   row, rows parted by Panel Rules. Columns: Map (its 19px Map Mark, then its name in bold, opening its MeowDB page in

@@ -896,8 +896,10 @@ function renderProblems() {
       problemsEl.append(
         problemNote(
           [
-            `At one launch, Minerva couldn't read your bests file, so the site may have more of ${name}'s bests than this PC has. `,
-            "Minerva won't send any of their bests until you press Send what's here, which replaces what the site has.",
+            `Your bests file didn't load at one launch, so the site may have bests of ${name}'s that this PC doesn't. `,
+            "Minerva won't send theirs until you press ",
+            Object.assign(document.createElement("strong"), { textContent: "Send what's here" }),
+            ".",
             ...(discord.offered ? [" To keep your characters' names yours if this PC's files are ever lost, ", linkButton("link Discord", true), "."] : []),
           ],
           send,
