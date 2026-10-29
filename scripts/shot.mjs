@@ -125,7 +125,7 @@ class Page {
   }
   /** The real device metrics at `width`: media queries, `vw` and the viewport meta all see it. */
   async viewport(width, height, { scale = 1, mobile = width <= PHONE_WIDTH } = {}) {
-    this.lastViewport = { scale, mobile };
+    this.lastViewport = { width, scale, mobile };
     await this.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile });
     await this.send("Emulation.setTouchEmulationEnabled", { enabled: mobile });
   }
@@ -168,10 +168,9 @@ class Page {
   /** The viewport as a PNG at `file`; with `full`, the viewport first grown to the page. */
   async screenshot(file, { full = false } = {}) {
     if (full) {
-      const metrics = await this.send("Page.getLayoutMetrics");
-      const { width } = metrics.cssLayoutViewport;
-      const height = Math.ceil(metrics.cssContentSize.height);
-      await this.viewport(width, height, this.lastViewport);
+      const { cssContentSize } = await this.send("Page.getLayoutMetrics");
+      const { width, ...rest } = this.lastViewport;
+      await this.viewport(width, Math.ceil(cssContentSize.height), rest);
       await this.settle();
     }
     const { data } = await this.send("Page.captureScreenshot", { format: "png" });

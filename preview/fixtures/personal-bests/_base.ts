@@ -15,7 +15,7 @@ function map(id: string, streetName: string, mapName: string, solo: number, part
     id,
     streetName,
     mapName,
-    region: "Victoria Island",
+    region: "Maple Isle",
     mark: null,
     url: `https://example.com/map/${id}`,
     leaderboardUrl: `https://example.com/leaderboards/${id}`,
@@ -44,10 +44,10 @@ export const owlbert: Character = {
   name: "Owlbert",
   current: true,
   maps: [
-    map("100000003", "Victoria Road", "Pig Beach", 61_000, 74_800, { bestOfAll: true, here: true }),
-    map("100000004", "Victoria Road", "Ant Tunnel I", 48_200, null, { mobLevels: { lowest: 18, highest: 24 } }),
-    map("100000005", "Hidden Street", "Wild Boar Land", 39_900, 41_000),
-    map("100000006", "Victoria Road", "Golem's Temple 2", 22_400, null, { mobLevels: { lowest: 15, highest: 19 } }),
+    map("100000003", "Lantern Road", "Owl Hollow", 61_000, 74_800, { bestOfAll: true, here: true }),
+    map("100000004", "Lantern Road", "Mossy Burrow I", 48_200, null, { mobLevels: { lowest: 18, highest: 24 } }),
+    map("100000005", "Quiet Lane", "Bramble Field", 39_900, 41_000),
+    map("100000006", "Lantern Road", "Stone Garden 2", 22_400, null, { mobLevels: { lowest: 15, highest: 19 } }),
   ],
   leaderboard: { on: true, maps: 4, offered: true, status: "upToDate", problem: false, uploadedAtUnixMs: NOW - 3_600_000, rejected: [] },
 };

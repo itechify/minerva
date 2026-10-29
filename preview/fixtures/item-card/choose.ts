@@ -6,7 +6,7 @@ export default {
   card: {
     card: 1,
     status: "choose",
-    name: "Blue Bandana",
+    name: "Feather Cap",
     items: [
       { id: "1002014", kind: "Hat", icon: null },
       { id: "1002015", kind: "Hat (female)", icon: null },

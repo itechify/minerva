@@ -7,7 +7,7 @@ export default {
     card: 1,
     status: "card",
     id: "2000000",
-    name: "Red Potion",
+    name: "Berry Tonic",
     icon: null,
     shop: { status: "sells", mesos: 25 },
     marketRows: null,

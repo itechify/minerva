@@ -7,7 +7,7 @@ export default {
     card: 1,
     status: "card",
     id: "1082002",
-    name: "Work Gloves",
+    name: "Leather Mitts",
     icon: null,
     shop: { status: "sells", mesos: 50 },
     marketRows: {

@@ -37,9 +37,9 @@ export const solo: Tracking = {
     mesos: 18_430,
     mesosPerHour: 32_500,
     items: [
-      { name: "Wild Boar Tooth", count: 41 },
-      { name: "Orange Potion", count: 6 },
-      { name: "Bronze Ore", count: 2 },
+      { name: "Boar Bristle", count: 41 },
+      { name: "Plum Tonic", count: 6 },
+      { name: "Copper Nugget", count: 2 },
     ],
     itemsTotal: 49,
   },

@@ -1,8 +1,8 @@
 import type { DealBadge } from "../../../src/deal-badges";
 
-const gloves = { id: "1082002", name: "Work Gloves", rechargeable: false };
-const stars = { id: "2070000", name: "Subi Throwing-Stars", rechargeable: true };
-const potion = { id: "2000000", name: "Red Potion", rechargeable: false };
+const gloves = { id: "1082002", name: "Leather Mitts", rechargeable: false };
+const stars = { id: "2070000", name: "Tin Throwing-Stars", rechargeable: true };
+const potion = { id: "2000000", name: "Berry Tonic", rechargeable: false };
 
 /** A shop's listings, one a band `band` physical px tall: a steal, a great and a good deal,
  *  no deal, one past twice the line, no price, one the pointer covers, and one unread. */
