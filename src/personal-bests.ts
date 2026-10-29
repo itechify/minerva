@@ -658,7 +658,7 @@ function renderWhose() {
   );
   let words = "";
   if (maps.length === 0) words = `No bests yet for ${current ? nameOf(current) : "you"}`;
-  else if (current?.name === null) words = "Set before Minerva read your characters' names, or while it couldn't";
+  else if (current?.name === null) words = "Set before Minerva read your characters' names, or while it couldn't read them";
   count.textContent = words;
   count.hidden = words === "";
 
@@ -717,7 +717,7 @@ function linkButton(words = "Link Discord", inSentence = false) {
   button.className = inSentence ? "text-link" : "text-button";
   button.dataset.linkDiscord = "";
   button.textContent = words;
-  button.title = "Link this PC to your Discord on owlofminerva.app, so your characters' names on the Map Leaderboards follow you to a new PC";
+  button.title = "Link this PC to your Discord on owlofminerva.app so your characters' names on the Map Leaderboards follow you to a new PC";
   return button;
 }
 
@@ -751,7 +751,7 @@ function renderShare() {
     if (link) shareEl.append(link);
   } else if (c?.name && t && c.maps.length > 0) {
     shareEl.append(
-      span("move-label", `Nothing of ${c.name}'s can go on the Map Leaderboards yet: a best goes up once Minerva has read the level and job that set it, and its date.`),
+      span("move-label", `None of ${c.name}'s bests can go on the Map Leaderboards yet. A best can go up once Minerva has read its date and the level and job that set it.`),
     );
   }
   shareEl.hidden = shareEl.childElementCount === 0;
@@ -824,8 +824,8 @@ function leaderboardSwitch(name: string, t: Toggle) {
   button.setAttribute("aria-checked", String(t.on));
   button.setAttribute("aria-label", `Share ${name}'s bests on the Map Leaderboards`);
   button.title = t.on
-    ? `${name}'s bests are on the Map Leaderboards at owlofminerva.app, for anyone to see. Turn off to delete them from the site.`
-    : `Share ${name}'s bests on ${mapsText(t.maps)} on the Map Leaderboards at owlofminerva.app, for anyone to see.`;
+    ? `${name}'s bests are on the Map Leaderboards at owlofminerva.app, where anyone can see them. Turn this off to delete them from the site.`
+    : `Share ${name}'s bests on ${mapsText(t.maps)} on the Map Leaderboards at owlofminerva.app, where anyone can see them.`;
   const knob = span("knob", "");
   knob.setAttribute("aria-hidden", "true");
   button.append(knob, "Share");
@@ -861,7 +861,7 @@ function linkPrompt() {
   note.className = "note link-prompt";
   const text = document.createElement("p");
   text.className = "problem-words";
-  text.textContent = "Link Discord, and your characters' names on the Map Leaderboards follow you to a new PC.";
+  text.textContent = "Link Discord so your characters' names on the Map Leaderboards follow you to a new PC.";
   const later = document.createElement("button");
   later.type = "button";
   later.className = "text-button";
@@ -896,8 +896,8 @@ function renderProblems() {
       problemsEl.append(
         problemNote(
           [
-            `Minerva couldn't read your bests file at a launch, so the site may hold more of ${name}'s bests than are here. `,
-            "Nothing of theirs is sent until you send what's here, which replaces what the site holds.",
+            `At one launch, Minerva couldn't read your bests file, so the site may have more of ${name}'s bests than this PC has. `,
+            "Minerva won't send any of their bests until you press Send what's here, which replaces what the site has.",
             ...(discord.offered ? [" To keep your characters' names yours if this PC's files are ever lost, ", linkButton("link Discord", true), "."] : []),
           ],
           send,
@@ -910,16 +910,16 @@ function renderProblems() {
       link.className = "text-link";
       link.dataset.control = "openDiscord";
       link.textContent = "ask on Minerva's Discord";
-      const words: (string | HTMLElement)[] = [`Not on the Map Leaderboards: another Minerva holds the name ${name} there. If it's yours (a new PC, say), `];
+      const words: (string | HTMLElement)[] = [`${name} isn't on the Map Leaderboards because another copy of Minerva holds that name there. If it's yours (from a new PC, say), `];
       // Linked already, the name would have gone through if the old PC was: only Discord can help.
       if (discord.offered) words.push("and your old PC was linked to Discord, ", linkButton("link this one", true), "; otherwise ");
-      words.push(link, ", then send again.");
+      words.push(link, ", then press Send again.");
       problemsEl.append(problemNote(words, again));
     } else if (t.status === "retrying") {
       const last = t.uploadedAtUnixMs === null ? "" : ` Last uploaded ${when(t.uploadedAtUnixMs)}.`;
       const words = t.on
-        ? `Couldn't upload ${name}'s bests: Minerva tries again by itself.${last}`
-        : `Couldn't take ${name}'s bests off the site yet: Minerva tries again by itself.`;
+        ? `Couldn't upload ${name}'s bests. Minerva will try again.${last}`
+        : `Couldn't take ${name}'s bests off the site yet. Minerva will try again.`;
       problemsEl.append(problemNote([words], again));
     }
     if (t.rejected.length > 0) {

@@ -127,13 +127,13 @@ mod win {
     /// window is there, its root and its stored caption (ADR 0001).
     pub fn window_under_cursor() -> Result<String, String> {
         let mut at = POINT::default();
-        unsafe { GetCursorPos(&mut at) }.map_err(|e| format!("no pointer position: {e}"))?;
+        unsafe { GetCursorPos(&mut at) }.map_err(|e| format!("the pointer's position couldn't be read ({e})"))?;
         let root = unsafe { GetAncestor(WindowFromPoint(at), GA_ROOT) };
         if root.is_invalid() {
-            return Err("no window under the pointer".into());
+            return Err("there's no window under the pointer".into());
         }
         if is_ours(root) {
-            return Err("that is Minerva itself".into());
+            return Err("that's Minerva's own window".into());
         }
         match caption(root) {
             Some(title) if !title.trim().is_empty() => Ok(title),

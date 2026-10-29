@@ -58,14 +58,14 @@ async function loadReports() {
       open.href = linkTo({ map: report.map, band: report.band, name: report.name, kind: report.party ? "party" : "solo" });
       const dismiss = make("button", "button small secondary", "Dismiss");
       dismiss.type = "button";
-      dismiss.title = "The report goes; the entry stays on the Map Leaderboard";
+      dismiss.title = "Removes the report. The entry stays on the Map Leaderboard.";
       dismiss.addEventListener("click", async () => {
         if ((await send(`/api/admin/reports/${report.id}`, "DELETE")).status !== 204) line.textContent = UNREACHABLE;
         else await loadReports();
       });
       const takeDown = make("button", "button small secondary", "Take entry down");
       takeDown.type = "button";
-      takeDown.title = "The entry and its reports go, and the same visit stays off until restored under Taken down";
+      takeDown.title = "Removes the entry and its reports. The same visit stays off until you restore it under Taken down.";
       armed(takeDown, `Take ${report.name}'s entry down? Click again`, async () => {
         const kind = report.party ? "party" : "solo";
         const path = `/api/admin/entries/${encodeURIComponent(report.name)}/${report.map}/${report.band}?kind=${kind}`;
@@ -92,7 +92,7 @@ async function loadRemoved() {
   }
   const removed = read.body.removed;
   line.textContent =
-    removed.length === 0 ? "None. An entry taken down stays off until restored here." : "Each stays off the Map Leaderboards until restored.";
+    removed.length === 0 ? "None. An entry you take down stays off until you restore it here." : "Each stays off the Map Leaderboards until you restore it.";
   byId("removed-list").replaceChildren(
     ...removed.map((entry) => {
       const item = make("li", "account-item");
@@ -194,7 +194,7 @@ byId("account-form").addEventListener("submit", async (event) => {
 async function load() {
   const account = await call<AccountAnswer>("/api/account");
   if (account.status === 401) {
-    said.textContent = signInFailed(location.search) ? "Signing in with Discord didn't go through. Try again." : "This page is the maintainer's. Sign in with Discord.";
+    said.textContent = signInFailed(location.search) ? "Signing in with Discord didn't go through. Try again." : "This page is for the maintainer. Sign in with Discord.";
     byId("signed-out").hidden = false;
     return;
   }
@@ -203,7 +203,7 @@ async function load() {
     return;
   }
   if (!account.body.maintainer) {
-    said.textContent = `This page is the maintainer's, and you're signed in as ${account.body.username}.`;
+    said.textContent = `This page is for the maintainer. You're signed in as ${account.body.username}.`;
     return;
   }
   said.textContent = `Signed in as ${account.body.username}.`;

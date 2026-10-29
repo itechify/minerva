@@ -154,7 +154,7 @@ fn texts(notice: Option<&UpdateNotice>) -> Texts {
         UpdateStage::DownloadingForQuit | UpdateStage::InstallsWhenYouQuit => {
             format!("Minerva: version {version} installs when you quit")
         }
-        UpdateStage::FinishingBeforeQuit => format!("Minerva: finishing version {version}'s download, then quitting"),
+        UpdateStage::FinishingBeforeQuit => format!("Minerva: finishing the download of version {version}, then quitting"),
         UpdateStage::Installing => format!("Minerva: installing version {version}"),
     };
     let quit = match quit {

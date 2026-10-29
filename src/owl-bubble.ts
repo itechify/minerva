@@ -61,7 +61,7 @@ function lookupSentence(line: ItemLookupLine, key: string): string {
     case "choose":
       return `${line.items.length} MeowDB items are named ${line.read}. Pick yours:`;
     case "noTooltip":
-      return `No item tooltip by the pointer. Hover an item until its tooltip shows, then press ${key}.`;
+      return `There's no item tooltip at the pointer. Hover over an item until its tooltip shows, then press ${key}.`;
     case "unreadable":
       return `Couldn't read the item's name. Press ${key} again with its tooltip in clear view.`;
     case "covered":

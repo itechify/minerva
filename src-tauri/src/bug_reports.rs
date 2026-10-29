@@ -37,7 +37,7 @@ pub fn save(app: &AppHandle, minerva: &mut Minerva, overlay: &WebviewWindow) {
             if let Err(e) = app.opener().reveal_item_in_dir(path) {
                 error!("couldn't show the Bug Report in its folder: {e}");
             }
-            format!("Drag {} here: it's selected in the folder that opened.", report.file_name)
+            format!("Drag {} here. It's selected in the folder Minerva just opened.", report.file_name)
         }
         Err(e) => {
             error!("the Bug Report couldn't be saved: {e}");
@@ -57,7 +57,7 @@ pub fn save(app: &AppHandle, minerva: &mut Minerva, overlay: &WebviewWindow) {
 
 /// `Bug Reports` in the app data folder, made if it isn't there.
 fn folder(app: &AppHandle) -> Result<PathBuf, String> {
-    let folder = app.path().app_data_dir().map_err(|e| format!("no app data folder: {e}"))?.join("Bug Reports");
+    let folder = app.path().app_data_dir().map_err(|e| format!("couldn't find the app data folder: {e}"))?.join("Bug Reports");
     fs::create_dir_all(&folder).map_err(|e| format!("couldn't make {}: {e}", folder.display()))?;
     Ok(folder)
 }

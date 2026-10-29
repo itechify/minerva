@@ -296,7 +296,7 @@ function dataNote(data: MapDataStatus): string {
   // A map without mobs says so in its Mobs section, not here.
   switch (data.status) {
     case "savedCopy":
-      return `OSMS Data Explorer unreachable — showing a saved copy from ${savedOn(data.savedAtUnixMs)}`;
+      return `Can't reach OSMS Data Explorer, so this is a saved copy from ${savedOn(data.savedAtUnixMs)}`;
     case "ready":
     case "noMap":
       return "";
@@ -325,7 +325,7 @@ function renderData(panel: PanelState) {
       ? `${keyLabel(nextKey)} for the next`
       : nextKey === ""
         ? "the two arrows at the top for the next"
-        : "Candidate shortcut unavailable; change it in Settings";
+        : "the next-map shortcut is unavailable; change it in Settings";
     candidatesNote.textContent = candidates.chosen
       ? `Your pick of ${candidates.maps.length} maps with this title · ${next}`
       : `${candidates.maps.length} maps share this title; not sure which you're on · ${next}`;
@@ -775,7 +775,7 @@ function renderMatches(search: SearchState, recognition: Recognition, marks: Map
   } else {
     query.removeAttribute("aria-activedescendant");
   }
-  noMatch.textContent = loaded ? "Nothing known has that in its name." : "Loading the map list…";
+  noMatch.textContent = loaded ? "Nothing Minerva knows has that in its name." : "Loading the map list…";
   noMatch.hidden = listed || search.query.trim() === "";
 }
 

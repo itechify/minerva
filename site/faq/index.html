@@ -32,7 +32,7 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Minerva's owl over its name in Minerva's window, beside the words Your guide for MapleStory Classic World, and MapleStory's minimap with the Minerva panel under it showing the same map, every portal ringed."
+      content="Minerva's owl over its name in Minerva's window, beside the words Your guide for MapleStory Classic World. Also in the picture: MapleStory's minimap, with the Minerva panel under it showing the same map and every portal ringed."
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="@CARD_IMAGE@" />
@@ -91,59 +91,65 @@
                   <summary>Can I get banned for using Minerva?</summary>
                   <p>
                     It's very unlikely. Minerva <a href="#reads-game">only looks at the screen</a>, the way a screenshot
-                    does: it never touches the game's memory or files, and never presses keys or clicks for you. Other
-                    tools read the game's screen the same way.
+                    does. It never touches the game's memory or files, and it never presses keys or clicks for you.
+                    Other tools read the game's screen the same way.
                   </p>
                   <p>
-                    Still, Minerva is a third-party tool, not made or approved by Nexon, so there's no guarantee:
-                    <strong>using it is at your own risk</strong>.
+                    Still, Minerva is a third-party tool. Nexon didn't make it and hasn't approved it, so there's no
+                    guarantee: <strong>using it is at your own risk</strong>.
                   </p>
                 </details>
                 <details class="qa" id="reads-game">
                   <summary>Does Minerva read or change the game?</summary>
+                  <p>No. Like a screenshot, it captures only what it needs:</p>
+                  <ul>
+                    <li>The minimap title.</li>
+                    <li>The bar at the bottom of the game, with your EXP, level and name.</li>
+                    <li>The Pickup Log in the bottom-right corner, while the Grind Tracker is on.</li>
+                    <li>The tooltip by the pointer, when you press an item hotkey.</li>
+                    <li>The game window a few times a second while the Deal Finder is on, to find a Player Shop.</li>
+                  </ul>
                   <p>
-                    No. Like a screenshot, it captures only what it needs: the minimap title, the bar at the bottom of the
-                    game (your EXP, level and name), the Pickup Log in the bottom-right corner (while the Grind Tracker
-                    is on), the tooltip by the pointer when you press an item hotkey, and, while
-                    the Deal Finder is on, the game window a few times a second to find a Player Shop. It never reads or
-                    changes the game's memory or files, never injects anything into it, and never presses keys or clicks
-                    for you.
+                    It never reads or changes the game's memory or files, never injects anything into it, and never
+                    presses keys or clicks for you.
                   </p>
                 </details>
                 <details class="qa" id="hotkeys-hook">
                   <summary>Are Minerva's hotkeys a keyboard hook?</summary>
                   <p>
                     No. They're ordinary hotkeys registered with Windows, and they act only while the game or one of
-                    Minerva's windows is in front. The game never sees them, and in any other app the same keys do what
-                    that app makes them do.
+                    Minerva's windows is in front. The game never sees them, and in any other app the same keys do
+                    whatever that app uses them for.
                   </p>
                 </details>
                 <details class="qa" id="source">
                   <summary>Can I check what Minerva does for myself?</summary>
                   <p>
-                    Yes. You don't have to take any of this on trust: its source code is public on
-                    <a href="https://github.com/itechify/minerva">GitHub</a>, for anyone to read. It's under the
-                    <a href="https://github.com/itechify/minerva/blob/main/LICENSE">MIT licence</a>, so anyone may reuse it,
-                    though not the name Minerva or its owl.
+                    Yes. Minerva's source code is public on <a href="https://github.com/itechify/minerva">GitHub</a> for
+                    anyone to read. It's under the
+                    <a href="https://github.com/itechify/minerva/blob/main/LICENSE">MIT licence</a>, so anyone may reuse
+                    the code, but not the name Minerva or its owl.
                   </p>
                 </details>
                 <details class="qa" id="free">
                   <summary>Is Minerva free? Does it need an account?</summary>
                   <p>
-                    It's free, and you never need to sign up. There's no analytics, and its check for a new version sends only the
-                    version you have (<a href="#self-update">see how</a>). Putting a character on the
-                    Map Leaderboards needs no account either: a secret key Minerva makes on your PC ties the name to it
-                    (<a href="#leaderboard-public">see what the site shows</a>). You can
-                    <a href="#link-discord">link your PCs to Discord</a> from Minerva, so your names follow you to a new PC,
-                    but you never have to.
+                    It's free, and you never need to sign up. Minerva has no analytics, and its check for a new version
+                    sends only the version you have (<a href="#self-update">see how</a>).
+                  </p>
+                  <p>
+                    You don't need an account to put a character on the Map Leaderboards either. A secret key that
+                    Minerva makes on your PC ties the name to you (<a href="#leaderboard-public">see what the site
+                    shows</a>). You can <a href="#link-discord">link your PCs to Discord</a> from Minerva so your names
+                    follow you to a new PC, but you never have to.
                   </p>
                 </details>
                 <details class="qa" id="maker">
                   <summary>Who makes Minerva?</summary>
                   <p>
                     @egberticus. Ask about Minerva, or say what you'd like it to do, on
-                    <a href="https://discord.gg/NnbnVWkRrF">Minerva's Discord</a>. For something wrong,
-                    <a href="#bug-reports">save a Bug Report</a> instead: it shows what Minerva read.
+                    <a href="https://discord.gg/NnbnVWkRrF">Minerva's Discord</a>. If something's wrong,
+                    <a href="#bug-reports">save a Bug Report</a> instead, because it shows what Minerva read.
                   </p>
                 </details>
                 <details class="qa" id="data">
@@ -151,35 +157,37 @@
                   <dl class="facts">
                     <dt>Map and mob data</dt>
                     <dd>
-                      Five files from <a href="https://osmsdataexplorer.com">OSMS Data Explorer</a>, under 1 MB together,
-                      when you start Minerva if its copy is a day old or an earlier version got it, every 24 hours while
-                      it runs, and when you <a href="#refresh">refresh it</a>.
+                      Five files from <a href="https://osmsdataexplorer.com">OSMS Data Explorer</a>, under 1 MB in all.
+                      Minerva gets them when it starts, if its copy is a day old or came from an earlier version. It
+                      also gets them every 24 hours while it runs, and when you <a href="#refresh">refresh them</a>.
                     </dd>
                     <dt>Item data</dt>
-                    <dd>Two more OSMS files, about 1.2 MB together, on the same schedule.</dd>
+                    <dd>Two more OSMS files, about 1.2 MB in all, on the same schedule.</dd>
                     <dt>Pictures</dt>
                     <dd>
-                      The shown map's picture and its mobs' animations, once, kept until they go 30 days unused. An item's
-                      picture only when a card lists it to pick from.
+                      The picture of the map the panel shows, and its mobs' animations. Minerva downloads them once and
+                      keeps them until they go unused for 30 days. It gets an item's picture only when a card lists the
+                      item for you to pick from.
                     </dd>
                     <dt>New versions</dt>
                     <dd>
-                      A small file from GitHub naming the newest release, when you start Minerva, every 6 hours while it
-                      runs, and when you ask. <a href="#self-update">See how it updates</a>.
+                      A small file from GitHub that names the newest release. Minerva gets it when it starts, every 6
+                      hours while it runs, and when you ask. <a href="#self-update">See how it updates</a>.
                     </dd>
                   </dl>
                   <p>
-                    <a href="#item-lookup">Item Lookup</a> also asks <a href="https://meowdb.com">NiaMeowDB</a>'s search
-                    for an item's name when you press its hotkey or click an Item Card's name: each name once a week at
-                    most.
+                    <a href="#item-lookup">Item Lookup</a> also searches <a href="https://meowdb.com">NiaMeowDB</a> for an
+                    item's name when you press its hotkey or click an Item Card's name. It looks up each name once a
+                    week at most.
                   </p>
                   <p>
-                    It sends only the version you have with each request, plus the bests of each character you share on
-                    the <a href="#leaderboard-appear">Map Leaderboards</a> (new characters are shared by default): their
-                    name, job, level, EXP per hour and dates, with your Leaderboard Key, which the site keeps only as a
-                    hash. Turn <strong>Share</strong> off under a character's name in your Personal Bests and nothing of
-                    theirs is sent. The site then asks <a href="https://classicrank.com">ClassicRank</a> for each shared
-                    character's portrait, by their name alone.
+                    With each request, Minerva sends only the version you have. It also sends the bests of each
+                    character you share on the <a href="#leaderboard-appear">Map Leaderboards</a> (new characters are
+                    shared by default): their name, job, level, EXP per hour and dates, along with your Leaderboard Key.
+                    The site keeps the key only as a hash. Turn <strong>Share</strong> off under a character's name in
+                    your Personal Bests and nothing of theirs is sent. The site asks
+                    <a href="https://classicrank.com">ClassicRank</a> for each shared character's portrait, using only
+                    their name.
                   </p>
                 </details>
                 <details class="qa" id="kept">
@@ -190,15 +198,15 @@
                       Settings) in <code class="path">%APPDATA%\<wbr />com.<wbr />itechify.<wbr />minerva\<wbr />settings.json</code>.
                     </li>
                     <li>
-                      Beside them: your Personal Bests, each character's best visits on each map, in
-                      <code>personal-bests.json</code>; the
-                      market prices you keep, in <code>market-prices.json</code>; and the 10 newest
-                      <a href="#bug-reports">Bug Reports</a> you save, in <code>Bug Reports</code>.
+                      In the same folder: your Personal Bests (each character's best visits on each map) in
+                      <code>personal-bests.json</code>, the market prices you keep in <code>market-prices.json</code>,
+                      and the 10 newest <a href="#bug-reports">Bug Reports</a> you've saved in <code>Bug Reports</code>.
                     </li>
                     <li>
-                      Once you put a character on the <a href="#leaderboard-appear">Map Leaderboards</a>, also beside them:
-                      the secret Leaderboard Key that ties their name to you, in <code>leaderboard-key</code>. Copy it
-                      across when you move to a new PC (or <a href="#link-discord">link Discord</a>), and keep it to yourself.
+                      Once you put a character on the <a href="#leaderboard-appear">Map Leaderboards</a>, the same folder
+                      also holds <code>leaderboard-key</code>, the secret Leaderboard Key that ties their name to you.
+                      Keep it to yourself, and copy it across when you move to a new PC (or
+                      <a href="#link-discord">link Discord</a>).
                     </li>
                     <li>
                       The map and item data, pictures and animations in
@@ -222,12 +230,12 @@
                 <details class="qa" id="requirements">
                   <summary>What do I need to run Minerva?</summary>
                   <p>
-                    Windows 10 or 11, 64-bit, and MapleStory Classic World played windowed or borderless, with the minimap
-                    showing, open or collapsed, anywhere in the game window.
+                    64-bit Windows 10 or 11, and MapleStory Classic World played windowed or borderless. The minimap has
+                    to be showing somewhere in the game window, open or collapsed.
                   </p>
                   <p>
-                    Minerva has been tested mostly with the game windowed at 1920×1200, its UI size set to
-                    <b>Default Ratio</b>. Other resolutions and UI sizes should work: if something reads wrong at yours,
+                    Minerva has been tested mostly with the game windowed at 1920×1200 and its UI size set to
+                    <b>Default Ratio</b>. Other resolutions and UI sizes should work. If something reads wrong at yours,
                     <a href="#bug-reports">send a Bug Report</a>.
                   </p>
                 </details>
@@ -239,7 +247,7 @@
                   <summary>Which file should I download?</summary>
                   <dl class="files">
                     <dt><a href="@SETUP_URL@">Minerva_@VERSION@_x64-setup.exe</a> <span class="tag">Recommended</span></dt>
-                    <dd>Installs for your user, over earlier versions, with a Start menu entry and an uninstaller.</dd>
+                    <dd>Installs just for you, over any earlier version, and adds a Start menu entry and an uninstaller.</dd>
                     <dt>Minerva_@VERSION@_x64_en-US.msi</dt>
                     <dd>The same, as an MSI package. It installs for all users, so it asks for admin rights.</dd>
                     <dt>minerva-@VERSION@-portable.exe</dt>
@@ -261,16 +269,17 @@
                   <summary>How do I update Minerva?</summary>
                   <p>
                     From inside Minerva. When a new version is out (<a href="#self-update">see how it checks</a>), click
-                    its owl in the notification area, by the clock, and choose <strong>Update to</strong> the new version,
-                    or press <strong>Update</strong> in Help &amp; Setup's About &amp; Credits. Minerva downloads it,
-                    installs it with a small progress window, and starts again. Your settings, hotkeys and Personal Bests
-                    carry over. <a href="https://github.com/itechify/minerva/releases">Each release</a> says what's new.
+                    Minerva's owl in the notification area, by the clock, and choose <strong>Update to</strong> the new
+                    version. You can also press <strong>Update</strong> in Help &amp; Setup's About &amp; Credits.
+                    Minerva downloads the update, installs it with a small progress window, and starts again. Your
+                    settings, hotkeys and Personal Bests carry over.
+                    <a href="https://github.com/itechify/minerva/releases">Each release</a> says what's new.
                   </p>
                   <p>
-                    The portable <code>.exe</code> doesn't update itself: its owl's menu opens the new version's release
-                    page instead. Quit the running Minerva first (choose <strong>Quit Minerva</strong> in the owl's menu),
-                    then download the new portable <code>.exe</code> and run it. Your settings and Personal Bests carry
-                    over.
+                    The portable <code>.exe</code> doesn't update itself. Its owl's menu opens the new version's release
+                    page instead. To update it, quit Minerva first (choose <strong>Quit Minerva</strong> in the owl's
+                    menu), then download the new portable <code>.exe</code> and run it. Your settings and Personal Bests
+                    carry over.
                   </p>
                 </details>
                 <details class="qa" id="self-update">
@@ -278,30 +287,36 @@
                   <p>
                     Not without asking you. Minerva checks GitHub for a new version when it starts, every 6 hours while it
                     runs, and when you press <strong>Check for updates</strong> in Help &amp; Setup's About &amp; Credits.
-                    The check sends only the version you have. When one is out, the owl says so at the top centre of the
-                    game window until you click it or hide it, and again the next time Minerva starts
-                    (<a href="#owl">see why</a>), and the owl in the
-                    notification area and Help &amp; Setup say so too, with a <strong>What's new</strong> link. Nothing
-                    downloads until you choose to update. <strong>Later</strong> just leaves the notice where it is.
+                    The check sends only the version you have.
                   </p>
                   <p>
-                    When you update, Minerva downloads the new version, checks it's signed as Minerva's own, installs it
-                    with a small progress window and starts again. If you installed the <code>.msi</code>, Windows asks
-                    for admin rights first. If the download fails or isn't signed as Minerva's own, Help &amp; Setup says
-                    so and nothing is installed: try again, or download it from the release's page. If the installer
-                    fails, it says why, and you keep the version you have. Minerva only ever installs the version it told
-                    you about, and never an older one.
+                    When a new version is out, the owl says so at the top centre of the game window until you click it
+                    or hide it, and again the next time Minerva starts (<a href="#owl">see why</a>). The owl in the
+                    notification area and Help &amp; Setup tell you too, with a <strong>What's new</strong> link.
+                    Nothing downloads until you choose to update. <strong>Later</strong> just leaves the notice where it
+                    is.
                   </p>
                   <p>
-                    Updating restarts Minerva, so if you're grinding it asks first: "Updating restarts Minerva and ends
-                    this Session." Choose <strong>Update now</strong>, or <strong>Update when I quit</strong> to install
-                    it the next time you choose <strong>Quit Minerva</strong>, without restarting. If it's still
-                    downloading when you quit, the owl says it's finishing first; <strong>Quit now, without
+                    When you update, Minerva downloads the new version and checks that it's signed as Minerva's own.
+                    Then it installs it with a small progress window and starts again. If you installed the
+                    <code>.msi</code>, Windows asks for admin rights first.
+                  </p>
+                  <p>
+                    If the download fails, or the file isn't signed as Minerva's own, Help &amp; Setup says so and
+                    nothing is installed. Try again, or download it from the release's page. If the installer fails, it
+                    says why, and you keep the version you have. Minerva only ever installs the version it told you
+                    about, and never an older one.
+                  </p>
+                  <p>
+                    Updating restarts Minerva, so if you're grinding, it asks first: "Updating restarts Minerva and ends
+                    this Session." Choose <strong>Update now</strong>, or choose <strong>Update when I quit</strong> to
+                    install it without restarting, the next time you choose <strong>Quit Minerva</strong>. If the update
+                    is still downloading when you quit, the owl says it's finishing first, and <strong>Quit now, without
                     updating</strong> skips it. Your Personal Bests are saved either way.
                   </p>
                   <p>
-                    The portable <code>.exe</code> never installs anything: it says the new version is out, with a link
-                    to its release page (<a href="#update">see how to update it</a>).
+                    The portable <code>.exe</code> never installs anything. It tells you the new version is out and
+                    links to its release page (<a href="#update">see how to update it</a>).
                   </p>
                   <p>
                     To stop the checks, turn off <strong>Check for updates</strong> in Settings, the gear at the top of the
@@ -311,13 +326,16 @@
                 <details class="qa" id="owl">
                   <summary>Why is an owl talking to me over the game?</summary>
                   <p>
-                    That's Minerva. At the top centre of the game window, clear of what Minerva reads, the owl says what
-                    came of an <a href="#lookup-alert">Item Lookup</a>, and that a new version is out. Click its bubble to
-                    open Help &amp; Setup's About &amp; Credits, where you update, or its &times; to hide it until
-                    Minerva starts again; choosing to update hides it too. It doesn't move or make a sound, so you can
-                    leave it be while you play. A new version you found with <strong>Check for updates</strong> shows
-                    only in Help &amp; Setup, where you're already looking, and with <strong>Check for updates</strong>
-                    turned off in Settings the owl says nothing of new versions.
+                    That's Minerva. The owl sits at the top centre of the game window, clear of everything Minerva reads.
+                    It tells you how an <a href="#lookup-alert">Item Lookup</a> went, and when a new version is out.
+                    Click its bubble to open Help &amp; Setup's About &amp; Credits, where you can update. Click its
+                    &times; to hide it until Minerva starts again. Choosing to update hides it too. It doesn't move or
+                    make a sound, so you can leave it there while you play.
+                  </p>
+                  <p>
+                    If you found a new version yourself with <strong>Check for updates</strong>, it shows only in
+                    Help &amp; Setup, where you're already looking. With <strong>Check for updates</strong> turned off in
+                    Settings, the owl never mentions new versions.
                   </p>
                 </details>
               </div>
@@ -341,14 +359,14 @@
                     <li>The <a href="/#safe">account warning</a>.</li>
                     <li>Finding the game window, or picking it by hand.</li>
                     <li>Setting up the game: windowed or borderless, with the minimap showing, open or collapsed.</li>
-                    <li>Finding your map: Minerva finds the minimap title by itself and shows the map it names.</li>
-                    <li>The <a href="/#grind-tracker">Grind Tracker</a>, which <a href="#exp-bar">needs nothing marked</a>.</li>
+                    <li>Finding your map: Minerva finds the minimap title for you and shows the map it names.</li>
+                    <li>The <a href="/#grind-tracker">Grind Tracker</a>. <a href="#exp-bar">You don't need to mark anything</a> for it.</li>
                   </ol>
-                  <p>Finish starts the overlay. Closing setup on its first run quits.</p>
+                  <p>Finish starts the overlay. If you close setup on its first run, Minerva quits.</p>
                   <figure class="shot">
                     <img
                       src="../screenshots/setup.png"
-                      alt="Setup opened again, at its step Finding your map (step 3 of 4): there's nothing to mark, and it shows the map Minerva found in the minimap's title, Victoria Road, Kerning City, beside its Map Mark, tagged Found, with the hotkeys to use while you play."
+                      alt="Setup, opened again, at step 3 of 4, Finding your map. There's nothing to mark. It shows the map Minerva found in the minimap's title, Victoria Road, Kerning City, beside its Map Mark and tagged Found, and the hotkeys to use while you play."
                       loading="lazy"
                       decoding="async"
                     />
@@ -357,27 +375,29 @@
                 <details class="qa" id="exp-bar">
                   <summary>Do I have to mark the EXP bar?</summary>
                   <p>
-                    No. Minerva finds the EXP bar in the game's bar at the bottom of the window by itself, and reads the
-                    <a href="/#grind-tracker">Grind Tracker</a>'s figures from it, wherever the game window is, whatever
-                    its size, and at any of the game's UI Size settings. A mark you made in an earlier version isn't used any more. To turn the Grind Tracker off, or
-                    on again, use its switch in <a href="#tracker-on">Settings</a>.
+                    No. Minerva finds the EXP bar in the game's bar at the bottom of the window and reads the
+                    <a href="/#grind-tracker">Grind Tracker</a>'s figures from it. That works wherever the game window
+                    is, whatever its size, and at any of the game's UI Size settings. If you marked the bar in an
+                    earlier version, that mark isn't used any more. To turn the Grind Tracker off, or back on, use its
+                    switch in <a href="#tracker-on">Settings</a>.
                   </p>
                 </details>
                 <details class="qa" id="setup-again">
                   <summary>How do I open setup again?</summary>
                   <p>
-                    <kbd>Ctrl+Shift+S</kbd>, or Help &amp; Setup on the panel or on the owl in the notification area. There
-                    you can see the map Minerva found, or read the Overlay Guide, which lists your hotkeys and explains placement
-                    and the hunting figures. About &amp; Credits, beside it, links back to this site.
+                    Press <kbd>Ctrl+Shift+S</kbd>, or choose Help &amp; Setup on the panel or on the owl in the
+                    notification area. There you can see the map Minerva found, or read the Overlay Guide. The guide
+                    lists your hotkeys and explains placement and the hunting figures. About &amp; Credits, beside it,
+                    links back to this site.
                   </p>
                 </details>
                 <details class="qa" id="tray">
                   <summary>Where is Minerva while it runs, and how do I quit it?</summary>
                   <p>
-                    Its owl sits in the notification area, the system tray by the clock. Click it for
+                    Its owl sits in the notification area (the system tray, by the clock). Click it for
                     <strong>Help &amp; Setup</strong>, <a href="#bug-reports">Bug Report</a> or <strong>Quit Minerva</strong>.
-                    That's the only way to quit, whether or not the game is open. Only one Minerva runs at a time: starting
-                    it again brings up the one that's running.
+                    That's the only way to quit, whether or not the game is open. Only one Minerva runs at a time, so
+                    starting it again brings up the one that's already running.
                   </p>
                 </details>
               </div>
@@ -388,40 +408,42 @@
                   <summary>How do I change a hotkey?</summary>
                   <ol>
                     <li>
-                      Click the gear at the top of the panel, or Change hotkeys in setup's Overlay Guide. Settings opens in a
-                      window of its own beside the panel: drag it anywhere, and close it with its &times; or the gear.
+                      Click the gear at the top of the panel, or Change hotkeys in setup's Overlay Guide. Settings opens in
+                      its own window beside the panel. You can drag it anywhere, and close it with its &times; or the gear.
                     </li>
                     <li>Click the hotkey's <strong>Change</strong>.</li>
                     <li>
-                      Press the new combination, or <kbd>Esc</kbd> to cancel. While Settings waits, the hotkeys are released,
-                      so your keys reach it rather than acting.
+                      Press the new combination, or <kbd>Esc</kbd> to cancel. While Settings waits for keys, Minerva
+                      releases its hotkeys, so the keys you press go to Settings instead of setting off a hotkey.
                     </li>
                   </ol>
                   <p>
-                    A combination must hold <kbd>Ctrl</kbd>, <kbd>Alt</kbd> or <kbd>Win</kbd>. <kbd>Ctrl+Shift</kbd> with a
-                    key is safest: MapleStory attacks with <kbd>Ctrl</kbd> and jumps with <kbd>Alt</kbd> by default.
+                    A combination must include <kbd>Ctrl</kbd>, <kbd>Alt</kbd> or <kbd>Win</kbd>. <kbd>Ctrl+Shift</kbd>
+                    plus a key is safest, because by default MapleStory attacks with <kbd>Ctrl</kbd> and jumps with
+                    <kbd>Alt</kbd>.
                   </p>
                 </details>
                 <details class="qa" id="hotkey-taken">
                   <summary>What if the keys I want are already taken?</summary>
                   <p>
-                    If another Minerva hotkey has them, <strong>Swap</strong> trades the two. If Windows or another app has
-                    them, the panel and setup say which, and Settings marks the row.
+                    If another Minerva hotkey uses them, <strong>Swap</strong> trades the two. If Windows or another app
+                    has them, the panel and setup say which one, and Settings marks the row.
                   </p>
                 </details>
                 <details class="qa" id="hotkey-off">
                   <summary>Can I turn a hotkey off?</summary>
                   <p>
-                    Yes, so it stops taking its keys from the game: choose <strong>Turn off</strong>, or press
-                    <kbd>Backspace</kbd> or <kbd>Delete</kbd> while it waits for keys. Its button at the top of the panel
-                    still works. The Item Card and Item Lookup have no button, so they can't be used while theirs is off.
+                    Yes. Choose <strong>Turn off</strong>, or press <kbd>Backspace</kbd> or <kbd>Delete</kbd> while it
+                    waits for keys, and the game gets those keys back. The hotkey's button at the top of the panel still
+                    works. The Item Card and Item Lookup have no button, so you can't use them while their hotkey is off.
                   </p>
                 </details>
                 <details class="qa" id="hotkey-undo">
                   <summary>Can I undo a change to the hotkeys?</summary>
                   <p>
-                    Every change works at once and is saved. <strong>Restore defaults</strong> puts every hotkey back, and
-                    on, and Undo brings yours back until you change another or close Settings.
+                    Every change takes effect at once and is saved. <strong>Restore defaults</strong> puts every hotkey
+                    back to its default and turns it on. Undo then brings yours back, until you change another hotkey or
+                    close Settings.
                   </p>
                 </details>
               </div>
@@ -443,18 +465,19 @@
                 <details class="qa" id="panel-shows">
                   <summary>What does the panel show?</summary>
                   <p>
-                    The map you're on, by its name and its Map Mark, then three sections: the <a href="/#map">Map</a>,
-                    <a href="/#navigation">Navigation</a> while you have a Hunting Target or a Destination, and the
-                    <a href="/#mobs">Mobs</a>. Click a section's heading to fold it, and again to open it. A folded section
-                    stays folded from map to map, and the next time you start Minerva.
+                    The map you're on, with its name and its Map Mark, then three sections: the <a href="/#map">Map</a>,
+                    <a href="/#navigation">Navigation</a> (while you have a Hunting Target or a Destination) and the
+                    <a href="/#mobs">Mobs</a>. Click a section's heading to fold it, and click it again to open it. A
+                    folded section stays folded as you change maps, and the next time you start Minerva.
                   </p>
                 </details>
                 <details class="qa" id="map-marks">
                   <summary>What's the emblem beside the map's name?</summary>
                   <p>
-                    Its <strong>Map Mark</strong>, the emblem the minimap shows beside its title for the area the map is
-                    in, like Henesys's shield, Kerning City's stone or Sleepywood's skull. Every other map the panel names,
-                    such as a portal's destination or a stop on your route, has a smaller one, so you can tell where it is.
+                    That's the map's <strong>Map Mark</strong>. The minimap shows the same emblem beside its title for the
+                    area the map is in, like Henesys's shield, Kerning City's stone or Sleepywood's skull. Every other map
+                    the panel names, such as a portal's destination or a stop on your route, has a smaller one, so you
+                    can tell where that map is.
                   </p>
                 </details>
                 <details class="qa" id="buttons">
@@ -466,7 +489,7 @@
                     </li>
                     <li>
                       <span class="icon-button" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13" /></svg></span>
-                      <span>The next map with the same title, only when <a href="#shared-titles">maps share it</a>.</span>
+                      <span>Step to the next map with the same title (only when <a href="#shared-titles">maps share it</a>).</span>
                     </li>
                     <li>
                       <span class="icon-button" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 12.5 6.5 8.5 9 11l4.5-4.5M10.5 6.5h3v3" /></svg></span>
@@ -486,7 +509,7 @@
                     </li>
                     <li>
                       <span class="icon-button" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5h9" /></svg></span>
-                      <span>Fold the panel to an icon: see <a href="#fold-panel">below</a>.</span>
+                      <span>Fold the panel to an icon (<a href="#fold-panel">see below</a>).</span>
                     </li>
                   </ul>
                   <p>Rest the pointer on a button to see its hotkey. Click the map's name to open its MeowDB page.</p>
@@ -494,17 +517,18 @@
                 <details class="qa" id="keyboard">
                   <summary>Does clicking the panel take the keyboard from the game?</summary>
                   <p>
-                    No. Click it whenever you like: the game keeps the keyboard. Only the search view takes it while it's
-                    open, and Settings as it opens and while you change a hotkey or type the Deal Margin. Click back into the
-                    game and the keys are the game's again: the search view closes, and Settings stays open.
+                    No. Click it whenever you like, and the game keeps the keyboard. Only the search view takes it while
+                    it's open, and Settings as it opens and while you change a hotkey or type the Deal Margin.
+                    Click back into the game and the keys go back to the game. The search view closes, and Settings
+                    stays open.
                   </p>
                 </details>
                 <details class="qa" id="move-panel">
                   <summary>How do I move or resize the panel?</summary>
                   <p>
-                    Drag it by its header to move it, or by a side or a bottom corner to make it wider or narrower. Its
-                    height follows what it shows, and a long list scrolls instead. Drop it on the minimap title and it
-                    moves just clear, so Minerva can still read the title.
+                    Drag its header to move it. Drag a side or a bottom corner to make it wider or narrower. Its height
+                    fits what it shows, and a long list scrolls instead. If you drop it on the minimap title, it moves
+                    just clear so Minerva can still read the title.
                   </p>
                 </details>
                 <details class="qa" id="placement">
@@ -525,9 +549,9 @@
                 <details class="qa" id="panel-hides">
                   <summary>Why does the panel disappear?</summary>
                   <p>
-                    It shows on top of everything, but only while the game or one of Minerva's windows is in front. While
-                    another app is, or the game is minimised, it hides: opening a MeowDB page in your browser hides it
-                    until you go back to the game.
+                    It shows on top of everything, but only while the game or one of Minerva's windows is in front. It
+                    hides while another app is in front or the game is minimised. So opening a MeowDB page in your
+                    browser hides it until you go back to the game.
                   </p>
                 </details>
                 <details class="qa" id="streams">
@@ -537,8 +561,9 @@
                 <details class="qa" id="fold-panel">
                   <summary>Can I fold the panel out of the way?</summary>
                   <p>
-                    Yes. <kbd>Ctrl+Shift+C</kbd>, or its minus button, folds it to an icon that shows the map's Hidden
-                    Portal count, with an orange dot when something needs a look. Click the icon to open the panel again.
+                    Yes. Press <kbd>Ctrl+Shift+C</kbd>, or click the panel's minus button, to fold it to an icon. The icon
+                    shows the map's Hidden Portal count, and an orange dot when something needs a look. Click the icon to
+                    open the panel again.
                   </p>
                 </details>
               </div>
@@ -548,9 +573,9 @@
                 <details class="qa" id="hidden-portals">
                   <summary>What's a Hidden Portal?</summary>
                   <p>
-                    A way to another map that the game doesn't show. The Map Preview rings it dashed, and lists it under
-                    the picture with where it leads, tagged <span class="tag">Hidden Street</span> when it leads to one, or
-                    <span class="tag quest">Quest</span> when it only works during a quest.
+                    A way to another map that the game doesn't show. The Map Preview gives it a dashed ring and lists it
+                    under the picture with where it leads. It's tagged <span class="tag">Hidden Street</span> when it
+                    leads to one, or <span class="tag quest">Quest</span> when it only works during a quest.
                   </p>
                 </details>
                 <details class="qa" id="ring-colours">
@@ -567,8 +592,8 @@
                       to a <a href="/#navigation">Hunting Target</a> or a Destination.
                     </li>
                     <li>
-                      <span class="ring-key npc" aria-hidden="true"></span><b>A green dot in magenta:</b> the NPC you picked
-                      in search, where they stand, once you're on their map.
+                      <span class="ring-key npc" aria-hidden="true"></span><b>A green dot in magenta:</b> where the NPC you
+                      picked in search stands, once you're on their map.
                     </li>
                   </ul>
                   <p>A dashed ring is a portal the game doesn't show.</p>
@@ -576,32 +601,33 @@
                 <details class="qa" id="zoom">
                   <summary>Can I zoom in on the map?</summary>
                   <p>
-                    Yes. Turn the mouse wheel over the picture to zoom in on the part you point at, as far as the map's own
+                    Yes. Turn the mouse wheel over the picture to zoom in on the part you point at, up to the map's own
                     size. The rings keep their size, so portals that crowd together come apart. Drag the picture to move
-                    around it, and double-click it to see the whole map again. A new map always shows whole.
+                    around, and double-click it to see the whole map again. A new map always shows in full.
                   </p>
                 </details>
                 <details class="qa" id="portal-card">
                   <summary>How do I see where a portal leads?</summary>
                   <p>
                     Rest the pointer on its ring, or on its row under the picture. A card shows the spot up close, so you
-                    can tell which ledge a hidden one is on, then says where it leads, its street and its kind. The ring
-                    and its row light together.
+                    can tell which ledge a hidden portal is on. It also says where the portal leads, that map's
+                    street, and what kind of portal it is. The ring and its row light up together.
                   </p>
                 </details>
                 <details class="qa" id="doors">
                   <summary>Why aren't a town's doors listed as Hidden Portals?</summary>
                   <p>
-                    You can see them in the game, so they're ringed like any visible portal rather than listed. A teleport
-                    within the map is never listed either, though an invisible one is dashed.
+                    You can see them in the game, so they get a ring like any visible portal but aren't listed. A teleport
+                    within the map is never listed either, but an invisible one gets a dashed ring.
                   </p>
                 </details>
                 <details class="qa" id="no-picture">
                   <summary>Why is the map's picture missing?</summary>
                   <p>
-                    It may still be loading ("Loading map…"), or it couldn't be fetched ("Couldn't load the map picture"),
-                    and the Hidden Portals list without it. When <a href="#shared-titles">maps share a title</a>, it waits
-                    until it's settled which one you're on. A map with no picture and no Hidden Portals has no Map section.
+                    It may still be loading ("Loading map…"), or Minerva couldn't download it ("Couldn't load the map
+                    picture"). The Hidden Portals are still listed without it. When
+                    <a href="#shared-titles">maps share a title</a>, the picture waits until Minerva knows which one
+                    you're on. A map with no picture and no Hidden Portals has no Map section.
                   </p>
                 </details>
               </div>
@@ -614,35 +640,39 @@
                     The map's <strong>Map Summary</strong> estimates its hourly ceiling, assuming mobs are killed as they
                     respawn. For each mob, multiply its spawn points by its spawns per hour, then by its base EXP.
                     Normal spawns use 3,600 ÷ 7.56 per point per hour for a party of 6 or more, and 75% of that solo
-                    (about 357). Timed spawns use 3,600 ÷ their timer in seconds for either party size; a ranged timer
-                    uses OSMS's listed average. Round each mob's result, then add them for the map. Mobs/h uses the same
-                    calculation without multiplying by EXP. EXP buffs, events and the map's Mob Rate aren't applied.
+                    (about 357). Timed spawns use 3,600 ÷ their timer in seconds for either party size, and a timer given
+                    as a range uses OSMS's listed average. Round each mob's result, then add them up for the map. Mobs/h
+                    uses the same calculation without multiplying by EXP. EXP buffs, events and the map's Mob Rate
+                    aren't applied.
                   </p>
                   <p>
-                    Hover the <strong>?</strong> beside solo EXP/h in the panel or Personal Bests to see
-                    the calculation there too. Each mob's <strong>Share</strong> is its share of all the map's spawn
-                    points: the higher it is, the fewer other mobs in your way.
+                    Hover the <strong>?</strong> beside solo EXP/h in the panel or Personal Bests to see the calculation
+                    there too. Each mob's <strong>Share</strong> is its share of all the map's spawn points. The higher
+                    it is, the fewer other mobs get in your way.
                   </p>
                 </details>
                 <details class="qa" id="spawn-points">
                   <summary>Where do a map's mobs spawn?</summary>
                   <p>
-                    Every red dot on the Map Preview is a <strong>spawn point</strong>, as the minimap dots mobs. Rest the
-                    pointer on a mob's row to light its spawn points and fade the rest, or on a dot to see which mob
-                    spawns there, close up.
+                    Every red dot on the Map Preview is a <strong>spawn point</strong>, drawn the way the minimap draws
+                    mobs. Rest the pointer on a mob's row to light up its spawn points and fade the rest. Rest it on a
+                    dot to see which mob spawns there, close up.
                   </p>
                 </details>
                 <details class="qa" id="mob-card">
                   <summary>How do I see more about a mob?</summary>
                   <p>
-                    Rest the pointer on its name for its <strong>Mob Card</strong>: the mob as OSMS animates it, and what
-                    its row doesn't show, such as its element, touch damage, accuracy, avoid and defences. Click the name
-                    to open the mob's MeowDB page.
+                    Rest the pointer on its name to see its <strong>Mob Card</strong>. The card shows the mob as OSMS
+                    animates it, and what its row doesn't show, such as its element, touch damage, accuracy, avoid and
+                    defences. Click the name to open the mob's MeowDB page.
                   </p>
                 </details>
                 <details class="qa" id="long-list">
                   <summary>Can I shorten a long mob list?</summary>
-                  <p>Click the Mobs heading to fold the section to its heading and the count, on every map, until you open it again.</p>
+                  <p>
+                    Yes. Click the Mobs heading to fold the section down to its heading and the count. It stays folded on
+                    every map until you open it again.
+                  </p>
                 </details>
               </div>
 
@@ -651,24 +681,26 @@
                 <details class="qa" id="shared-titles">
                   <summary>What happens when two maps share a title?</summary>
                   <p>
-                    A few do, like the two Maple Road / Mushroom Town maps. If they'd show the same summary, mobs and Hidden
-                    Portals anyway, the panel just shows them, without a picture. Otherwise it picks the one connected to
-                    the map you came from. Failing that, it shows the first, marked <span class="chip-doubt">Not sure</span>.
+                    A few maps do, like the two Maple Road / Mushroom Town maps. If both would show the same summary, mobs
+                    and Hidden Portals anyway, the panel shows those without a picture. Otherwise it picks the one
+                    connected to the map you came from. If that doesn't settle it, the panel shows the first one, marked
+                    <span class="chip-doubt">Not sure</span>.
                   </p>
                 </details>
                 <details class="qa" id="not-sure">
                   <summary>The panel says "Not sure". How do I pick the right map?</summary>
                   <p>
-                    It lists the maps it could be, each with its first mobs, mob levels and Hidden Portal count.
-                    <kbd>Ctrl+Shift+N</kbd>, or the arrows button, steps through them, and your pick holds until you change
-                    maps.
+                    The panel lists the maps you could be on, each with its first mobs, mob levels and Hidden Portal
+                    count. Press <kbd>Ctrl+Shift+N</kbd>, or click the arrows button, to step through them. Your pick
+                    holds until you change maps.
                   </p>
                 </details>
                 <details class="qa" id="numerals">
                   <summary>What about maps whose names differ only by a numeral?</summary>
                   <p>
-                    Like Rocky Road I, II and III: when Minerva can't make the numeral out, it picks the one the map you
-                    came from leads to, if that leads to just one of them. Otherwise it says it isn't sure rather than guess.
+                    Rocky Road I, II and III are an example. When Minerva can't make out the numeral, it
+                    picks the one that the map you came from leads to, if it leads to just one of them. Otherwise it says
+                    it isn't sure.
                   </p>
                 </details>
               </div>
@@ -687,21 +719,20 @@
                 <details class="qa" id="search">
                   <summary>How do I search?</summary>
                   <p>
-                    <kbd>Ctrl+Shift+F</kbd>, or the magnifier at the top of the panel. Type part of a name: the mobs, maps,
-                    NPCs and items that have it show in a section each, mobs first, names that start with what you typed
-                    first.
-                    Each section shows its best five and counts the rest. Pick one with the arrow keys and
-                    <kbd>Enter</kbd>, or a click.
+                    Press <kbd>Ctrl+Shift+F</kbd>, or click the magnifier at the top of the panel, and type part of a
+                    name. The mobs, maps, NPCs and items that match each get a section, with mobs first. In each section,
+                    names that start with what you typed come first. Each section shows its best five and counts the
+                    rest. Pick one with the arrow keys and <kbd>Enter</kbd>, or click it.
                   </p>
                 </details>
                 <details class="qa" id="search-picks">
                   <summary>What happens when I pick a mob, a map, an NPC or an item?</summary>
                   <ul>
-                    <li><b>A mob:</b> it lists the maps the mob spawns on, to pick one to hunt it on.</li>
+                    <li><b>A mob:</b> search lists the maps the mob spawns on, so you can pick one to hunt it on.</li>
                     <li><b>A map:</b> it becomes your Destination, and the panel shows the way there.</li>
                     <li>
-                      <b>An NPC:</b> its map becomes your Destination, or you choose from its maps, nearest first, when it
-                      stands on more than one. Once you're there, <a href="#ring-colours">the Map Preview marks them</a>.
+                      <b>An NPC:</b> its map becomes your Destination. If the NPC stands on more than one map, you choose
+                      from them, nearest first. Once you're there, <a href="#ring-colours">the Map Preview marks them</a>.
                     </li>
                     <li><b>An item:</b> its <a href="#item-card">Item Card</a> opens beside the panel.</li>
                   </ul>
@@ -709,20 +740,20 @@
                 <details class="qa" id="mob-maps">
                   <summary>How are a mob's maps ranked?</summary>
                   <p>
-                    By <strong>Density Tier</strong>, then the nearest within a tier, each with its figures. Tick
+                    By <strong>Density Tier</strong>, then nearest first within a tier, each with its figures. Tick
                     <strong>Taxis</strong> or <strong>Teleport Scrolls</strong> to count them as ways to travel. Event maps
-                    and the developers' room aren't listed, nor found as maps.
+                    and the developers' room aren't listed, and search doesn't find them as maps either.
                   </p>
                 </details>
                 <details class="qa" id="figures">
                   <summary>What do Density, Share, Tier and Distance mean?</summary>
                   <dl class="facts">
                     <dt>Density</dt>
-                    <dd>How many of the mob you can kill there: its spawns, times how fast the map refills.</dd>
+                    <dd>How many of the mob you can kill there: its spawns times how fast the map refills.</dd>
                     <dt>Share</dt>
-                    <dd>The mob's share of all the map's spawns: the higher, the fewer other mobs in your way.</dd>
+                    <dd>The mob's share of all the map's spawns. The higher it is, the fewer other mobs get in your way.</dd>
                     <dt>Tier</dt>
-                    <dd>The map's Density Tier: High, Medium or Low against the mob's densest map.</dd>
+                    <dd>The map's Density Tier: High, Medium or Low, compared with the mob's densest map.</dd>
                     <dt>Distance</dt>
                     <dd>The fewest map changes to get there.</dd>
                   </dl>
@@ -730,34 +761,34 @@
                 <details class="qa" id="target-or-destination">
                   <summary>What's the difference between a Hunting Target and a Destination?</summary>
                   <p>
-                    Pick one of a mob's maps and it's your <strong>Hunting Target</strong>: Navigation shows the mob as OSMS
-                    animates it, the map, its figures and the way there. Pick a map itself and it's your
-                    <strong>Destination</strong>: the map, its street, how far it is and the way, without a mob. Pick an
-                    NPC and its map is your Destination, with the NPC shown above the map. You have one or the other: the
-                    last you picked.
+                    Pick one of a mob's maps and it becomes your <strong>Hunting Target</strong>. Navigation shows the mob
+                    as OSMS animates it, the map, its figures and the way there. Pick a map on its own and it becomes your
+                    <strong>Destination</strong>. Navigation shows the map, its street, how far it is and the way, with no
+                    mob. Pick an NPC and its map becomes your Destination, with the NPC shown above the map. You have one
+                    or the other, whichever you picked last.
                   </p>
                 </details>
                 <details class="qa" id="route">
                   <summary>How does Navigation show the way?</summary>
                   <p>
-                    Between the Map and the Mobs, it lists the route from the map you're on, worked out again as you move,
-                    and the portal it takes next wears a wide magenta ring on the Map Preview. When you arrive, it says
-                    <strong>You're here</strong>, with how far you came, until you leave the map.
+                    Navigation sits between the Map and the Mobs. It lists the route from the map you're on, and works it
+                    out again as you move. The next portal on the route has a wide magenta ring on the Map Preview. When
+                    you arrive, it says <strong>You're here</strong>, with how far you came, until you leave the map.
                   </p>
                 </details>
                 <details class="qa" id="change-target">
                   <summary>How do I change or clear my Hunting Target?</summary>
                   <p>
-                    Its magnifier opens the mob's map list again, to pick another map, and the × clears a Hunting Target or
-                    a Destination. Otherwise it lasts until you close Minerva.
+                    The Hunting Target's magnifier opens the mob's map list again, so you can pick another map. The ×
+                    clears a Hunting Target or a Destination. Otherwise it lasts until you close Minerva.
                   </p>
                 </details>
                 <details class="qa" id="search-keyboard">
                   <summary>Why can't I move my character while searching?</summary>
                   <p>
-                    The search view has the keyboard, for your typing, until it closes. <kbd>Esc</kbd> or the back arrow
-                    goes back a step without changing anything: from a mob's or an NPC's maps to what you typed, and from there to the
-                    panel, where the game has the keyboard again.
+                    The search view takes the keyboard for your typing until it closes. <kbd>Esc</kbd> or the back arrow
+                    goes back a step without changing anything: from a mob's or an NPC's maps to what you typed, then
+                    from there to the panel. Back at the panel, the game has the keyboard again.
                   </p>
                 </details>
               </div>
@@ -783,106 +814,119 @@
                     <li>Your EXP per hour over the last 5 minutes and, once you've played longer, over the whole Session.</li>
                     <li>Your deaths, and what they cost.</li>
                     <li>
-                      Your <a href="#loot">Loot</a>, closed at first with the mesos and items you've picked up this Session.
-                      Open, it adds mesos per hour and every item you've picked up, the most first.
+                      Your <a href="#loot">Loot</a>. It starts closed, showing the mesos and items you've picked up this
+                      Session. Open it to add mesos per hour and every item you've picked up, most first.
                     </li>
                     <li>
                       Once you've shared EXP with a party, hover your Session rate to see how it
                       <a href="#exp-split">splits</a> into yours and the party's.
                     </li>
                     <li>
-                      Your last 5 minutes, kill by kill, <a href="#pace-trace">raced against the 5 minutes before</a>
-                      and, when you come close, your <a href="#personal-bests">Personal Best</a>.
+                      Your last 5 minutes, kill by kill, <a href="#pace-trace">raced against the 5 minutes before</a>, and
+                      against your <a href="#personal-bests">Personal Best</a> when you come close to it.
                     </li>
                     <li>
-                      At its foot, the EXP bar as it last read it, so you can see it's being read, with the
-                      <a href="#which-character">character</a> playing beside it. After a death, the hatched stretch is
-                      the ground it took back, until you're past it again.
+                      At the bottom, the EXP bar as Minerva last read it, so you can see it's being read, with the
+                      <a href="#which-character">character</a> you're playing beside it. After a death, a hatched stretch
+                      shows the EXP the death took back, until you're past that point again.
                     </li>
-                    <li>Under the EXP bar, where it will be in so long at your pace, and Time to Level at its end.</li>
+                    <li>
+                      Under the EXP bar, marks for where the bar will be later on at your pace, with Time to Level at its
+                      end.
+                    </li>
                   </ul>
                 </details>
                 <details class="qa" id="tracker-on">
                   <summary>How do I turn the Grind Tracker on?</summary>
                   <p>
-                    It's on from the start, in a window of its own beside the panel: Minerva finds your EXP bar by itself.
-                    <kbd>Ctrl+Shift+G</kbd> or the panel's button shows or hides it, and its × closes the window while the
-                    Session carries on. To turn it off, click the gear at the top of the panel and untick
-                    <strong>Grind Tracker</strong>: Minerva then doesn't read your EXP at all, until you tick it again.
+                    It's on from the start, in its own window beside the panel, and Minerva finds your EXP bar for you.
+                    Press <kbd>Ctrl+Shift+G</kbd> or click the panel's button to show or hide it. Its × closes the window,
+                    and the Session carries on. To turn it off, click the gear at the top of the panel and untick
+                    <strong>Grind Tracker</strong>. Minerva then stops reading your EXP until you tick it again.
                   </p>
                 </details>
                 <details class="qa" id="loot">
                   <summary>Where does the Loot come from, and why can the figures be low?</summary>
                   <p>
-                    From the game's <strong>Pickup Log</strong>, the lines that fade in the bottom-right corner of the
-                    window ("You have gained mesos (+29)"). Minerva adds up the ones that arrive during the Session, so a
-                    reset or a <a href="#which-character">character switch</a> starts the count again, and shows mesos per
-                    hour over the Session's active time, as it does your EXP. Mesos you pick up while no EXP comes in still
-                    count, and keep the Session from pausing. It reads the log only while the Grind Tracker is on and the
-                    game is in front.
+                    From the game's <strong>Pickup Log</strong>: the lines that fade in the bottom-right corner of the
+                    window ("You have gained mesos (+29)"). Minerva adds up the lines that arrive during the Session, so a
+                    reset or a <a href="#which-character">character switch</a> starts the count again. It shows mesos per
+                    hour over the Session's active time, the same way it does for your EXP. Mesos you pick up while no EXP
+                    comes in still count, and they keep the Session from pausing. Minerva reads the log only while the
+                    Grind Tracker is on and the game is in front.
                   </p>
                   <p>
-                    The items you pick up come from the same lines ("Orange Mushroom Cap x26 earned. (Etc)") and are
-                    tallied by name. Closed, the <strong>Loot</strong> header shows the Session's totals ("Loot 1,593+ mesos
-                    28+ items"), the "+" because you picked up at least that much, possibly more. Click Loot to open it: the mesos and mesos per hour, then every item you've picked up, the
-                    most first, each with its count, in a short list that scrolls. It stays open or closed as you leave it, even
-                    after you restart Minerva. A reset or a character switch clears the items with the
-                    mesos, and there is no per-hour figure for them. Minerva names an item from the game's item list. When
-                    the game cuts a long name short ("Arrows for Cros...") it goes by the item list and the inventory tab
-                    named in the line; if more than one item fits, it's tallied as the game shows it, never guessed. The
-                    game's font gets some letters wrong in the same few ways again and again (a D that comes out as "Ci", a
-                    B as "El"), so a name that is only those slips away from an item in the line's tab is tallied as that
-                    item, when it is clearly nearer it than any other. That can put a line under the wrong one of two
-                    items with similar names, so one item's count may be a little high now and then; the total never is. A
-                    name that matches no item, such as a new one the list doesn't have yet, is tallied as read only once it has
-                    been read on two lines, so one misread never counts as an item.
+                    The items you pick up come from the same lines ("Orange Mushroom Cap x26 earned. (Etc)"), counted by
+                    name. While Loot is closed, the <strong>Loot</strong> header shows the Session's totals ("Loot 1,593+
+                    mesos 28+ items"). The "+" means you picked up at least that much, maybe more. Click Loot to open it.
+                    It shows the mesos and mesos per hour, then a short scrolling list of every item you've picked up,
+                    most first, each with its count. Loot stays open or closed as you left it, even after you restart
+                    Minerva. A reset or a character switch clears the items along with the mesos. Items have no per-hour
+                    figure.
                   </p>
                   <p>
-                    The figures can be low, never high. A line Minerva isn't sure of isn't counted: one a monster or a skill
-                    effect covered, or more lines at once than the log can show. Mesos and items you pick up before your first EXP of the
-                    Session aren't counted either. If one of Minerva's own windows sits over the log for a few seconds, the
-                    Grind Tracker says "Pickup Log covered": move it, and the count carries on.
+                    Minerva names each item from the game's item list. When the game cuts a long name short ("Arrows for
+                    Cros..."), Minerva goes by the item list and the inventory tab named in the line. If more than one
+                    item fits, it doesn't pick one: it counts the line under the name as the game shows it.
+                  </p>
+                  <p>
+                    Some letters in the game's font get misread in the same few ways again and again: a D comes out as
+                    "Ci", a B as "El". So when a name is only those slips away from an item in the line's tab, and is
+                    clearly nearer that item than any other, Minerva counts it as that item. Now and then this puts a
+                    line under the wrong one of two items with similar names, so one item's count may be a little high,
+                    though the total never is. A name that matches no item, such as a new item the list doesn't have
+                    yet, is counted under the name Minerva read, but only once it has been read on two lines. That way
+                    one misreading never counts as an item.
+                  </p>
+                  <p>
+                    The figures can be low, never high. Minerva doesn't count a line it isn't sure of, such as one a
+                    monster or a skill effect covered, or one of more lines at once than the log can show. Mesos and items
+                    you pick up before your first EXP of the Session aren't counted either. If one of Minerva's own
+                    windows sits over the log for a few seconds, the Grind Tracker says "The Pickup Log is covered". Move the
+                    window and the count carries on.
                   </p>
                 </details>
                 <details class="qa" id="reset-session">
                   <summary>How do I reset the Session?</summary>
                   <p>
-                    The circular arrow beside Time to Level resets it, and a new one starts at your next EXP gain; until
-                    then, Undo brings the old one back. It has no hotkey, so a stray key press while you fight can't clear
-                    it. <a href="#which-character">Switch character</a> and the Session starts afresh by itself.
+                    Click the circular arrow beside Time to Level. A new Session starts at your next EXP gain, and until
+                    then, Undo brings the old one back. Resetting has no hotkey, so a stray key press while you fight
+                    can't clear your Session. When you <a href="#which-character">switch character</a>, a new Session
+                    starts automatically.
                   </p>
                 </details>
                 <details class="qa" id="which-character">
                   <summary>How does Minerva know which character I'm playing?</summary>
                   <p>
-                    From the status bar at the bottom of the game window, with nothing to set up: it reads your level,
-                    job and name there every second, and the Grind Tracker shows your name and level beside your EXP bar. Log in as
-                    another character and it reads the new name, so the Session starts afresh within seconds. A level-up the
-                    status bar shows counts at once, even if something covered your EXP bar as it filled. While it
-                    can't read a name, it still tells another character from the EXP bar.
+                    From the status bar at the bottom of the game window, and you don't have to set anything up. Every
+                    second, Minerva reads your level, job and name there, and the Grind Tracker shows your name and level
+                    beside your EXP bar. Log in as another character and Minerva reads the new name, so a new Session
+                    starts within seconds. A level-up counts as soon as the status bar shows it, even if something covered
+                    your EXP bar as it filled. While Minerva can't read a name, it can still tell from the EXP bar that
+                    you've switched to another character.
                   </p>
                 </details>
                 <details class="qa" id="exp-split">
                   <summary>How much of my EXP came from my party?</summary>
                   <p>
-                    Hover your Session rate's EXP/h on the Grind Tracker. Once a partymate's kill has shared EXP
-                    with you in this Session, it tells you the <strong>EXP Split</strong>: how much of your EXP was
-                    your own kills and how much came from your party (the share of your partymates' kills and the
-                    party bonus together). Playing alone, there is nothing to split. It starts afresh with each
-                    Session.
+                    Hover your Session rate's EXP/h on the Grind Tracker. Once a partymate's kill has shared EXP with you
+                    this Session, it shows the <strong>EXP Split</strong>: how much of your EXP came from your own kills,
+                    and how much came from your party (your share of your partymates' kills plus the party bonus). When
+                    you play alone, there's nothing to split. The split starts over with each Session.
                   </p>
                   <p>
-                    Minerva tells the two apart from the lines the game writes at the bottom right of the screen: a
-                    share of a partymate's kill is yellow, your own is white. They give the shares, not the amounts,
-                    which come from your EXP bar, so the split is in proportion to what the lines it caught said.
+                    Minerva tells the two apart from the lines the game writes at the bottom right of the screen. Your
+                    share of a partymate's kill is yellow, and EXP from your own kill is white. Those lines give the
+                    shares, while the amounts come from your EXP bar. So the split follows the proportions in the lines
+                    Minerva caught.
                   </p>
                 </details>
                 <details class="qa" id="move-tracker">
                   <summary>Can I move the Grind Tracker?</summary>
                   <p>
-                    Yes. It sits beside the panel with their tops level. Drag it by its bar anywhere, even outside the game
-                    window, and it keeps that spot; drag it back beside the panel and it follows the panel again. Like the
-                    panel, it hides while another app is in front or the game is minimised.
+                    Yes. It sits beside the panel, with their tops level. Drag it by its bar anywhere, even outside the
+                    game window, and it stays there. Drag it back beside the panel and it follows the panel again. Like
+                    the panel, it hides while another app is in front or the game is minimised.
                   </p>
                 </details>
               </div>
@@ -892,113 +936,116 @@
                 <details class="qa" id="personal-bests">
                   <summary>What's a Personal Best?</summary>
                   <p>
-                    On a map with mobs, the best EXP per hour the character you're playing has had over 5 minutes of play
-                    there. Come back to the map and a Best row shows it from the moment you arrive. Beat it, or play 5
+                    It's the best EXP per hour the character you're playing has had over 5 minutes of play on a map with
+                    mobs. Come back to the map and a Best row shows it from the moment you arrive. Beat it, or play 5
                     minutes on a map for the first time, and the row moves up to your new best at once, labelled
                     "Visit best". A yellow star marks your last 5 minutes while they're that best. When you slow down,
-                    the row keeps your best, so you can see where you were.
+                    the row keeps your best so you can see where you were.
                   </p>
                   <p>
-                    A map has two: a <a href="#party-bests">Solo Best and a Party Best</a>, and the Best row races the
-                    one you're playing.
+                    Each map has two, a <a href="#party-bests">Solo Best and a Party Best</a>, and the Best row races the
+                    one for the way you're playing.
                   </p>
                 </details>
                 <details class="qa" id="party-bests">
                   <summary>What's a Solo Best and a Party Best?</summary>
                   <p>
-                    Each map keeps your best EXP per hour when you played alone, your <strong>Solo Best</strong>, and when
-                    you played with a party, your <strong>Party Best</strong>, so a party run never hides what you do on
-                    your own. You don't tell Minerva which: any 5 minutes with a partymate's EXP in them count as party,
-                    and 5 minutes with none count as solo. A partymate who leaves, or is on another map, shares no EXP,
-                    so 5 minutes later your play counts as solo again. Your Session carries on through it all.
+                    Each map keeps two bests: your best EXP per hour playing alone, your <strong>Solo Best</strong>, and
+                    your best playing with a party, your <strong>Party Best</strong>. That way a party run never hides
+                    what you do on your own. You don't have to tell Minerva which you're doing. Any 5 minutes with a
+                    partymate's EXP in them count as party, and 5 minutes with none count as solo. A partymate who
+                    leaves, or is on another map, shares no EXP, so 5 minutes later your play counts as solo again. Your
+                    Session carries on through all of it.
                   </p>
                   <p>
-                    The Best row and the line under your rates race the best of the kind you're playing, and the row
-                    shows two small figures in gold while it's your Party Best. In your Personal Bests, a map with a
-                    Party Best shows both under its figure, and its visits say which kind each is.
+                    The Best row and the line under your rates race the best for the way you're playing. While that's
+                    your Party Best, the row shows two small figures in gold. In your Personal Bests, a map with a Party
+                    Best shows both bests under its figure, and its visits say which kind each one is.
                   </p>
                   <p>
-                    Bests from before Minerva told them apart are Party Bests, so a map's Solo Best starts empty until
-                    you set a new one.
+                    Bests set before Minerva told solo and party play apart count as Party Bests, so a map's Solo Best
+                    starts empty until you set a new one.
                   </p>
                 </details>
                 <details class="qa" id="pace-trace">
                   <summary>What's the line under my rates?</summary>
                   <p>
-                    Your last 5 minutes raced against the 5 minutes before them. The flat line is your earlier pace. Your
-                    line sinks between kills and steps up with each one: level means you're keeping pace, sinking means
-                    you've slowed, and a cliff is a death. The number by your dot is how much EXP you're ahead or behind.
-                    It appears once you've played 6 minutes.
+                    Your last 5 minutes, raced against the 5 minutes before them. The flat line is your earlier pace. Your
+                    line sinks between kills and steps up with each one. If it stays level, you're keeping pace. If it
+                    sinks, you've slowed down, and a cliff is a death. The number by your dot is how much EXP you're ahead
+                    or behind. The line appears once you've played 6 minutes.
                   </p>
                   <p>
-                    On a map where you have a Personal Best, once you come within 10% of its pace, it joins as a gold
-                    line ending in a star and stays until you leave the map. Get above it and the gap is lit yellow; the
-                    number by your dot turns gold and counts against your best. Set a new best and the gold line moves
-                    up to it, so later on it shows how far you are from your best pace.
+                    On a map where you have a Personal Best, your best joins as a gold line ending in a star once you
+                    come within 10% of its pace. It stays until you leave the map. Get above it and the gap lights up
+                    yellow, and the number by your dot turns gold and counts against your best. Set a new best and the
+                    gold line moves up to it, so from then on it shows how far you are from your best pace.
                   </p>
                 </details>
                 <details class="qa" id="best-characters">
                   <summary>Are bests kept for each character?</summary>
                   <p>
-                    Yes. Minerva reads your character's name, level and job from the game's status bar, keeps each
-                    character's bests apart, and notes the level and job you had when you set each one. The Grind
-                    Tracker races the best of the character you're playing.
+                    Yes. Minerva reads your character's name, level and job from the game's status bar and keeps each
+                    character's bests separate. With each best, it notes the level and job you had when you set it. The
+                    Grind Tracker races the best of the character you're playing.
                   </p>
                   <p>
-                    Bests from before Minerva knew your characters, or set while it couldn't read the name, are
-                    <strong>Unassigned</strong>, and the Grind Tracker races those while no name is read. To hand them
-                    out, pick Unassigned in your Personal Bests, then <strong>Assign all to…</strong> and a character, or
-                    a visit's <strong>Move</strong> to move just that one, and click again to confirm. Every visit has a
-                    Move, in case Minerva misread the name when it was set.
+                    Bests set before Minerva knew your characters, or while it couldn't read the name, are
+                    <strong>Unassigned</strong>. The Grind Tracker races those while it can't read a name. To give them
+                    to a character, pick Unassigned in your Personal Bests. Then choose <strong>Assign all to…</strong>
+                    and a character, or a visit's <strong>Move</strong> to move just that visit, and click again to
+                    confirm. Every visit has a Move, in case Minerva misread the name when the best was set.
                   </p>
                   <p>
-                    Renamed a character? The new name shows up as a new character. Pick it, click
-                    <strong>Manage</strong>, choose <strong>Merge into…</strong> and the old name, and click again to
-                    confirm: its bests move across. To remove a character and all their bests, pick them, click
-                    <strong>Manage</strong>, then <strong>Remove</strong> twice. Neither can be undone, and both take the
-                    character off the <a href="#map-leaderboards">Map Leaderboards</a>. A best on a map that's no longer
-                    in the map list stays, marked "Not in the map list".
+                    If you rename a character, the new name shows up as a new character. Pick it, click
+                    <strong>Manage</strong>, choose <strong>Merge into…</strong> and the old name, then click again to
+                    confirm. Its bests move across to the old name. To remove a character and all their bests, pick
+                    them, click <strong>Manage</strong>, then click <strong>Remove</strong> twice. You can't undo either
+                    one, and both take the character off the <a href="#map-leaderboards">Map Leaderboards</a>. A best on
+                    a map that's no longer in the map list stays, marked "Not in the map list".
                   </p>
                 </details>
                 <details class="qa" id="every-best">
                   <summary>Where can I see my best on every map?</summary>
                   <p>
-                    Click the star on the Grind Tracker's bar to open your Personal Bests. It lists your best on every map
-                    for the character you're playing, highest first, with the map's mob levels, how close you came to its
-                    solo EXP/h ceiling (the <strong>?</strong> explains it) and when you set it; the higher of its
-                    <a href="#party-bests">Solo Best and Party Best</a>, with both shown under it if it has a Party
-                    Best. Switch to another
-                    character, or to Unassigned, at the top. Each best is a bar on the same scale; a notch is another of
-                    your visits there, and the dot is the visit you're on, moving as you play. Click a column to sort by
-                    it, or a map to open it on MeowDB.
+                    Click the star on the Grind Tracker's bar to open your Personal Bests. It lists the best of the
+                    character you're playing on every map, highest first. Each map shows the higher of its
+                    <a href="#party-bests">Solo Best and Party Best</a> (with both under it if it has a Party Best), the
+                    map's mob levels, how close you came to its solo EXP/h ceiling (the <strong>?</strong> explains it),
+                    and when you set it. Switch to another character, or to Unassigned, at the top.
+                  </p>
+                  <p>
+                    Each best is a bar, all on the same scale. A notch is another of your visits there, and the dot is
+                    the visit you're on, moving as you play. Click a column to sort by it, or a map to open it on MeowDB.
                   </p>
                 </details>
                 <details class="qa" id="visits">
                   <summary>Can I see each of my visits to a map?</summary>
                   <p>
-                    A map keeps each character's 10 best visits, and their best in each
-                    <a href="#level-bands">Level Band</a> even if it isn't among them, so levelling up never loses your
-                    best at lower levels. In your Personal Bests, click its count ("3 visits") to list them, best first,
-                    each with the level you set it at, its EXP per hour and its own bar, its share of the ceiling and its
-                    date, then a link to the map's <a href="#leaderboard-link">Map Leaderboard</a>. The visit you're on
-                    is marked "This visit", and joins your history when you leave the map; until then it can be removed,
-                    but not moved.
+                    Yes. A map keeps each character's 10 best visits, plus their best in each
+                    <a href="#level-bands">Level Band</a> even if it isn't among those 10. That way levelling up never
+                    loses your best at lower levels. In your Personal Bests, click a map's visit count ("3 visits") to
+                    list them, best first. Each shows the level you set it at, its EXP per hour and its own bar, its
+                    share of the ceiling and its date. A link to the map's <a href="#leaderboard-link">Map Leaderboard</a>
+                    follows them. The visit you're on is marked "This visit" and joins your history when you leave the
+                    map. Until then you can remove it, but not move it.
                   </p>
                 </details>
                 <details class="qa" id="remove-best">
                   <summary>A best came from a misreading. How do I remove it?</summary>
                   <p>
-                    On the Grind Tracker, the × beside the Best row removes it at once, with no undo, whether you set it
-                    on this visit or an earlier one, and your next-best visit takes over. In your Personal Bests, click a visit's ×, then
-                    "Remove?" to confirm, the visit you're on included. Once this visit's best is removed, only the 5
-                    minutes after it count towards a new one, so the misreading isn't counted again.
+                    On the Grind Tracker, click the × beside the Best row. It removes the best at once, whether you set it
+                    on this visit or an earlier one, and you can't undo it. Your next-best visit takes over. In your
+                    Personal Bests, click a visit's ×, then "Remove?" to confirm. That works for the visit you're on too.
+                    Once this visit's best is removed, only the 5 minutes after it count towards a new one, so the
+                    misreading isn't counted again.
                   </p>
                 </details>
                 <details class="qa" id="bests-window">
                   <summary>Can I move the Personal Bests window?</summary>
                   <p>
-                    Yes. It opens in the middle of the game; drag it by its bar and it opens where you left it next time.
-                    It keeps up as you play, shows and hides with the panel, and closes with the star or its ×.
+                    Yes. It opens in the middle of the game. Drag it by its bar, and next time it opens where you left it.
+                    It updates as you play, shows and hides with the panel, and closes with the star or its ×.
                   </p>
                 </details>
               </div>
@@ -1020,16 +1067,21 @@
                 <details class="qa" id="map-leaderboards">
                   <summary>What are the Map Leaderboards?</summary>
                   <p>
-                    A page on this site for each map, ranking players' Personal Bests from Minerva, so you can see what
+                    Each map has a page on this site that ranks players' Personal Bests from Minerva, so you can see what
                     EXP per hour others at your level get there. Each <a href="#level-bands">Level Band</a> is ranked
-                    separately and shows its top 50, with each character's name, job, level, EXP per hour and date, and
-                    a bar showing how far behind #1 they are. A <strong>Party</strong> mark in gold is on an entry
-                    that is a <a href="#party-bests">Party Best</a>, and <strong>Both</strong>, <strong>Solo</strong>
-                    and <strong>Party</strong> choose which entries are ranked: both, each character once by their
-                    higher best; or only Solo Bests, or only Party Bests. On the
-                    <a href="/leaderboards/">Map Leaderboards</a> page, <a href="#where-to-train">Where to train</a>
-                    lists the maps for your Level Band, you can find a map by its name, and <strong>Latest</strong>
-                    lists the newest bests on every map. Click a character's name to see
+                    separately and shows its top 50. An entry shows the character's name, job, level, EXP per hour and
+                    date, and a bar showing how far behind #1 they are.
+                  </p>
+                  <p>
+                    An entry that is a <a href="#party-bests">Party Best</a> has a gold <strong>Party</strong> mark.
+                    <strong>Both</strong>, <strong>Solo</strong> and <strong>Party</strong> choose which entries are
+                    ranked. Both ranks each character once, by their higher best. Solo ranks only Solo Bests, and Party
+                    only Party Bests.
+                  </p>
+                  <p>
+                    On the <a href="/leaderboards/">Map Leaderboards</a> page, <a href="#where-to-train">Where to train</a>
+                    lists the maps for your Level Band. You can also find a map by its name there, and
+                    <strong>Latest</strong> lists the newest bests on every map. Click a character's name to see
                     <a href="#character-page">all their bests</a>.
                   </p>
                 </details>
@@ -1037,13 +1089,16 @@
                   <summary>How does Where to train pick a Level Band's maps?</summary>
                   <p>
                     Pick your <a href="#level-bands">Level Band</a> on the <a href="/leaderboards/">Map Leaderboards</a>
-                    page, and it lists each map whose mobs are at those levels, and any map someone has an entry on in
-                    that band. A map's mobs are the middle half of its spawns, so one stray mob far above or below the
-                    rest doesn't put it in another band. Beside each map are those mobs' levels, the band's best EXP per
-                    hour there and who set it, and how many entries it has. The maps with entries come first, the best
-                    first, and a band with more than 20 maps shows its first 15: <strong>Show all</strong> lists the
-                    rest. Pick an area, by the same emblem the game's minimap shows beside the map's name, to see only
-                    its maps. <strong>Solo</strong> and <strong>Party</strong> rank only Solo Bests or only Party Bests
+                    page. Where to train lists each map whose mobs are at those levels, plus any map where someone has an
+                    entry in that band. It counts a map's mobs as the middle half of its spawns, so one stray mob far
+                    above or below the rest doesn't put the map in another band.
+                  </p>
+                  <p>
+                    Beside each map are those mobs' levels, the band's best EXP per hour there and who set it, and how
+                    many entries the map has. Maps with entries come first, best first. A band with more than 20 maps
+                    shows its first 15, and <strong>Show all</strong> lists the rest. To see only one area's maps, pick
+                    the area by its emblem, the same one the game's minimap shows beside the map's name.
+                    <strong>Solo</strong> and <strong>Party</strong> rank only Solo Bests or only Party Bests
                     (<a href="#party-bests">what those are</a>), and a best set in a party has a gold
                     <strong>Party</strong> mark.
                   </p>
@@ -1051,23 +1106,23 @@
                 <details class="qa" id="level-bands">
                   <summary>What's a Level Band?</summary>
                   <p>
-                    Ten levels of a Map Leaderboard: 1–9, 10–19, 20–29 and on, so you're ranked against players near
-                    your level. An entry is one character's best visit to the map at those levels, of one kind (their
-                    <a href="#party-bests">Solo Best or Party Best</a>), so a character that levels up can have an entry
-                    in each band, and a character with both kinds has two there. The highest EXP per hour ranks first; on a tie, whoever
-                    set it first.
+                    Ten levels of a Map Leaderboard, ranked on their own: 1–9, 10–19, 20–29 and so on. That way you're
+                    ranked against players near your level. An entry is one character's best visit to the map at those levels,
+                    of one kind (their <a href="#party-bests">Solo Best or Party Best</a>). So a character that levels up
+                    can have an entry in each band, and a character with both kinds has two entries in a band. The
+                    highest EXP per hour ranks first. On a tie, whoever set it first ranks higher.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-exp">
                   <summary>What does the EXP per hour on the Map Leaderboards count?</summary>
                   <p>
-                    The <a href="#personal-bests">Personal Best</a> as Minerva counted it: everything the EXP bar gained,
-                    at its best over 5 minutes of play on the map. It's raw, so EXP events and buffs aren't told apart:
-                    Minerva can't see them, and the site has no tag for you to set. Party play is told apart, since
-                    Minerva sees a partymate's EXP: your <a href="#party-bests">Solo Best and Party Best</a> are entries
-                    of their own, and the Map Leaderboards rank them together (each character by their higher one) or
-                    apart. Only a figure over 5 times the map's solo EXP/h ceiling is kept off, of either kind, as one
-                    no map gives.
+                    The <a href="#personal-bests">Personal Best</a> as Minerva counted it: everything the EXP bar gained
+                    during the best 5 minutes of play on the map. It's raw. Minerva can't see EXP events or buffs, and the
+                    site has no tag for you to set, so they aren't told apart. Party play is told apart, because Minerva
+                    sees a partymate's EXP. Your <a href="#party-bests">Solo Best and Party Best</a> are separate entries,
+                    and the Map Leaderboards rank them together (each character by their higher one) or apart. The only
+                    figure kept off is one over 5 times the map's solo EXP/h ceiling, of either kind, since no map gives
+                    that much.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-appear">
@@ -1075,126 +1130,150 @@
                   <p>
                     A new character is on them already. <strong>Share</strong>, the switch under their name in your
                     <a href="#every-best">Personal Bests</a>, starts on for every character Minerva meets for the first
-                    time. A character Minerva knew before sharing was on by default starts off: pick them and click
-                    <strong>Share</strong> to turn it on. Minerva uploads the character's Solo Best and Party Best on each map in each
-                    <a href="#level-bands">Level Band</a> as entries of their own, then each new best when its visit ends. Removing, moving or
-                    merging visits updates the site too.
+                    time. For a character Minerva knew before sharing was on by default, it starts off: pick them and
+                    click <strong>Share</strong> to turn it on. Minerva uploads the character's Solo Best and Party Best
+                    on each map in each <a href="#level-bands">Level Band</a> as separate entries, then each new best when
+                    its visit ends. Removing, moving or merging visits updates the site too.
                   </p>
                   <p>
-                    Unassigned bests are never uploaded, and nor are bests set before Minerva recorded the date, level
-                    and job; a character with only those has no switch yet. Beside the switch, Minerva says when the last
-                    upload went through. If one fails, because you're offline for instance, a note above your bests says
-                    so and Minerva retries by itself; <strong>Send again</strong> retries straight away.
+                    Minerva never uploads Unassigned bests, or bests set before it recorded the date, level and job. A
+                    character with only those has no switch yet. Beside the switch, Minerva says when the last upload
+                    went through. If an upload fails, because you're offline for instance, a note above your bests says
+                    so and Minerva retries automatically. <strong>Send again</strong> retries straight away.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-public">
                   <summary>What does the site show of me?</summary>
                   <p>
-                    For each entry: your character's name and job, the exact level they set it at, the EXP per hour, the
-                    date, and whether it's a Party Best, for everyone to see. Nothing else about you or your PC goes, and you need no account. Instead Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the
-                    first time it uploads, which ties your character's name to it, so no one else can upload under that
-                    name. The site keeps only a scrambled form (a hash) of the key, and you never need to see it.
-                    The newest bests on every map are also listed in <strong>Latest</strong> on the Map Leaderboards
-                    page, each with its map. Taking a map's top spot off someone else is marked there, and
+                    For each entry, everyone can see your character's name and job, the exact level they set it at, the
+                    EXP per hour, the date, and whether it's a Party Best. Nothing else about you or your PC goes to the
+                    site, and you don't need an account.
+                  </p>
+                  <p>
+                    Instead, Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the first time it
+                    uploads. The key ties your character's name to it, so no one else can upload under that name. The
+                    site keeps only a scrambled form of the key (a hash), and you never need to see it.
+                  </p>
+                  <p>
+                    <strong>Latest</strong>, on the Map Leaderboards page, also lists the newest bests on every map, each
+                    with its map. When an entry takes a map's top spot from someone else, Latest marks it, and it's
                     <a href="#leaderboard-discord">posted in Minerva's Discord</a>.
                   </p>
                   <p>
-                    Beside your character's name is their portrait from <a href="https://classicrank.com">ClassicRank</a>,
-                    if it has one: the site asks ClassicRank for it by name, and your browser loads it from
-                    classicrank.com. A question mark means ClassicRank has no photo of them, or hasn't been asked yet; point
-                    at it to see which. Hide your character on
-                    ClassicRank and their portrait goes from the Map Leaderboards within a day.
+                    If your character has a portrait on <a href="https://classicrank.com">ClassicRank</a>, it shows
+                    beside their name. The site asks ClassicRank for it by name, and your browser loads it from
+                    classicrank.com. A question mark means ClassicRank has no photo of them, or hasn't been asked yet.
+                    Point at it to see which. If you hide your character on ClassicRank, their portrait goes from the Map
+                    Leaderboards within a day.
                   </p>
                 </details>
                 <details class="qa" id="character-page">
                   <summary>Can others see all my character's bests in one place?</summary>
                   <p>
-                    Yes. Click a character's name anywhere on the Map Leaderboards and their page lists every entry they
-                    have, a <a href="#level-bands">Level Band</a> at a time, each with its rank and a link to it on its
-                    map. Over them are their job and level as their newest best says, how many #1s and top-3 places they
-                    hold, how many maps they're on, and their best EXP per hour. Each Level Band of a map counts on its
-                    own, however few entries it has. A <a href="#party-bests">Party Best</a> has the gold Party mark
-                    and is ranked among the Party Bests, a Solo Best among the Solo Bests, so a character can have both
-                    on a map. It shows only what their entries already show map by map, and
-                    their portrait from ClassicRank with a link to their profile there, and nothing ties it to your
-                    other characters or your Discord.
-                    <a href="#leaderboard-remove">Taking the character off</a> takes their page with them.
+                    Yes. Click a character's name anywhere on the Map Leaderboards to open their page. It lists every
+                    entry they have, one <a href="#level-bands">Level Band</a> at a time, each with its rank and a link to
+                    it on its map. At the top are their job and level from their newest best, how many #1s and top-3
+                    places they hold, how many maps they're on, and their best EXP per hour. Each Level Band of a map
+                    counts separately, however few entries it has.
+                  </p>
+                  <p>
+                    A <a href="#party-bests">Party Best</a> has the gold Party mark and is ranked among the Party Bests,
+                    and a Solo Best among the Solo Bests, so a character can have both on a map.
+                  </p>
+                  <p>
+                    The page shows only what their entries already show map by map, plus their ClassicRank portrait with
+                    a link to their profile there. Nothing on it ties the character to your other characters or your
+                    Discord. <a href="#leaderboard-remove">Taking the character off</a> removes their page too.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-discord">
                   <summary>My character's name turned up in Minerva's Discord. Why?</summary>
                   <p>
-                    When one of your uploads takes a map's Solo or Party top spot off someone else, Minerva's
-                    <a href="https://discord.gg/NnbnVWkRrF">Discord</a> posts it in <strong>#map-leaderboards</strong>:
-                    the map, by its name and its Map Mark if it has one, and your character's name, the Level Band, the EXP per hour
-                    (with "in a party" if the entry is a <a href="#party-bests">Party Best</a>) and whose spot it was,
-                    with your character's portrait from ClassicRank if they have one.
-                    Each kind has its own top spot, so a Solo Best can take one even below the Party board's top rate. That's all from the entry itself, so it says nothing the Map Leaderboards
-                    <a href="#leaderboard-public">don't already show</a>, and it never pings anyone. Only a spot taken
-                    is posted: the first entry in a Level Band nobody had one in, and beating your own best, both go
-                    unsaid. <a href="#leaderboard-remove">Taking your character off</a> stops it, since a character
-                    that isn't on the Map Leaderboards is never posted.
+                    When one of your uploads takes a map's Solo or Party top spot from someone else, Minerva's
+                    <a href="https://discord.gg/NnbnVWkRrF">Discord</a> posts it in <strong>#map-leaderboards</strong>.
+                    The post gives the map's name and its Map Mark if it has one, your character's name, the Level Band,
+                    the EXP per hour (with "in a party" if the entry is a <a href="#party-bests">Party Best</a>) and whose
+                    spot it was. It also shows your character's portrait from ClassicRank if they have one.
+                  </p>
+                  <p>
+                    Solo and Party each have their own top spot, so a Solo Best can take one even if it's below the top
+                    Party rate. Everything in the post comes from the entry itself, so it says nothing the Map
+                    Leaderboards <a href="#leaderboard-public">don't already show</a>, and it never pings anyone.
+                  </p>
+                  <p>
+                    Only a taken spot is posted. The first entry in a Level Band nobody had one in isn't posted, and
+                    neither is beating your own best. <a href="#leaderboard-remove">Taking your character off</a> stops
+                    the posts, since a character that isn't on the Map Leaderboards is never posted.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-remove">
                   <summary>How do I take my character off the Map Leaderboards?</summary>
                   <p>
-                    Click <strong>Share</strong> under the character's name in your Personal Bests to turn it off: every
-                    entry of the character is deleted from the site, and it stays off. Removing the character from your
-                    Personal Bests, or merging them into another, takes them off too. The name stays yours, so you can put them back any time. A single
-                    best that came from a bug goes when you remove that visit.
+                    Click <strong>Share</strong> under the character's name in your Personal Bests to turn it off. Every
+                    entry of theirs is deleted from the site, and sharing stays off. Removing the character from your
+                    Personal Bests, or merging them into another, takes them off too. The name stays yours, so you can
+                    put them back any time. To remove a single best that came from a bug, remove that visit.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-claimed">
-                  <summary>It says another Minerva holds my character's name. What now?</summary>
+                  <summary>It says another copy of Minerva holds my character's name. What now?</summary>
                   <p>
                     A name belongs to the Leaderboard Key that uploaded it first. If that was you, on a PC you've since
-                    reinstalled or replaced, your old key went with it. If your old PC was
-                    <a href="#link-discord">linked to Discord</a>, click <strong>link this one</strong> on the note in your
-                    Personal Bests and link this PC to the same Discord: your uploads go through again by themselves.
-                    Otherwise, ask on <a href="https://discord.gg/NnbnVWkRrF">Minerva's Discord</a>, with the character's
-                    name: once Minerva has tried to upload from your new PC, the maintainer can hand the name to its key.
-                    Then click <strong>Send again</strong> on the note, and your uploads go through again. To keep your
-                    names when you move PCs, link Discord, or copy <code>leaderboard-key</code> across
-                    (<a href="#kept">where Minerva keeps its files</a>).
+                    reinstalled or replaced, your old key went with that PC.
+                  </p>
+                  <p>
+                    If your old PC was <a href="#link-discord">linked to Discord</a>, click <strong>link this one</strong>
+                    on the note in your Personal Bests and link this PC to the same Discord. Your uploads then go through
+                    again on their own.
+                  </p>
+                  <p>
+                    Otherwise, ask on <a href="https://discord.gg/NnbnVWkRrF">Minerva's Discord</a> and give the
+                    character's name. Once Minerva has tried to upload from your new PC, the maintainer can hand the name
+                    to its key. Then click <strong>Send again</strong> on the note, and your uploads go through again.
+                  </p>
+                  <p>
+                    To keep your names when you move to a new PC, link Discord, or copy <code>leaderboard-key</code>
+                    across (<a href="#kept">where Minerva keeps its files</a>).
                   </p>
                 </details>
                 <details class="qa" id="link-discord">
                   <summary>What does Link Discord do?</summary>
                   <p>
                     It links this PC to your Discord on owlofminerva.app, so your characters' names on the Map Leaderboards
-                    follow you to a new PC. In your Personal Bests, beside a character's <strong>Share</strong>, click
-                    <strong>Link Discord</strong>: your browser opens the site, which signs you in with Discord and asks
-                    before it links this PC. Then on a new PC, or after reinstalling Windows, link that one to the same
-                    Discord, and it can upload your characters again, with no need to ask anyone. Your Personal Bests then
-                    say <strong>Linked to Discord as</strong> your username.
+                    follow you to a new PC. In your Personal Bests, click <strong>Link Discord</strong> beside a
+                    character's <strong>Share</strong>. Your browser opens the site, which signs you in with Discord and
+                    asks before it links this PC. Your Personal Bests then say <strong>Linked to Discord as</strong> your
+                    username. On a new PC, or after reinstalling Windows, link that PC to the same Discord and it can
+                    upload your characters again. You don't need to ask anyone.
                   </p>
                   <p>
-                    The site keeps your Discord user ID and username, and shows neither. It's optional: Minerva uploads
-                    just the same without it. At <a href="/account/">your account</a> on the site you can unlink a PC (one
-                    you sold, say) or delete the account; your characters stay on the Map Leaderboards either way. Link
-                    before you need it: a PC that was never linked can't hand its names on, and then the maintainer
-                    <a href="#leaderboard-claimed">does it by hand</a>.
+                    The site keeps your Discord user ID and username, and shows neither. Linking is optional, and Minerva
+                    uploads the same way without it. At <a href="/account/">your account</a> on the site you can unlink a
+                    PC (one you sold, say) or delete the account. Your characters stay on the Map Leaderboards either
+                    way. Link before you need it. A PC that was never linked can't hand its names on, so the maintainer
+                    has to <a href="#leaderboard-claimed">do it by hand</a>.
                   </p>
                 </details>
                 <details class="qa" id="leaderboard-link">
                   <summary>Where's my character's entry?</summary>
                   <p>
-                    In your Personal Bests, click a map's count of visits: under its visits, <strong>Map
-                    Leaderboard</strong> opens the map's page at the Level Band of the character you're playing, marks
-                    your entry and says its rank, even outside the top 50. If it says your character has no entry there,
-                    they haven't put a best there yet, or the entry has gone: taken off the Map Leaderboards, or
-                    removed after a report. If the site
-                    kept one of your bests off, as over 5 times the map's solo EXP/h or removed after a report, a note
+                    In your Personal Bests, click a map's visit count. Under the visits, <strong>Map Leaderboard</strong>
+                    opens the map's page at the Level Band of the character you're playing. It marks your entry and gives
+                    its rank, even outside the top 50.
+                  </p>
+                  <p>
+                    If the page says your character has no entry there, either they haven't put a best there yet, or the
+                    entry is gone: taken off the Map Leaderboards, or removed after a report. If the site kept one of your
+                    bests off, because it was over 5 times the map's solo EXP/h or was removed after a report, a note
                     above your bests says so.
                   </p>
                 </details>
                 <details class="qa" id="report-entry">
                   <summary>An entry can't be right. What can I do?</summary>
                   <p>
-                    Report it: each entry has a flag, Report, at the end of its row. Say what's wrong if you like, and send it.
-                    Minerva's maker reads the reports, and removes an entry that can't be right. Your own entry, the one
-                    your Map Leaderboard link stars, has no Report: to take it off, see
+                    Report it. Each entry has a Report flag at the end of its row. Say what's wrong if you like, and send
+                    it. Minerva's maker reads the reports and removes any entry that can't be right. Your own entry, the
+                    one your Map Leaderboard link stars, has no Report flag. To take it off, see
                     <a href="#leaderboard-remove">taking your character off</a>.
                   </p>
                 </details>
@@ -1216,17 +1295,18 @@
                   <summary>How do I open an Item Card?</summary>
                   <p>
                     Hover an item in the game until its tooltip shows, then press <kbd>Ctrl+Shift+I</kbd>. Minerva reads
-                    the name in the tooltip nearest the pointer, the inventory's or any window's drawn the same way, and
-                    shows the card at the pointer. Or find the item in <a href="#search">search</a> and pick it: its card
-                    opens beside the panel.
+                    the name in the tooltip nearest the pointer and shows the card at the pointer. That works for the
+                    inventory's tooltips and any window's drawn the same way. You can also find the item in
+                    <a href="#search">search</a> and pick it, and its card opens beside the panel.
                   </p>
                 </details>
                 <details class="qa" id="shop-price">
                   <summary>What does "Shop pays" mean?</summary>
                   <p>
-                    What an NPC shop pays for one. When a shop won't buy the item, the card says so, as it does for a Cash
-                    item. It's not known for scrolls, starter gear and arrows, which the game's data gives no price for, nor
-                    for throwing stars and bullets until a sale in the game confirms what a shop pays.
+                    It's what an NPC shop pays for one. When a shop won't buy the item, the card says so, as it does for a
+                    Cash item. The price isn't known for scrolls, starter gear and arrows, because the game's data gives
+                    no price for them. For throwing stars and bullets, it isn't known until a sale in the game confirms
+                    what a shop pays.
                   </p>
                 </details>
                 <details class="qa" id="market-prices">
@@ -1234,10 +1314,11 @@
                   <p>
                     <b>Going rate</b> and <b>Cheapest now</b> come from
                     <a href="https://maplestory.market">maplestory.market</a>, which scans the Free Market's stores about
-                    once an hour. The Going rate is what the item sold for on average over 3 days, or, with too few sales,
-                    the middle of what it's listed at; Cheapest now is the cheapest listing for one. Hover either for what
-                    it's based on and when it was seen. For equipment they cover every copy, whatever its stats. The
-                    button by Market, or "Prices from maplestory.market" under the lines, opens the item's page there.
+                    once an hour. The Going rate is what the item sold for on average over 3 days. If there were too few
+                    sales, it's the middle of the item's listed prices instead. Cheapest now is the cheapest listing for
+                    one. Hover either price to see what it's based on and when it was seen. For equipment, both cover
+                    every copy, whatever its stats. The button by Market, or "Prices from maplestory.market" under the
+                    lines, opens the item's page on maplestory.market.
                   </p>
                   <p>
                     Any lines below them are your own <a href="#market-lines">market lines</a>, with prices you keep.
@@ -1246,57 +1327,61 @@
                 <details class="qa" id="market-sent">
                   <summary>What does Minerva send to get the prices?</summary>
                   <p>
-                    The item numbers of the card you open, and of the listings in a Player Shop while the Deal Finder
-                    compares with maplestory.market's prices, to owlofminerva.app, which asks maplestory.market for them.
-                    Nothing else. The prices are kept only while Minerva runs. To turn them off, untick
-                    <b>Prices from maplestory.market</b> in Settings, the gear at the top of the panel: Minerva asks for
-                    none, and the cards show only your own lines.
+                    Item numbers, to owlofminerva.app, which asks maplestory.market for their prices. Minerva sends the
+                    item number of each card you open, and of the listings in a Player Shop while the Deal Finder compares
+                    them with maplestory.market's prices. It sends nothing else, and keeps the prices only while it runs.
+                  </p>
+                  <p>
+                    To turn this off, untick <b>Prices from maplestory.market</b> in Settings (the gear at the top of the
+                    panel). Minerva then asks for no prices, and the cards show only your own lines.
                   </p>
                 </details>
                 <details class="qa" id="set-price">
                   <summary>How do I set a market price?</summary>
                   <p>
-                    Click a price, or "Not set", and type it as players write it: 450,000, 450k or 1.2m. <kbd>Enter</kbd>
-                    keeps it, <kbd>Esc</kbd> leaves it as it was, and an empty field clears it. It's saved with the day you
-                    set it, which its tooltip shows, and the next card for that item shows it.
+                    Click a price, or "Not set", and type it the way players write it: 450,000, 450k or 1.2m.
+                    <kbd>Enter</kbd> keeps it, <kbd>Esc</kbd> leaves it as it was, and an empty field clears it. Minerva
+                    saves it with the day you set it, which its tooltip shows, and the next card for that item shows it.
                   </p>
                 </details>
                 <details class="qa" id="market-lines">
                   <summary>Can I keep more than one price for each item?</summary>
                   <p>
-                    Yes. Click the <b>+</b> by Market and name a new line, such as the price you mean to sell at: every
-                    card lists it from then on, under maplestory.market's, with its own price for each item. Click a line's
-                    name to rename it, or to remove it with the bin beside it; the card asks first, saying how many items'
-                    prices go with it.
+                    Yes. Click the <b>+</b> by Market and name a new line, such as the price you mean to sell at. From then
+                    on, every card lists it under maplestory.market's prices, with its own price for each item. Click a
+                    line's name to rename it, or to remove it with the bin beside it. The card asks first, and says how
+                    many items' prices go with it.
                   </p>
                 </details>
                 <details class="qa" id="shared-name">
                   <summary>Why does the card ask me to pick an item?</summary>
                   <p>
-                    Some items that don't look alike share a name: Blue Moon is a top and an earring. The card lists them
-                    with their pictures and kinds: click the one your tooltip shows.
+                    Some items that look different share a name. Blue Moon, for example, is both a top and an earring.
+                    The card lists them with their pictures and kinds, so click the one your tooltip shows.
                   </p>
                 </details>
                 <details class="qa" id="move-card">
                   <summary>How do I move or close an Item Card?</summary>
                   <p>
-                    Drag it by its bar: it stays there until it closes, and the next card opens at the pointer again. Close
-                    it with its ×, or press <kbd>Ctrl+Shift+I</kbd> again: over another item for that item's card, anywhere
-                    else to close it. One card shows at a time, and clicks on it never reach the game.
+                    Drag it by its bar. It stays there until it closes, and the next card opens at the pointer again. To
+                    close it, click its ×, or press <kbd>Ctrl+Shift+I</kbd> again anywhere but over another item. Over
+                    another item, the same key opens that item's card instead. One card shows at a time, and clicks on it
+                    never reach the game.
                   </p>
                 </details>
                 <details class="qa" id="card-keyboard">
                   <summary>Does typing a price take the keyboard from the game?</summary>
                   <p>
-                    While you type a price or a line's name, the card has the keyboard. Clicking back into the game gives it
-                    back, keeping what you typed.
+                    Yes, while you type a price or a line's name. Clicking back into the game gives the keyboard back to
+                    the game, and what you typed is kept.
                   </p>
                 </details>
                 <details class="qa" id="no-card">
                   <summary>Why didn't a card show?</summary>
                   <p>
-                    The owl at the top centre of the game window says why: no tooltip by the pointer, a name it couldn't
-                    read, a Minerva window covering the name, no item of that name, or the item data not loaded yet.
+                    The owl at the top centre of the game window says why. There may have been no tooltip by the pointer,
+                    a name Minerva couldn't read, a Minerva window covering the name, or no item of that name. Or the
+                    item data may not have loaded yet.
                   </p>
                 </details>
               </div>
@@ -1306,32 +1391,32 @@
                 <details class="qa" id="item-lookup">
                   <summary>Which name does Item Lookup read?</summary>
                   <p>
-                    The one on the tooltip's line with the blue dot, so a crafted item's maker isn't taken for it. It opens
-                    a page only when MeowDB has an item of that name, allowing for letters the reading confuses, such as I
-                    and l. Clicking an Item Card's name opens the same page.
+                    The name on the tooltip's line with the blue dot, so a crafted item's maker isn't mistaken for the
+                    item. Item Lookup opens a page only when MeowDB has an item of that name. It allows for letters that
+                    are easy to misread, such as I and l. Clicking an Item Card's name opens the same page.
                   </p>
                 </details>
                 <details class="qa" id="lookup-alert">
                   <summary>What does the owl say after Item Lookup?</summary>
                   <p>
-                    What came of it, in a speech bubble at the top centre of the game window: the page it opened, or why
-                    nothing opened: no tooltip by the pointer, a name it couldn't read, a Minerva window covering the name,
-                    no MeowDB item of that name, or MeowDB out of reach. It goes after a few seconds, and clicks pass
-                    through it to the game.
+                    How it went, in a speech bubble at the top centre of the game window. It names the page it opened, or
+                    says why nothing opened: no tooltip by the pointer, a name it couldn't read, a Minerva window covering
+                    the name, no MeowDB item of that name, or MeowDB out of reach. The bubble goes after a few seconds,
+                    and clicks pass through it to the game.
                   </p>
                 </details>
                 <details class="qa" id="lookup-pick">
                   <summary>What if several MeowDB items share the name?</summary>
                   <p>
-                    The owl lists them with their categories for you to pick, and stays half a minute. From an Item
-                    Card's name, the one of the card's kind opens if MeowDB has just one.
+                    The owl lists them with their categories so you can pick one, and stays for half a minute. If you
+                    clicked an Item Card's name and MeowDB has just one item of the card's kind, that one opens.
                   </p>
                 </details>
                 <details class="qa" id="item-keys-off">
                   <summary>Can I use the Item Card or Item Lookup without its hotkey?</summary>
                   <p>
-                    No: they have no button, so turning off their hotkey turns them off. <a href="#search">Search</a> still
-                    opens any item's card, and its name still opens its MeowDB page.
+                    No. They have no button, so turning off their hotkey turns them off. <a href="#search">Search</a> still
+                    opens any item's card, and the card's name still opens the item's MeowDB page.
                   </p>
                 </details>
               </div>
@@ -1341,61 +1426,66 @@
                 <details class="qa" id="deal-finder">
                   <summary>How do I find the deals in a Player Shop?</summary>
                   <p>
-                    Press <kbd>Ctrl+Shift+D</kbd>, or click the price tag at the top of the panel, and open a shop. A
-                    badge shows to the left of each listing and follows as you scroll. It stays on until you press the
-                    key or click the tag again, or press <strong>Turn off</strong> in the panel. It starts off each time
-                    you open Minerva, and while it's on, the folded panel's owl holds a magnifying glass.
+                    Press <kbd>Ctrl+Shift+D</kbd>, or click the price tag at the top of the panel, then open a shop. A
+                    badge shows to the left of each listing and follows it as you scroll. The Deal Finder stays on until
+                    you press the key or click the tag again, or press <strong>Turn off</strong> in the panel. It starts
+                    off each time you open Minerva. While it's on, the folded panel's owl holds a magnifying glass.
                   </p>
                 </details>
                 <details class="qa" id="deal-line">
                   <summary>What does the Deal Finder compare prices with?</summary>
                   <p>
-                    The <b>Deal Line</b>: maplestory.market's <a href="#market-prices">Going rate</a> unless you choose
-                    otherwise in Settings, the gear at the top of the panel, under Deal Finder: Cheapest now, or one of
-                    your <a href="#market-lines">market lines</a>. A listing of several
-                    is judged by the price of one: 10 for 6,800 mesos is 680 each. Throwing stars and bullets are judged by
-                    the listing's whole price, since its number is how many the set holds. To count only bigger savings, set the
-                    <b>Deal Margin</b> in Settings, the gear at the top of the panel: at 10%, a deal is at least 10% below
-                    the line.
+                    The <b>Deal Line</b>. That's maplestory.market's <a href="#market-prices">Going rate</a>, unless you
+                    pick Cheapest now or one of your <a href="#market-lines">market lines</a> instead. You'll find the
+                    choice under Deal Finder in Settings, the gear at the top of the panel.
+                  </p>
+                  <p>
+                    A listing of several is judged by the price of one: 10 for 6,800 mesos is 680 each. Throwing stars
+                    and bullets are judged by the listing's whole price, since their number is how many the set holds.
+                    To count only bigger savings, set the <b>Deal Margin</b> in Settings. At 10%, a deal has to be at
+                    least 10% below the line.
                   </p>
                 </details>
                 <details class="qa" id="deal-badges">
                   <summary>What do the Deal Finder's badges mean?</summary>
                   <p>
                     A coloured badge is a deal. It says how far under the Deal Line the listing is, and the line's price,
-                    such as −32% · 1,470. The colour grades it the way the game grades items: blue for a good deal, purple
-                    for a great one (20% or more under), gold for a steal (40% or more). A pale badge isn't a deal, and
-                    says how far over it is, such as +12%. The bar along each badge's bottom edge shows the price against
-                    the Deal Line, the notch in the middle, so you can spot the biggest deals down the column. Click any
-                    badge to open the item's card.
+                    such as −32% · 1,470. The colour grades the deal the way the game grades items: blue for a good deal,
+                    purple for a great one (20% or more under), gold for a steal (40% or more). A pale badge isn't a deal,
+                    and says how far over the line the listing is, such as +12%. The bar along each badge's bottom edge
+                    shows the price against the Deal Line, which is the notch in the middle, so you can spot the biggest
+                    deals down the column. Click any badge to open the item's card.
                   </p>
                   <p>
-                    <b>no price</b> means the Deal Line has no price for the item: maplestory.market has none, or, on
-                    a line of yours, click it to set one. <b>?</b> means
-                    Minerva couldn't read the listing for sure, such as a name the shop cut short that could be several
-                    items, and it won't guess. A scroll cut short is usually named anyway, by the colour of its
-                    picture, which tells Lesser, Intermediate, Greater and Chaos apart. For the rest, hover the listing
-                    until the game shows its tooltip, and the badge judges the item the tooltip names until the list
-                    changes. While the pointer or a tooltip covers a listing, its
-                    badge fades and keeps its last reading, with an orange dot, until the list changes. Equipment is
-                    judged by its name alone, as the shop doesn't show its stats.
+                    <b>no price</b> means the Deal Line has no price for the item. Either maplestory.market has none, or
+                    the line is one of yours and you can click the badge to set one. <b>?</b> means Minerva couldn't read
+                    the listing for sure and won't guess, for example when the shop cut a name short and it could be
+                    several items.
+                  </p>
+                  <p>
+                    A scroll whose name is cut short is usually named anyway, from the colour of its picture, which tells
+                    Lesser, Intermediate, Greater and Chaos apart. For other listings, hover the listing until the game
+                    shows its tooltip. The badge then judges the item the tooltip names until the list changes. While the
+                    pointer or a tooltip covers a listing, its badge fades and keeps its last reading, with an orange
+                    dot, until the list changes. Equipment is judged by its name alone, since the shop doesn't show its
+                    stats.
                   </p>
                 </details>
                 <details class="qa" id="deal-whole-shop">
                   <summary>Does the Deal Finder read the whole shop?</summary>
                   <p>
-                    It reads the listings on screen, and you scroll for the rest: Minerva never clicks or scrolls for you.
+                    It reads the listings on screen, and you scroll for the rest. Minerva never clicks or scrolls for you.
                     Sold-out listings get no badge. It finds the shop wherever its window is, so you can drag it, at any
-                    window size. It reads best with the game's UI size set to <b>Default Ratio</b>: with
-                    <b>Ideal Ratio</b>, a listing now and then reads less reliably. It reads Player Shops; Hired Merchants
-                    aren't read yet.
+                    window size. It reads best with the game's UI size set to <b>Default Ratio</b>. With
+                    <b>Ideal Ratio</b>, a listing now and then reads less reliably. It reads Player Shops, but not Hired
+                    Merchants yet.
                   </p>
                 </details>
                 <details class="qa" id="deal-key-off">
                   <summary>Can I use the Deal Finder without its hotkey?</summary>
                   <p>
-                    Yes: the price tag at the top of the panel turns it on and off, as its hotkey does, and stays pressed
-                    while it's on. Turn off its hotkey in Settings, and the tag still works.
+                    Yes. The price tag at the top of the panel turns it on and off just as its hotkey does, and stays
+                    pressed while it's on. If you turn off its hotkey in Settings, the tag still works.
                   </p>
                 </details>
               </div>
@@ -1424,8 +1514,8 @@
                 <details class="qa" id="minimap-not-found">
                   <summary>The panel says "Can't find the minimap's title". What now?</summary>
                   <p>
-                    No minimap title has been found for 10 seconds, so the panel keeps the last map it showed. Open the
-                    minimap, or expand it if you collapsed it to its bar, and keep it out from under other windows:
+                    Minerva hasn't found a minimap title for 10 seconds, so the panel keeps showing the last map it
+                    found. Open the minimap, or expand it if you collapsed it to its bar, and keep other windows off it.
                     Minerva finds it wherever it is, within a second or two. If the minimap is showing and the panel still
                     can't find it, <a href="#bug-reports">send a Bug Report</a>.
                   </p>
@@ -1434,7 +1524,7 @@
                   <summary>Why doesn't the panel show?</summary>
                   <p>
                     It shows only while the game is open and not minimised, and the game or one of Minerva's windows is in
-                    front: click into the game. Screen capture can't see exclusive fullscreen, so play windowed or
+                    front. Click into the game. Screen capture can't see exclusive fullscreen, so play windowed or
                     borderless.
                   </p>
                 </details>
@@ -1443,17 +1533,17 @@
                   <p>
                     It says "Reading the minimap title…", or shows the last map it read marked
                     <span class="chip-doubt">Not sure</span>. Keep the minimap's title in sight, open or collapsed, with
-                    nothing over it: the pointer or another window over it makes it unreadable. If it goes on with the
-                    title in plain sight, <a href="#bug-reports">send a Bug Report</a>: Minerva reads best at the game's
-                    <b>Default Ratio</b> UI size.
+                    nothing over it. The pointer or another window over the title makes it unreadable. Minerva reads best
+                    with the game's UI size set to <b>Default Ratio</b>. If it still can't tell with the title in plain
+                    sight, <a href="#bug-reports">send a Bug Report</a>.
                   </p>
                 </details>
                 <details class="qa" id="recognition-unavailable">
                   <summary>What does "Map recognition unavailable" mean?</summary>
                   <p>
-                    Minerva couldn't load the map list from OSMS Data Explorer, which its first launch needs. Check your
-                    connection: it tries again every minute. If it says OSMS's data has changed format, Minerva needs an
-                    update.
+                    Minerva couldn't load the map list from OSMS Data Explorer, and it needs that list the first time it
+                    runs. Check your connection. Minerva tries again every minute. If it says OSMS's data has changed
+                    format, Minerva needs an update.
                   </p>
                 </details>
                 <details class="qa" id="hotkey-nothing">
@@ -1466,36 +1556,37 @@
                 <details class="qa" id="cant-read-bar">
                   <summary>Why does the Grind Tracker say "Can't read the EXP bar"?</summary>
                   <p>
-                    Something has covered the bar for ten seconds; it says so rather than count the time as a break. Move
-                    whatever covers the bar. If it says it can't find the game's bar at the bottom of the window, though the
-                    bar shows, Minerva doesn't know the game at that window size or UI Size yet:
-                    <a href="#bug-reports">send a Bug Report</a>.
+                    Something has covered the bar for ten seconds. The Grind Tracker tells you so instead of counting the
+                    time as a break. Move whatever is covering the bar. If it says it can't find the game's bar at the
+                    bottom of the window even though the bar is showing, Minerva doesn't know the game at that window size
+                    or UI Size yet. <a href="#bug-reports">Send a Bug Report</a>.
                   </p>
                 </details>
                 <details class="qa" id="bests-gone">
                   <summary>Why are my Personal Bests gone?</summary>
                   <p>
-                    If their file can't be read, Minerva renames it <code>personal-bests.json.bad</code> and starts with no
-                    bests. If it can't rename it, it leaves it as it is and saves no bests until the next launch. The file
-                    is <a href="#kept">beside your settings</a>.
+                    If Minerva can't read their file, it renames it <code>personal-bests.json.bad</code> and starts with no
+                    bests. If it can't rename the file, it leaves it as it is and saves no bests until the next launch.
+                    The file is <a href="#kept">beside your settings</a>.
                   </p>
                   <p>
                     A character you show on the <a href="#leaderboard-appear">Map Leaderboards</a> keeps their entries
-                    there: Minerva sends nothing of theirs, and a note in your Personal Bests says so, since what's left
-                    on your PC would replace them. Click <strong>Send what's here</strong> on it, and again to confirm,
-                    to send what's there now instead.
+                    there. Minerva sends nothing of theirs, because what's left on your PC would replace those entries,
+                    and a note in your Personal Bests tells you so. To send what's on your PC now instead, click
+                    <strong>Send what's here</strong> on the note, then click again to confirm.
                   </p>
                 </details>
                 <details class="qa" id="refresh">
                   <summary>Search doesn't find a new map, mob or item. What do I do?</summary>
                   <p>
-                    Minerva gets the game's data once a day, so a patch can take a day to show. To get it now, open
-                    Settings, the gear at the top of the panel, and press <strong>Refresh</strong> under Game Data.
-                    A new version of Minerva gets it afresh the first time it starts.
+                    Minerva downloads the game's data once a day, so a patch can take a day to show up. To get it now,
+                    open Settings (the gear at the top of the panel) and press <strong>Refresh</strong> under Game Data.
+                    A new version of Minerva downloads the data again the first time it starts.
                   </p>
                   <p>
-                    If Refresh says to update Minerva, OSMS Data Explorer's data changed in a way this version can't read:
-                    <a href="#update">install the latest release</a>. Until then, Minerva keeps the data it has.
+                    If Refresh tells you to update Minerva, OSMS Data Explorer's data has changed in a way this version
+                    can't read. <a href="#update">Install the latest release</a>. Until you do, Minerva keeps using the
+                    data it has.
                   </p>
                 </details>
               </div>
@@ -1506,43 +1597,47 @@
                   <summary>How do I report a bug?</summary>
                   <p>
                     When Minerva shows something wrong, like a rate far higher than you're getting, click its owl in the
-                    notification area and choose <strong>Bug Report</strong> right away. It saves a <code>.zip</code>, shows
-                    it in its folder, and opens the bug form on <a href="https://github.com/itechify/minerva/issues">GitHub</a>.
-                    Drag the file into the form, and say what looked wrong and about when.
+                    notification area and choose <strong>Bug Report</strong> right away. Minerva saves a
+                    <code>.zip</code>, shows it in its folder, and opens the bug form on
+                    <a href="https://github.com/itechify/minerva/issues">GitHub</a>. Drag the file into the form, and say
+                    what looked wrong and roughly when.
                   </p>
                   <p>
-                    No GitHub account? Send the file to @egberticus in a direct message on
-                    <a href="https://discord.gg/NnbnVWkRrF">Minerva's Discord</a>, not in its channels: its pictures can
-                    show other players' names and chat.
+                    If you don't have a GitHub account, send the file to @egberticus in a direct message on
+                    <a href="https://discord.gg/NnbnVWkRrF">Minerva's Discord</a>. Don't post it in the channels, because
+                    its pictures can show other players' names and chat.
                   </p>
                 </details>
                 <details class="qa" id="bug-report-contents">
                   <summary>What's in a Bug Report?</summary>
-                  <p>What Minerva read and made of it since you started it, up to a day back:</p>
+                  <p>What Minerva read and what it made of it, since you started it and up to a day back:</p>
                   <ul>
                     <li>
-                      Each reading of the minimap title and the game's bar at the bottom of the window, with pictures of
-                      the title, the EXP figures, and the level, job and name on that bar; each item you looked up or
-                      opened a card for, with a picture of the game around the pointer (your inventory, and whatever is
-                      beside it); and, while the Deal Finder was on, pictures of the Player Shop's list. Nothing else on
-                      your screen, but for what's below.
+                      Each reading of the minimap title and of the game's bar at the bottom of the window, with pictures
+                      of the title, the EXP figures, and the level, job and name on that bar.
                     </li>
                     <li>
-                      If the Deal Finder couldn't find the shop, a picture of the whole game window, chat and other
-                      players' names included; and if Minerva couldn't find the game's bar at the bottom, a picture of
-                      the strip across the bottom of the window, which can show chat. One of each at most, from the last
-                      10 minutes, so the bug can be seen.
+                      Each item you looked up or opened a card for, with a picture of the game around the pointer (your
+                      inventory, and whatever is beside it).
+                    </li>
+                    <li>Pictures of the Player Shop's list, while the Deal Finder was on.</li>
+                    <li>
+                      At most one of each of these two pictures from the last 10 minutes, so the bug can be seen. If the
+                      Deal Finder couldn't find the shop, a picture of the whole game window, chat and other players'
+                      names included. If Minerva couldn't find the game's bar at the bottom, a picture of the strip across
+                      the bottom of the window, which can show chat. Apart from these and the pictures above, nothing
+                      else on your screen is in it.
                     </li>
                     <li>
-                      The map it showed, the Grind Tracker's figures, and why they changed: a level-up, a death, a misread
-                      set aside.
+                      The map it showed, the Grind Tracker's figures, and why they changed: a level-up, a death, a
+                      misreading it set aside.
                     </li>
                     <li>What you did in Minerva: its buttons, hotkeys and searches.</li>
                     <li>
-                      Your settings and Personal Bests, which characters you show on the Map Leaderboards and what the site
-                      answered (never your Leaderboard Key), Minerva's version, your Windows version and display scaling,
-                      and any errors it ran into.
+                      Your settings and Personal Bests, which characters you show on the Map Leaderboards, and what the
+                      site answered (never your Leaderboard Key).
                     </li>
+                    <li>Minerva's version, your Windows version and display scaling, and any errors Minerva ran into.</li>
                   </ul>
                 </details>
                 <details class="qa" id="bug-report-private">
@@ -1550,8 +1645,8 @@
                   <p>
                     No. It stays on your PC, in
                     <code class="path">%APPDATA%\<wbr />com.<wbr />itechify.<wbr />minerva\<wbr />Bug Reports</code>, until
-                    you attach it to an issue. Saving one changes nothing in Minerva, which keeps the 10 newest. With it,
-                    the bug can be played back as it happened instead of guessed at.
+                    you attach it to an issue. Saving one changes nothing in Minerva, and Minerva keeps the 10 newest.
+                    With a Bug Report, the bug can be played back as it happened instead of guessed at.
                   </p>
                 </details>
                 <details class="qa" id="something-else">

@@ -57,8 +57,8 @@ const BACK = [0.82, 1];
  * has none on it: its own caption is for screen readers.
  */
 const CAPTIONS: [string, number, number][] = [
-  ["MapleStory, windowed, with its minimap open.", 0.08, 0.25],
-  ["Minerva finds the minimap's title by itself, wherever the minimap is.", 0.25, 0.41],
+  ["MapleStory in a window, with its minimap open.", 0.08, 0.25],
+  ["Minerva finds the minimap's title for you, wherever the minimap is.", 0.25, 0.41],
   ["It captures just the title, the way a screenshot does, and reads it.", 0.41, 0.59],
   ["The panel names the map it read.", 0.59, 0.82],
 ];

@@ -53,7 +53,7 @@ describe("the link page", () => {
     const question = linkQuestion("egberticus", { characters: [], linked: "other" });
 
     expect(question.holds).toBe("It holds no Characters on the Map Leaderboards yet.");
-    expect(question.warn).toMatch(/^It's linked to another Discord account now, and moves to this one\./);
+    expect(question.warn).toMatch(/^It's linked to another Discord account now\. Linking moves it to this one\./);
   });
 });
 
