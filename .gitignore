@@ -12,6 +12,8 @@ site/screenshots/webp/
 # The site Worker's local state (D1) from wrangler, and its local secrets
 site/.wrangler/
 site/.dev.vars
+# Each worktree's working files: pnpm site:local's local D1, worker.json and log among them
+_scratch/
 
 # impeccable-ignore-start
 # Ephemeral output, runtime state, and per-dev overrides.

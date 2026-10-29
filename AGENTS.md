@@ -8,6 +8,7 @@
 - `pnpm install` then `pnpm tauri build --debug --no-bundle`: build the app. `pnpm tauri dev` runs it.
 - `pnpm site:dev` runs the site (`site/`, the player site at owlofminerva.app); `pnpm site:build` builds it, and fails while a screenshot it shows is missing or the home page names a FAQ question there isn't.
 - `pnpm site:test`: type-check the site's Worker (`site/worker`, the Map Leaderboards API, ADR 0015) and run its tests in workerd against a local D1 with `site/migrations` applied. Its one-time setup on Cloudflare is `docs/map-leaderboards-setup.md`.
+- `pnpm site:local [--seed]`: the built site and its Worker on a free port, with a local D1 under `_scratch/`; it prints the `MINERVA_WORKER_PORT=<port> pnpm site:dev` and cron-trigger lines for that port, and `--seed` uploads made-up Characters. Other worktrees run their own Workers at the same time: stop yours with `pnpm site:local stop`, which ends only the processes it started.
 - `pnpm shot <url> [--width 1280,390] [--full] [--eval '<js>'] [--wait <selector>]` and `pnpm preview:window <window> [state…]`: screenshots of a site page, or of an app window fed the fixture views in `preview/fixtures/<window>/` at its real width, into `_scratch/shots/` under a new name each time.
 - `cargo run -p minerva --example probe [reads] [out.png]`: read-only smoke test against a running game, with no UI.
 - `cargo run -p minerva --example probe record <out-dir> <name>=<x>,<y>,<w>,<h>@<hz> ... [--seconds <n>]`: record timestamped crops of client-area regions from a running game, for samples.
