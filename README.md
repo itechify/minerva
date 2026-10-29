@@ -33,11 +33,11 @@ pnpm tauri build --debug --no-bundle            # build target/debug/minerva.exe
 cargo run -p minerva --example probe       # no UI: capture the title and print what the core reads
 cargo run -p minerva --example probe osms  # no game: fetch OSMS's live data and read it in full
 cargo run -p minerva --example probe replay <report.zip>  # no game: a Bug Report's timeline, replayed through the core
-pnpm site:dev                                   # the site, at http://localhost:5173/ (its /api/ from wrangler dev, below)
+pnpm site:dev                                   # the site, at http://localhost:5173/ (MINERVA_WORKER_PORT=<port> for site:local's /api/, below)
 pnpm site:build                                 # the site, into site/dist (fails while a screenshot is missing)
 pnpm site:test                                  # the site's Worker (the Map Leaderboards API, against a local D1) and what its pages show
-pnpm exec wrangler d1 migrations apply minerva-leaderboards --local --config site/wrangler.jsonc  # once: a local D1
-pnpm exec wrangler dev --config site/wrangler.jsonc  # the built site and its API, at http://localhost:8787/
+pnpm site:local [--seed] [--key] [--build]      # the built site and its API on a free port, with a local D1 in _scratch/; prints the port
+pnpm site:local stop                            # stop the one this worktree started
 cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json  # no game: the Map Leaderboards' cap and Where to train, from OSMS
 ```
 

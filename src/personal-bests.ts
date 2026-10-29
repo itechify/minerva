@@ -108,7 +108,7 @@ type DiscordLink = {
 /** What the shell sends: whether the window shows at all, whose bests it can show, each
  *  with the core's rows, every Map Mark, which each row's map names its own by, and linking
  *  to Discord. */
-type BestsView = { shown: boolean; characters: BestsCharacter[]; mapMarks: MapMarks; discord: DiscordLink };
+export type BestsView = { shown: boolean; characters: BestsCharacter[]; mapMarks: MapMarks; discord: DiscordLink };
 
 type Column = "map" | "levels" | "exp" | "share" | "set";
 type Way = "ascending" | "descending";

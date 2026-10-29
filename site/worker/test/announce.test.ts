@@ -2,9 +2,10 @@
 // the spot from another (ADR 0022): a first entry in an empty band, a Character beating its
 // own best, a re-upload of the same set and an opt-out that hands the spot on all stay quiet.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EMBEDS_PER_POST, type Post, type PostedMark, type Taken, type Top, postsFor, takenTops, tell } from "../announce";
+import { EMBEDS_PER_POST, type PostedMark, type Taken, type Top, postsFor, takenTops, tell } from "../announce";
 import { entry, key, optOut, partyEntry, upload } from "./api";
 import { classicRank, knownOnClassicRank, photoOf } from "./classicrank";
+import { discordWebhook } from "./discord-webhook";
 
 /** The made-up webhook the test config sets (vitest.config.ts). */
 const WEBHOOK = "https://discord.invalid/api/webhooks/made-up/webhook";
@@ -31,19 +32,13 @@ function linked(name: string): string {
   return `[${name}](https://owlofminerva.app/character/?name=${name})`;
 }
 
-let posts: Post[];
+/** The posts the made-up webhook (test/discord-webhook.ts) is sent in this test. */
+const posts = discordWebhook.posts;
 let realFetch: typeof globalThis.fetch;
 
 beforeEach(() => {
-  posts = [];
+  posts.length = 0;
   realFetch = globalThis.fetch;
-  // Only the webhook is taken off: D1 and the rest of the runtime keep the real fetch.
-  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = input instanceof Request ? input.url : String(input);
-    if (!url.startsWith(WEBHOOK)) return realFetch(input as RequestInfo, init);
-    posts.push(JSON.parse(String(init?.body)) as Post);
-    return Promise.resolve(new Response(null, { status: 204 }));
-  }) as typeof globalThis.fetch;
 });
 
 afterEach(() => {

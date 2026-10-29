@@ -32,7 +32,7 @@ const ROOMY_BAND = 44;
 
 /** What the shell sends: the badges (none while the window draws nothing), and the Deal
  * Line's name for their words, and whether it is one of maplestory.market's figures. */
-type BadgesView = { badges: DealBadge[]; dealLine: string | null; fromMarket: boolean };
+export type BadgesView = { badges: DealBadge[]; dealLine: string | null; fromMarket: boolean };
 
 const list = byId("badges");
 
