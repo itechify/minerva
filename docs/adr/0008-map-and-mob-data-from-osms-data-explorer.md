@@ -32,7 +32,7 @@ Minerva now takes every map's and mob's data from the JSON files that OSMS Data 
 
   The Touch DMG and Speed rules were fitted to MeowDB's pages, not documented. The card drops its movement line, because OSMS can't tell a mob that jumps between floors from one that stays on its floor. The card's image is OSMS's default animation for the mob, which replaces maplestory.io's still.
 - **Items:** ADR 0010 defines the separate item-file set, on the same fetch schedule.
-- **Links out stay on MeowDB.** A mob's name, the map's title and the open-page hotkey still open MeowDB's pages; its IDs are the game's. Item Lookup keeps calling MeowDB's search (ADR 0007), Minerva's only remaining request to MeowDB. With the crawl gone, its searches keep MeowDB's pace of one every 2 seconds themselves. ADR 0007 records the search's terms and why a browser link cannot replace it.
+- **Links out stay on MeowDB.** A mob's name, the map's title and the open-page hotkey still open MeowDB's pages; its IDs are the game's. Item Lookup keeps calling MeowDB's search (ADR 0007), Minerva's only remaining request to MeowDB. With the crawl gone, its searches keep MeowDB's pace of one every 2 seconds themselves. ADR 0007 records the search's terms. A browser link cannot replace the search: MeowDB's `/msclassic/search?q=` returned 404, and `/msclassic/item-db?q=` ignored the query.
 
 ## Portals on the Map Preview
 
