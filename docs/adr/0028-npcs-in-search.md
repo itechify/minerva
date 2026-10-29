@@ -10,7 +10,7 @@ Search matches mobs, maps and items (ADR 0012). Players also go looking for an N
 
 - **An NPC matches by its name alone**, ranked as everything else in Search is. Matching the name of its map too would only repeat the Maps section ("henesys" would list everyone in Henesys), as matching a map's street would (ADR 0012).
 - **The NPCs section comes between Maps and Items**, its best five shown and the rest counted. An NPC is a kind of place to go, so it sits by the maps; items stay last, the largest and the slowest to load.
-- **Only NPCs on a map Search can send the player to.** An NPC `npc_lookup` names that stands on no map in the map list (98 of 301 in October 2026) has nowhere to go, and an NPC standing only on Event and Dev maps is left out, as those maps are. An NPC `npc_lookup` doesn't name can't be searched for, so the reader leaves it out. Objects that OSMS counts as NPCs (Exit, Mailbox, the crafting stations) are matched like any other: there is no hand-kept list to leave them out.
+- **Only NPCs on a map Search can send the player to.** An NPC `npc_lookup` names that stands on no map in the map list has nowhere to go, and an NPC standing only on Event and Dev maps is left out, as those maps are. An NPC `npc_lookup` doesn't name can't be searched for, so the reader leaves it out. Objects that OSMS counts as NPCs (Exit, Mailbox, the crafting stations) are matched like any other: there is no hand-kept list to leave them out.
 - **One match per NPC ID.** NPCs sharing a name are different NPCs (a Regular Cab in each town, two Sams), each listed with its picture and its map, which tells them apart.
 - **A row shows the NPC's picture, its name, and its map** with its Map Mark, or "on 3 maps" for an NPC on more than one.
 

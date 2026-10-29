@@ -1,10 +1,10 @@
 ---
-status: accepted, amended by ADR-0024 (a top spot taken is also kept, for Latest to mark, whether or not the webhook is set), by #165 (each spot named is an embed, with its map's Map Mark), by #173 (a spot taken with a Party Best says it was in a party; each kind has its own top spot, while Both remains the default board), by ADR-0027 (each Character it names links to their page), and by ADR-0029 (the Character's portrait from ClassicRank is the thumbnail, the Map Mark moving to the footer)
+status: accepted, amended by ADR-0024, ADR-0026, ADR-0027, ADR-0029
 ---
 
 # A new #1 on a map is posted to Discord
 
-The Map Leaderboards (ADR 0015) are worth looking at, but nothing tells anyone when they change: a player sees their own rank in the Personal Bests window, and no one else ever hears about it. Minerva's Discord is where the small community is, and an empty channel makes a server look dead. This records how a new #1 gets there.
+The site's Worker posts a Top spot taken to a Discord webhook. It announces an achievement from the upload that caused it, without making Discord a dependency of uploading.
 
 ## The decision
 
@@ -15,22 +15,11 @@ The Map Leaderboards (ADR 0015) are worth looking at, but nothing tells anyone w
   - a top spot that **fell to someone** because an entry was deleted, opted out or dropped from an upload, which they never took;
   - the **same set uploaded again**, which the app sends as every Visit ends.
 - **Reads are kept off the common upload.** Only an entry that is new, or higher than the one it replaces, can take a top spot, so the Worker compares the upload with the Character's entries it already holds and reads the top spots for those places alone, before and after the write. Nearly every upload has none and reads nothing more. The rule above would turn the rest down anyway; this is what makes it cheap.
-- **An embed per spot, ten to a post, and no text.** A Character mirroring a whole Visit History for the first time can take several at once, so the post names each, an **embed** apiece, best first. Ten is the most Discord holds in one message, so an upload that takes more goes on in another post, sent after the first so they show in order; that is rare enough not to crowd the channel. A post has no text of its own: the embeds say it all. A post never mentions or pings anyone (`allowed_mentions: { parse: [] }`). An embed's title is the map's name, linking to its Map Leaderboard, and its thumbnail the map's **Map Mark** from the ceilings table (ADR 0024), as Where to train and Latest show it; a map without one has none. The link is the title's, never in the text, so Discord shows no preview under a post that names several.
+- **An embed per spot, ten to a post, and no text.** A Character mirroring a whole Visit History for the first time can take several at once, so the post names each, an **embed** apiece, best first. Ten is the most Discord holds in one message, so an upload that takes more goes on in another post, sent after the first so they show in order; that is rare enough not to crowd the channel. A post has no text of its own: the embeds say it all. A post never mentions or pings anyone (`allowed_mentions: { parse: [] }`). An embed's title is the map's name, linking to its Map Leaderboard, and its thumbnail the portrait, or the map's **Map Mark** when there is no portrait (ADR 0029). The link is the title's, never in the text, so Discord shows no preview under a post that names several.
 - **The post is a nicety, never a cost to the upload.** It is handed to `ctx.waitUntil`, so the upload is answered without waiting for Discord, and a webhook that is gone, rate-limited or slow is swallowed and never retried. The Map Leaderboards are the record; a post that didn't go is not.
 - **A post says nothing the site doesn't.** The Character's name, the map, the Level Band, the EXP/h and whose spot it was all come from the entry, which is public (ADR 0015). A player who takes their Character off the Map Leaderboards is never posted, and the FAQ answers why a name turned up (`leaderboard-discord`).
 
-A spot's embed reads:
-
-```json
-{
-  "title": "Henesys Hunting Ground I",
-  "url": "https://owlofminerva.app/leaderboards/map/?map=010001010&band=20&name=Hakuo&kind=solo",
-  "description": "**Hakuo** took #1, levels 20–29, with 153,000 EXP/h, past Egbert's 150,000.",
-  "thumbnail": { "url": "https://osmsdataexplorer.com/data/current/images/map_marks/Henesys.png" }
-}
-```
-
-The map is named from the map names fixture (ADR 0008) through `site/map-names.ts`, which the Worker and the Map Leaderboards' pages now share as they share `site/level-bands.ts`, so a map is named the same wherever it shows. EXP/h is written by `src/figures.ts`'s `rate`, as the panel and the site write rates. A map's name goes in the title as it is written, since a title isn't markdown (the fixture holds one with a `*` in it, "G\* Coconut Season"); a Character's name, in the description, is letters and digits only (ADR 0015), so it never needs escaping either. Each embed's link is its own, since the map, band or kind in it differs, which matters: Discord folds embeds with the same link into one. The Map Mark's picture is OSMS's, as the site shows it; Discord fetches it through its own media proxy, so no one reading the post loads it from OSMS.
+Map names come from `site/map-names.ts`, rates from `src/figures.ts`. Each embed has its own map, band and kind link: Discord folds embeds with the same link into one. ADR 0029 adds the Character's portrait as the thumbnail and moves the Map Mark to the footer when one shows.
 
 **Release posts** need no code: a GitHub repo webhook delivering only the *Releases* event to `<discord-webhook>/github` lets Discord render the release itself. It is set up on the repository, not in it.
 
@@ -46,7 +35,5 @@ The map is named from the map names fixture (ADR 0008) through `site/map-names.t
 
 - The Worker's `fetch` now takes its `ExecutionContext`, and `upload` takes it to hand the post to. A direct call without one waits for the post instead, so nothing is left running after the answer.
 - An upload that takes a top spot costs two extra D1 reads. One that doesn't costs none beyond the Character's own entries, which the write already needed.
-- `MapNameRow`, `MapPlace`, `MapNames`, `mapNames` and `placeOf` moved from `site/leaderboards/leaderboards.ts` to `site/map-names.ts`, and are re-exported from where they were, so the pages' imports are unchanged.
-- The map names fixture is now bundled into the Worker (about 31 KB), which is the first data the Worker carries beyond the ceilings table.
 - Names a player uploads now also appear in a Discord channel, which is a change a player notices: the FAQ says so (`leaderboard-public`, `leaderboard-discord`).
 - The webhook URL is a secret in the same sense as `ADMIN_TOKEN`: whoever holds it can post to that channel. It is never committed, and a lost one is fixed by deleting the webhook in Discord.
