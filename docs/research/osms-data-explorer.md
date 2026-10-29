@@ -40,7 +40,7 @@ Compared on the 9 fixture maps OSMS has:
 | `nearest_town` | `returnMap` | `return_map_id` | identical where OSMS gives one. OSMS leaves it out on 18 of its 92 Towns (Henesys, Kerning City, the Mushroom Towns), where MeowDB gives the Town itself, and on 4 Hidden Street event maps. The reader would take a missing one as the map itself on a Town, and as none elsewhere |
 | `is_town` | `isTown` | `is_town`, absent when false | identical: the same as MeowDB's town flag on all 298 maps both have. It also covers shops and event rooms (92 maps), so Doors work as they do now |
 | Hidden Portal destination name and street | `toMapName`, `toStreetName` | `lookups.json` names + `maps.json` streets | available |
-| Hidden Portal position | portal x, y with `minimapWidth/Height`, `miniMapCenterX/Y` | portal x, y in the rendered map image's pixels; **no minimap bounds** | **gap**, see below |
+| Hidden Portal position | portal x, y with `minimapWidth/Height`, `miniMapCenterX/Y` | portal x, y in the rendered map image's pixels; **no minimap bounds** | **gap**, see [ADR 0008](../adr/0008-map-and-mob-data-from-osms-data-explorer.md) |
 
 ### Map Summary
 
