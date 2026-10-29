@@ -299,7 +299,7 @@ fn a_map_is_high_from_two_thirds_of_the_densest_maps_density_and_medium_from_one
 }
 
 #[test]
-fn results_are_ordered_by_tier_then_density_with_spawn_count_and_mob_rate_both_counting() {
+fn search_results_are_ordered_by_tier_then_density_with_spawn_count_and_mob_rate_both_counting() {
     let mut minerva = loaded(vec![
         map("100000001", "Slow Refill", 50, vec![orange(20)]),
         map("100000002", "Few But Fast", 200, vec![orange(4)]),
