@@ -12,14 +12,14 @@ import { withKind } from "./kinds";
 import { readLatest } from "./latest";
 import { optOut, readBand, readMap, readMaps, upload } from "./leaderboards";
 import { deleteEntry, dismissReport, findAccounts, readCharacter, readRemoved, readReports, reassign, report, restoreEntry } from "./moderation";
-import { readPodiums } from "./podiums";
+import { readPedestals } from "./pedestals";
 import { refreshPortraits } from "./portraits";
 import { endSession, isMaintainerAccount, sameOrigin, sessionAccount } from "./sessions";
 import { readBands, readTraining } from "./where-to-train";
 
 /** The Map Leaderboards' reads, which read no key or cookie, a Character's page's among them
  *  (the app's writes under /api/characters aren't GETs). */
-const PUBLIC_READS = ["/api/maps", "/api/bands", "/api/latest", "/api/podiums", "/api/characters"];
+const PUBLIC_READS = ["/api/maps", "/api/bands", "/api/latest", "/api/pedestals", "/api/characters"];
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
@@ -84,8 +84,8 @@ async function route(request: Request, url: URL, env: Env, ctx: ExecutionContext
     case path.length === 1 && path[0] === "latest" && method === "GET": {
       return withKind(url, (kind) => readLatest(env, kind));
     }
-    case path.length === 1 && path[0] === "podiums" && method === "GET":
-      return readPodiums(env);
+    case path.length === 1 && path[0] === "pedestals" && method === "GET":
+      return readPedestals(env);
     case path.length === 1 && path[0] === "reports" && method === "POST":
       return report(env, request);
     default:

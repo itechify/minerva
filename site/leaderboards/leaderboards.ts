@@ -15,7 +15,7 @@ import {
   type Kind,
   type LatestAnswer,
   type MapMark,
-  type PodiumsAnswer,
+  type PedestalsAnswer,
   type PortraitAnswer,
   type Ranked,
   type TrainingAnswer,
@@ -53,7 +53,7 @@ export function portraitSlot(answer: PortraitAnswer | undefined): PortraitSlot |
 export function medalOf(rank: number): Medal | null {
   return rank >= 1 && rank <= 3 ? (rank as Medal) : null;
 }
-export type { BandAnswer, BandsAnswer, Kind, LatestAnswer, MapMark, PodiumsAnswer, Ranked, TrainingAnswer } from "../entries.ts";
+export type { BandAnswer, BandsAnswer, Kind, LatestAnswer, MapMark, PedestalsAnswer, Ranked, TrainingAnswer } from "../entries.ts";
 
 /** A map's page as its address names it: `/leaderboards/map/?map=<ID>&band=<first level>&name=<name>&kind=<kind>`.
  *  Any part may be missing, or dropped for not being one. */
@@ -716,8 +716,7 @@ export function trainingTable(
 }
 
 /** A Character on a Pedestal's step: their name (a link to their page), their portrait, and
- *  what they stand it for, its figure over what it counts ("7" over "podiums"), with more
- *  under the pointer. On the EXP/h Pedestal, also their job and level, and the map they set
+ *  what they stand it for, its figure and what it counts ("7 podiums"). On the EXP/h Pedestal, also their job and level, and the map they set
  *  it on. */
 export interface Stood {
   name: string;
@@ -726,7 +725,6 @@ export interface Stood {
   portrait: PortraitSlot | null;
   value: string;
   label: string;
-  detail: string | null;
   /** Their job ("Magician") and the job's class, whose icon goes beside it, and their level
    *  ("Lv 25"), which a narrow step puts on a line of its own, never splitting it. */
   who: { job: string; jobClass: JobClass | null; level: string } | null;
@@ -760,62 +758,65 @@ function pedestalOf(stood: Stood[]): Pedestal {
   return { steps: [step(1), step(2), step(3)], empty: YOURS_HERE, portraits: stood.some((s) => s.portrait !== null) };
 }
 
-/** The Podiums Pedestal, from GET /api/podiums: the three with the most podiums, each counted
- *  as their page counts them. */
-export function podiumsPedestal(answer: PodiumsAnswer): Pedestal {
-  return pedestalOf(
-    answer.characters.map((c) => ({
+/** Which of the page's Pedestals shows: the most podiums, or the highest EXP/h. */
+export type PedestalKind = "podiums" | "exp";
+
+/** A Pedestal as the page offers it: its name on its tab, what its "?" says it ranks, and the
+ *  Pedestal. */
+export interface PedestalChoice {
+  kind: PedestalKind;
+  label: string;
+  about: string;
+  pedestal: Pedestal;
+}
+
+/** The page's two Pedestals, from GET /api/pedestals, Most podiums first: the three with the
+ *  most podiums, each counted as their page counts them; and the three with the highest EXP/h
+ *  on any map at any level, each map linking to its page at the entry's band, the entry
+ *  marked. */
+export function pedestalChoices(answer: PedestalsAnswer, names: MapNames): PedestalChoice[] {
+  const podiums = pedestalOf(
+    answer.podiums.map((c) => ({
       name: c.name,
       nameHref: characterLinkTo(c.name),
       portrait: portraitSlot(c.portrait),
       value: whole(c.podiums),
       label: c.podiums === 1 ? "podium" : "podiums",
-      detail: "Top 3 in a band",
       who: null,
       map: null,
       party: false,
     })),
   );
-}
-
-/** The EXP/h Pedestal for the band GET /api/bands/<band> answered, of the `kind` Where to train
- *  shows, in `area` (by its Map Mark's ID; `null`, every area), as Where to train shows it
- *  (`trainingTable`'s area, not the link's, which may name one the band has no maps in); with
- *  its title, "Highest EXP/h in Lith Harbor at Lv 20–29"; each map linking to its page at the
- *  band and the kind, with the entry marked. `null` where no one has an entry. */
-export function expPedestal(
-  answer: TrainingAnswer,
-  names: MapNames,
-  kind: Kind | null,
-  area: string | null,
-): (Pedestal & { title: string }) | null {
-  const entries = area === null ? answer.pedestal.all : (answer.pedestal.areas[area] ?? []);
-  if (entries.length === 0) return null;
-  const marks = new Map(answer.maps.map((m) => [m.map, m.mark]));
-  const areaName = area === null ? null : ([...marks.values()].find((m) => m?.id === area)?.name ?? null);
-  const at = bandLevels(answer.band);
-  const title = areaName === null ? `Highest EXP/h at ${at}` : `Highest EXP/h in ${areaName} at ${at}`;
-  const pedestal = pedestalOf(
-    entries.map((e) => {
-      const mark = marks.get(e.map) ?? null;
-      return {
-        name: e.name,
-        nameHref: characterLinkTo(e.name),
-        portrait: portraitSlot(e.portrait),
-        value: rate(e.expPerHour),
-        label: "EXP/h",
-        detail: null,
-        who: { job: e.job, jobClass: classOf(e.job), level: `Lv ${e.level}` },
-        map: {
-          name: placeOf(names, e.map).name,
-          href: linkTo({ map: e.map, band: answer.band, name: e.name, kind }),
-          mark: mark === null ? null : { name: mark.name, picture: mark.picture },
-        },
-        party: e.party,
-      };
-    }),
+  const fastest = pedestalOf(
+    answer.expPerHour.map((e) => ({
+      name: e.name,
+      nameHref: characterLinkTo(e.name),
+      portrait: portraitSlot(e.portrait),
+      value: rate(e.expPerHour),
+      label: "EXP/h",
+      who: { job: e.job, jobClass: classOf(e.job), level: `Lv ${e.level}` },
+      map: {
+        name: placeOf(names, e.map).name,
+        href: linkTo({ map: e.map, band: e.band, name: e.name, kind: null }),
+        mark: e.mark === null ? null : { name: e.mark.name, picture: e.mark.picture },
+      },
+      party: e.party,
+    })),
   );
-  return { ...pedestal, title };
+  return [
+    {
+      kind: "podiums",
+      label: "Most podiums",
+      about: "A podium is a place in a Level Band's top 3 on a map. Solo and party bests are ranked separately, so each can earn one.",
+      pedestal: podiums,
+    },
+    {
+      kind: "exp",
+      label: "Highest EXP/h",
+      about: "Each character's best EXP per hour on any map, at any level.",
+      pedestal: fastest,
+    },
+  ];
 }
 
 /** What Where to train says before a band is picked. */

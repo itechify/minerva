@@ -1,10 +1,10 @@
 // The Pedestals on the Map Leaderboards page (ADR 0024, amended): the three Characters with
-// the most Podiums, places in a band's top 3 counted as a Character's page counts them; and in
-// each Level Band's Where to train, its three highest EXP/h, one per Character, in every area
-// and in each by its Map Mark. (D1 starts empty for each test file; each Podiums test opts its
-// Characters out after, so the next starts from none.)
+// the most podiums, places in a band's top 3 counted as a Character's page counts them; and the
+// three with the highest EXP/h on any map at any level, one per Character. (D1 starts empty
+// for each test file; each Podiums test opts its Characters out after, so the next starts from
+// none.)
 import { describe, expect, it } from "vitest";
-import type { PodiumsAnswer, TrainingAnswer } from "../../entries";
+import type { PedestalsAnswer } from "../../entries";
 import { call, entry, FIELD, key, NO_CEILING, optOut, partyEntry, upload } from "./api";
 import { knownOnClassicRank, photoOf, profileOf } from "./classicrank";
 
@@ -21,7 +21,7 @@ async function read<T>(path: string): Promise<T> {
 }
 
 async function podiums(): Promise<{ name: string; podiums: number }[]> {
-  return (await read<PodiumsAnswer>("/api/podiums")).characters.map(({ name, podiums }) => ({ name, podiums }));
+  return (await read<PedestalsAnswer>("/api/pedestals")).podiums.map(({ name, podiums }) => ({ name, podiums }));
 }
 
 /** Upload each Character's entries with a key of their own. */
@@ -38,7 +38,7 @@ async function optOutAll(names: string[]) {
 
 describe("the Podiums Pedestal", () => {
   it("is empty before anyone has an entry", async () => {
-    expect(await read<PodiumsAnswer>("/api/podiums")).toEqual({ characters: [] });
+    expect((await read<PedestalsAnswer>("/api/pedestals")).podiums).toEqual([]);
   });
 
   it("ranks the three Characters with the most places in a band's top 3, a Solo Best's and a Party Best's each counting", async () => {
@@ -51,9 +51,9 @@ describe("the Podiums Pedestal", () => {
       Dee: [entry(FIELD, 75, 60_000)],
     });
 
-    const answer = await read<PodiumsAnswer>("/api/podiums");
+    const answer = await read<PedestalsAnswer>("/api/pedestals");
 
-    expect(answer.characters).toEqual([
+    expect(answer.podiums).toEqual([
       { name: "Ann", podiums: 3, portrait: { photo: photoOf("Ann"), profile: profileOf("Ann") } },
       { name: "Ben", podiums: 2, portrait: { photo: null, profile: null } },
       { name: "Cal", podiums: 1, portrait: { photo: null, profile: null } },
@@ -102,79 +102,59 @@ describe("the Podiums Pedestal", () => {
   });
 });
 
-describe("a Level Band's EXP/h Pedestal", () => {
-  async function pedestal(band: number, kind?: "solo" | "party"): Promise<TrainingAnswer["pedestal"]> {
-    return (await read<TrainingAnswer>(`/api/bands/${band}${kind === undefined ? "" : `?kind=${kind}`}`)).pedestal;
+describe("the EXP/h Pedestal", () => {
+  async function fastest() {
+    return (await read<PedestalsAnswer>("/api/pedestals")).expPerHour;
   }
 
   /** A pedestal's steps as who, where and how much. */
-  function steps(on: TrainingAnswer["pedestal"]["all"]) {
-    return on.map((s) => [s.name, s.map, s.expPerHour, s.party]);
+  function steps(on: PedestalsAnswer["expPerHour"]) {
+    return on.map((s) => [s.name, s.map, s.band, s.expPerHour, s.party]);
   }
 
-  it("is empty in a band with no entries", async () => {
-    expect(await pedestal(1)).toEqual({ all: [], areas: {} });
+  it("is empty before anyone has an entry", async () => {
+    expect(await fastest()).toEqual([]);
   });
 
-  it("ranks the band's three highest EXP/h, one per Character, in every area and in each by its Map Mark", async () => {
+  it("stands the three highest EXP/h on any map at any level, each Character by their best entry", async () => {
     knownOnClassicRank("Pia");
     await uploadAll({
-      Pia: [entry(MARKED, 25, 250_000), entry(STRADDLING, 25, 300_000)],
-      Quin: [entry(MARKED, 26, 200_000), partyEntry(MARKED, 26, 280_000)],
-      Rex: [entry(NO_CEILING, 27, 150_000)],
+      // Pia's best is her Lv 70s Solo Best, not her other entries.
+      Pia: [entry(MARKED, 25, 250_000), entry(FIELD, 72, 400_000), partyEntry(MARKED, 26, 300_000)],
+      Quin: [entry(STRADDLING, 31, 200_000), partyEntry(MARKED, 26, 380_000)],
+      Rex: [entry(NO_CEILING, 15, 150_000)],
       Sam: [entry(MARKED, 28, 100_000)],
     });
 
-    const both = await pedestal(20);
+    const on = await fastest();
 
-    expect(both.all[0]).toEqual({
-      name: "Pia",
+    expect(steps(on)).toEqual([
+      ["Pia", FIELD, 70, 400_000, false],
+      ["Quin", MARKED, 20, 380_000, true],
+      ["Rex", NO_CEILING, 10, 150_000, false],
+    ]);
+    expect(on[1]).toEqual({
+      name: "Quin",
       job: "Magician",
-      level: 25,
-      expPerHour: 300_000,
+      level: 26,
+      expPerHour: 380_000,
       setAt: 1_760_000_000_000,
-      party: false,
-      map: STRADDLING,
-      portrait: { photo: photoOf("Pia"), profile: profileOf("Pia") },
+      party: true,
+      map: MARKED,
+      mark: { id: "MadeUpTown", name: "Made-up Town", picture: "https://osms.invalid/images/map_marks/MadeUpTown.png" },
+      band: 20,
+      portrait: { photo: null, profile: null },
     });
-    expect(steps(both.all)).toEqual([
-      ["Pia", STRADDLING, 300_000, false],
-      ["Quin", MARKED, 280_000, true],
-      ["Rex", NO_CEILING, 150_000, false],
-    ]);
-    // A map without a Map Mark counts only in every area's.
-    expect(Object.keys(both.areas)).toEqual(["MadeUpTown"]);
-    expect(steps(both.areas.MadeUpTown)).toEqual([
-      ["Quin", MARKED, 280_000, true],
-      ["Pia", MARKED, 250_000, false],
-      ["Sam", MARKED, 100_000, false],
-    ]);
-  });
-
-  it("ranks only the kind asked for", async () => {
-    const solo = await pedestal(20, "solo");
-    expect(steps(solo.all)).toEqual([
-      ["Pia", STRADDLING, 300_000, false],
-      ["Quin", MARKED, 200_000, false],
-      ["Rex", NO_CEILING, 150_000, false],
-    ]);
-    expect(steps(solo.areas.MadeUpTown)).toEqual([
-      ["Pia", MARKED, 250_000, false],
-      ["Quin", MARKED, 200_000, false],
-      ["Sam", MARKED, 100_000, false],
-    ]);
-
-    const party = await pedestal(20, "party");
-    expect(steps(party.all)).toEqual([["Quin", MARKED, 280_000, true]]);
-    expect(Object.keys(party.areas)).toEqual(["MadeUpTown"]);
+    expect(on[0].portrait).toEqual({ photo: photoOf("Pia"), profile: profileOf("Pia") });
+    expect(on[0].mark).toBeNull();
   });
 
   it("gives a tie to whoever set it first", async () => {
     await uploadAll({
-      Tia: [entry(STRADDLING, 31, 400_000, 1_760_000_000_005)],
-      Uma: [entry(STRADDLING, 32, 400_000, 1_760_000_000_004)],
+      Tia: [entry(STRADDLING, 31, 500_000, 1_760_000_000_005)],
+      Uma: [entry(STRADDLING, 32, 500_000, 1_760_000_000_004)],
     });
 
-    expect(steps((await pedestal(30)).all).map(([name]) => name)).toEqual(["Uma", "Tia"]);
+    expect(steps(await fastest()).map(([name]) => name)).toEqual(["Uma", "Tia", "Pia"]);
   });
 });

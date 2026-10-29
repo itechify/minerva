@@ -37,9 +37,6 @@ function map(id: string, mobs: [number, number] | null, mark: MapMark | null, be
   };
 }
 
-/** A band's EXP/h Pedestal with no one on it: the table doesn't read it (test/pedestals.test.ts). */
-const NO_PEDESTAL: TrainingAnswer["pedestal"] = { all: [], areas: {} };
-
 /** Band 20's maps: Pig Field and Party Field with entries, Boar Field and Quiet Field
  *  without (Quiet Field's mobs the lower), and a map the fixture doesn't name with an entry
  *  but no mob levels or mark. Two in Lith Harbor, two in Kerning City. */
@@ -53,7 +50,6 @@ const BAND_20: TrainingAnswer = {
     map("100000003", [24, 28], CITY, 600_000),
     map("100000009", null, null, 50_000),
   ],
-  pedestal: NO_PEDESTAL,
 };
 
 const LINK: TrainingLink = { band: 20, area: null, kind: null };
@@ -65,7 +61,7 @@ function table(link: Partial<TrainingLink> = {}, answer = BAND_20, all = false) 
 /** Band 20 with `count` made-up maps, each with an entry, the first the best. */
 function many(count: number): TrainingAnswer {
   const maps = Array.from({ length: count }, (_, i) => map(String(100_000_100 + i), [22, 27], CITY, 900_000 - i * 1_000));
-  return { band: 20, levels: [20, 29], maps, pedestal: NO_PEDESTAL };
+  return { band: 20, levels: [20, 29], maps };
 }
 
 describe("where to train's address", () => {
@@ -228,7 +224,7 @@ describe("where to train's table", () => {
   });
 
   it("says so for a band with no maps", () => {
-    expect(table({ band: 150 }, { band: 150, levels: [150, 159], maps: [], pedestal: NO_PEDESTAL })).toEqual({
+    expect(table({ band: 150 }, { band: 150, levels: [150, 159], maps: [] })).toEqual({
       rows: [],
       areas: [],
       area: null,

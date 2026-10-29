@@ -97,30 +97,12 @@ export interface TrainingMap {
   best: Best | null;
 }
 
-/** An entry on a Level Band's EXP/h Pedestal: a Character's best in the band, where they set
- *  it, and their portrait. */
-export interface PedestalEntry extends Best {
-  map: string;
-  portrait?: PortraitAnswer;
-}
-
-/** A Level Band's EXP/h Pedestal (ADR 0024, amended): its three highest EXP/h, one per
- *  Character, highest first, ties going to whoever set it first. `all` ranks every map's
- *  entries; `areas`, by a Map Mark's ID, only those on its maps, each area with an entry
- *  there. */
-export interface TrainingPedestal {
-  all: PedestalEntry[];
-  areas: Record<string, PedestalEntry[]>;
-}
-
 /** GET /api/bands/<band>: the maps for the Level Band, by ID: each map whose middle half of
- *  spawns is at its levels, and each map with an entry in it; and the band's EXP/h
- *  Pedestal. */
+ *  spawns is at its levels, and each map with an entry in it. */
 export interface TrainingAnswer {
   band: number;
   levels: [number, number];
   maps: TrainingMap[];
-  pedestal: TrainingPedestal;
 }
 
 /** A Character on the Podiums Pedestal: how many podiums they hold, places in a Level Band's
@@ -132,11 +114,23 @@ export interface PodiumsStep {
   portrait?: PortraitAnswer;
 }
 
-/** GET /api/podiums: the Podiums Pedestal (ADR 0024, amended): the three Characters with the
- *  most podiums, most first, a tie going to whoever holds more #1s, then more #2s, then
- *  whoever set their first podium entry first. Fewer while fewer have one. */
-export interface PodiumsAnswer {
-  characters: PodiumsStep[];
+/** A Character on the EXP/h Pedestal: their best entry anywhere, where (the map and its Map
+ *  Mark, `null` for a map without one, and the Level Band) and their portrait. */
+export interface ExpStep extends Best {
+  map: string;
+  mark: MapMark | null;
+  band: number;
+  portrait?: PortraitAnswer;
+}
+
+/** GET /api/pedestals: the Map Leaderboards page's two Pedestals (ADR 0024, amended), each
+ *  at most three Characters, fewer while fewer qualify. `podiums`: the most podiums, most
+ *  first, a tie going to whoever holds more #1s, then more #2s, then whoever set their first
+ *  podium entry first. `expPerHour`: the highest EXP/h on any map at any level, one per
+ *  Character (their best entry), highest first, a tie going to whoever set it first. */
+export interface PedestalsAnswer {
+  podiums: PodiumsStep[];
+  expPerHour: ExpStep[];
 }
 
 /** An entry as Latest lists it: where (with the map's Map Mark, `null` for a map without

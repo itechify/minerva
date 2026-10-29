@@ -1,8 +1,8 @@
 <!doctype html>
 <!-- The Map Leaderboards page: Where to train, a Level Band's maps with the best players got
-     on each, over the band's EXP/h Pedestal; the Podiums Pedestal, the three Characters with
-     the most places in a band's top 3, beside the page's title on a wide page and after Where
-     to train on a narrow one; find a map by its name (from the map names fixture, as the panel
+     on each; the Pedestals, the three Characters with the most places in a band's top 3 or the
+     highest EXP/h, beside the page's title on a wide page and after Where to train on a narrow
+     one; find a map by its name (from the map names fixture, as the panel
      names maps); and Latest, the newest bests (ADR 0024). A map's own page is
      leaderboards/map/. Both read the site's API (ADR 0015) from the browser, so without
      script the page says it needs it. -->
@@ -42,7 +42,7 @@
     <link rel="stylesheet" href="../../src/theme.css" />
     <link rel="stylesheet" href="../site.css" />
     <script type="module" src="../site.ts"></script>
-    <script type="module" src="./podiums.ts"></script>
+    <script type="module" src="./pedestals.ts"></script>
     <script type="module" src="./training.ts"></script>
     <script type="module" src="./search.ts"></script>
     <script type="module" src="./latest.ts"></script>
@@ -60,7 +60,7 @@
 
       <main class="window-body" id="main">
         <div class="part" data-street="Map Leaderboards">
-          <!-- The title, Where to train and Most podiums: one grid on a wide page (site.css). -->
+          <!-- The title, Where to train and the Pedestals: one grid on a wide page (site.css). -->
           <div class="lb-top">
             <header class="lb-head stop" id="top" data-mini="Map Leaderboards">
               <h1>
@@ -94,23 +94,38 @@
                 </thead>
                 <tbody id="train-rows" role="rowgroup"></tbody>
               </table>
-              <!-- Under the maps, the band's EXP/h Pedestal, in the area shown, once someone has an entry
-                   there. -->
-              <div class="lb-train-pedestal" id="train-pedestal" hidden>
-                <h3 class="lb-pedestal-title" id="train-pedestal-title"></h3>
-                <ol class="lb-pedestal" id="train-pedestal-steps" aria-labelledby="train-pedestal-title"></ol>
-                <p class="lb-credit" id="train-pedestal-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
-              </div>
             </section>
 
-            <!-- Beside the title on a wide page (site.css), after Where to train on a narrow one, so
-                 the band choices come first. The steps keep their room while they come. -->
-            <section class="lb-podiums stop" id="podiums" data-mini="Most podiums" aria-labelledby="podiums-title">
-              <h2 id="podiums-title">Most podiums</h2>
-              <p class="lb-said lb-pedestal-said">A podium is a place in a Level Band's top 3 on any map.</p>
-              <ol class="lb-pedestal lb-waiting" id="podiums-steps"></ol>
-              <p class="lb-said" id="podiums-said" aria-live="polite" hidden></p>
-              <p class="lb-credit" id="podiums-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
+            <!-- The Pedestals: Most podiums or Highest EXP/h, one at a time, the "?" saying what
+                 the one shown ranks. Beside the title on a wide page (site.css), after Where to train
+                 on a narrow one, so the band choices come first. The steps keep their room while
+                 they come. -->
+            <section class="lb-pedestals stop" id="pedestals" data-mini="Pedestals" aria-labelledby="pedestals-title">
+              <h2 class="sr-only" id="pedestals-title">Pedestals</h2>
+              <div class="lb-pedestal-head">
+                <div class="lb-pedestal-tabs" id="pedestal-tabs" role="tablist" aria-labelledby="pedestals-title">
+                  <button class="lb-pedestal-tab" type="button" role="tab" id="pedestal-tab-podiums" data-pedestal="podiums" aria-selected="true" aria-controls="pedestal-panel-podiums">Most podiums</button>
+                  <button class="lb-pedestal-tab" type="button" role="tab" id="pedestal-tab-exp" data-pedestal="exp" aria-selected="false" aria-controls="pedestal-panel-exp" tabindex="-1">Highest EXP/h</button>
+                </div>
+                <span class="lb-help">
+                  <button class="lb-help-button" type="button" id="pedestal-help" aria-label="What this ranks" aria-describedby="pedestal-about" aria-expanded="false">
+                    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="7" /><path d="M6 6.1a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.3v.4" /><circle class="lb-help-dot" cx="8" cy="11.9" r="0.9" /></svg>
+                  </button>
+                  <span class="lb-tip" id="pedestal-about" role="tooltip">A podium is a place in a Level Band's top 3 on a map. Solo and party bests are ranked separately, so each can earn one.</span>
+                </span>
+              </div>
+              <!-- Both drawn, one over the other, the one not shown kept out of sight and reach: the
+                   box is always the taller one's, so a switch moves nothing under it. -->
+              <div class="lb-pedestal-panels">
+                <div class="lb-pedestal-panel" id="pedestal-panel-podiums" role="tabpanel" aria-labelledby="pedestal-tab-podiums">
+                  <ol class="lb-pedestal lb-waiting" id="pedestal-podiums"></ol>
+                </div>
+                <div class="lb-pedestal-panel" id="pedestal-panel-exp" role="tabpanel" aria-labelledby="pedestal-tab-exp" data-off>
+                  <ol class="lb-pedestal" id="pedestal-exp"></ol>
+                </div>
+              </div>
+              <p class="lb-said" id="pedestal-said" aria-live="polite" hidden></p>
+              <p class="lb-credit" id="pedestal-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
             </section>
           </div>
 

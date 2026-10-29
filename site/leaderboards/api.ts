@@ -265,11 +265,8 @@ const PLACES: Record<Medal, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
  *  Character's portrait, their name (a link to their page) and what they stand it for; on the
  *  EXP/h Pedestal, the map (a link to its page at the band, with their entry marked) and their
  *  job and level go under its block, so the steps carry no more than Most podiums' do. A step
- *  no one stands asks for yours. `credit` shows while any step has a portrait. `restack`, for a
- *  Pedestal drawn again at a click, moves its Characters from where they stood to where they
- *  stand now (`restackOnto`). */
-export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedestal: Pedestal, restack = false) {
-  const before = restack && !reducedMotion().matches ? standing(steps) : null;
+ *  no one stands asks for yours. */
+export function drawPedestal(steps: HTMLOListElement, pedestal: Pedestal) {
   steps.replaceChildren(
     ...pedestal.steps.map(({ place, stood }) => {
       const step = make("li", `lb-stand lb-stand-${place}`);
@@ -290,7 +287,6 @@ export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedes
         const amount = make("span", "lb-stand-amount");
         amount.append(make("strong", "lb-stand-value", stood.value), ` ${stood.label}`);
         figure.append(amount);
-        if (stood.detail !== null) figure.title = stood.detail;
         if (stood.party) figure.append(partyMark());
         who.append(figure);
       }
@@ -302,8 +298,13 @@ export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedes
       return step;
     }),
   );
-  credit.hidden = !pedestal.portraits;
-  if (before !== null) restackOnto(steps, before);
+}
+
+/** Restack (DESIGN.md, Motion): as the Pedestal `to` takes the place of `from`, drawn in the same
+ *  room, move each Character on both from their step on `from` to theirs on `to`, and bring in
+ *  whoever is new. With reduced motion it is there at once. */
+export function restack(from: HTMLOListElement, to: HTMLOListElement) {
+  if (!reducedMotion().matches) restackOnto(to, standing(from));
 }
 
 /** How a Pedestal restacks (DESIGN.md, Motion): the site's one exponential ease-out, as a
@@ -330,10 +331,10 @@ function standing(steps: HTMLOListElement): Map<string, Map<string, DOMRect>> {
   return stood;
 }
 
-/** Move each one still on the Pedestal from where they stood `before` to their step now, and
- *  bring in whoever is new to it; measured from the Pedestal, so a table above it growing or
- *  shrinking doesn't carry them across the page. Only `transform` and `opacity` move, and what
- *  they carry reads all the way. */
+/** Move each one on the Pedestal who stood on it `before` from there to their step now, and
+ *  bring in whoever is new to it; measured from the Pedestal, so where it is on the page
+ *  doesn't matter. Only `transform` and `opacity` move, and what they carry reads all the
+ *  way. */
 function restackOnto(steps: HTMLOListElement, before: Map<string, Map<string, DOMRect>>) {
   if (before.size === 0) return;
   const box = steps.getBoundingClientRect();
@@ -349,7 +350,17 @@ function restackOnto(steps: HTMLOListElement, before: Map<string, Map<string, DO
       const dx = from.x - (at.x - box.x);
       const dy = from.y - (at.y - box.y);
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-      part.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], RESTACK);
+      // One crossing past another's step (2nd and 3rd trading places) goes faint as they pass,
+      // so the two never read as one pile in the middle.
+      const crossing = Math.abs(dx) > at.width;
+      part.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px)`, opacity: 1 },
+          ...(crossing ? [{ offset: 0.5, opacity: 0.15 }] : []),
+          { transform: "none", opacity: 1 },
+        ],
+        RESTACK,
+      );
     }
   }
 }

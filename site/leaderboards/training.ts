@@ -1,7 +1,6 @@
 // Where to train, on the Map Leaderboards page (leaderboards/index.html): the Level Bands,
 // and the open band's maps, each with its Map Mark, mob levels and the band's #1 there, in
-// every area or one, by its Map Mark (ADR 0024), a long band's first 15 until Show all, under
-// the band's EXP/h Pedestal in the area shown (ADR 0024, amended). A
+// every area or one, by its Map Mark (ADR 0024), a long band's first 15 until Show all. A
 // click on a band or an area switches the table in place and the address with it, so the
 // link still shares and Back comes back. What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
@@ -9,7 +8,6 @@ import {
   byId,
   characterLink,
   drawKindLinks,
-  drawPedestal,
   jobWithIcon,
   markImage,
   markSlot,
@@ -21,7 +19,6 @@ import {
 } from "./api.ts";
 import {
   type BandsAnswer,
-  expPedestal,
   type Kind,
   PICK_A_BAND,
   readTrainingLink,
@@ -45,10 +42,6 @@ const kindsNav = byId("train-kinds");
 const areasNav = byId("train-areas");
 const table = byId("train-table");
 const rows = byId<HTMLTableSectionElement>("train-rows");
-const pedestal = byId("train-pedestal");
-const pedestalTitle = byId("train-pedestal-title");
-const pedestalSteps = byId<HTMLOListElement>("train-pedestal-steps");
-const pedestalCredit = byId("train-pedestal-credit");
 /** The Level Bands, once read. */
 let bands: BandsAnswer | null = null;
 /** Whether the open band shows all its maps: Show all was pressed. Another band or area
@@ -74,14 +67,12 @@ function say(text: Said | string) {
   saidWith(said, typeof text === "string" ? { text } : text);
   said.hidden = false;
   table.hidden = true;
-  pedestal.hidden = true;
 }
 
 /** The API can't be reached: the page says so once, and Try again starts over. */
 function down() {
   done();
   table.hidden = true;
-  pedestal.hidden = true;
   bandsNav.hidden = bands === null;
   kindsNav.hidden = bands === null;
   areasNav.hidden = true;
@@ -108,9 +99,8 @@ async function readBand(band: number, kind: Kind | null): Promise<TrainingAnswer
 /** Which draw is the latest, so a slower answer to an earlier click is dropped. */
 let draws = 0;
 
-/** Draw what `link` names: the bands, and the open band's table; `restack`, at a click (or
- *  Back and Forward), the band's EXP/h Pedestal restacking from what it showed. */
-async function show(restack = false) {
+/** Draw what `link` names: the bands, and the open band's table. */
+async function show() {
   const turn = ++draws;
   if (bands === null) return;
   drawBands();
@@ -129,11 +119,11 @@ async function show(restack = false) {
   if (turn !== draws) return;
   section.removeAttribute("aria-busy");
   if (answer === null) return down();
-  drawTable(answer, restack);
+  drawTable(answer);
 }
 
 /** The open band's table, from its answer: its first 15 maps, or all of them. */
-function drawTable(answer: TrainingAnswer, restack = false) {
+function drawTable(answer: TrainingAnswer) {
   const shown = trainingTable(answer, names, link, new Date(), { all });
   // An area the band has no maps in shows every area, and the address says so.
   if (shown.area !== link.area) {
@@ -143,7 +133,6 @@ function drawTable(answer: TrainingAnswer, restack = false) {
   }
   drawAreas(shown.areas, shown.area);
   if (shown.empty !== null) return say(shown.empty);
-  drawExpPedestal(answer, shown.area, restack);
   // Maps none of which has an entry: said once, over them.
   if (shown.none !== null) saidWith(said, shown.none);
   said.hidden = shown.none === null;
@@ -152,17 +141,6 @@ function drawTable(answer: TrainingAnswer, restack = false) {
   if (shown.more !== null) rows.append(moreRow(shown.more, answer));
   table.hidden = false;
   done();
-}
-
-/** The band's EXP/h Pedestal in the area the table shows, once someone has an entry there;
- *  `restack`, from what it showed, if it showed anything (DESIGN.md, Motion). */
-function drawExpPedestal(answer: TrainingAnswer, area: string | null, restack: boolean) {
-  const shown = expPedestal(answer, names, link.kind, area);
-  const showing = !pedestal.hidden;
-  pedestal.hidden = shown === null;
-  if (shown === null) return;
-  pedestalTitle.textContent = shown.title;
-  drawPedestal(pedestalSteps, pedestalCredit, shown, restack && showing);
 }
 
 /** The row under a long band's first 15: Show all, which shows the rest in place and
@@ -270,7 +248,7 @@ function go(to: TrainingLink) {
   link = to;
   all = false;
   history.pushState(null, "", trainingLinkTo(link));
-  show(true);
+  show();
 }
 
 /** A click on a band or an area switches in place. A click meant for a new tab or window,
@@ -288,7 +266,7 @@ areasNav.addEventListener("click", (event) => switchOnClick(event, "a.lb-area"))
 addEventListener("popstate", () => {
   link = readTrainingLink(location.search);
   all = false;
-  show(true);
+  show();
 });
 
 /** Read the Level Bands, then draw what the address names. */

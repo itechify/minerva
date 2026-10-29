@@ -56,8 +56,6 @@ describe("where to train", () => {
         },
         { map: STRADDLING, mobs: [25, 34], mark: null, entries: 0, best: null },
       ],
-      // The band's EXP/h Pedestal (test/pedestals.test.ts).
-      pedestal: expect.objectContaining({ all: [expect.objectContaining({ name: "Bea" }), expect.objectContaining({ name: "Ada" })] }),
     });
   });
 
@@ -85,7 +83,7 @@ describe("where to train", () => {
   });
 
   it("lists a band with no maps as empty, and refuses one that isn't a band's first level", async () => {
-    expect(await read<{ maps: unknown[] }>("/api/bands/150")).toEqual({ band: 150, levels: [150, 159], maps: [], pedestal: { all: [], areas: {} } });
+    expect(await read<{ maps: unknown[] }>("/api/bands/150")).toEqual({ band: 150, levels: [150, 159], maps: [] });
     expect((await call("/api/bands/25")).status).toBe(400);
     expect((await call("/api/bands/twenty")).status).toBe(400);
   });
