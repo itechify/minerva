@@ -26,15 +26,15 @@ How a Minerva version is numbered, made and published as a GitHub Release. Follo
   - `pnpm build`
   - `pnpm site:test`
 
-  `.github/workflows/check.yml` runs the first four on every pull request that touches code and on `main`, and `site-check.yml` the last on one that touches the site, so a green check on `main`'s head covers this.
+  `check.yml` runs the core tests, app library tests, clippy and build on code PRs and `main`; `site-check.yml` runs the site tests on site PRs and `main`. CI uses `cargo test -p minerva --lib`, so also run `cargo test -p minerva` before releasing to cover the probe's tests.
 - **The live data still reads:** `cargo run -p minerva --example probe osms` reads OSMS Data Explorer's live set in full.
 - **A smoke test against the game** (`pnpm tauri dev`): the map is recognised; the Map section shows its picture; Search sets a Hunting Target, then a Destination, and Navigation shows the route to each; an item picked in Search shows its card beside the panel; a Mob Card opens; Item Lookup opens a page.
-- **The site describes this release** (`site/`, published from the tag in step 6): every change a player notices is on it, and nothing that's gone. While the game is open for the smoke test, retake each shot under Retake in `site/screenshots/README.md` as it says, set the version they were taken on, empty the list, and merge them into `main`. `pnpm site:build` passes, and `pnpm site:dev` reads right.
+- **The site describes this release** (`site/`, published from the tag in step 6): every change a player notices is on it, and nothing that's gone. Follow `site/screenshots/README.md` for retakes, version labels and deferred shots, and merge any changes into `main`. `pnpm site:build` passes, and `pnpm site:dev` reads right.
 - **The credits are current:**
   - If dependencies were added, removed or upgraded, regenerate the crate table in `THIRD-PARTY-NOTICES.md` (how is described there).
   - If a bundled asset or data source changed, update About & Credits in `setup.html` to match.
-- **The Map Leaderboards API is live** before the first release that uploads to it: its one-time setup and deploy are in `docs/map-leaderboards-setup.md`. `curl https://owlofminerva.app/api/maps` answers with JSON.
-- **The updater's signing key is at hand** (#125): the minisign private key and its password, from the password manager. Every installer is signed with it, and installed copies only take an update it signed. If it's lost, they can never update again.
+- **The Map Leaderboards API is live** with the API and migrations this release needs: provisioning and deploy instructions are in `docs/map-leaderboards-setup.md`. `curl https://owlofminerva.app/api/maps` answers with JSON.
+- **The updater's signing key is at hand** (#125): the minisign private key and its password, from the password manager. The private key is password-protected, kept in the maintainer's password manager with an offline backup. Every installer is signed with it, and installed copies only take an update it signed. If it's lost, they can never update again.
 - **Tools:** `gh` is signed in to an account that can push to `itechify/minerva`. Cargo is on `PATH`; in Git Bash, `export PATH="$HOME/.cargo/bin:$PATH"`.
 
 Before step 1, tell the user how each item above stands: ran and passed, already true, or skipped and why.
@@ -96,7 +96,7 @@ Tauri builds the optimised app and both installers, and signs each installer, wr
 
 ### The update smoke test
 
-Before tagging, check that an installed copy updates to this one. The previous version must have the updater (0.13.0 or later); for 0.13.0 itself, the first with it, install the setup `.exe` over 0.12.0 by hand instead, and check that About & Credits shows `X.Y.Z` and settings and Personal Bests carried over.
+Before tagging, check that an installed copy of the previous version updates to this one.
 
 1. Install the previous version's setup `.exe`, and quit it.
 2. Serve the new `latest.json` and installers over `http` from `127.0.0.1`, from the repo root:

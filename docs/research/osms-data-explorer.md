@@ -2,9 +2,7 @@
 
 Checked on 10 October 2026, against OSMS's `data/current` (its "Public Release" set, dated 6 October 2026), the MeowDB pages then kept in `crates/minerva-core/tests/fixtures` (saved 7 October, since removed), and three live MeowDB pages. The decisions it led to, and what shipped, are in ADR 0008.
 
-## Answer
-
-OSMS Data Explorer can supply nearly everything Minerva reads from MeowDB, and it doesn't have MeowDB's scraping problem in the same form. It is a static site that loads a handful of plain JSON files. No terms forbid fetching them, and the five files the whole world needs are about 0.8 MB in one go, not about 420 map pages and the listed mobs' pages, fetched one every 2 seconds. Most of the panel's data maps over directly, the Map Summary can be computed exactly, and three Mob Card figures can be derived with fitted rules. Two things have no OSMS equivalent: minimap bounds, which place Hidden Portals, and whether a mob jumps between floors. Item Lookup can keep opening MeowDB pages, but it still needs one MeowDB search per press to find the page.
+This is the pre-migration field comparison. [ADR 0008](../adr/0008-map-and-mob-data-from-osms-data-explorer.md) records the completed switch, source-access decision, Map Preview, dropped movement line and retained MeowDB Item Lookup. Counts and comparisons below describe the October 2026 snapshot, not current coverage.
 
 ## What OSMS is
 
@@ -20,13 +18,6 @@ OSMS Data Explorer can supply nearly everything Minerva reads from MeowDB, and i
 | `map_manifest.json` | 15 KB | map ID to rendered map image (`data/maps/<hash>.webp`) |
 
 Past datasets are kept and fixed under `data/patches/<version>/` (`cot1`, `cot2`, `v49`, ...), listed in `data/patches/index.json`. `patch_notes.json` lists what changed from COT2 to the Public Release.
-
-## The scraping question
-
-- **MeowDB:** its terms (§4) forbid "automated scripts, bots, or scrapers ... without permission" (ADR 0003). Minerva parses its HTML and Next.js flight data, page by page.
-- **OSMS:** the site has no terms page, and the repo has no licence (`license: null` on GitHub). Its `robots.txt` is Cloudflare's content-signals preamble with no rules and no signals set, which by its own wording "neither grants nor restricts". Nothing forbids automated access, and Cloudflare served `maps.json` and `portals.json` as JSON to Minerva's own user agent. The files are the site's own data files, so reading them parses no HTML and uses no undocumented page structure. Fetching all of them is about as much load as one visit to the site.
-- **What's still open:** having no licence means no one has granted reuse either. Fetching the files live for personal use is fine. Bundling a snapshot in a public release, or redistributing it, still needs permission, but from one person (@ohmi on the [Classic World Discord](https://discord.gg/AK9tZ2TvN8)), not a commercial site. Minerva would credit OSMS as it now credits MeowDB.
-- **Nexon:** both sites' data is mined from Nexon's client, so this part doesn't change.
 
 ## Field by field
 
@@ -49,7 +40,7 @@ Compared on the 9 fixture maps OSMS has:
 | `nearest_town` | `returnMap` | `return_map_id` | identical where OSMS gives one. OSMS leaves it out on 18 of its 92 Towns (Henesys, Kerning City, the Mushroom Towns), where MeowDB gives the Town itself, and on 4 Hidden Street event maps. The reader would take a missing one as the map itself on a Town, and as none elsewhere |
 | `is_town` | `isTown` | `is_town`, absent when false | identical: the same as MeowDB's town flag on all 298 maps both have. It also covers shops and event rooms (92 maps), so Doors work as they do now |
 | Hidden Portal destination name and street | `toMapName`, `toStreetName` | `lookups.json` names + `maps.json` streets | available |
-| Hidden Portal position | portal x, y with `minimapWidth/Height`, `miniMapCenterX/Y` | portal x, y in the rendered map image's pixels; **no minimap bounds** | **gap**, see below |
+| Hidden Portal position | portal x, y with `minimapWidth/Height`, `miniMapCenterX/Y` | portal x, y in the rendered map image's pixels; **no minimap bounds** | **gap**, see [ADR 0008](../adr/0008-map-and-mob-data-from-osms-data-explorer.md) |
 
 ### Map Summary
 
@@ -82,38 +73,6 @@ Each mob in `monsters.json` names its animations (`move`, `stand`, `fly`, `attac
 ### Item Lookup (ADR 0007)
 
 OSMS has every item's name with its game ID (7,431 in `lookups.json`), straight from the game's data. A reading could be matched offline against that list, so ADR 0007's problem of MeowDB's list missing 68 items goes away. "Hat MP Scroll: Greater", ADR 0007's example of a missing item, is in it, as are all 54 item names in the MeowDB search answers the tests then kept. But MeowDB's item pages are numbered by MeowDB's own IDs, and OSMS doesn't carry them. Opening the right MeowDB page still needs one request per press to MeowDB's search, as now. Otherwise Item Lookup could open OSMS's own listing, which needs no request to anyone. OSMS has no page per item. Its Items tab (consumables, etc., setup, scrolls) and Equipment tab take a search in the link, such as `#items?q=<name>` or `id:<game ID>`, which its own cross-links use. That wasn't tried for the Equipment tab.
-
-## Coverage and freshness
-
-- **Maps:** OSMS has 305 maps. Live MeowDB lists 428: those 305 (less OSMS's Dev map), plus 124 more: 92 in Ossyria (Orbis and El Nath), 31 in Forgotten Hollow, and the Yellow Mushroom House. OSMS's patch notes list all 124 as removed in the Public Release client. Launch coverage says Orbis and El Nath are held back from the opening build and Forgotten Hollow is closed for now, to come later ([Noisy Pixel](https://noisypixel.net/maplestory-classic-world-october-21-launch-founders-access/), [GosuGamers](https://www.gosugamers.net/entertainment/news/79063-maplestory-classic-world-announces-21-october-release-date)). So OSMS covers what a player can reach today. When those areas return, OSMS gets them once they're in the client it mines, and that lag is unknown.
-- **Mobs:** OSMS has 92 mobs in `monsters.json`. The 9 more in `lookups.json` (Nependeath, Dark Nependeath, the 810000-series boss variants, and a "Monsters Near Your Level" placeholder) appear on no map.
-- **Freshness:** both are current. OSMS's repo was pushed on 10 October, and live MeowDB already has the Public Release Mob Rates.
-
-## Gaps and risks
-
-1. **Hidden Portal positions.** OSMS's portal x and y are pixels in its rendered map image, which adds margins around the minimap bounds, and the margins vary by map (left 50–115 px, bottom 124–185 px). Dividing by the image's size, read from the first bytes of the WebP, put 31 of the 38 fixture portals in MeowDB's minimap cell. Every miss was "lower" read as "middle". Subtracting typical margins would close most of that, but it stays an approximation. The clean fix is to ask OSMS to add each map's minimap bounds to `maps.json`.
-2. **Mob movement.** Losing "Jumps between floors" leaves the Mob Card without that line, unless OSMS adds the field (the game has it, as MeowDB shows).
-3. **Undocumented JSON.** The format has changed before: `data.js` falls back for a missing `beauty.json` and a missing `map_manifest.json`. The reader would stay all or nothing (`FormatChanged`, never partial figures), as it is now. Reading a fixed `data/patches/<version>/` set would trade freshness for stability.
-4. **Fitted rules.** Touch DMG and Speed match MeowDB on 12 mobs but aren't documented by either site.
-
-## What a switch would change
-
-As foreseen before the switch; ADR 0008 records what changed.
-
-- **No world crawl.** One fetch of the five files, about 0.8 MB, gives the whole world's portal graph, mobs and Mob Rates, so ADR 0004's crawl of about 420 pages at 2-second intervals, its week-old refreshes and the "Mapping the world" progress all go. Search and Distance work from the first launch, and offline after the first fetch.
-- **No Mob Card fetches.** Every mob's figures arrive with the rest, so ADR 0006's per-mob page fetches go.
-- **The core's interface barely moves.** `MapData`, `Mob`, `Portal`, `MobDetails` and `PanelState` stay as they are. The `meowdb` module's HTML and flight readers become a JSON reader of OSMS's files. Clicking a mob's name can still open its MeowDB page, since MeowDB's mob IDs are the game's (`mob_url` is unchanged).
-- **Tests.** New fixtures would be OSMS JSON files, and the MeowDB HTML fixtures would go. AGENTS.md's rule for `tests/fixtures/meowdb-monsters` would move to the new fixtures.
-
-## Decisions
-
-Recorded in ADR 0008:
-
-1. **Hidden Portal positions:** neither. The panel shows OSMS's picture of the map as a Map Preview, with every portal marked and the Hidden Portals set apart. Hovering a mark shows where it leads, and hovering a row shows where the portal is. OSMS's portal positions are already in that picture's pixels, so no minimap bounds are needed.
-2. **Mob movement:** the Mob Card drops the line.
-3. **Item Lookup:** for now it keeps opening MeowDB pages through MeowDB's search (ADR 0007), the one MeowDB request left. The letter of MeowDB's terms arguably covers it, so it's a grey area to raise with MeowDB, but not a bar to release. Pointing the browser at a MeowDB search instead was checked and isn't possible: `/msclassic/search?q=` is a 404, and `/msclassic/item-db?q=` loads the item database without applying the query. OSMS may supply an item card on hover later. (It did: OSMS's item files are in `docs/research/item-card-sources.md`, and the Item Card in ADR 0010.)
-4. **Asking @ohmi:** not needed, since nothing restricts fetching. Minerva fetches the files and doesn't bundle them.
-5. **Tests:** no OSMS file is committed. The tests run on made-up worlds in OSMS's shape, title recognition on a committed list of the game's map names (IDs, streets, names and regions only), and `probe osms` reads the live set in full by hand. The MeowDB fixtures go.
 
 ## How this was checked
 

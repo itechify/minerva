@@ -1,6 +1,6 @@
 # Setting up the Map Leaderboards API
 
-The Map Leaderboards API, and the Accounts beside it, run on the site's Worker with a D1 database (ADR 0015, ADR 0023). The Site workflow (`.github/workflows/site.yml`) applies the database's migrations and deploys the Worker when a release is published, or when it's run by hand; merging to `main` deploys nothing. But a few steps are done by hand on the Cloudflare account, once, before its first deploy. Do them in this order. Wrangler is a dev dependency, so after `pnpm install` each command runs as `pnpm exec wrangler ...`, from the repo root, signed in to the account in `site/wrangler.jsonc` (`pnpm exec wrangler login`).
+The Map Leaderboards API, and the Accounts beside it, run on the site's Worker with a D1 database (ADR 0015, ADR 0023). The Site workflow (`.github/workflows/site.yml`) applies the database's migrations and deploys the Worker when a release is published, or when it's run by hand; merging to `main` deploys nothing. The database and Discord IDs are already in `site/wrangler.jsonc`. For a replacement deployment, provision its resources in this order and set its secrets before deploying. Wrangler is a dev dependency, so after `pnpm install` each command runs as `pnpm exec wrangler ...`, from the repo root, signed in to the account in `site/wrangler.jsonc` (`pnpm exec wrangler login`).
 
 ## 1. Create the database, and commit its ID
 
@@ -8,11 +8,11 @@ The Map Leaderboards API, and the Accounts beside it, run on the site's Worker w
 pnpm exec wrangler d1 create minerva-leaderboards
 ```
 
-It prints the new database's `database_id`. In `site/wrangler.jsonc`, replace the all-zero placeholder under `d1_databases` with it, and commit that on a branch merged into `main`. The ID isn't a secret (the `account_id` beside it is committed too). Until it's there, the placeholder works for `pnpm site:test` and `wrangler dev`, but the Site workflow fails at its migrations step.
+It prints the new database's `database_id`. For a replacement, update `d1_databases` in `site/wrangler.jsonc` with that ID and set `account_id` to its account, then merge it into `main`. These IDs aren't secrets. Local runs and tests use local databases.
 
 ## 2. Let the API token edit D1
 
-The `site` environment's `CLOUDFLARE_API_TOKEN` (GitHub: Settings → Environments → site) can deploy the Worker but not yet touch D1. In the Cloudflare dashboard (My Profile → API Tokens), edit that token and add the account permission **D1 → Edit**. The token's value doesn't change, so the secret stays as it is.
+The `site` environment's `CLOUDFLARE_API_TOKEN` (GitHub: Settings → Environments → site) needs Worker deploy and **D1 → Edit** permissions on the replacement account. Check them under Cloudflare's My Profile → API Tokens.
 
 ## 3. Set the maintainer's secret
 
@@ -40,12 +40,12 @@ Paste the URL. For a local run, put `DISCORD_WEBHOOK_URL=...` in `site/.dev.vars
 
 Accounts (ADR 0023) sign in with Discord: players to link their PCs, the maintainer to moderate at `/admin/`. With either of the client ID and secret unset, signing in is off and everything else works as before.
 
-1. In the [Discord Developer Portal](https://discord.com/developers/applications), **New Application**, named "Minerva". Under **OAuth2**, copy the **Client ID**, then **Reset Secret** and copy the **Client Secret** into the password manager beside `ADMIN_TOKEN`.
+1. For a replacement Discord application, choose **New Application** in the [Discord Developer Portal](https://discord.com/developers/applications) and name it "Minerva". Under **OAuth2**, copy the **Client ID**, then **Reset Secret** and copy the **Client Secret** into the password manager beside `ADMIN_TOKEN`.
 2. Still under **OAuth2 → Redirects**, add the three addresses Discord may send a player back to:
    - `https://owlofminerva.app/api/auth/discord/callback`
    - `https://www.owlofminerva.app/api/auth/discord/callback`
    - `http://localhost:5173/api/auth/discord/callback`, for `pnpm site:dev`
-3. In `site/wrangler.jsonc`, set `vars.DISCORD_CLIENT_ID` to the client ID and `vars.MAINTAINER_DISCORD_IDS` to your Discord user ID (Discord: **Settings → Advanced → Developer Mode**, then right-click your name → **Copy User ID**; more than one, comma-separated). Neither is secret, so commit them.
+3. The current IDs are committed in `site/wrangler.jsonc`. For a replacement, set `vars.DISCORD_CLIENT_ID` to the client ID and `vars.MAINTAINER_DISCORD_IDS` to your Discord user ID (Discord: **Settings → Advanced → Developer Mode**, then right-click your name → **Copy User ID**; more than one, comma-separated). Neither is secret, so commit them.
 4. Set the secret:
 
    ```bash
@@ -76,15 +76,15 @@ Paste the key. Check it with `curl -s "https://owlofminerva.app/api/market?ids=4
 
 ## 8. Deploy the API before any app that uses it
 
-The API must be live before any Minerva version that uses it is released: one that uploads (#110), one that links a PC to an Account (#152), one that uploads a Party Best as an entry of its own (#173: an older Worker refuses a set with two entries for one map and Level Band), or one that shows maplestory.market's prices (ADR 0030: an older Worker has no `/api/market`, and the cards say the prices aren't available). Migration `0005_party_entries.sql` makes `entries` and `removed_entries` again with the entry's kind in their keys, every entry before it a Party Best (an entry of no known kind is one: a player's earlier bests rank as Party Bests until they set a Solo Best), and the Worker reads an upload entry with no `party` the same way; it keeps the Worker before it working until the deploy after. Once this is on `main`, publish the site from `main`:
+Deploy the API and migrations a release depends on before releasing the app. Once they are on `main`, publish from `main`:
 
 ```bash
 gh workflow run site.yml -f ref=main
 ```
 
-It applies the migrations to the remote database, then deploys. Check it with `curl https://owlofminerva.app/api/maps`, which answers `{"maps":[]}` at first.
+It applies the migrations to the remote database, then deploys. Check it with `curl https://owlofminerva.app/api/maps`, which must answer with JSON.
 
-From then on, **never publish the site from a ref older than the API**: an older release's tag would deploy a Worker without it, and every upload would fail. A release published after this carries the API, so publishing a release stays safe.
+Never publish from a ref missing API behavior the released app needs: the workflow deploys that ref's Worker too.
 
 ## Afterwards
 
