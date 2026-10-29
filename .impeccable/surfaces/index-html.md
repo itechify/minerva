@@ -7,9 +7,9 @@ related_targets: ["src/main.ts","src/styles.css"]
 
 # Overlay panel
 
-Scope: the in-game overlay panel (index.html, src/main.ts, src/styles.css), every state it can show. Mode: Operate. A glanceable, click-through tool read mid-hunt.
+Scope: the in-game overlay panel (index.html, src/main.ts, src/styles.css), every state it can show. Mode: Operate. A glanceable, clickable tool read mid-hunt.
 
-Job: on each map change, tell the player which map this is, where its Hidden Portals are, and whether its mobs are worth grinding, in one glance. Constraints: fixed 380 px width, height fits the content (44–900 px), 44 px collapsed square, no hover or pointer interaction except dragging in edit mode, credit "Data: OSMS Data Explorer (osmsdataexplorer.com) · pages: NiaMeowDB (meowdb.com)" whenever a map is shown.
+Job: on each map change, tell the player which map this is, where its Hidden Portals are, and whether its mobs are worth grinding, in one glance. Constraints: 380px initial width, resizable down to 320px, content-height up to 600px or the available space, 44px collapsed square. Pointer interaction is always available; window bar and title panel drag the panel, sides and bottom corners resize width. Credit is an info-glyph tooltip in the footer.
 
 Scene: a player at a desk, the bright, saturated 2D game filling the screen, glancing at the right edge between attacks. The game's own windows there (Quest Helper, minimap) are light, translucent periwinkle and lavender, so the panel is light.
 
@@ -17,11 +17,11 @@ Scene: a player at a desk, the bright, saturated 2D game filling the screen, gla
 
 THESIS: The panel is the window the game forgot to ship. It sits under the Quest Helper in the game's own window language, and puts hidden exits first. It refuses the generic dark dev-tools card with a stats table on top. Boundary: the game lends materials (body, chrome, lettering, minimap glyphs) and one signature move. Organisation, hierarchy and density are a working tool's, never a screenshot of a game window.
 
-OWN-WORLD: Translucent lavender-grey body as in the Quest Helper. Steel-periwinkle title bar with white top highlight and dark-navy hairline. The Map Name in white bold lettering with a dark-navy outline, as the minimap draws it. Navy text, steel secondary text. The minimap's colour vocabulary: blue portal rings, red mob dots. Game-orange is reserved for doubt and problems. Arial-family sans, because the game uses one (a pinned-world override of the system-display-face rule). Street Name above Map Name stays, because it is the minimap's own idiom (a pinned-world override of the eyebrow ban).
+OWN-WORLD: Quest Helper glass with near-black Panel Ink and its light text edge, under the Mini Map's grey window bar and sky-blue title panel. Street Name above Map Name in light, blue-outlined lettering. Portal blue, mob red and you yellow keep their minimap meanings; game orange marks doubt and problems. Maplestory Light and Bold throughout.
 
 STORY: The player learns the map, sees each hidden exit's spot and where it leads, checks EXP/h, and gets back to hunting. When unsure, the panel says so before anything else.
 
-FIRST VIEWPORT: Title bar with the street name and the outlined map name, full width. Under it, Portals: the Map Preview, OSMS's picture of the whole map with every portal ringed, then a row per Hidden Portal (its dashed ring, the destination and its tags). Then one summary line ("EXP/h 6,180 solo · 27,900 6+"), then up to 5 mobs (red dot, name, Lv, HP, EXP, share) and a "+N more · Lv x–y" line, then the credit footer. Signature move: the map itself, ringed the way the minimap rings a portal, with the hidden ones dashed.
+FIRST VIEWPORT: Grey window bar with toolbar, then sky-blue title panel. Map section: the ringed Map Preview and Hidden Portal rows. Navigation while a target is set. Mobs: two-row summary, then every mob in a table; narrow panels use labelled cards. Credit info glyph at the foot. See DESIGN.md for spacing and states.
 
 FORM: user-pinned, no roll (the user chose "lean into MapleStory" and confirmed this direction). Code-led: no image generation is available.
 
