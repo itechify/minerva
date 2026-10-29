@@ -1,7 +1,8 @@
 <!doctype html>
-<!-- The Map Leaderboards page: Where to train, a Level Band's maps with the best players got
-     on each; find a map by its name (from the map names fixture, as
-     the panel names maps); and Latest, the newest bests (ADR 0024). A map's own page is
+<!-- The Map Leaderboards page: the Podiums Pedestal, the three Characters with the most
+     places in a band's top 3; Where to train, a Level Band's maps with the best players got
+     on each, under the band's EXP/h Pedestal; find a map by its name (from the map names
+     fixture, as the panel names maps); and Latest, the newest bests (ADR 0024). A map's own page is
      leaderboards/map/. Both read the site's API (ADR 0015) from the browser, so without
      script the page says it needs it. -->
 <html lang="en">
@@ -40,6 +41,7 @@
     <link rel="stylesheet" href="../../src/theme.css" />
     <link rel="stylesheet" href="../site.css" />
     <script type="module" src="../site.ts"></script>
+    <script type="module" src="./podiums.ts"></script>
     <script type="module" src="./training.ts"></script>
     <script type="module" src="./search.ts"></script>
     <script type="module" src="./latest.ts"></script>
@@ -68,11 +70,26 @@
             </p>
           </header>
 
+          <!-- The three steps keep their room while they come, so Where to train doesn't jump. -->
+          <section class="lb-podiums stop" id="podiums" data-mini="Most podiums" aria-labelledby="podiums-title">
+            <h2 id="podiums-title">Most podiums</h2>
+            <p class="lb-said lb-pedestal-said">A podium is a place in a Level Band's top 3 on any map.</p>
+            <ol class="lb-pedestal lb-waiting" id="podiums-steps"></ol>
+            <p class="lb-said" id="podiums-said" aria-live="polite" hidden></p>
+            <p class="lb-credit" id="podiums-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
+          </section>
+
           <section class="lb-train stop" id="where-to-train" data-mini="Where to train" aria-labelledby="train-title">
             <h2 id="train-title">Where to train</h2>
             <nav class="lb-bands" id="train-bands" aria-label="Level Bands"></nav>
             <nav class="lb-kinds" id="train-kinds" aria-label="Solo or party entries" hidden></nav>
             <nav class="lb-areas" id="train-areas" aria-label="Areas, by their Map Marks" hidden></nav>
+            <!-- The band's EXP/h Pedestal, in the area shown, once someone has an entry there. -->
+            <div class="lb-train-pedestal" id="train-pedestal" hidden>
+              <h3 class="lb-pedestal-title" id="train-pedestal-title"></h3>
+              <ol class="lb-pedestal" id="train-pedestal-steps" aria-labelledby="train-pedestal-title"></ol>
+              <p class="lb-credit" id="train-pedestal-credit" hidden>Portraits from <a href="https://classicrank.com">ClassicRank</a></p>
+            </div>
             <p class="lb-said" id="train-said" aria-live="polite">Loading the Level Bands…</p>
             <noscript><p class="lb-said">The Map Leaderboards need JavaScript to load.</p></noscript>
             <!-- The roles keep the table a table to assistive tech on a phone, where its rows
@@ -115,7 +132,7 @@
             <!-- Under Find a map, beside Latest, on a wide page; after Latest on a narrow one. -->
             <section class="lb-questions stop" id="questions" data-mini="Questions" aria-labelledby="questions-title">
               <h2 id="questions-title">How they work</h2>
-              <div class="qa-list" data-qa="map-leaderboards where-to-train level-bands leaderboard-exp report-entry" data-group="leaderboards"></div>
+              <div class="qa-list" data-qa="map-leaderboards pedestals where-to-train level-bands leaderboard-exp report-entry" data-group="leaderboards"></div>
             </section>
           </div>
         </div>

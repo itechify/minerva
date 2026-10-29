@@ -3861,6 +3861,143 @@ button.button {
   margin-top: 4px;
   padding-left: 12px;
 }
+
+/* The Pedestals (ADR 0024, amended): three steps on a podium, 2nd, 1st and 3rd from the left,
+   each a Character standing on a block in Inset, the 1st's the tallest, with the step's crown
+   and place on it. The list keeps 1st to 3rd for assistive tech; only the order on screen
+   changes. The crowns stay 14px on the blocks: the blocks are never filled with the metal. */
+.lb-podiums {
+  max-width: 60em;
+  padding-top: 32px;
+}
+.lb-podiums h2 {
+  margin-bottom: 0;
+  font-size: 23px;
+  line-height: 30px;
+}
+.lb-pedestal-said {
+  margin-top: 2px;
+}
+.lb-pedestal {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  max-width: 34em;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+/* While the steps come, their room: a step's portrait, name and figure over the 1st's block. */
+.lb-pedestal.lb-waiting {
+  min-height: 236px;
+}
+.lb-pedestal[hidden] {
+  display: none;
+}
+.lb-stand {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+}
+.lb-stand-1 {
+  order: 2;
+}
+.lb-stand-2 {
+  order: 1;
+}
+.lb-stand-3 {
+  order: 3;
+}
+.lb-stand-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0 6px 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+.lb-stand-who .lb-portrait {
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  margin-bottom: 4px;
+}
+.lb-stand-name {
+  max-width: 100%;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.lb-stand-figure {
+  font-size: 14px;
+  line-height: 20px;
+}
+.lb-stand-value {
+  color: var(--ink);
+}
+.lb-stand-where {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  max-width: 100%;
+}
+.lb-stand-map {
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.lb-stand-yours {
+  font-size: 14px;
+  line-height: 20px;
+}
+.lb-stand-block {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px 4px 0 0;
+  background: var(--inset-bg);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+}
+.lb-stand-1 .lb-stand-block {
+  position: relative;
+  height: 72px;
+  margin: 0 -1px;
+}
+.lb-stand-2 .lb-stand-block {
+  height: 52px;
+}
+.lb-stand-3 .lb-stand-block {
+  height: 38px;
+}
+.lb-stand-block .lb-crown {
+  margin-top: 3px;
+}
+/* The band's EXP/h Pedestal, under Where to train's choices and over its table. */
+.lb-train-pedestal {
+  margin-top: 24px;
+}
+.lb-train-pedestal[hidden] {
+  display: none;
+}
+.lb-pedestal-title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 24px;
+}
 /* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
 .ch-board .lb-said.ch-lost-said {
   font-size: 15px;

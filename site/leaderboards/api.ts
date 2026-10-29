@@ -11,6 +11,7 @@ import {
   mapNames,
   type MapNames,
   type Medal,
+  type Pedestal,
   type PortraitSlot,
   type Said,
   type Words,
@@ -252,6 +253,53 @@ export function crown(medal: Medal): SVGSVGElement {
   defs.append(gradient);
   svg.append(defs, svgEl("path", { d: "M2 12.5 1 4.5l4 3 3-5 3 5 4-3-1 8Z", fill: `url(#${id})`, stroke: metal.edge }));
   return svg;
+}
+
+/** How a Pedestal's places read: on its blocks, and first in each step to assistive tech. */
+const PLACES: Record<Medal, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
+
+/** A Pedestal's three steps in `steps` (an <ol>), 1st to 3rd, as assistive tech reads them;
+ *  site.css stands them 2nd, 1st, 3rd, each on its block, the 1st's the tallest, with its
+ *  crown and place. A step shows the Character's portrait, their name (a link to their page)
+ *  and what they stand it for, and on the EXP/h Pedestal their job and level and the map (a
+ *  link to its page at the band, with their entry marked). A step no one stands asks for
+ *  yours. `credit` shows while any step has a portrait. */
+export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedestal: Pedestal) {
+  steps.replaceChildren(
+    ...pedestal.steps.map(({ place, stood }) => {
+      const step = make("li", `lb-stand lb-stand-${place}`);
+      const who = make("div", "lb-stand-who");
+      who.append(make("span", "sr-only", `${PLACES[place]}: `));
+      if (stood === null) {
+        const yours = make("a", "lb-stand-yours", pedestal.empty.text);
+        yours.href = pedestal.empty.href;
+        who.append(yours);
+      } else {
+        if (stood.portrait !== null) who.append(portraitImage(stood.portrait, BAND_PORTRAIT));
+        who.append(characterLink(stood.name, stood.nameHref, "lb-stand-name"));
+        const figure = make("span", "lb-stand-figure");
+        figure.append(make("strong", "lb-stand-value", stood.value), ` ${stood.label}`);
+        if (stood.detail !== null) figure.title = stood.detail;
+        if (stood.party) figure.append(partyMark());
+        who.append(figure);
+        if (stood.who !== null) who.append(jobWithIcon(stood.who.text, stood.who.jobClass, "lb-stand-job", false));
+        if (stood.map !== null) {
+          const map = make("a", "lb-stand-map", stood.map.name);
+          map.href = stood.map.href;
+          const line = make("span", "lb-stand-where");
+          if (stood.map.mark !== null) line.append(markImage(stood.map.mark, true));
+          line.append(map);
+          who.append(line);
+        }
+      }
+      const block = make("div", "lb-stand-block");
+      block.setAttribute("aria-hidden", "true");
+      block.append(crown(place), PLACES[place]);
+      step.append(who, block);
+      return step;
+    }),
+  );
+  credit.hidden = !pedestal.portraits;
 }
 
 /** `words` drawn, a link for each that has one. */

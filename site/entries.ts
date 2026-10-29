@@ -97,12 +97,46 @@ export interface TrainingMap {
   best: Best | null;
 }
 
+/** An entry on a Level Band's EXP/h Pedestal: a Character's best in the band, where they set
+ *  it, and their portrait. */
+export interface PedestalEntry extends Best {
+  map: string;
+  portrait?: PortraitAnswer;
+}
+
+/** A Level Band's EXP/h Pedestal (ADR 0024, amended): its three highest EXP/h, one per
+ *  Character, highest first, ties going to whoever set it first. `all` ranks every map's
+ *  entries; `areas`, by a Map Mark's ID, only those on its maps, each area with an entry
+ *  there. */
+export interface TrainingPedestal {
+  all: PedestalEntry[];
+  areas: Record<string, PedestalEntry[]>;
+}
+
 /** GET /api/bands/<band>: the maps for the Level Band, by ID: each map whose middle half of
- *  spawns is at its levels, and each map with an entry in it. */
+ *  spawns is at its levels, and each map with an entry in it; and the band's EXP/h
+ *  Pedestal. */
 export interface TrainingAnswer {
   band: number;
   levels: [number, number];
   maps: TrainingMap[];
+  pedestal: TrainingPedestal;
+}
+
+/** A Character on the Podiums Pedestal: how many Podiums they hold, places in a Level Band's
+ *  top 3 on a map, counted as their page counts them (a Solo Best's and a Party Best's
+ *  each). */
+export interface PodiumsStep {
+  name: string;
+  podiums: number;
+  portrait?: PortraitAnswer;
+}
+
+/** GET /api/podiums: the Podiums Pedestal (ADR 0024, amended): the three Characters with the
+ *  most Podiums, most first, a tie going to whoever holds more #1s, then more #2s, then
+ *  whoever set their first podium entry first. Fewer while fewer have one. */
+export interface PodiumsAnswer {
+  characters: PodiumsStep[];
 }
 
 /** An entry as Latest lists it: where (with the map's Map Mark, `null` for a map without

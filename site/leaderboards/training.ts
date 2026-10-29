@@ -1,6 +1,7 @@
 // Where to train, on the Map Leaderboards page (leaderboards/index.html): the Level Bands,
 // and the open band's maps, each with its Map Mark, mob levels and the band's #1 there, in
-// every area or one, by its Map Mark (ADR 0024), a long band's first 15 until Show all. A
+// every area or one, by its Map Mark (ADR 0024), a long band's first 15 until Show all, under
+// the band's EXP/h Pedestal in the area shown (ADR 0024, amended). A
 // click on a band or an area switches the table in place and the address with it, so the
 // link still shares and Back comes back. What it shows is worked out in leaderboards.ts.
 import { make } from "../../src/dom.ts";
@@ -8,6 +9,7 @@ import {
   byId,
   characterLink,
   drawKindLinks,
+  drawPedestal,
   jobWithIcon,
   markImage,
   markSlot,
@@ -19,6 +21,7 @@ import {
 } from "./api.ts";
 import {
   type BandsAnswer,
+  expPedestal,
   type Kind,
   PICK_A_BAND,
   readTrainingLink,
@@ -42,6 +45,7 @@ const kindsNav = byId("train-kinds");
 const areasNav = byId("train-areas");
 const table = byId("train-table");
 const rows = byId<HTMLTableSectionElement>("train-rows");
+const pedestal = byId("train-pedestal");
 /** The Level Bands, once read. */
 let bands: BandsAnswer | null = null;
 /** Whether the open band shows all its maps: Show all was pressed. Another band or area
@@ -67,12 +71,14 @@ function say(text: Said | string) {
   saidWith(said, typeof text === "string" ? { text } : text);
   said.hidden = false;
   table.hidden = true;
+  pedestal.hidden = true;
 }
 
 /** The API can't be reached: the page says so once, and Try again starts over. */
 function down() {
   done();
   table.hidden = true;
+  pedestal.hidden = true;
   bandsNav.hidden = bands === null;
   kindsNav.hidden = bands === null;
   areasNav.hidden = true;
@@ -133,6 +139,7 @@ function drawTable(answer: TrainingAnswer) {
   }
   drawAreas(shown.areas, shown.area);
   if (shown.empty !== null) return say(shown.empty);
+  drawExpPedestal(answer, shown.area);
   // Maps none of which has an entry: said once, over them.
   if (shown.none !== null) saidWith(said, shown.none);
   said.hidden = shown.none === null;
@@ -141,6 +148,15 @@ function drawTable(answer: TrainingAnswer) {
   if (shown.more !== null) rows.append(moreRow(shown.more, answer));
   table.hidden = false;
   done();
+}
+
+/** The band's EXP/h Pedestal in the area the table shows, once someone has an entry there. */
+function drawExpPedestal(answer: TrainingAnswer, area: string | null) {
+  const shown = expPedestal(answer, names, link, area);
+  pedestal.hidden = shown === null;
+  if (shown === null) return;
+  byId("train-pedestal-title").textContent = shown.title;
+  drawPedestal(byId<HTMLOListElement>("train-pedestal-steps"), byId("train-pedestal-credit"), shown);
 }
 
 /** The row under a long band's first 15: Show all, which shows the rest in place and
