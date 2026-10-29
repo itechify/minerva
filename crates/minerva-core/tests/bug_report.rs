@@ -1841,6 +1841,22 @@ fn a_reports_stats_count_each_readers_readings_misses_areas_and_crops() {
 }
 
 #[test]
+fn a_reports_stats_count_readings_the_same_as_one_cut_from_the_trace_apart() {
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(2 * S, CONSTRUCTION_SITE, grind);
+    let (_, mut recording) = shell.report();
+    // As a run over a day cuts the trace: the title read at 0:00.35 gone, the four the same as it
+    // left.
+    let first = recording.lines.iter().position(|line| matches!(line.event, Event::Title { .. })).expect("a title line");
+    recording.lines.remove(first);
+
+    let stats = bug_report::stats_of(&recording, 0, u64::MAX);
+
+    assert_eq!(stats.readers[0].readings, [("the same as one before the trace", 4)]);
+    assert!(stats.readers[0].misses.is_empty());
+}
+
+#[test]
 fn a_reports_stats_over_a_window_count_only_what_was_captured_in_it() {
     use bug_report::{AreaChange, MissWindow};
     let (recording, moved) = run_with_every_reader();

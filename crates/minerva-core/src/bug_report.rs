@@ -1817,7 +1817,8 @@ impl Tally {
     /// A reading captured at `at_ms` that came to `outcome` (`None`: the same as the one
     /// before), finding what it reads at `area`; counted if `counted`.
     fn reading(&mut self, at_ms: u64, outcome: Option<Came>, area: Option<ScreenRect>, counted: bool) {
-        let Some(outcome) = outcome.or(self.last) else { return };
+        // The same as a reading the trace no longer holds, where a run over a day cut it.
+        let outcome = outcome.or(self.last).unwrap_or(Came::Aside("the same as one before the trace"));
         if !matches!(outcome, Came::Aside(_)) {
             self.last = Some(outcome);
         }
