@@ -248,7 +248,7 @@ export default defineConfig({
   // The Map Leaderboards pages read the Worker's API. While developing, it is the Worker
   // `pnpm site:local` runs beside the dev server, on the port it prints as
   // MINERVA_WORKER_PORT (README.md), or a bare `wrangler dev` on 8787.
-  server: { proxy: { "/api": `http://localhost:${process.env.MINERVA_WORKER_PORT ?? 8787}` } },
+  server: { proxy: { "/api": `http://localhost:${process.env.MINERVA_WORKER_PORT || 8787}` } },
   plugins: [
     questions(),
     fillPlaceholders(),

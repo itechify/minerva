@@ -47,6 +47,9 @@ async function start() {
   let port = await running();
   if (port !== undefined) {
     console.log(`Already running, from _scratch/worker.json; \`pnpm site:local stop\` stops it.`);
+    if (has("--key") || (process.env.MINERVA_WORKER_PORT && Number(process.env.MINERVA_WORKER_PORT) !== port)) {
+      console.log("It keeps the port and --key it was started with; stop it first to change them.");
+    }
   } else {
     port = await launch();
   }
@@ -81,6 +84,10 @@ async function launch() {
   if (migrated.status !== 0) fail("Applying the migrations failed.");
 
   const port = process.env.MINERVA_WORKER_PORT ? Number(process.env.MINERVA_WORKER_PORT) : await freePort();
+  if (!Number.isInteger(port) || port < 1 || port > 65535) fail(`MINERVA_WORKER_PORT isn't a port: ${process.env.MINERVA_WORKER_PORT}`);
+  // Taken, wrangler would fail to start, and whatever holds the port (another worktree's
+  // Worker) could answer the wait below and take the seed.
+  if (!(await isFree(port))) fail(`Port ${port} is taken (another worktree's Worker?). Unset MINERVA_WORKER_PORT, or pick another.`);
   // wrangler's devtools port is 9229 unless given, and another worktree's may hold it.
   const inspector = await freePort();
   const flags = ["dev", "--config", CONFIG, "--port", String(port), "--inspector-port", String(inspector)];
@@ -92,8 +99,8 @@ async function launch() {
   console.log(`Starting wrangler dev on port ${port} (PID ${pid})...`);
 
   for (let waited = 0; waited < 90; waited++) {
-    if (await answers(port)) return port;
     if (!alive(pid)) break;
+    if (await answers(port)) return port;
     await new Promise((done) => setTimeout(done, 1000));
   }
   const tail = readFileSync(LOG, "utf8").split("\n").slice(-30).join("\n");
@@ -169,7 +176,7 @@ async function seed(port) {
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(0, 3);
   const now = Date.now();
-  const at = (i, [map, row], share, party = false) => ({
+  const madeUpEntry = (i, [map, row], share, party = false) => ({
     map,
     level: row.mobs[0],
     expPerHour: Math.round(row.ceiling * share),
@@ -177,9 +184,9 @@ async function seed(port) {
     party,
   });
   const characters = {
-    MadeUpMage: { job: "Magician", entries: [at(1, maps[0], 0.6), at(2, maps[1], 0.5)] },
-    MadeUpThief: { job: "Assassin", entries: [at(3, maps[0], 0.4), at(4, maps[0], 0.9, true)] },
-    MadeUpBowman: { job: "Hunter", entries: [at(5, maps[0], 0.5), at(6, maps[2], 0.7)] },
+    MadeUpMage: { job: "Magician", entries: [madeUpEntry(1, maps[0], 0.6), madeUpEntry(2, maps[1], 0.5)] },
+    MadeUpThief: { job: "Assassin", entries: [madeUpEntry(3, maps[0], 0.4), madeUpEntry(4, maps[0], 0.9, true)] },
+    MadeUpBowman: { job: "Hunter", entries: [madeUpEntry(5, maps[0], 0.5), madeUpEntry(6, maps[2], 0.7)] },
   };
   console.log("Seeding made-up Characters...");
   for (const [name, { job, entries }] of Object.entries(characters)) {
@@ -204,8 +211,8 @@ function readRecord() {
   }
 }
 
-/** Whether `pid` is still the `serve` this script started: after a restart, the PID may be
- *  any other process's. */
+/** Whether `pid` is still the `serve` this worktree's script started: after a restart, the
+ *  PID may be any other process's. */
 function isOurs(pid) {
   if (!alive(pid)) return false;
   const command = WINDOWS
@@ -215,7 +222,7 @@ function isOurs(pid) {
         { encoding: "utf8" },
       ).stdout
     : spawnSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8" }).stdout;
-  return /site-local\.mjs"? serve/.test(command ?? "");
+  return (command ?? "").includes(SCRIPT) && / serve$/.test(command.trim());
 }
 
 function alive(pid) {
@@ -255,6 +262,14 @@ function freePort() {
       const { port } = server.address();
       server.close(() => done(port));
     });
+  });
+}
+
+function isFree(port) {
+  return new Promise((done) => {
+    const server = createServer();
+    server.once("error", () => done(false));
+    server.listen(port, "127.0.0.1", () => server.close(() => done(true)));
   });
 }
 
