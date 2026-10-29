@@ -5,7 +5,7 @@
 // none.)
 import { describe, expect, it } from "vitest";
 import type { PedestalsAnswer } from "../../entries";
-import { call, entry, FIELD, key, NO_CEILING, optOut, partyEntry, upload } from "./api";
+import { admin, call, entry, FIELD, key, NO_CEILING, optOut, partyEntry, upload } from "./api";
 import { knownOnClassicRank, photoOf, profileOf } from "./classicrank";
 
 /** The test config's map in Lv 20–29 with the made-up Map Mark, and its map in Lv 20–29 and
@@ -156,5 +156,17 @@ describe("the EXP/h Pedestal", () => {
     });
 
     expect(steps(await fastest()).map(([name]) => name)).toEqual(["Uma", "Tia", "Pia"]);
+  });
+});
+
+describe("a Block (ADR 0031)", () => {
+  it("keeps the Characters it reaches off both Pedestals, and out of everyone's podiums", async () => {
+    const blocked = await admin("/characters/uma/block", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    expect(blocked.status).toBeLessThan(300);
+
+    const answer = await read<PedestalsAnswer>("/api/pedestals");
+
+    expect(answer.expPerHour.map((s) => s.name)).toEqual(["Tia", "Pia", "Quin"]);
+    expect(answer.podiums.map((s) => s.name)).not.toContain("Uma");
   });
 });

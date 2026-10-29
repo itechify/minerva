@@ -3,6 +3,7 @@
 // (ADR 0022).
 import type { Kind, LatestEntry } from "../entries";
 import { markOf } from "./ceilings";
+import { HIDDEN, SHOWN } from "./blocks";
 import type { Answer } from "./http";
 import { isParty } from "./kinds";
 
@@ -15,10 +16,10 @@ export async function readLatest(env: Env, kind: Kind | null): Promise<Answer> {
   const rows = await env.DB.prepare(
     `SELECT c.name, e.job, e.level, e.exp_per_hour, e.set_at, e.map_id, e.band, e.party,
             t.name_key IS NOT NULL AS took, f.name AS from_name, t.from_exp_per_hour
-     FROM entries e JOIN characters c USING (name_key)
+     FROM ${SHOWN} e JOIN characters c USING (name_key)
      LEFT JOIN taken_tops t ON t.name_key = e.name_key AND t.map_id = e.map_id AND t.band = e.band
                            AND t.exp_per_hour = e.exp_per_hour AND t.party = e.party
-     LEFT JOIN characters f ON f.name_key = t.from_name_key
+     LEFT JOIN characters f ON f.name_key = t.from_name_key AND f.name_key NOT IN (${HIDDEN})
      WHERE ?2 IS NULL OR e.party = ?2
      ORDER BY e.set_at DESC, e.name_key, e.map_id, e.band, e.party LIMIT ?1`,
   )

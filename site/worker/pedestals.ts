@@ -2,8 +2,10 @@
 // most podiums, places in a Level Band's top 3 on a map, counted as a Character's page counts
 // them (ADR 0027): each kind of entry ranked on its own, so a Solo Best's place and a Party
 // Best's each count; and the three with the highest EXP/h on any map at any level, each by
-// their best entry.
+// their best entry. A Character a Block reaches stands on neither, nor counts in anyone's
+// podiums (ADR 0031).
 import type { ExpStep, PedestalsAnswer, PodiumsStep } from "../entries";
+import { SHOWN } from "./blocks";
 import { markOf } from "./ceilings";
 import type { Answer } from "./http";
 import { isParty } from "./kinds";
@@ -19,7 +21,7 @@ export async function readPedestals(env: Env): Promise<Answer> {
       `WITH ranked AS (
          SELECT name_key, set_at,
                 ROW_NUMBER() OVER (PARTITION BY map_id, band, party ORDER BY exp_per_hour DESC, set_at, name_key) AS rank
-         FROM entries),
+         FROM ${SHOWN}),
        podiums AS (
          SELECT name_key, COUNT(*) AS podiums, SUM(rank = 1) AS firsts, SUM(rank = 2) AS seconds, MIN(set_at) AS first_set
          FROM ranked WHERE rank <= 3 GROUP BY name_key)
@@ -31,7 +33,7 @@ export async function readPedestals(env: Env): Promise<Answer> {
     env.DB.prepare(
       `WITH best AS (
          SELECT e.*, ROW_NUMBER() OVER (PARTITION BY e.name_key ORDER BY e.exp_per_hour DESC, e.set_at, e.map_id, e.band, e.party) AS n
-         FROM entries e)
+         FROM ${SHOWN} e)
        SELECT c.name, b.job, b.level, b.exp_per_hour, b.set_at, b.party, b.map_id, b.band, ${PORTRAIT_COLUMNS}
        FROM best b JOIN characters c USING (name_key) ${PORTRAIT_JOIN}
        WHERE b.n = 1 ORDER BY b.exp_per_hour DESC, b.set_at, b.name_key LIMIT 3`,

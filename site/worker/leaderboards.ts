@@ -6,6 +6,7 @@ import { type Taken, type Top, takenTops, tell } from "./announce";
 import { type Answer, badRequest, body } from "./http";
 import { boardOf, isParty, sqlParty } from "./kinds";
 import { accountOfKey, touchKey } from "./accounts";
+import { BLOCKED, isBlocked, SHOWN } from "./blocks";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
 import { ceilingsOf } from "./ceilings";
@@ -98,8 +99,9 @@ interface Claim {
  *  the write may go ahead: only with the key that holds the name, or a key linked to the
  *  name's Account (ADR 0023). Another key is refused as "claimed", and kept as the one the
  *  maintainer would reassign the name to. A name first claimed by a linked key gets its
- *  Account. With `unclaimed: "leave"`, a name no key holds is left so, and the answer is
- *  `null`. */
+ *  Account. An upload a Block reaches is refused as "blocked" before it claims anything (ADR
+ *  0031). With `unclaimed: "leave"` (taking entries down, which a Block never stops), a name
+ *  no key holds is left so, and the answer is `null`. */
 async function claim(
   env: Env,
   request: Request,
@@ -115,6 +117,7 @@ async function claim(
   const limited = await limit(env, `key:${keyHash}`, WRITES);
   if (limited !== undefined) return limited;
   const account = await accountOfKey(env, keyHash);
+  if (unclaimed === "claim" && (await isBlocked(env, nameKey, keyHash, account))) return BLOCKED;
   type Holder = { key_hash: string; account_id: number | null };
   const holder =
     unclaimed === "claim"
@@ -160,8 +163,8 @@ interface Place {
  *  parameters, and a D1 statement takes at most 100. */
 const PLACES_PER_READ = 40;
 
-/** Each kind's top entry in each place that has one. The Both board remains the default
- *  read, but a top spot is taken from the board of its kind. */
+/** Each kind's top entry in each place that has one, as the boards show them. The Both board
+ *  remains the default read, but a top spot is taken from the board of its kind. */
 async function topsAt(env: Env, places: Place[]): Promise<Top[]> {
   const tops: Top[] = [];
   for (let from = 0; from < places.length; from += PLACES_PER_READ) {
@@ -172,7 +175,7 @@ async function topsAt(env: Env, places: Place[]): Promise<Top[]> {
            SELECT e.map_id, e.band, e.name_key, c.name, e.exp_per_hour, e.party,
                   ROW_NUMBER() OVER (PARTITION BY e.map_id, e.band, e.party
                                      ORDER BY e.exp_per_hour DESC, e.set_at, e.name_key) AS rank
-           FROM entries e JOIN characters c USING (name_key)
+           FROM ${SHOWN} e JOIN characters c USING (name_key)
            JOIN places p ON p.map_id = e.map_id AND p.band = e.band)
        SELECT map_id, band, name_key, name, exp_per_hour, party FROM ranked WHERE rank = 1`,
     )
@@ -369,7 +372,7 @@ export async function readMap(env: Env, map: string): Promise<Answer> {
   const rows = await env.DB.prepare(
     `SELECT band, (SELECT COUNT(*) FROM ${boardOf(null)} h WHERE h.map_id = ?1 AND h.band = e.band) AS entries,
             SUM(party = 0) AS solo, SUM(party = 1) AS party
-     FROM entries e WHERE map_id = ?1 GROUP BY band ORDER BY band`,
+     FROM ${SHOWN} e WHERE map_id = ?1 GROUP BY band ORDER BY band`,
   )
     .bind(map)
     .all<{ band: number; entries: number; solo: number; party: number }>();

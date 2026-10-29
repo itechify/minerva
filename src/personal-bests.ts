@@ -70,7 +70,7 @@ type Toggle = {
   maps: number;
   /** The switch is offered: they're shown, or have something to upload. */
   offered: boolean;
-  status: "off" | "sending" | "upToDate" | "retrying" | "claimed" | "held";
+  status: "off" | "sending" | "upToDate" | "retrying" | "claimed" | "blocked" | "held";
   /** Where they stand is a problem, said as one, which can be sent again. */
   problem: boolean;
   uploadedAtUnixMs: number | null;
@@ -871,8 +871,8 @@ function linkPrompt() {
   return note;
 }
 
-/** The shown Character's upload problems, whether Manage is open or not: held, claimed or
- *  tried again, each with its Send again, and the entries the site kept off. */
+/** The shown Character's upload problems, whether Manage is open or not: held, claimed,
+ *  blocked or tried again, each with its Send again, and the entries the site kept off. */
 function renderProblems() {
   const c = shown();
   const t = c?.leaderboard ?? null;
@@ -915,6 +915,22 @@ function renderProblems() {
       if (discord.offered) words.push("and your old PC was linked to Discord, ", linkButton("link this one", true), "; otherwise ");
       words.push(link, ", then press Send again.");
       problemsEl.append(problemNote(words, again));
+    } else if (t.status === "blocked") {
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "text-link";
+      link.dataset.control = "openDiscord";
+      link.textContent = "ask on Minerva's Discord";
+      problemsEl.append(
+        problemNote(
+          [
+            `${name}'s uploads to the Map Leaderboards are blocked, so Minerva isn't sending their bests. If you think that's a mistake, `,
+            link,
+            ". Once the block is lifted, press Send again.",
+          ],
+          again,
+        ),
+      );
     } else if (t.status === "retrying") {
       const last = t.uploadedAtUnixMs === null ? "" : ` Last uploaded ${when(t.uploadedAtUnixMs)}.`;
       const words = t.on

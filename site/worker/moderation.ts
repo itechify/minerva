@@ -1,7 +1,10 @@
 // Reports against entries, and the maintainer's routes: reading and dismissing the reports,
-// taking an entry down and restoring it, looking a name up, and reassigning it to the key its
-// player has now.
+// taking an entry down (or all of a Character's) and restoring it, looking a name up, and
+// reassigning it to the key its player has now. Each write says what the log keeps of it
+// (ADR 0031).
 import type { Kind } from "../entries";
+import { linesOf } from "./admin-log";
+import { blockReaching } from "./blocks";
 import { type Answer, badRequest, body } from "./http";
 import { hash } from "./keys";
 import { isParty, kindCondition, sqlKind, sqlParty } from "./kinds";
@@ -60,7 +63,25 @@ export async function deleteEntry(env: Env, name: string, map: string, band: str
     env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND map_id = ?2 AND band = ?3 AND ${kindCondition("?4")}`).bind(...at),
   ]);
   if (removed.meta.changes === 0) return { status: 404, body: { error: "no-entry" } };
-  return { status: 204 };
+  return { status: 204, logged: { nameKey: name.toLowerCase(), detail: `${map} ${band} ${kind ?? "solo and party"}` } };
+}
+
+/** Take every entry of `name` down, as `deleteEntry` takes each: each Visit stays off until
+ *  restored. */
+export async function deleteAllEntries(env: Env, name: string): Promise<Answer> {
+  const nameKey = name.toLowerCase();
+  const [removed] = await env.DB.batch([
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO removed_entries (name_key, map_id, band, exp_per_hour, party)
+       SELECT name_key, map_id, band, exp_per_hour, party FROM entries WHERE name_key = ?`,
+    ).bind(nameKey),
+    env.DB.prepare("DELETE FROM entries WHERE name_key = ?").bind(nameKey),
+    env.DB.prepare("DELETE FROM reports WHERE name_key = ?").bind(nameKey),
+    env.DB.prepare("DELETE FROM taken_tops WHERE name_key = ?").bind(nameKey),
+  ]);
+  const entries = removed.meta.changes;
+  if (entries === 0) return { status: 404, body: { error: "no-entry" } };
+  return { status: 204, logged: { nameKey, detail: `${entries} entr${entries === 1 ? "y" : "ies"}` } };
 }
 
 /** Every entry the maintainer took down, by its Character's name as it is now: the Visits
@@ -91,29 +112,39 @@ export async function restoreEntry(
     .bind(name.toLowerCase(), map, Number(band), Number(expPerHour), sqlParty(kind === "party"))
     .run();
   if (restored.meta.changes === 0) return { status: 404, body: { error: "no-removed" } };
-  return { status: 204 };
+  return { status: 204, logged: { nameKey: name.toLowerCase(), detail: `${map} ${band} ${kind ?? "solo"}` } };
 }
 
 /** Dismiss report `id`: the report goes, and the entry stays. */
 export async function dismissReport(env: Env, id: string): Promise<Answer> {
   if (!/^\d+$/.test(id)) return badRequest("a report is its number");
-  const dismissed = await env.DB.prepare("DELETE FROM reports WHERE id = ?").bind(Number(id)).run();
-  if (dismissed.meta.changes === 0) return { status: 404, body: { error: "no-report" } };
-  return { status: 204 };
+  const dismissed = await env.DB.prepare("DELETE FROM reports WHERE id = ? RETURNING name_key, map_id, band, party")
+    .bind(Number(id))
+    .first<{ name_key: string; map_id: string; band: number; party: number }>();
+  if (dismissed === null) return { status: 404, body: { error: "no-report" } };
+  const kind = isParty(dismissed.party) ? "party" : "solo";
+  return { status: 204, logged: { nameKey: dismissed.name_key, detail: `${dismissed.map_id} ${dismissed.band} ${kind}` } };
 }
 
 /** What the maintainer sees of `name`: when it was claimed, when another key was last
- *  refused for it, its Account's Discord username, and how many entries it has. */
+ *  refused for it, its Account's Discord username, its entries (hidden or not), the Block
+ *  that reaches it, and its lines in the log. */
 export async function readCharacter(env: Env, name: string): Promise<Answer> {
+  const nameKey = name.toLowerCase();
   const character = await env.DB.prepare(
-    `SELECT c.name, c.claimed_at, c.refused_at, c.account_id, l.username,
-            (SELECT COUNT(*) FROM entries e WHERE e.name_key = c.name_key) AS entries
+    `SELECT c.name, c.claimed_at, c.refused_at, c.account_id, l.username
      FROM characters c LEFT JOIN logins l ON l.account_id = c.account_id AND l.provider = 'discord'
      WHERE c.name_key = ?`,
   )
-    .bind(name.toLowerCase())
-    .first<{ name: string; claimed_at: number; refused_at: number | null; account_id: number | null; username: string | null; entries: number }>();
+    .bind(nameKey)
+    .first<{ name: string; claimed_at: number; refused_at: number | null; account_id: number | null; username: string | null }>();
   if (character === null) return { status: 404, body: { error: "no-character" } };
+  const entries = await env.DB.prepare(
+    `SELECT map_id AS map, band, party, level, job, exp_per_hour AS expPerHour, set_at AS setAt FROM entries
+     WHERE name_key = ? ORDER BY band DESC, exp_per_hour DESC, map_id, party`,
+  )
+    .bind(nameKey)
+    .all<{ map: string; band: number; party: number; level: number; job: string; expPerHour: number; setAt: number }>();
   return {
     status: 200,
     body: {
@@ -121,7 +152,9 @@ export async function readCharacter(env: Env, name: string): Promise<Answer> {
       claimedAt: character.claimed_at,
       refusedAt: character.refused_at,
       account: character.account_id === null ? null : { id: character.account_id, username: character.username },
-      entries: character.entries,
+      entries: entries.results.map((e) => ({ ...e, party: isParty(e.party) })),
+      blocked: await blockReaching(env, nameKey),
+      log: await linesOf(env, nameKey),
     },
   };
 }
@@ -163,13 +196,14 @@ export async function reassign(env: Env, request: Request, name: string): Promis
       .bind(asked.account)
       .first<string>("key_hash");
     if (to === null) return { status: 409, body: { error: "no-linked-key" } };
+    const account = asked.account as number;
     await env.DB.prepare(
       `UPDATE characters SET key_hash = ?2, account_id = ?3, claimed_at = ?4, refused_key_hash = NULL, refused_at = NULL
        WHERE name_key = ?1`,
     )
-      .bind(nameKey, to, asked.account, now)
+      .bind(nameKey, to, account, now)
       .run();
-    return { status: 200, body: { name: character.name } };
+    return { status: 200, body: { name: character.name }, logged: { nameKey, accountId: account, detail: "to the Account" } };
   }
   if (character.refused_key_hash === null) return { status: 409, body: { error: "no-refused-key" } };
   // The name's Account becomes the refused key's (none, if it isn't linked), so no key the
@@ -181,5 +215,5 @@ export async function reassign(env: Env, request: Request, name: string): Promis
   )
     .bind(nameKey, character.refused_key_hash, now)
     .run();
-  return { status: 200, body: { name: character.name, refusedAt: character.refused_at } };
+  return { status: 200, body: { name: character.name, refusedAt: character.refused_at }, logged: { nameKey, detail: "to the refused key" } };
 }

@@ -319,10 +319,10 @@ fn standing(state: &PanelState) -> (LeaderboardStatus, bool) {
 }
 
 #[test]
-fn an_upload_that_failed_or_whose_name_another_key_holds_is_a_problem_and_sent_again_goes_at_once() {
+fn an_upload_that_failed_was_blocked_or_whose_name_another_key_holds_is_a_problem_and_sent_again_goes_at_once() {
     use LeaderboardStatus::*;
     let offline = LeaderboardAnswer::Failed { why: "owlofminerva.app couldn't be reached".to_string() };
-    for (answer, status) in [(offline, Retrying), (LeaderboardAnswer::Claimed {}, Claimed)] {
+    for (answer, status) in [(offline, Retrying), (LeaderboardAnswer::Claimed {}, Claimed), (LeaderboardAnswer::Blocked {}, Blocked)] {
         let (mut minerva, id) = egbert_uploading();
         assert_eq!(standing(minerva.panel_state()), (Sending, false));
         assert_eq!(standing(&minerva.on_leaderboard_answer(id, answer).clone()), (status, true));
@@ -359,6 +359,32 @@ fn a_name_another_key_holds_says_so_and_is_tried_again_now_and_then_and_at_each_
     let id = state.leaderboard_uploads[0].id;
     let state = minerva.on_leaderboard_answer(id, taken()).clone();
     assert_eq!(toggle(&state, "Egbert").status, LeaderboardStatus::UpToDate);
+}
+
+#[test]
+fn blocked_nothing_more_goes_up_this_launch_but_the_deletion_and_the_next_launch_tries_once() {
+    let (mut minerva, id) = egbert_uploading();
+    minerva.on_leaderboard_answer(id, LeaderboardAnswer::Blocked {});
+    // Not later, nor at a change.
+    assert_eq!(sent(minerva.tick(2 * 60 * MIN)), []);
+    minerva.remove_visit(Some("Egbert"), CONSTRUCTION_SITE_ID, &visit(6000, Some(1), 31));
+    let state = minerva.tick(2 * 60 * MIN + S).clone();
+    assert_eq!(sent(&state), []);
+    assert_eq!(standing(&state), (LeaderboardStatus::Blocked, true));
+
+    // At the next launch, it's tried once more.
+    let mut again = tracking();
+    again.restore(minerva.settings());
+    again.restore_bests(saved_bests());
+    again.press(PanelControl::TogglePersonalBests);
+    again.on_wall_clock(WALL);
+    let state = again.tick(50).clone();
+    assert_eq!(sent(&state), [egbert(egberts_entries())]);
+    assert_eq!(standing(&state), (LeaderboardStatus::Sending, false));
+
+    // Turned off, their deletion still goes: a Block never keeps a player's entries up.
+    minerva.show_on_leaderboards("Egbert", false);
+    assert_eq!(sent(minerva.tick(2 * 60 * MIN + 2 * S)), [("Egbert".to_string(), None)]);
 }
 
 #[test]
@@ -599,6 +625,7 @@ fn the_sites_answers_read_as_what_they_mean() {
     assert_eq!(read(200, None, r#"{ "accepted": 3, "rejected": [] }"#), taken());
     assert_eq!(read(204, None, ""), LeaderboardAnswer::Deleted {});
     assert_eq!(read(409, None, r#"{ "error": "claimed" }"#), LeaderboardAnswer::Claimed {});
+    assert_eq!(read(403, None, r#"{ "error": "blocked" }"#), LeaderboardAnswer::Blocked {});
     assert_eq!(read(429, Some("37"), r#"{ "error": "rate-limited" }"#), LeaderboardAnswer::RateLimited { retry_after_secs: 37 });
     // With no time given, a minute.
     assert_eq!(read(429, None, ""), LeaderboardAnswer::RateLimited { retry_after_secs: 60 });

@@ -226,6 +226,10 @@ _Avoid_: password, token, account
 An optional sign-in on owlofminerva.app, with Discord, that the player links their PCs' Leaderboard Keys to (ADR 0023), each from that PC's Personal Bests window (Link Discord). A name its linked keys claimed may be written by any key linked to it, so the name follows the player to a new PC. Never needed to upload. The site keeps the Discord user ID and username, never shown. The maintainer signs in to one to moderate at `/admin/`.
 _Avoid_: profile, login (alone), user
 
+**Block**:
+The maintainer keeping a player off the Map Leaderboards until they lift it, from `/admin/` (ADR 0031). It reaches the Character's Account and every Leaderboard Key linked to it, the key that claimed the name, and, if asked, the name itself. Uploads it reaches are refused, and the Personal Bests window says so; every Character it reaches is hidden from the site, its entries kept for when it's lifted. Taking a single entry down is a take-down, not a Block.
+_Avoid_: ban, suspension
+
 **Time to Level**:
 How long the player would take to reach the next level at their net EXP rate.
 _Avoid_: ETA, time to next level

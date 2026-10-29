@@ -298,6 +298,28 @@ button:disabled {
 .button.icon svg {
   display: block;
 }
+/* Greyed out, as the game greys a button it won't take, and as setup's are. */
+.button:disabled,
+.button:disabled:hover,
+.button.secondary:disabled,
+.button.secondary:disabled:hover {
+  border-color: var(--disabled-edge);
+  background: var(--disabled-bg);
+  box-shadow: none;
+  color: var(--disabled-ink);
+  text-shadow: none;
+}
+/* A button asking before it does what it says (Block?, Delete this Account?): in the problem
+   palette, cream with an amber edge and brown words, as the app's armed buttons are. */
+.button.armed,
+.button.armed:hover,
+.button.armed:active {
+  border-color: var(--problem-edge);
+  background: var(--problem-bg);
+  box-shadow: none;
+  color: var(--problem-ink);
+  text-shadow: none;
+}
 /* On a phone or a touch screen, each of the window bar's buttons takes a thumb's tap, 44px
    tall, past its edge: the 10px between them is shared, so no tap lands on two. */
 @media (max-width: 640px), (hover: none) and (pointer: coarse) {
@@ -1841,6 +1863,7 @@ button.icon-button:active {
 }
 /* The search field, as the panel's: the one surface set into the body. */
 .lb-search input,
+.lb-search textarea,
 .faq-filter input,
 .lb-dialog textarea {
   box-sizing: border-box;
@@ -3440,6 +3463,10 @@ button.button {
   max-width: 44em;
   padding-top: 40px;
 }
+/* Moderation's views open on their content: the tab above names them. */
+.part[data-street="Moderation"] .lb-section {
+  padding-top: 28px;
+}
 /* A row of buttons, wrapping on a phone. */
 .account-actions {
   display: flex;
@@ -3508,6 +3535,56 @@ button.button {
 }
 .lb-section .lb-search {
   margin-top: 18px;
+}
+.lb-search textarea {
+  resize: vertical;
+}
+/* What the maintainer's Overview opens on: the open reports, a size up, with the way to them. */
+.account-lead {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 26px;
+}
+.account-lead a {
+  margin-left: 10px;
+  font-size: 15px;
+}
+/* A Character or an Account opened on the maintainer's page: its name heads what follows, its
+   Block or Account as a tag beside it. */
+.account-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 28px 0 0;
+  font-size: 23px;
+  line-height: 30px;
+}
+.account-name:focus {
+  outline: none;
+}
+.account-name:focus-visible {
+  outline: 2px solid var(--edit);
+  outline-offset: 4px;
+}
+.tag.blocked {
+  border-color: var(--problem-edge);
+  background: var(--problem-bg);
+  color: var(--problem-ink);
+}
+/* A Block's "Block the name too", a checkbox under the note rather than a field of its own. */
+.lb-search .account-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-weight: 400;
+}
+.lb-search .account-check input {
+  width: auto;
+  margin: 0;
+  box-shadow: none;
 }
 /* Who's signed in, in the window's bar beside the version, once a page has asked. */
 .window-signed-in {
