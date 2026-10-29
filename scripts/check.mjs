@@ -16,11 +16,6 @@ import { fileURLToPath } from "node:url";
 const REPO = fileURLToPath(new URL("..", import.meta.url));
 const LOGS = join(REPO, "_scratch", "checks");
 
-// The Worker's tests print "uncaught exception … internal error" while they pass (retro §10).
-// Until they call the Worker with an execution context and wait on it, the line is only a
-// warning; then set this, as site-check.yml fails on it too.
-const UNCAUGHT_FAILS = false;
-
 const CHECKS = [
   { name: "names", run: testNames },
   // First: the app embeds dist/ when it compiles (tauri.conf.json's frontendDist).
@@ -141,13 +136,14 @@ function readVitest(lines) {
     failed += Number(/(\d+) failed/.exec(m[1])?.[1] ?? 0);
     skipped += Number(/(\d+) skipped/.exec(m[1])?.[1] ?? 0);
   }
-  const uncaught = lines.filter((l) => /uncaught exception/i.test(l)).length;
+  // An uncaught exception in workerd fails the check even when every test passes, as it does
+  // site-check.yml: a test let something out of its made-up world.
+  const uncaught = lines.filter((l) => /uncaught exception/.test(l));
   const failing = lines.find((l) => /^\s*FAIL\s/.test(l)) ?? lines.find((l) => /^\s*[×✗]\s/.test(l));
   return {
-    counts: `${passed} passed, ${failed} failed${skipped ? `, ${skipped} skipped` : ""}`,
-    first: firstTscError(lines) ?? failing?.trim() ?? null,
-    warn: uncaught ? `${uncaught} "uncaught exception" lines (retro §10)` : null,
-    failOnWarn: UNCAUGHT_FAILS,
+    counts: `${passed} passed, ${failed} failed${skipped ? `, ${skipped} skipped` : ""}${uncaught.length ? `, ${uncaught.length} uncaught exceptions` : ""}`,
+    first: firstTscError(lines) ?? failing?.trim() ?? uncaught[0]?.trim() ?? null,
+    failed: uncaught.length > 0,
   };
 }
 
@@ -217,7 +213,7 @@ for (const check of checks) {
     read = check.run(log);
     code = read.code;
   }
-  const failed = code !== 0 || (read.warn && read.failOnWarn);
+  const failed = code !== 0 || read.failed;
   if (failed) failures++;
   const parts = [`exit ${code}`];
   if (read.counts) parts.push(read.counts);
@@ -225,7 +221,6 @@ for (const check of checks) {
   parts.push(duration(Date.now() - t0), shownLog);
   if (process.stdout.isTTY) process.stdout.write("\r\x1b[K");
   console.log(`${failed ? "FAIL" : "PASS"}  ${check.name.padEnd(width)}  ${parts.join("   ")}`);
-  if (read.warn) console.log(`WARN  ${check.name.padEnd(width)}  ${read.warn}   ${shownLog}`);
 }
 console.log(`${failures ? "FAIL" : "PASS"}  ${checks.length - failures} of ${checks.length} checks passed in ${duration(Date.now() - started)}`);
 process.exit(failures ? 1 : 0);

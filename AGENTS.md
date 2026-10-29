@@ -2,6 +2,7 @@
 
 ## Build and test
 
+- `pnpm check [--only <names>] [--from <name>]`: every check CI runs, in its order, each logged in full to `_scratch/checks/<name>.log`, with one PASS/FAIL line each (exit code, counts, first failure). Run it once before a PR and quote its summary lines; never pipe cargo's output through `grep` or `head` instead. The full `cargo test` takes ~9 min, so iterate with `cargo test --test <file>`.
 - `cargo test`: runs the `minerva-core` tests. The core is the default workspace member, so this never builds Tauri.
 - `cargo test -p minerva`: runs the app's own unit tests and the probe's (`update-manifest`'s), which `cargo test` leaves out.
 - `cargo clippy --workspace --all-targets -- -D warnings`: lint everything.
