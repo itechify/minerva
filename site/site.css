@@ -3994,12 +3994,18 @@ button.button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   min-width: 0;
   padding: 8px 6px 0;
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-2);
+}
+/* Under the blocks the job's icon takes its whole height, rather than reaching into the map's
+   line above it as it does in a table's row. */
+.lb-stand-floor .lb-job-icon {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 /* On a phone a step is too narrow for every job and its level on one line: each step gives its
    level a line of its own, so all three read alike. */
