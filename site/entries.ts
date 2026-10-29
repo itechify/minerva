@@ -105,6 +105,34 @@ export interface TrainingAnswer {
   maps: TrainingMap[];
 }
 
+/** A Character on the Podiums Pedestal: how many podiums they hold, places in a Level Band's
+ *  top 3 on a map, counted as their page counts them (a Solo Best's and a Party Best's
+ *  each). */
+export interface PodiumsStep {
+  name: string;
+  podiums: number;
+  portrait?: PortraitAnswer;
+}
+
+/** A Character on the EXP/h Pedestal: their best entry anywhere, where (the map and its Map
+ *  Mark, `null` for a map without one, and the Level Band) and their portrait. */
+export interface ExpStep extends Best {
+  map: string;
+  mark: MapMark | null;
+  band: number;
+  portrait?: PortraitAnswer;
+}
+
+/** GET /api/pedestals: the Map Leaderboards page's two Pedestals (ADR 0024, amended), each
+ *  at most three Characters, fewer while fewer qualify. `podiums`: the most podiums, most
+ *  first, a tie going to whoever holds more #1s, then more #2s, then whoever set their first
+ *  podium entry first. `expPerHour`: the highest EXP/h on any map at any level, one per
+ *  Character (their best entry), highest first, a tie going to whoever set it first. */
+export interface PedestalsAnswer {
+  podiums: PodiumsStep[];
+  expPerHour: ExpStep[];
+}
+
 /** An entry as Latest lists it: where (with the map's Map Mark, `null` for a map without
  *  one), and whether it took the top spot from another Character, from whom (`null` once
  *  they've left the Map Leaderboards) and what they had. */

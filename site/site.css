@@ -2393,8 +2393,16 @@ html.lb-band .lb-train,
   line-height: 18px;
   color: var(--ink-2);
 }
-/* The date a #1 was set on never breaks across lines ("22 / Oct"). */
+/* The date a #1 was set on, on a line of its own under who set it, so no line ends on a dot; it
+   never breaks across lines ("22 / Oct"), and nor does their job and level ("Cleric Lv 26"). */
 .lb-train-date {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.lb-train-job {
   white-space: nowrap;
 }
 /* Latest: an entry that took a map's top spot says so under it. */
@@ -3937,6 +3945,330 @@ button.button {
 .lb-table-box + .lb-credit {
   margin-top: 4px;
   padding-left: 12px;
+}
+
+/* The page's top: its title, then Where to train, then the Pedestals, as the page reads on a
+   narrow page, so the band choices come before anyone's podiums. On a wide one the Pedestals
+   stand beside the title, in the room the title art leaves, their tabs level with the art's
+   top, so either Pedestal fits beside it and switching moves nothing under it; Where to train
+   runs full width under both. */
+@media (min-width: 1000px) {
+  .lb-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22em;
+    grid-template-areas:
+      "head podiums"
+      "train train";
+    column-gap: 40px;
+    max-width: 60em;
+  }
+  .lb-top > .lb-head {
+    grid-area: head;
+  }
+  .lb-top > .lb-train {
+    grid-area: train;
+  }
+  .lb-top > .lb-pedestals {
+    grid-area: podiums;
+    align-self: start;
+    padding: 44px 0 8px;
+  }
+}
+/* The Pedestals (ADR 0024, amended): three steps, 2nd, 1st and 3rd from the left, each a
+   Character standing on a block in Inset, the 1st's the tallest, with the step's crown and
+   place on it. The list keeps 1st to 3rd for assistive tech and Tab; only the order on screen
+   changes. The crowns stay 14px on the blocks: the blocks are never filled with the metal. */
+.lb-pedestals {
+  max-width: 60em;
+  padding-top: 48px;
+}
+/* Its two tabs, Most podiums and Highest EXP/h, are its heading: 20px bold, the one shown in Ink
+   over a 2px Ink rule, the other in Ink Slate, Portal Blue under the pointer as a link is; then
+   the "?". */
+.lb-pedestal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lb-pedestal-tabs {
+  display: flex;
+  gap: 18px;
+}
+.lb-pedestal-tab {
+  padding: 0 0 3px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-3);
+  font: 700 20px/28px var(--font);
+  cursor: pointer;
+}
+.lb-pedestal-tab:hover {
+  color: var(--portal);
+}
+.lb-pedestal-tab[aria-selected="true"] {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+  cursor: default;
+}
+/* Both Pedestals in one cell, the one not shown out of sight and out of reach (`visibility`
+   keeps its room), so the box is always the taller one's. */
+.lb-pedestal-panels {
+  display: grid;
+}
+.lb-pedestal-panel {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.lb-pedestal-panel[data-off] {
+  visibility: hidden;
+}
+/* The "?": a 16px ring drawn in Ink Steel, as the game's small buttons draw their icons, a 32px
+   tap around it; what it says opens under it at the pointer, at the keyboard's focus or at a
+   tap, in a small window of its own. */
+.lb-help {
+  position: relative;
+  display: inline-flex;
+}
+.lb-help-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px 0 -6px -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  cursor: help;
+}
+.lb-help-button svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.lb-help-button .lb-help-dot {
+  fill: currentColor;
+  stroke: none;
+}
+.lb-help-button:hover,
+.lb-help-button[aria-expanded="true"] {
+  color: var(--portal);
+}
+.lb-tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -8px;
+  z-index: 2;
+  display: none;
+  box-sizing: border-box;
+  width: 17em;
+  padding: 8px 10px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(20, 30, 60, 0.16);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 19px;
+  text-align: left;
+}
+.lb-help:hover .lb-tip,
+.lb-help-button:focus-visible + .lb-tip,
+.lb-help-button[aria-expanded="true"] + .lb-tip {
+  display: block;
+}
+.lb-help.lb-hushed .lb-tip {
+  display: none;
+}
+/* Three rows every step shares (subgrid): its Character, as tall as the tallest step's; its
+   block's row, as tall as the 1st's; and under the blocks, on the EXP/h Pedestal, where and as
+   whom they set it. Each step's Character is set down onto its own block, so the blocks alone
+   make the podium's outline, however much one step's words wrap. */
+.lb-pedestal {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto 72px auto;
+  max-width: 34em;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+/* While the steps come, their room: a step's portrait, name and figure over the 1st's block. */
+.lb-pedestal.lb-waiting {
+  min-height: 236px;
+}
+.lb-stand {
+  --rise: 38px;
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+}
+.lb-stand-1 {
+  --rise: 72px;
+  order: 2;
+}
+.lb-stand-2 {
+  --rise: 52px;
+  order: 1;
+}
+.lb-stand-3 {
+  order: 3;
+}
+.lb-stand-who {
+  position: relative;
+  top: calc(72px - var(--rise));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 0 6px 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+.lb-stand-who .lb-portrait,
+.lb-stand-empty {
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  margin-bottom: 4px;
+}
+/* A step no one stands keeps its portrait's square, outlined and empty, over the link to put
+   yours there. */
+.lb-stand-empty {
+  box-sizing: border-box;
+  width: 96px;
+  border: 1px dashed var(--inset-edge);
+  border-radius: 2px;
+}
+.lb-stand-name {
+  max-width: 100%;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.lb-stand-figure {
+  font-size: 14px;
+  line-height: 20px;
+}
+/* The Party mark's line under a figure, as tall on a step without one. */
+.lb-stand-kind {
+  display: block;
+  height: 19px;
+  margin-top: 2px;
+}
+.lb-stand-kind .lb-party {
+  margin-left: 0;
+}
+/* Under a step's block: what its Character stands it for, then on Highest EXP/h the map it was
+   set on and the job and level, quieter than the step itself, the three steps' lines side by
+   side. */
+.lb-stand-floor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 6px 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+/* Under the blocks the job's icon takes its whole height, rather than reaching into the map's
+   line above it as it does in a table's row. */
+.lb-stand-floor .lb-job-icon {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+/* A step is too narrow for every job and its level on one line: each step gives its level a
+   line of its own, so all three read alike. */
+.lb-stand-floor .lb-stand-level {
+  display: block;
+}
+.lb-pedestal + .lb-credit {
+  margin-top: 14px;
+}
+/* A figure and what it counts ("380,000 EXP/h") never part, nor does a level ("Lv 27"). */
+.lb-stand-amount,
+.lb-stand-level {
+  white-space: nowrap;
+}
+.lb-stand-value {
+  color: var(--ink);
+}
+.lb-stand-where {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  max-width: 100%;
+}
+.lb-stand-map {
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.lb-stand-yours {
+  font-size: 14px;
+  line-height: 20px;
+}
+.lb-stand-block {
+  box-sizing: border-box;
+  display: flex;
+  align-self: end;
+  align-items: flex-start;
+  justify-content: center;
+  height: var(--rise);
+  padding-top: 8px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px 4px 0 0;
+  background: var(--inset-bg);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+}
+.lb-stand-1 .lb-stand-block {
+  position: relative;
+  margin: 0 -1px;
+}
+.lb-stand-block .lb-crown {
+  margin-top: 3px;
+}
+/* The Pedestals rise with the scroll (DESIGN.md, Motion): as it comes up into view from the
+   bottom of the window, each block comes up out of the floor to its height and its Character
+   with it, the 1st's the furthest, all of them stood in place by the time the whole podium is
+   in view. The scroll moves it, never a timer: scrolled back down, they go back down. A page
+   that opens with it already in view opens with it stood. The floor clips what is under it.
+   Without scroll-driven animations, or with reduced motion, it is the podium as it stands. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lb-pedestals .lb-pedestal {
+      view-timeline: --lb-podium block;
+      clip-path: inset(-8px -8px 0 -8px);
+    }
+    .lb-pedestals .lb-stand-block,
+    .lb-pedestals .lb-stand-who {
+      animation: lb-rise linear both;
+      animation-timeline: --lb-podium;
+      animation-range: entry 30% entry 100%;
+    }
+  }
+}
+@keyframes lb-rise {
+  from {
+    transform: translateY(var(--rise));
+  }
 }
 /* A Character with no entries: the line under the owl in Ink, as it is the page's whole say. */
 .ch-board .lb-said.ch-lost-said {

@@ -1,5 +1,5 @@
 ---
-status: accepted, amended 2026-10-23 (Where to train shows a long band's first 15 maps until Show all; Latest lists 10, each with its map's Map Mark), by #173 (Where to train and Latest can be filtered to solo or party entries, and mark a party one: ADR 0015), and by ADR-0027 (each name in Where to train and Latest links to its Character's page)
+status: accepted, amended 2026-10-23 (Where to train shows a long band's first 15 maps until Show all; Latest lists 10, each with its map's Map Mark), by #173 (Where to train and Latest can be filtered to solo or party entries, and mark a party one: ADR 0015), by ADR-0027 (each name in Where to train and Latest links to its Character's page), and 2026-10-28 by #189 (the Pedestals)
 ---
 
 # Where to train and Latest on the Map Leaderboards page
@@ -20,13 +20,23 @@ The page reads top to bottom: its title, Where to train full width, then Find a 
 
 **Amended 2026-10-23.** Every row shown with no cut-off buried the page: a band of 69 maps pushed Find a map and Latest some 4,000px down, and Latest's 20 rows left the search's column empty beside them. Where to train now shows a band of more than 20 maps by its first 15, in the order above, with a Show all button that lists the rest in place; the address stays the band's (the page works it out, `trainingTable`). Latest lists the 10 newest entries, and `GET /api/latest` gives each its map's Map Mark as `GET /api/bands/<band>` gives a map's (`"mark": { "id", "name", "picture" }`, or `null`), so Latest shows the mark beside the map's name as Where to train does.
 
+**Amended 2026-10-28 (#189).** The page stands two **Pedestals**, each three Characters standing on steps, 2nd, 1st and 3rd from the left, with their Portraits (and ClassicRank's credit under them) and names linking to their pages. They rank Characters, never players or Accounts, as everything on the site does (ADR 0027).
+
+- **Where:** beside the page's title on a wide page, in the room the title art leaves, and after Where to train on a narrow one, so the band choices come first. The page shows one Pedestal at a time, picked by its tab (Most podiums, then Highest EXP/h), with a "?" beside the tabs saying what the one shown ranks.
+- **Most podiums** stands the three Characters with the most podiums, places in a Level Band's top 3 on a map. Podiums are counted as a Character's page counts them: each kind of entry is ranked on its own, so a Solo Best's place and a Party Best's in the same band each count, and the two figures always agree. It counts every band, both kinds and every area. A tie goes to whoever holds more #1s, then more #2s, then whoever set their first podium entry first.
+- **Highest EXP/h** stands the three highest EXP/h on any map at any level, each Character by their best entry (the earlier on a tie), each with their job, level and map (a link to its page at the entry's band, the entry marked). A tie between them goes to whoever set it first. It ranks levels as much as players, since a higher level earns more EXP/h; Where to train ranks a band's maps for that. It was first built per band, under Where to train's table, following its kind and area, and replaced in review by this one, offered beside Most podiums as its other tab.
+- A step no one stands says "Yours could be here", linking to how to put your bests up.
+
+This lifts the deferral of crowns and #1s held under Considered options for the page, as ADR 0027 did for a Character's page. Neither Pedestal posts to Discord: a Top spot taken already does.
+
 ## The API
 
-Beside ADR 0015's, the Map Leaderboards page reads three more routes. They are public and cached for a minute, as the other reads are.
+Beside ADR 0015's, the Map Leaderboards page reads four more routes. They are public and cached for a minute, as the other reads are.
 
 - `GET /api/bands`: every Level Band with maps, lowest first. `{ "bands": [{ "band": 20, "levels": [20, 29], "maps": 68, "entries": 7 }] }`. `maps` counts the maps the band's table lists, and `entries` the entries those maps have in the band. A band with neither isn't listed.
 - `GET /api/bands/<band>`: the band's maps, by ID. `{ "band": 20, "levels": [20, 29], "maps": [{ "map": "010001010", "mobs": [3, 8], "mark": { "id": "Henesys", "name": "Henesys", "picture": "https://osmsdataexplorer.com/data/current/images/map_marks/Henesys.png" }, "entries": 2, "best": { "name": "Egbert", "job": "Magician", "level": 23, "expPerHour": 150000, "setAt": 1760000000000 } }] }`. A map the ceilings table doesn't hold has `mobs` and `mark` `null`, a map without a Map Mark has `mark` `null`, and a map with no entries in the band has `best` `null`. A band with no maps answers `maps: []`. `band` is the band's first level, as in ADR 0015; anything else is a 400.
 - `GET /api/latest`: `{ "entries": [{ "name": "Hakuo", "job": "Bandit", "level": 26, "expPerHour": 153000, "setAt": 1760000000000, "map": "010001010", "band": 20, "took": { "from": "Egbert", "fromExpPerHour": 150000 } }] }`, newest first. `took` is `null` for an entry that took no top spot, and `from` is `null` once that Character has opted out.
+- `GET /api/pedestals` (amended 2026-10-28): both Pedestals, read together, so the page switches between them without asking again. `{ "podiums": [{ "name": "Egbert", "podiums": 7, "portrait": { "photo": "...", "profile": "..." } }], "expPerHour": [{ "name": "Hakuo", "job": "Bandit", "level": 26, "expPerHour": 153000, "setAt": 1760000000000, "party": false, "map": "010001010", "mark": { "id", "name", "picture" }, "band": 20, "portrait": { ... } }] }`, each at most three, highest first, fewer while fewer qualify. `portrait` is as a band's entries give it (ADR 0029).
 
 The page orders, filters and names the maps itself (`site/leaderboards/leaderboards.ts`), from the map names fixture, as it names every map. An Event or Dev map is left out unless it has entries, as search leaves it out.
 

@@ -1,7 +1,7 @@
 // The Map Leaderboards pages' reads of the site's API (ADR 0015), and the few DOM helpers
 // both pages draw with.
 import fixture from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
-import { make, svgEl } from "../../src/dom.ts";
+import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import ceilings from "../worker/osms-ceilings.json";
 import {
   type JobClass,
@@ -11,7 +11,9 @@ import {
   mapNames,
   type MapNames,
   type Medal,
+  type Pedestal,
   type PortraitSlot,
+  type Stood,
   type Said,
   type Words,
 } from "./leaderboards.ts";
@@ -252,6 +254,150 @@ export function crown(medal: Medal): SVGSVGElement {
   defs.append(gradient);
   svg.append(defs, svgEl("path", { d: "M2 12.5 1 4.5l4 3 3-5 3 5 4-3-1 8Z", fill: `url(#${id})`, stroke: metal.edge }));
   return svg;
+}
+
+/** How a Pedestal's places read: on its blocks, and first in each step to assistive tech. */
+const PLACES: Record<Medal, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
+
+/** A Pedestal's three steps in `steps` (an <ol>), 1st to 3rd, the order assistive tech reads
+ *  them and Tab goes through them, the ranking's own; site.css stands them 2nd, 1st, 3rd, each
+ *  on its block, the 1st's the tallest, with its crown and place. On a step stand the
+ *  Character's portrait and name (a link to their page); under its block, what they stand it
+ *  for ("3 podiums", or "380,000 EXP/h" and a Party Best's mark), and on Highest EXP/h the map
+ *  (a link to its page at the band, with their entry marked) and their job and level. A step
+ *  no one stands asks for yours. */
+export function drawPedestal(steps: HTMLOListElement, pedestal: Pedestal) {
+  // With a Party Best on it, every step keeps a line for the mark, so their lines stay level.
+  const partyLine = pedestal.steps.some((s) => s.stood?.party);
+  steps.replaceChildren(
+    ...pedestal.steps.map(({ place, stood }) => {
+      const step = make("li", `lb-stand lb-stand-${place}`);
+      step.dataset.who = stood?.name.toLowerCase() ?? `none-${place}`;
+      const who = make("div", "lb-stand-who");
+      who.append(make("span", "sr-only", `${PLACES[place]}: `));
+      if (stood === null) {
+        // The room a portrait would take, kept empty, so the step reads as a place to stand.
+        if (pedestal.portraits) who.append(emptyPlace());
+        const yours = make("a", "lb-stand-yours", pedestal.empty.text);
+        yours.href = pedestal.empty.href;
+        who.append(yours);
+      } else {
+        if (stood.portrait !== null) who.append(portraitImage(stood.portrait, BAND_PORTRAIT));
+        who.append(characterLink(stood.name, stood.nameHref, "lb-stand-name"));
+      }
+      const block = make("div", "lb-stand-block");
+      block.setAttribute("aria-hidden", "true");
+      block.append(crown(place), PLACES[place]);
+      step.append(who, block);
+      if (stood !== null) step.append(floorOf(stood, partyLine));
+      return step;
+    }),
+  );
+}
+
+/** Restack (DESIGN.md, Motion): as the Pedestal `to` takes the place of `from`, drawn in the same
+ *  room, move each Character on both from their step on `from` to theirs on `to`, and bring in
+ *  whoever is new. With reduced motion it is there at once. */
+export function restack(from: HTMLOListElement, to: HTMLOListElement) {
+  if (!reducedMotion().matches) restackOnto(to, standing(from));
+}
+
+/** How a Pedestal restacks (DESIGN.md, Motion): the site's one exponential ease-out, as a
+ *  map's band morph moves. */
+const RESTACK: KeyframeAnimationOptions = { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
+
+/** What a Character brings to a step and takes from it: what stands on its block and what lies
+ *  under it. The blocks stay where they are. */
+const CARRIED = ":scope > .lb-stand-who, :scope > .lb-stand-floor";
+
+/** Where each one on a Pedestal stands, by who they are (a step no one stands by its place):
+ *  each part they carry, by its class, relative to the Pedestal. */
+function standing(steps: HTMLOListElement): Map<string, Map<string, DOMRect>> {
+  const box = steps.getBoundingClientRect();
+  const stood = new Map<string, Map<string, DOMRect>>();
+  for (const step of steps.querySelectorAll<HTMLElement>(":scope > .lb-stand")) {
+    const parts = new Map<string, DOMRect>();
+    for (const part of step.querySelectorAll<HTMLElement>(CARRIED)) {
+      const at = part.getBoundingClientRect();
+      parts.set(part.className, new DOMRect(at.x - box.x, at.y - box.y, at.width, at.height));
+    }
+    stood.set(step.dataset.who!, parts);
+  }
+  return stood;
+}
+
+/** Move each one on the Pedestal who stood on it `before` from there to their step now, and
+ *  bring in whoever is new to it; measured from the Pedestal, so where it is on the page
+ *  doesn't matter. Only `transform` and `opacity` move, and what they carry reads all the
+ *  way. */
+function restackOnto(steps: HTMLOListElement, before: Map<string, Map<string, DOMRect>>) {
+  if (before.size === 0) return;
+  const box = steps.getBoundingClientRect();
+  for (const step of steps.querySelectorAll<HTMLElement>(":scope > .lb-stand")) {
+    const was = before.get(step.dataset.who!);
+    for (const part of step.querySelectorAll<HTMLElement>(CARRIED)) {
+      const from = was?.get(part.className);
+      if (from === undefined) {
+        part.animate([{ opacity: 0 }, { opacity: 1 }], RESTACK);
+        continue;
+      }
+      const at = part.getBoundingClientRect();
+      const dx = from.x - (at.x - box.x);
+      const dy = from.y - (at.y - box.y);
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      // One crossing past another's step (2nd and 3rd trading places) goes faint as they pass,
+      // so the two never read as one pile in the middle.
+      const crossing = Math.abs(dx) > at.width;
+      part.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px)`, opacity: 1 },
+          ...(crossing ? [{ offset: 0.5, opacity: 0.15 }] : []),
+          { transform: "none", opacity: 1 },
+        ],
+        RESTACK,
+      );
+    }
+  }
+}
+
+/** What goes under a step's block: what its Character stands it for, on a line of its own
+ *  under it the Party mark for a Party Best (`partyLine`, that line kept empty on the other
+ *  steps), then on Highest EXP/h the map, with its Map Mark, then the job, with its icon, and
+ *  the level. */
+function floorOf(stood: Stood, partyLine: boolean): HTMLElement {
+  const floor = make("div", "lb-stand-floor");
+  const figure = make("span", "lb-stand-figure");
+  // The figure and what it counts never part.
+  const amount = make("span", "lb-stand-amount");
+  amount.append(make("strong", "lb-stand-value", stood.value), ` ${stood.label}`);
+  figure.append(amount);
+  if (partyLine) {
+    const kind = make("span", "lb-stand-kind");
+    if (stood.party) kind.append(partyMark());
+    figure.append(kind);
+  }
+  floor.append(figure);
+  if (stood.map !== null) {
+    const map = make("a", "lb-stand-map", stood.map.name);
+    map.href = stood.map.href;
+    const line = make("span", "lb-stand-where");
+    if (stood.map.mark !== null) line.append(markImage(stood.map.mark, true));
+    line.append(map);
+    floor.append(line);
+  }
+  if (stood.who !== null) {
+    const job = jobWithIcon(stood.who.job, stood.who.jobClass, "lb-stand-job", false);
+    job.append(" ", make("span", "lb-stand-level", stood.who.level));
+    floor.append(job);
+  }
+  return floor;
+}
+
+/** A step no one stands: its portrait's square, outlined and empty. Decoration. */
+function emptyPlace(): HTMLElement {
+  const place = make("span", "lb-stand-empty");
+  place.setAttribute("aria-hidden", "true");
+  return place;
 }
 
 /** `words` drawn, a link for each that has one. */

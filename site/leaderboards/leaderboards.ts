@@ -15,6 +15,7 @@ import {
   type Kind,
   type LatestAnswer,
   type MapMark,
+  type PedestalsAnswer,
   type PortraitAnswer,
   type Ranked,
   type TrainingAnswer,
@@ -52,7 +53,7 @@ export function portraitSlot(answer: PortraitAnswer | undefined): PortraitSlot |
 export function medalOf(rank: number): Medal | null {
   return rank >= 1 && rank <= 3 ? (rank as Medal) : null;
 }
-export type { BandAnswer, BandsAnswer, Kind, LatestAnswer, MapMark, Ranked, TrainingAnswer } from "../entries.ts";
+export type { BandAnswer, BandsAnswer, Kind, LatestAnswer, MapMark, PedestalsAnswer, Ranked, TrainingAnswer } from "../entries.ts";
 
 /** A map's page as its address names it: `/leaderboards/map/?map=<ID>&band=<first level>&name=<name>&kind=<kind>`.
  *  Any part may be missing, or dropped for not being one. */
@@ -712,6 +713,110 @@ export function trainingTable(
     empty:
       rows.length === 0 ? { text: `No map has mobs at ${at}, and no one at those levels has a ${kindWord(link.kind)}best yet.`, link: PUT_YOURS } : null,
   };
+}
+
+/** A Character on a Pedestal's step: their name (a link to their page), their portrait, and
+ *  what they stand it for, its figure and what it counts ("7 podiums"). On the EXP/h Pedestal, also their job and level, and the map they set
+ *  it on. */
+export interface Stood {
+  name: string;
+  nameHref: string;
+  /** `null` for none at all, while the API gives none. */
+  portrait: PortraitSlot | null;
+  value: string;
+  label: string;
+  /** Their job ("Magician") and the job's class, whose icon goes beside it, and their level
+   *  ("Lv 25"), which a narrow step puts on a line of its own, never splitting it. */
+  who: { job: string; jobClass: JobClass | null; level: string } | null;
+  /** The map, with its Map Mark (`null` for a map without one), and its page at the band
+   *  with the entry marked. */
+  map: { name: string; href: string; mark: { name: string; picture: string } | null } | null;
+  /** Whether it's a Party Best's: the step marks it. */
+  party: boolean;
+}
+
+/** A step on a Pedestal: its place, and who stands it; `null` while no one does. */
+export interface PedestalStep {
+  place: Medal;
+  stood: Stood | null;
+}
+
+/** A Pedestal (ADR 0024, amended): its three steps, 1st to 3rd (the page stands them 2nd,
+ *  1st, 3rd), the link a step no one stands shows, and whether its steps show portraits, so
+ *  the page credits ClassicRank under it. */
+export interface Pedestal {
+  steps: [PedestalStep, PedestalStep, PedestalStep];
+  empty: { text: string; href: string };
+  portraits: boolean;
+}
+
+/** What a step no one stands says, and where it goes. */
+const YOURS_HERE = { text: "Yours could be here", href: PUT_YOURS.href };
+
+function pedestalOf(stood: Stood[]): Pedestal {
+  const step = (place: Medal): PedestalStep => ({ place, stood: stood[place - 1] ?? null });
+  return { steps: [step(1), step(2), step(3)], empty: YOURS_HERE, portraits: stood.some((s) => s.portrait !== null) };
+}
+
+/** Which of the page's Pedestals shows: the most podiums, or the highest EXP/h. */
+export type PedestalKind = "podiums" | "exp";
+
+/** A Pedestal as the page offers it: its name on its tab, what its "?" says it ranks, and the
+ *  Pedestal. */
+export interface PedestalChoice {
+  kind: PedestalKind;
+  label: string;
+  about: string;
+  pedestal: Pedestal;
+}
+
+/** The page's two Pedestals, from GET /api/pedestals, Most podiums first: the three with the
+ *  most podiums, each counted as their page counts them; and the three with the highest EXP/h
+ *  on any map at any level, each map linking to its page at the entry's band, the entry
+ *  marked. */
+export function pedestalChoices(answer: PedestalsAnswer, names: MapNames): PedestalChoice[] {
+  const podiums = pedestalOf(
+    answer.podiums.map((c) => ({
+      name: c.name,
+      nameHref: characterLinkTo(c.name),
+      portrait: portraitSlot(c.portrait),
+      value: whole(c.podiums),
+      label: c.podiums === 1 ? "podium" : "podiums",
+      who: null,
+      map: null,
+      party: false,
+    })),
+  );
+  const fastest = pedestalOf(
+    answer.expPerHour.map((e) => ({
+      name: e.name,
+      nameHref: characterLinkTo(e.name),
+      portrait: portraitSlot(e.portrait),
+      value: rate(e.expPerHour),
+      label: "EXP/h",
+      who: { job: e.job, jobClass: classOf(e.job), level: `Lv ${e.level}` },
+      map: {
+        name: placeOf(names, e.map).name,
+        href: linkTo({ map: e.map, band: e.band, name: e.name, kind: null }),
+        mark: e.mark === null ? null : { name: e.mark.name, picture: e.mark.picture },
+      },
+      party: e.party,
+    })),
+  );
+  return [
+    {
+      kind: "podiums",
+      label: "Most podiums",
+      about: "A podium is a place in a Level Band's top 3 on a map. Solo and party bests are ranked separately, so each can earn one.",
+      pedestal: podiums,
+    },
+    {
+      kind: "exp",
+      label: "Highest EXP/h",
+      about: "Each character's best EXP per hour on any map, at any level.",
+      pedestal: fastest,
+    },
+  ];
 }
 
 /** What Where to train says before a band is picked. */
