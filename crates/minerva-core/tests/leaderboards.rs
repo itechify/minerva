@@ -849,6 +849,17 @@ fn a_pull_of_a_name_another_key_holds_says_so_and_sends_nothing() {
 }
 
 #[test]
+fn a_rate_limited_pull_holds_up_the_deletion_too_as_long_as_the_site_said() {
+    let (mut player, at) = a_best_after_the_bests_were_lost(&["Egbert"]);
+    player.minerva.tick(at);
+    // Turned off while the pull is under way, and the site says to wait a minute.
+    player.minerva.show_on_leaderboards("Egbert", false);
+    pull_answered(&mut player.minerva, "Egbert", LeaderboardAnswer::RateLimited { retry_after_secs: 60 });
+    assert_eq!(player.minerva.tick(at + 30 * S).leaderboard_uploads, []);
+    assert_eq!(sent(player.minerva.tick(at + 61 * S)), [("Egbert".to_string(), None)]);
+}
+
+#[test]
 fn held_uploads_stay_held_at_the_next_launch_until_pulled() {
     let player = lost_bests(&["Egbert", "Bob"]);
     // The bests file the shell saves from now on reads at the next launch, but holds only

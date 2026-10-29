@@ -38,8 +38,9 @@
 //!   the bests set since), until their entries are pulled from the site and merged in. While
 //!   that fails, the toggle says why, as a problem, and sending them again pulls at once.
 //!   Turning them off and on sends what is here, deleting first.
-//! - **Problems** (held, blocked, a name claimed, an upload tried again) the window says as problems,
-//!   and the player can send them again at once rather than wait.
+//! - **Problems** (held with the pull failing, blocked, a name claimed, an upload tried again) the
+//!   window says as problems, and the player can send them again at once rather than wait (held,
+//!   that pulls at once).
 
 use crate::personal_best::{LevelBand, SavedBests, VisitBest, band_bests};
 use crate::SITE_URL;
@@ -537,8 +538,9 @@ impl Leaderboards {
                 Some(entries) => standing.confirmed.as_ref() != Some(entries),
                 None => true,
             };
+            // A pull that failed holds up nothing but the next pull, unless the site said how long.
             let waiting = standing.wait.as_ref().is_some_and(|wait| {
-                !wait.pull && self.now_ms < wait.until_ms && (wait.rate_limited || wait.wanted == wanted)
+                (!wait.pull || wait.rate_limited) && self.now_ms < wait.until_ms && (wait.rate_limited || wait.wanted == wanted)
             });
             if due && !waiting {
                 self.last_id += 1;

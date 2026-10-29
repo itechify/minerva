@@ -193,6 +193,9 @@ fn a_character_that_levels_up_keeps_its_best_in_each_lower_level_band_past_the_1
     // Shown on the Map Leaderboards, his best in each band on the map is an entry.
     player.minerva.show_on_leaderboards("Egbert", true);
     let at = player.at;
+    // What the site holds of him first: nothing yet.
+    let pull = player.minerva.tick(at).leaderboard_uploads[0].id;
+    player.minerva.on_leaderboard_answer(pull, minerva_core::LeaderboardAnswer::Pulled { entries: Vec::new() });
     let state = player.minerva.tick(at);
     let entries: Vec<(String, u32, u64)> = state.leaderboard_uploads[0]
         .entries

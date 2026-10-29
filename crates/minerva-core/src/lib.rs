@@ -334,7 +334,8 @@ pub struct PanelState {
     #[serde(skip_serializing)]
     pub personal_bests: PersonalBestsWindow,
     /// The uploads to the Map Leaderboards under way (#110), for the shell to make: each
-    /// shown Character's whole set of entries, or the deletion of one taken off. The shell
+    /// shown Character's whole set of entries, the deletion of one taken off, or the pull of the
+    /// set the site holds of one before their set goes up (#206). The shell
     /// makes each once, by its id, and tells the answer to [`Minerva::on_leaderboard_answer`].
     /// Not sent to the overlay.
     #[serde(skip_serializing)]
