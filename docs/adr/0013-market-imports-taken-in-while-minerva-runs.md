@@ -1,5 +1,5 @@
 ---
-status: accepted, amended 2026-10-28 (Minerva fetches maplestory.market's prices, ADR 0030; imports in shape 2 still read)
+status: accepted, amended by ADR-0030
 ---
 
 # Market Imports, taken in while Minerva runs
@@ -21,7 +21,7 @@ So Minerva stays the only writer of `market-prices.json`, and a tool hands its p
 - An import removes nothing: neither a line nor a price. Only the player removes them, on the card, which asks first because a line's prices don't come back (ADR 0011). A tool's line the player removed comes back with the tool's next import that names it.
 - The prices are saved at once, as typed ones are, and every card shows them from then on, an open one included. A field left open stays open.
 
-Minerva still fetches no market prices (ADR 0010). The player's tool fetches them, from where the player may, as the player types theirs.
+Imports supply the player's own Market Lines. ADR 0030 separately fetches read-only maplestory.market prices; imports in shape 2 still read.
 
 ## Considered options
 

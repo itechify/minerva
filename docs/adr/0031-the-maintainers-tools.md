@@ -4,7 +4,7 @@ status: accepted
 
 # The maintainer's tools: an overview, Accounts, Blocks and a log
 
-`/admin/` (ADR 0023) moderates only what players report: a report's entry can be dismissed or taken down, and a name looked up and reassigned. Everything else is `curl` with `ADMIN_TOKEN`, or SQL by hand: refreshing portraits, an entry nobody reported, an Account a player asks to have removed. Nothing keeps a player who cheats off the Map Leaderboards for good, since a take-down keeps only that one Visit off (ADR 0015), and nothing records what the maintainer did, or when. This records the tools `/admin/` gains for each.
+`/admin/` gives the maintainer an overview, Account and Character management, Blocks and a log of administrative writes. It uses the same authenticated routes as token-based administration (ADR 0023).
 
 ## The decision
 
@@ -36,11 +36,9 @@ As ADR 0015 and ADR 0023, every answer JSON and every refusal `{ "error": "<code
 
 ## Considered options
 
-- **A moderator role** beside the maintainer, with fewer powers. Nobody helps moderate yet, and a second role is a second variable, a check on every route, and a page that hides parts of itself. It's added the day someone does.
 - **A Block on the key alone.** A blocked player would link a new PC to their Account, or reinstall, and carry on. On the Account alone, unlinking the PC would free its key.
 - **Taking a blocked player's entries down**, as Take all down does. Unblocking after a mistake would mean restoring each entry, and each one's next upload. Hidden, they come back as they were.
 - **A quiet Block**, every upload answered as taken. The player would see their bests never show, and send a Bug Report the maintainer then has to chase. Minerva doesn't do things to a player silently, as its updates aren't (ADR 0019).
-- **Blocks that end by themselves.** Nobody has needed one yet; a Block is lifted by hand until someone does.
 - **Taking a Discord post down with its entry.** The webhook would have to be asked to wait for each post's message ID, and D1 to keep it for each spot, and a post holds several spots, so it would be edited rather than deleted. The channel is a history, and its link already shows the board as it is.
 - **A count of uploads for the Overview.** One more write on every upload, for a figure new bests already stand in for.
 
@@ -49,4 +47,3 @@ As ADR 0015 and ADR 0023, every answer JSON and every refusal `{ "error": "<code
 - A Block, an Unblock or a take-down shows on the public reads within a minute, as long as they're cached (ADR 0015).
 - Nothing keeps a player who's blocked from uploading again with a new key and a new name. A Block is for the player who keeps their name; a new name starts at the bottom again.
 - A Minerva from before this shows a blocked upload as failed ("HTTP 403: blocked"), and tries again as it does after any failure.
-- `0007_maintainers_tools.sql` only adds tables, so the Worker before it keeps working between the migration and the deploy.
