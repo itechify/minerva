@@ -34,7 +34,7 @@ How a Minerva version is numbered, made and published as a GitHub Release. Follo
   - If dependencies were added, removed or upgraded, regenerate the crate table in `THIRD-PARTY-NOTICES.md` (how is described there).
   - If a bundled asset or data source changed, update About & Credits in `setup.html` to match.
 - **The Map Leaderboards API is live** with the API and migrations this release needs: provisioning and deploy instructions are in `docs/map-leaderboards-setup.md`. `curl https://owlofminerva.app/api/maps` answers with JSON.
-- **The updater's signing key is at hand** (#125): the minisign private key and its password, from the password manager. Every installer is signed with it, and installed copies only take an update it signed. If it's lost, they can never update again.
+- **The updater's signing key is at hand** (#125): the minisign private key and its password, from the password manager. The private key is password-protected, kept in the maintainer's password manager with an offline backup. Every installer is signed with it, and installed copies only take an update it signed. If it's lost, they can never update again.
 - **Tools:** `gh` is signed in to an account that can push to `itechify/minerva`. Cargo is on `PATH`; in Git Bash, `export PATH="$HOME/.cargo/bin:$PATH"`.
 
 Before step 1, tell the user how each item above stands: ran and passed, already true, or skipped and why.
