@@ -4064,6 +4064,31 @@ button.button {
 .lb-stand-block .lb-crown {
   margin-top: 3px;
 }
+/* Most podiums rises with the scroll (DESIGN.md, Motion): as it comes up into view from the
+   bottom of the window, each block comes up out of the floor to its height and its Character
+   with it, the 1st's the furthest, all of them stood in place by the time the whole podium is
+   in view. The scroll moves it, never a timer: scrolled back down, they go back down. A page
+   that opens with it already in view opens with it stood. The floor clips what is under it.
+   Without scroll-driven animations, or with reduced motion, it is the podium as it stands. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    #podiums-steps {
+      view-timeline: --lb-podium block;
+      clip-path: inset(-8px -8px 0 -8px);
+    }
+    #podiums-steps .lb-stand-block,
+    #podiums-steps .lb-stand-who {
+      animation: lb-rise linear both;
+      animation-timeline: --lb-podium;
+      animation-range: entry 30% entry 100%;
+    }
+  }
+}
+@keyframes lb-rise {
+  from {
+    transform: translateY(var(--rise));
+  }
+}
 /* The band's EXP/h Pedestal, under Where to train's maps. */
 .lb-train-pedestal {
   margin-top: 40px;

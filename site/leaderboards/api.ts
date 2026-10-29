@@ -1,7 +1,7 @@
 // The Map Leaderboards pages' reads of the site's API (ADR 0015), and the few DOM helpers
 // both pages draw with.
 import fixture from "../../crates/minerva-core/tests/fixtures/osms-map-names.json";
-import { make, svgEl } from "../../src/dom.ts";
+import { make, reducedMotion, svgEl } from "../../src/dom.ts";
 import ceilings from "../worker/osms-ceilings.json";
 import {
   type JobClass,
@@ -265,11 +265,15 @@ const PLACES: Record<Medal, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
  *  Character's portrait, their name (a link to their page) and what they stand it for; on the
  *  EXP/h Pedestal, the map (a link to its page at the band, with their entry marked) and their
  *  job and level go under its block, so the steps carry no more than Most podiums' do. A step
- *  no one stands asks for yours. `credit` shows while any step has a portrait. */
-export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedestal: Pedestal) {
+ *  no one stands asks for yours. `credit` shows while any step has a portrait. `restack`, for a
+ *  Pedestal drawn again at a click, moves its Characters from where they stood to where they
+ *  stand now (`restackOnto`). */
+export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedestal: Pedestal, restack = false) {
+  const before = restack && !reducedMotion().matches ? standing(steps) : null;
   steps.replaceChildren(
     ...pedestal.steps.map(({ place, stood }) => {
       const step = make("li", `lb-stand lb-stand-${place}`);
+      step.dataset.who = stood?.name.toLowerCase() ?? `none-${place}`;
       const who = make("div", "lb-stand-who");
       who.append(make("span", "sr-only", `${PLACES[place]}: `));
       if (stood === null) {
@@ -299,6 +303,55 @@ export function drawPedestal(steps: HTMLOListElement, credit: HTMLElement, pedes
     }),
   );
   credit.hidden = !pedestal.portraits;
+  if (before !== null) restackOnto(steps, before);
+}
+
+/** How a Pedestal restacks (DESIGN.md, Motion): the site's one exponential ease-out, as a
+ *  map's band morph moves. */
+const RESTACK: KeyframeAnimationOptions = { duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
+
+/** What a Character brings to a step and takes from it: what stands on its block and what lies
+ *  under it. The blocks stay where they are. */
+const CARRIED = ":scope > .lb-stand-who, :scope > .lb-stand-floor";
+
+/** Where each one on a Pedestal stands, by who they are (a step no one stands by its place):
+ *  each part they carry, by its class, relative to the Pedestal. */
+function standing(steps: HTMLOListElement): Map<string, Map<string, DOMRect>> {
+  const box = steps.getBoundingClientRect();
+  const stood = new Map<string, Map<string, DOMRect>>();
+  for (const step of steps.querySelectorAll<HTMLElement>(":scope > .lb-stand")) {
+    const parts = new Map<string, DOMRect>();
+    for (const part of step.querySelectorAll<HTMLElement>(CARRIED)) {
+      const at = part.getBoundingClientRect();
+      parts.set(part.className, new DOMRect(at.x - box.x, at.y - box.y, at.width, at.height));
+    }
+    stood.set(step.dataset.who!, parts);
+  }
+  return stood;
+}
+
+/** Move each one still on the Pedestal from where they stood `before` to their step now, and
+ *  bring in whoever is new to it; measured from the Pedestal, so a table above it growing or
+ *  shrinking doesn't carry them across the page. Only `transform` and `opacity` move, and what
+ *  they carry reads all the way. */
+function restackOnto(steps: HTMLOListElement, before: Map<string, Map<string, DOMRect>>) {
+  if (before.size === 0) return;
+  const box = steps.getBoundingClientRect();
+  for (const step of steps.querySelectorAll<HTMLElement>(":scope > .lb-stand")) {
+    const was = before.get(step.dataset.who!);
+    for (const part of step.querySelectorAll<HTMLElement>(CARRIED)) {
+      const from = was?.get(part.className);
+      if (from === undefined) {
+        part.animate([{ opacity: 0 }, { opacity: 1 }], RESTACK);
+        continue;
+      }
+      const at = part.getBoundingClientRect();
+      const dx = from.x - (at.x - box.x);
+      const dy = from.y - (at.y - box.y);
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      part.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], RESTACK);
+    }
+  }
 }
 
 /** What goes under a step's block on the EXP/h Pedestal: the map, with its Map Mark, then the

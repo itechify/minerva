@@ -108,8 +108,9 @@ async function readBand(band: number, kind: Kind | null): Promise<TrainingAnswer
 /** Which draw is the latest, so a slower answer to an earlier click is dropped. */
 let draws = 0;
 
-/** Draw what `link` names: the bands, and the open band's table. */
-async function show() {
+/** Draw what `link` names: the bands, and the open band's table; `restack`, at a click (or
+ *  Back and Forward), the band's EXP/h Pedestal restacking from what it showed. */
+async function show(restack = false) {
   const turn = ++draws;
   if (bands === null) return;
   drawBands();
@@ -128,11 +129,11 @@ async function show() {
   if (turn !== draws) return;
   section.removeAttribute("aria-busy");
   if (answer === null) return down();
-  drawTable(answer);
+  drawTable(answer, restack);
 }
 
 /** The open band's table, from its answer: its first 15 maps, or all of them. */
-function drawTable(answer: TrainingAnswer) {
+function drawTable(answer: TrainingAnswer, restack = false) {
   const shown = trainingTable(answer, names, link, new Date(), { all });
   // An area the band has no maps in shows every area, and the address says so.
   if (shown.area !== link.area) {
@@ -142,7 +143,7 @@ function drawTable(answer: TrainingAnswer) {
   }
   drawAreas(shown.areas, shown.area);
   if (shown.empty !== null) return say(shown.empty);
-  drawExpPedestal(answer, shown.area);
+  drawExpPedestal(answer, shown.area, restack);
   // Maps none of which has an entry: said once, over them.
   if (shown.none !== null) saidWith(said, shown.none);
   said.hidden = shown.none === null;
@@ -153,13 +154,15 @@ function drawTable(answer: TrainingAnswer) {
   done();
 }
 
-/** The band's EXP/h Pedestal in the area the table shows, once someone has an entry there. */
-function drawExpPedestal(answer: TrainingAnswer, area: string | null) {
+/** The band's EXP/h Pedestal in the area the table shows, once someone has an entry there;
+ *  `restack`, from what it showed, if it showed anything (DESIGN.md, Motion). */
+function drawExpPedestal(answer: TrainingAnswer, area: string | null, restack: boolean) {
   const shown = expPedestal(answer, names, link.kind, area);
+  const showing = !pedestal.hidden;
   pedestal.hidden = shown === null;
   if (shown === null) return;
   pedestalTitle.textContent = shown.title;
-  drawPedestal(pedestalSteps, pedestalCredit, shown);
+  drawPedestal(pedestalSteps, pedestalCredit, shown, restack && showing);
 }
 
 /** The row under a long band's first 15: Show all, which shows the rest in place and
@@ -267,7 +270,7 @@ function go(to: TrainingLink) {
   link = to;
   all = false;
   history.pushState(null, "", trainingLinkTo(link));
-  show();
+  show(true);
 }
 
 /** A click on a band or an area switches in place. A click meant for a new tab or window,
@@ -285,7 +288,7 @@ areasNav.addEventListener("click", (event) => switchOnClick(event, "a.lb-area"))
 addEventListener("popstate", () => {
   link = readTrainingLink(location.search);
   all = false;
-  show();
+  show(true);
 });
 
 /** Read the Level Bands, then draw what the address names. */
