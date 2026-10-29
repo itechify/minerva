@@ -1,24 +1,47 @@
-# Every ADR has a number of its own, so "ADR 0017" names one decision. Two once shared a
-# number for weeks before a review noticed.
+# Every ADR and every D1 migration has a number of its own, so "ADR 0017" names one decision
+# and migrations apply in one order. Two ADRs once shared a number for weeks before a review
+# noticed, and numbers have clashed with other open pull requests' since.
 name: ADR check
 
 on:
   pull_request:
     paths:
       - docs/adr/**
+      - site/migrations/**
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   numbers:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Each ADR number is used once
+        with:
+          fetch-depth: 0
+      - name: Each ADR and migration number is used once
         run: |
-          twice=$(ls docs/adr | sed 's/-.*//' | sort | uniq -d)
-          if [ -n "$twice" ]; then
-            echo "ADR numbers used twice: $twice"
-            exit 1
-          fi
+          for dir in docs/adr site/migrations; do
+            twice=$(ls "$dir" | sed 's/[-_].*//' | sort | uniq -d)
+            if [ -n "$twice" ]; then
+              echo "$dir numbers used twice: $twice"
+              exit 1
+            fi
+          done
+      - name: No other open pull request adds the same number
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          paths=$(gh pr list --repo "${{ github.repository }}" --state open --limit 100 --json number,files \
+            --jq '.[] | select(.number != ${{ github.event.number }}) | .files[].path')
+          for dir in docs/adr site/migrations; do
+            mine=$(git diff --name-only --diff-filter=A "origin/${{ github.base_ref }}...HEAD" -- "$dir" | sed 's#.*/##; s/[-_].*//' | sort -u)
+            others=$(echo "$paths" | grep "^$dir/" | sed 's#.*/##; s/[-_].*//' | sort -u || true)
+            clash=$(comm -12 <(echo "$mine") <(echo "$others") | grep . || true)
+            if [ -n "$clash" ]; then
+              echo "$dir: another open pull request also adds number $clash. Take the next free one."
+              exit 1
+            fi
+          done
