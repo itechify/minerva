@@ -23,8 +23,10 @@
 //!   read it (it may have been misread).
 //! - Where a reader that looks for its place in a capture found nothing, one such capture from
 //!   the last [`RECENT_CROPS_MS`], whole (#133): the Deal Finder's client area, the latest whose
-//!   reader saw a near miss, else the latest; and the Status Bar's strip, the latest. It is held
-//!   as captured, and made a PNG only when a report is saved.
+//!   reader saw a near miss, else the latest; the Status Bar's strip, the latest; and the title
+//!   capture, the latest once the Minimap Title had gone unfound for [`TITLE_UNFOUND_MS`], longer
+//!   than a map's loading screen. It is held as captured, and made a PNG only when a report is
+//!   saved.
 //! - The text and the ordinary crops are at most [`MAX_TEXT_AND_CROPS_BYTES`]: crops are left
 //!   out to keep it so, the oldest of the kind that takes the most first (the ordinary ones before
 //!   those kept for the run), and the latest few of every kind last, so no one reader's crops
@@ -76,6 +78,12 @@ pub const MAX_TEXT_AND_CROPS_BYTES: usize = 5 * 1024 * 1024;
 /// ...and the biggest it gets, with the captures where a reader found nothing: under 10 MB, in
 /// MB of a million bytes, for a Discord DM from a free account.
 pub const MAX_REPORT_BYTES: usize = 10_000_000;
+/// A title capture with no Minimap Title found is kept whole once the title has gone unfound
+/// this long: longer than a map's loading screen, which every map change brings...
+pub const TITLE_UNFOUND_MS: u64 = 10_000;
+/// ...in captures no further apart than this: a longer gap (the game not in front, say) starts
+/// the count again.
+const TITLE_UNFOUND_GAP_MS: u64 = 5_000;
 /// Room left under each for what the crops left out change in the text.
 const MARGIN_BYTES: usize = 4096;
 /// The trace's text is compressed in chunks of about this much.
@@ -603,6 +611,9 @@ pub(crate) enum Region {
     ClientArea { near_miss: bool },
     /// The whole strip, at a Status Bar capture with no bar found (#133).
     StatusBarStrip,
+    /// The whole title capture (the client area, or where the title was last found), with no
+    /// Minimap Title found.
+    TitleCapture,
     PickupLog,
 }
 
@@ -617,6 +628,7 @@ impl Region {
             Region::StatusBar => "status-bar",
             Region::ClientArea { .. } => "client-area",
             Region::StatusBarStrip => "status-bar-strip",
+            Region::TitleCapture => "title-capture",
             Region::PickupLog => "pickup-log",
         }
     }
@@ -632,6 +644,7 @@ impl Region {
             Region::StatusBar => format!("crops/status-bar-{at_ms:010}.png"),
             Region::ClientArea { .. } => format!("crops/client-area-{at_ms:010}.png"),
             Region::StatusBarStrip => format!("crops/status-bar-strip-{at_ms:010}.png"),
+            Region::TitleCapture => format!("crops/title-capture-{at_ms:010}.png"),
             Region::PickupLog => format!("crops/pickup-log-{at_ms:010}.png"),
         }
     }
@@ -720,10 +733,11 @@ pub(crate) fn player_shop_crop(capture: ShopCapture, reading: &ShopReading) -> O
 }
 
 /// The Minimap Title in a title capture, for a Bug Report: where it was found (ADR 0021), as
-/// a sample of it in `samples/minimap` keeps it, and none of the rest of the client area.
-/// `None` with no title found.
-pub(crate) fn title_crop(capture: &TitleCapture, found: Option<ScreenRect>) -> Option<(Region, Frame)> {
-    Some((Region::Title, rect_crop(&capture.frame, capture.origin, found?, 0)?))
+/// a sample of it in `samples/minimap` keeps it, and none of the rest of the client area. With
+/// no title found, the whole capture, as it was captured.
+pub(crate) fn title_crop(capture: TitleCapture, found: Option<ScreenRect>) -> Option<(Region, Frame)> {
+    let Some(found) = found else { return Some((Region::TitleCapture, capture.frame)) };
+    Some((Region::Title, rect_crop(&capture.frame, capture.origin, found, 0)?))
 }
 
 /// How far the crop of a Status Bar capture reaches around the bar's level, job and name
@@ -894,6 +908,10 @@ pub(crate) struct Recorder {
     /// The latest Deal Finder capture with no shop found, and Status Bar capture with no bar.
     client_area: Unfound,
     status_bar_strip: Unfound,
+    /// The latest title capture with no Minimap Title found once it had gone unfound for
+    /// [`TITLE_UNFOUND_MS`]; and the first and latest capture times of the misses in a row so far.
+    title_capture: Unfound,
+    title_misses: Option<(u64, u64)>,
     /// Every map shown over the run, by ID.
     maps: BTreeSet<String>,
     /// The fingerprints of the OSMS sets taken, in order.
@@ -951,6 +969,10 @@ impl Recorder {
     /// before nor one the next can be.
     pub fn open(&mut self, mut event: Event, at_ms: Option<u64>, frames: Vec<(Region, Frame)>) {
         if let Event::Title { lines, found, same, stale_region: None, .. } = &mut event {
+            // A title found ends the misses in a row.
+            if found.is_some() {
+                self.title_misses = None;
+            }
             *same = !changes(&mut self.last.title, &(lines.clone(), *found));
             if *same {
                 *lines = None;
@@ -1081,6 +1103,21 @@ impl Recorder {
             Region::StatusBarStrip => {
                 self.status_bar_strip.hold(frame, false);
                 self.status_bar_strip.expire(since);
+                return;
+            }
+            // Only once the title has gone unfound for a while: every map change has a loading
+            // screen with none.
+            Region::TitleCapture => {
+                let at = frame.at_ms;
+                let first = match self.title_misses {
+                    Some((first, latest)) if at.saturating_sub(latest) <= TITLE_UNFOUND_GAP_MS => first,
+                    _ => at,
+                };
+                self.title_misses = Some((first, at));
+                if at.saturating_sub(first) >= TITLE_UNFOUND_MS {
+                    self.title_capture.hold(frame, false);
+                }
+                self.title_capture.expire(since);
                 return;
             }
             Region::ExpBar => {
@@ -1296,8 +1333,12 @@ impl Recorder {
         }
         let mut pictures: Vec<(String, Vec<u8>)> = crops.iter().map(|crop| (crop.name.clone(), crop.png.clone())).collect();
         // On top, the captures where a reader found nothing, made PNGs now: the strip first, as
-        // it is small, then the client area, each if it fits.
-        let unfound = [(&self.status_bar_strip, Region::StatusBarStrip), (&self.client_area, Region::ClientArea { near_miss: false })];
+        // it is small, then the Deal Finder's client area, then the title capture, each if it fits.
+        let unfound = [
+            (&self.status_bar_strip, Region::StatusBarStrip),
+            (&self.client_area, Region::ClientArea { near_miss: false }),
+            (&self.title_capture, Region::TitleCapture),
+        ];
         let mut captures_left_out = Vec::new();
         for (frame, region) in unfound.into_iter().filter_map(|(unfound, region)| Some((unfound.kept(since)?, region))) {
             let (name, Some(png)) = (region.crop_name(frame.at_ms), png(frame)) else { continue };
@@ -1368,7 +1409,9 @@ impl Recorder {
         out += "               with what came of it: answers, notes, what the Grind Tracker and map showed\n";
         out += "  crops/       the EXP figures', the Minimap Title's, the Status Bar's, the Item Tooltip's and the Player Shop's crops,\n";
         out += "               named by capture time (ms since launch); and, where nothing was found, a whole capture:\n";
-        out += "               client-area-<ms>.png, the Deal Finder's with no shop found (chat and names included),\n";
+        out += "               client-area-<ms>.png, the Deal Finder's with no shop found (chat and names included);\n";
+        out += "               title-capture-<ms>.png, the game window with no Minimap Title found for 10 s or more\n";
+        out += "               (chat and names included);\n";
         out += "               and status-bar-strip-<ms>.png, the bottom of the game window with no Status Bar found\n";
         out
     }
@@ -2254,6 +2297,7 @@ impl Recording {
             let whole = match line.event {
                 Event::PlayerShop { at_ms, stale_region: None, .. } => Some(Region::ClientArea { near_miss: false }.crop_name(at_ms)),
                 Event::StatusBar { at_ms, stale_region: None, .. } => Some(Region::StatusBarStrip.crop_name(at_ms)),
+                Event::Title { at_ms, stale_region: None, .. } => Some(Region::TitleCapture.crop_name(at_ms)),
                 _ => None,
             }
             .filter(|name| self.crops.contains(name));

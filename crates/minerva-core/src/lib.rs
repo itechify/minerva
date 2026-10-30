@@ -776,7 +776,7 @@ impl Minerva {
     }
 
     fn take_title_capture(&mut self, capture: TitleCapture, reading: TitleReading) -> &PanelState {
-        let crop = bug_report::title_crop(&capture, reading.found);
+        let crop = bug_report::title_crop(capture, reading.found);
         let event =
             Event::Title { at_ms: reading.at_ms, lines: reading.lines.clone(), found: reading.found, same: false, stale_region: None };
         self.record_input(event, Some(reading.at_ms), crop);

@@ -1634,6 +1634,76 @@ fn status_bar_captures_with_a_bar_found_or_none_found_over_10_minutes_ago_leave_
     assert_eq!(whole_captures(&recording, "status-bar-strip"), Vec::<&str>::new(), "none found over 10 minutes ago");
 }
 
+/// A title capture of `region` with no Minimap Title in it, its blue telling `at_ms` apart.
+fn untitled_capture(region: ScreenRect, at_ms: u64) -> minerva_core::TitleCapture {
+    let shade = (at_ms / 350 % 251) as u8;
+    let img = image::RgbaImage::from_fn(region.width, region.height, |x, y| image::Rgba([(x % 256) as u8, (y % 256) as u8, shade, 255]));
+    minerva_core::TitleCapture { frame: frame(&img, at_ms), origin: ScreenPoint { x: region.x, y: region.y }, ours: Vec::new() }
+}
+
+/// Play on until `until` with no Minimap Title found: what the core has captured read every
+/// 350 ms, as `play` reads the title.
+fn title_unfound(shell: &mut Shell, until: u64) {
+    while shell.at < until {
+        shell.at += 50;
+        if shell.at.is_multiple_of(350) {
+            let at = shell.at;
+            let region = shell.minerva.panel_state().title_capture.expect("a title capture with the game in front");
+            shell.minerva.on_title_read(untitled_capture(region, at), TitleReading { lines: None, found: None, at_ms: at });
+        }
+        shell.step();
+    }
+}
+
+/// The title unfound for 15 s, then found, then unfound through a loading screen, and found
+/// again: the report keeps the latest capture of the long run, whole.
+#[test]
+fn a_title_capture_with_no_title_found_for_10_s_is_kept_whole_the_latest() {
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(5 * S, SUNSET_SKY, grind);
+    title_unfound(&mut shell, 20 * S);
+    shell.play(21 * S, SUNSET_SKY, grind);
+    title_unfound(&mut shell, 22 * S);
+    shell.play(30 * S, SUNSET_SKY, grind);
+
+    let (report, recording) = shell.report();
+
+    let at = 20 * S / 350 * 350;
+    let name = format!("crops/title-capture-{at:010}.png");
+    assert_eq!(whole_captures(&recording, "title-capture"), [name.as_str()]);
+    let png = image::load_from_memory(&zip_bytes(&report.zip, &name)).expect("a PNG").to_rgba8();
+    assert_eq!(png.dimensions(), (1920, 1200), "the whole client area, where the title is looked for once it isn't found");
+    assert!(png.as_raw() == &untitled_capture(game().client, at).frame.rgba, "the capture, pixel for pixel");
+    let timeline = recording.timeline(0).join("\n");
+    assert!(timeline.contains(&format!("[{name}]")), "{timeline}");
+    let summary = text_in(&report.zip, "summary.txt");
+    assert!(summary.contains("title-capture-<ms>.png"), "{summary}");
+    assert_eq!(bug_report::replay(&recording, Some(osms::game().files())).divergence, None);
+}
+
+#[test]
+fn title_captures_unfound_for_less_than_10_s_in_a_row_or_over_10_minutes_ago_leave_no_whole_capture() {
+    // Loading screens, 4 s each, either side of a 6 s gap with nothing captured.
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(5 * S, SUNSET_SKY, grind);
+    title_unfound(&mut shell, 9 * S);
+    while shell.at < 15 * S {
+        shell.at += 50;
+        shell.step();
+    }
+    title_unfound(&mut shell, 19 * S);
+    shell.play(25 * S, SUNSET_SKY, grind);
+    let (_, recording) = shell.report();
+    assert_eq!(whole_captures(&recording, "title-capture"), Vec::<&str>::new(), "no run of misses 10 s long");
+
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(5 * S, SUNSET_SKY, grind);
+    title_unfound(&mut shell, 20 * S);
+    shell.play(20 * S + 10 * MIN + S, SUNSET_SKY, grind);
+    let (_, recording) = shell.report();
+    assert_eq!(whole_captures(&recording, "title-capture"), Vec::<&str>::new(), "none found over 10 minutes ago");
+}
+
 /// A Deal Finder capture, its top `noisy` rows noise, which no PNG compresses (4 bytes a
 /// pixel), and the rest one colour.
 fn noisy_deal_finder_capture(noisy: u32, at_ms: u64) -> ShopCapture {

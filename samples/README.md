@@ -6,7 +6,7 @@ To check many new frames at once, tile them into contact sheets, each frame labe
 
 ## `minimap`
 
-Every file in `samples/minimap` must be recognised against the map names fixture, `crates/minerva-core/tests/fixtures/osms-map-names.json`; there, a `--window` sample's client area is fed whole, and the title is found in it wherever it is (ADR 0021). Each is also fed scaled to other UI Sizes, where it must read as its map or as unreadable, never as another (`tests/minimap_samples.rs`). A title ever read wrong becomes a sample there: a Bug Report's `crops/minimap-title-<ms>.png` is one already.
+Every file in `samples/minimap` must be recognised against the map names fixture, `crates/minerva-core/tests/fixtures/osms-map-names.json`; there, a `--window` sample's client area is fed whole, and the title is found in it wherever it is (ADR 0021). Each is also fed scaled to other UI Sizes, where it must read as its map or as unreadable, never as another (`tests/minimap_samples.rs`). A title ever read wrong becomes a sample there: a Bug Report's `crops/minimap-title-<ms>.png` is one already. A title ever not found becomes a `--window` sample: a Bug Report's `crops/title-capture-<ms>.png`, kept whole where no title was found for 10 s, is one already, renamed to that shape, with any other player's name or chat in it painted out.
 
 ## `exp-bar`
 
