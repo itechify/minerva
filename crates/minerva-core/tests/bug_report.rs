@@ -1683,18 +1683,29 @@ fn a_title_capture_with_no_title_found_for_10_s_is_kept_whole_the_latest() {
 
 #[test]
 fn title_captures_unfound_for_less_than_10_s_in_a_row_or_over_10_minutes_ago_leave_no_whole_capture() {
-    // Loading screens, 4 s each, either side of a 6 s gap with nothing captured.
+    // Loading screens, 4 s each, with the title found between them.
     let mut shell = Shell::new(FakeSource::osms());
     shell.play(5 * S, SUNSET_SKY, grind);
     title_unfound(&mut shell, 9 * S);
-    while shell.at < 15 * S {
-        shell.at += 50;
-        shell.step();
-    }
+    shell.play(15 * S, SUNSET_SKY, grind);
     title_unfound(&mut shell, 19 * S);
     shell.play(25 * S, SUNSET_SKY, grind);
     let (_, recording) = shell.report();
-    assert_eq!(whole_captures(&recording, "title-capture"), Vec::<&str>::new(), "no run of misses 10 s long");
+    assert_eq!(whole_captures(&recording, "title-capture"), Vec::<&str>::new(), "loading screens");
+
+    // 6 s each side of a minute behind another app, when nothing is looked for.
+    let mut shell = Shell::new(FakeSource::osms());
+    shell.play(5 * S, SUNSET_SKY, grind);
+    title_unfound(&mut shell, 11 * S);
+    while shell.at < 71 * S {
+        shell.at += 50;
+        shell.minerva.on_foreground(Foreground::OtherApp);
+        shell.minerva.tick(shell.at);
+    }
+    shell.step();
+    title_unfound(&mut shell, 77 * S);
+    let (_, recording) = shell.report();
+    assert_eq!(whole_captures(&recording, "title-capture"), Vec::<&str>::new(), "time behind another app doesn't count");
 
     let mut shell = Shell::new(FakeSource::osms());
     shell.play(5 * S, SUNSET_SKY, grind);

@@ -24,8 +24,8 @@
 //! - Where a reader that looks for its place in a capture found nothing, one such capture from
 //!   the last [`RECENT_CROPS_MS`], whole (#133): the Deal Finder's client area, the latest whose
 //!   reader saw a near miss, else the latest; the Status Bar's strip, the latest; and the title
-//!   capture, the latest once the Minimap Title had gone unfound for [`TITLE_UNFOUND_MS`], longer
-//!   than a map's loading screen. It is held as captured, and made a PNG only when a report is
+//!   capture, the latest once the panel said it can't find the Minimap Title
+//!   ([`PanelState::title_lost`]), which a map's loading screen is too short for. It is held as captured, and made a PNG only when a report is
 //!   saved.
 //! - The text and the ordinary crops are at most [`MAX_TEXT_AND_CROPS_BYTES`]: crops are left
 //!   out to keep it so, the oldest of the kind that takes the most first (the ordinary ones before
@@ -78,12 +78,6 @@ pub const MAX_TEXT_AND_CROPS_BYTES: usize = 5 * 1024 * 1024;
 /// ...and the biggest it gets, with the captures where a reader found nothing: under 10 MB, in
 /// MB of a million bytes, for a Discord DM from a free account.
 pub const MAX_REPORT_BYTES: usize = 10_000_000;
-/// A title capture with no Minimap Title found is kept whole once the title has gone unfound
-/// this long: longer than a map's loading screen, which every map change brings...
-pub const TITLE_UNFOUND_MS: u64 = 10_000;
-/// ...in captures no further apart than this: a longer gap (the game not in front, say) starts
-/// the count again.
-const TITLE_UNFOUND_GAP_MS: u64 = 5_000;
 /// Room left under each for what the crops left out change in the text.
 const MARGIN_BYTES: usize = 4096;
 /// The trace's text is compressed in chunks of about this much.
@@ -908,10 +902,9 @@ pub(crate) struct Recorder {
     /// The latest Deal Finder capture with no shop found, and Status Bar capture with no bar.
     client_area: Unfound,
     status_bar_strip: Unfound,
-    /// The latest title capture with no Minimap Title found once it had gone unfound for
-    /// [`TITLE_UNFOUND_MS`]; and the first and latest capture times of the misses in a row so far.
+    /// The latest title capture with no Minimap Title found, once the panel said it can't find
+    /// it ([`PanelState::title_lost`]).
     title_capture: Unfound,
-    title_misses: Option<(u64, u64)>,
     /// Every map shown over the run, by ID.
     maps: BTreeSet<String>,
     /// The fingerprints of the OSMS sets taken, in order.
@@ -969,10 +962,6 @@ impl Recorder {
     /// before nor one the next can be.
     pub fn open(&mut self, mut event: Event, at_ms: Option<u64>, frames: Vec<(Region, Frame)>) {
         if let Event::Title { lines, found, same, stale_region: None, .. } = &mut event {
-            // A title found ends the misses in a row.
-            if found.is_some() {
-                self.title_misses = None;
-            }
             *same = !changes(&mut self.last.title, &(lines.clone(), *found));
             if *same {
                 *lines = None;
@@ -1105,16 +1094,10 @@ impl Recorder {
                 self.status_bar_strip.expire(since);
                 return;
             }
-            // Only once the title has gone unfound for a while: every map change has a loading
-            // screen with none.
+            // Only once the panel says it can't find the title: every map change has a loading
+            // screen with none, too short for that.
             Region::TitleCapture => {
-                let at = frame.at_ms;
-                let first = match self.title_misses {
-                    Some((first, latest)) if at.saturating_sub(latest) <= TITLE_UNFOUND_GAP_MS => first,
-                    _ => at,
-                };
-                self.title_misses = Some((first, at));
-                if at.saturating_sub(first) >= TITLE_UNFOUND_MS {
+                if state.title_lost {
                     self.title_capture.hold(frame, false);
                 }
                 self.title_capture.expire(since);
