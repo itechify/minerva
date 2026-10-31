@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended by ADR-0032
 ---
 
 # The maintainer's tools: an overview, Accounts, Blocks and a log

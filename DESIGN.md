@@ -1143,7 +1143,8 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   Selection Periwinkle with an inset ring. Open-report count is larger and bold. Detail headings use 23px; Blocked
   tags and armed confirmations use the problem palette, disabled controls the greyed tokens. Buttons wrap 8px apart.
   Lists use Inset tint, 1px Inset Edge, 4px corners, Window Rule row dividers, 10px 14px padding, 14px/21px text:
-  bold Ink names over Ink Steel details, report reasons italic, actions right-aligned and wrapping below when narrow.
+  bold Ink names over Ink Steel details, report reasons italic (a player's in quotes; one the Worker made, ADR 0032,
+  bare under "Flagged by Minerva" in place of "Reported"), actions right-aligned and wrapping below when narrow.
   Feedback is a polite live line. Account and confirmation workflows belong to ADRs 0023 and 0031 and the FAQ.
 - **Tabs (signature):** the game's raised window tabs, one per page (Home, Map Leaderboards, FAQ); a page added later
   gets a tab of its own, a map's page is under Map Leaderboards, and the Account's pages, reached by signing in, have
