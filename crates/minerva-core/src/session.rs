@@ -53,7 +53,8 @@
 //!   forecast (where the bar will be at the Last 5 min pace shown) and the ground a death
 //!   took back.
 //! - The Pickup Log tells the player's own EXP from Party EXP (ADR 0026). Any Rolling Rate
-//!   window, the last 5 minutes of active play, with Party EXP in it is party: the Best row
+//!   window, the last 5 minutes of active play, with the party bonus in it is party (a
+//!   share's yellow alone can be a white line misread): the Best row
 //!   and the Pace Trace race the map's Party Best, and a best set then is a Party Best; a
 //!   window with none is solo, and races and sets the Solo Best. The Session never resets for
 //!   it. The log's lines give the EXP Split's shares and the kind of a window, never an amount
@@ -159,7 +160,7 @@ pub struct ExpTracking {
     /// What the Pickup Log says the player picked up in the Session.
     pub loot: Loot,
     /// The EXP Split: how much of the Session's EXP was the player's own and how much Party
-    /// EXP, as the Pickup Log's lines say. `None` until Party EXP has come in this Session. It
+    /// EXP, as the Pickup Log's lines say. `None` until the party bonus has come in this Session. It
     /// moves with the log, as the bar does, rather than holding with the figures.
     pub exp_split: Option<ExpSplit>,
 }
@@ -201,17 +202,22 @@ struct PartyPlay {
     own: u64,
     /// Party EXP: the shares of partymates' kills and the party bonus.
     party: u64,
-    /// The Session's active time when a line of Party EXP last arrived; `None` if none has.
+    /// The Session's active time when the party bonus last arrived; `None` if it hasn't.
     last_party_at: Option<u64>,
 }
 
 impl PartyPlay {
-    /// The lines that arrived at active time `active`.
+    /// The lines that arrived at active time `active`. Only the party bonus says the player is
+    /// partied: it comes with every EXP line of party play, own kill or share, and is told by
+    /// its words. A share is told by its colour alone, and a white line over some backgrounds
+    /// reads as yellow (a Bug Report of 0.17.0, solo in a cave). Such a share still joins the
+    /// party's EXP, a little off in the split of a later party.
     fn take(&mut self, lines: &[PickupLine], active: u64) {
         for line in lines {
             match line {
                 PickupLine::Exp { amount, party: false } => self.own += amount,
-                PickupLine::Exp { amount, party: true } | PickupLine::PartyBonus { amount } => {
+                PickupLine::Exp { amount, party: true } => self.party += amount,
+                PickupLine::PartyBonus { amount } => {
                     self.party += amount;
                     self.last_party_at = Some(active);
                 }
@@ -220,7 +226,7 @@ impl PartyPlay {
         }
     }
 
-    /// The shares, once Party EXP has come in (and the lines gave some EXP to share).
+    /// The shares, once the party bonus has come in (and the lines gave some EXP to share).
     fn split(&self) -> Option<ExpSplit> {
         self.last_party_at?;
         let total = self.own + self.party;
@@ -1257,16 +1263,16 @@ impl Session {
         play.take(arrived, active);
     }
 
-    /// Whether the Rolling Rate's window, the last 5 minutes of active play, has Party EXP in
-    /// it: any such window is party, and the Best row races the Party Best. With 5 minutes
-    /// gone since the last Party EXP, it is solo again.
+    /// Whether the Rolling Rate's window, the last 5 minutes of active play, has the party
+    /// bonus in it: any such window is party, and the Best row races the Party Best. With 5
+    /// minutes gone since the last party bonus, it is solo again.
     fn best_kind(&self) -> BestKind {
         self.figures.as_ref().is_some_and(|figures| {
             figures.play.last_party_at.is_some_and(|at| at + ROLLING_MS >= figures.active(self.now))
         }).into()
     }
 
-    /// The EXP Split as it stands: `None` until Party EXP has come in this Session.
+    /// The EXP Split as it stands: `None` until the party bonus has come in this Session.
     fn exp_split(&self) -> Option<ExpSplit> {
         self.figures.as_ref().and_then(|figures| figures.play.split())
     }

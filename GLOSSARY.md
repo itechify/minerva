@@ -190,22 +190,23 @@ way. A map has two kinds, its Solo Best and Party Best.
 _Avoid_: record, high score, PB, max
 
 **Solo Best**:
-A map's Personal Best over 5 minutes with no Party EXP in them.
+A map's Personal Best over 5 minutes with no party bonus in them.
 _Avoid_: personal solo best, solo record
 
 **Party Best**:
-A map's Personal Best over 5 minutes with Party EXP in them, kept apart from its Solo Best so a party run never hides
-what the Character does alone. The Grind Tracker races the Party Best while the player is partied.
+A map's Personal Best over 5 minutes with the party bonus in them, kept apart from its Solo Best so a party run never
+hides what the Character does alone. The Grind Tracker races the Party Best while the player is partied.
 _Avoid_: group best, party record
 
 **Party EXP**:
 The EXP the Pickup Log says came from being in a party: a share of a partymate's kill ("You received EXP" in yellow) and
 the bonus on every kill while partied ("Bonus EXP for PARTY"). The player's own EXP is "You received EXP" in white.
+Only the bonus, told by its words, makes 5 minutes party play: a white line can read as yellow.
 _Avoid_: shared EXP, group EXP, bonus EXP (only part of it)
 
 **EXP Split**:
 How much of the Session's EXP was the player's own and how much was Party EXP, as shares of what the EXP bar gained,
-given on hovering the Grind Tracker's Session EXP/h once Party EXP has come in.
+given on hovering the Grind Tracker's Session EXP/h once the party bonus has come in.
 _Avoid_: EXP breakdown, EXP sources
 
 **Level Band**:
