@@ -1,7 +1,7 @@
 //! Party EXP (GLOSSARY): the Pickup Log tells the player's own EXP from a partymate's. Any 5
-//! minutes of active play with Party EXP in them are party; a map's Personal Best is a Solo Best
+//! minutes of active play with the party bonus in them are party; a map's Personal Best is a Solo Best
 //! or a Party Best by the window that set it, the Grind Tracker races the kind being played, and
-//! the EXP Split shows the shares once Party EXP has come in.
+//! the EXP Split shows the shares once the party bonus has come in.
 
 mod common;
 
@@ -92,6 +92,23 @@ fn a_session_solo_then_partied_then_solo_has_each_window_set_the_best_of_its_kin
     assert!(alone.exp_tracking.new_best);
     // One Session throughout: it didn't reset when the party came or left.
     assert!(alone.exp_tracking.active_s > 15 * 60);
+}
+
+#[test]
+fn a_yellow_exp_line_with_no_party_bonus_leaves_a_solo_window_solo() {
+    // A Bug Report of 0.17.0: alone in a cave, a few of the player's own white EXP lines read
+    // as yellow, a partymate's share, and the best they set went up as a Party Best. In party
+    // play every EXP line comes with a "Bonus EXP for PARTY" line, and the reader tells that
+    // by its words, never its colour.
+    let mut player = Player::clocked(tracking());
+    player.arrive(SUNSET_SAMPLE);
+    hunt_solo(&mut player, 3 * MIN, 10);
+    hunt_with(&mut player, 30 * S, 10, || vec![PickupLine::Exp { amount: 5, party: true }]);
+    let state = hunt_solo(&mut player, 3 * MIN, 10);
+
+    assert_eq!(kept(&player.minerva, SUNSET_SKY_ID), [(3600, false)]);
+    assert!(!state.exp_tracking.personal_best_party);
+    assert_eq!(state.exp_tracking.exp_split, None);
 }
 
 #[test]

@@ -185,7 +185,7 @@ function render(view: TrackerView) {
   bestLink.textContent = t.personalBestThisVisit ? "Visit best" : "Best";
   // Racing the Party Best, while Party EXP is in the last 5 minutes: a small party mark.
   bestParty.toggleAttribute("hidden", !t.personalBestParty);
-  // The EXP Split, once Party EXP has come in this Session: the shares, on hovering the
+  // The EXP Split, once the party bonus has come in this Session: the shares, on hovering the
   // Session's EXP/h.
   if (t.expSplit) {
     const { ownHundredths: own, partyHundredths: party } = t.expSplit;

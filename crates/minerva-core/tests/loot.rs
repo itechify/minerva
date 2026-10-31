@@ -103,10 +103,10 @@ fn a_party_line_that_arrived_before_a_reset_does_not_join_the_next_session() {
     let mut minerva = a_minute_in();
     minerva.tick(80 * S);
     minerva.act(Action::ResetSession);
-    let party = PickupLine::Exp { amount: 30, party: true };
+    let party = vec![PickupLine::Exp { amount: 30, party: true }, PickupLine::PartyBonus { amount: 3 }];
 
     // Read after the reset, but it arrived before.
-    minerva.on_pickup_log_reading(arriving(80 * S + 300, 79 * S + 900, vec![party]));
+    minerva.on_pickup_log_reading(arriving(80 * S + 300, 79 * S + 900, party));
     let state = read(&mut minerva, 82 * S, 400, 952);
 
     assert_eq!(state.exp_tracking.exp_split, None);
