@@ -54,7 +54,7 @@ export async function readMarket(env: Env, request: Request, url: URL, now = Dat
     `SELECT source, pulled_at,
        (SELECT json_group_object(item.key, json(item.value)) FROM json_each(market_pulls.items) AS item
         WHERE item.key IN (SELECT CAST(value AS TEXT) FROM json_each(?1))) AS items
-     FROM market_pulls WHERE items IS NOT NULL`,
+     FROM market_pulls WHERE market_pulls.items IS NOT NULL`,
   )
     .bind(JSON.stringify(ids))
     .all<{ source: Source; pulled_at: number; items: string }>();
