@@ -49,27 +49,20 @@ export async function readMarket(env: Env, request: Request, url: URL, now = Dat
   const key = env.MM_API_KEY;
   if (!key) return { status: 200, body: { prices: null, listed: null } };
   await Promise.all((Object.keys(SOURCES) as Source[]).map((source) => pullIfDue(env, key, source, now)));
-  const pulls = await env.DB.prepare("SELECT source, pulled_at FROM market_pulls WHERE pulled_at IS NOT NULL").all<{
-    source: Source;
-    pulled_at: number;
-  }>();
-  const pulledAt = new Map(pulls.results.map((p) => [p.source, p.pulled_at]));
-  const json = JSON.stringify(ids);
-  const [prices, listed] = await env.DB.batch<{ item_id: number; body?: string; min_unit_price?: number; listings?: number }>([
-    env.DB.prepare("SELECT item_id, body FROM market_prices WHERE item_id IN (SELECT value FROM json_each(?))").bind(json),
-    env.DB.prepare("SELECT item_id, min_unit_price, listings FROM market_listed WHERE item_id IN (SELECT value FROM json_each(?))").bind(json),
-  ]);
-  const table = (source: Source, items: [number, unknown][]): Table | null => {
-    const at = pulledAt.get(source);
-    return at === undefined ? null : { pulledAt: at, items: Object.fromEntries(items.map(([id, item]) => [String(id), item])) };
+  // Each table is one row (migration 0009): D1 picks the items asked about out of it.
+  const kept = await env.DB.prepare(
+    `SELECT source, pulled_at,
+       (SELECT json_group_object(item.key, json(item.value)) FROM json_each(market_pulls.items) AS item
+        WHERE item.key IN (SELECT CAST(value AS TEXT) FROM json_each(?1))) AS items
+     FROM market_pulls WHERE items IS NOT NULL`,
+  )
+    .bind(JSON.stringify(ids))
+    .all<{ source: Source; pulled_at: number; items: string }>();
+  const table = (source: Source): Table | null => {
+    const row = kept.results.find((r) => r.source === source);
+    return row === undefined ? null : { pulledAt: row.pulled_at, items: JSON.parse(row.items) };
   };
-  return {
-    status: 200,
-    body: {
-      prices: table("prices", prices.results.map((r) => [r.item_id, JSON.parse(r.body!)])),
-      listed: table("listed", listed.results.map((r) => [r.item_id, { min_unit_price: r.min_unit_price, listings: r.listings }])),
-    },
-  };
+  return { status: 200, body: { prices: table("prices"), listed: table("listed") } };
 }
 
 /** The maintainer's Pull market prices (ADR 0031): both tables pulled at once, whatever their
@@ -86,11 +79,12 @@ export async function pullNow(env: Env, now = Date.now()): Promise<Answer> {
  *  whatever comes of it. */
 async function pullIfDue(env: Env, key: string, source: Source, now: number, atOnce = false): Promise<void> {
   try {
-    // Claim the pull, so reads at the same moment don't all ask.
+    // Claim the pull, so reads at the same moment don't all ask. A copy kept a row per item,
+    // before migration 0009, is none.
     const claim = await env.DB.prepare(
       `INSERT INTO market_pulls (source, tried_at) VALUES (?1, ?2)
        ON CONFLICT (source) DO UPDATE SET tried_at = ?2
-       WHERE (market_pulls.pulled_at IS NULL OR market_pulls.pulled_at <= ?2 - ?3) AND market_pulls.tried_at <= ?2 - ?4`,
+       WHERE (market_pulls.items IS NULL OR market_pulls.pulled_at <= ?2 - ?3) AND market_pulls.tried_at <= ?2 - ?4`,
     )
       .bind(source, now, atOnce ? 0 : PULL_EVERY_MS, atOnce ? 0 : ASK_AGAIN_MS)
       .run();
@@ -100,48 +94,32 @@ async function pullIfDue(env: Env, key: string, source: Source, now: number, atO
     });
     if (!response.ok) return;
     // The table is read by D1 rather than here: /api/prices is most of a megabyte. What isn't
-    // JSON fails the batch, and what isn't a list of rows, or is an empty one, changes
+    // JSON fails the statement, and what isn't a list of rows, or is an empty one, changes
     // nothing: either way the copy kept stays.
     const text = await response.text();
-    await env.DB.batch(source === "prices" ? keepPrices(env, text, now) : keepListed(env, text, now));
+    await env.DB.prepare(
+      `UPDATE market_pulls SET pulled_at = ?2,
+         items = (SELECT json_group_object(CAST(json_extract(value, '$.item_id') AS TEXT), ${KEPT[source]})
+                  FROM json_each(?1) WHERE json_type(value, '$.item_id') = 'integer' AND ${ROW_KEPT[source]})
+       WHERE source = ?3 AND json_type(?1) = 'array' AND json_array_length(?1) > 0`,
+    )
+      .bind(text, now, source)
+      .run();
   } catch {
     // Unreachable, or not JSON: the copy kept stays, and the next read a minute on asks again.
   }
 }
 
-/** /api/prices' rows in place of those kept, each without its figures by attack roll or its deal
- *  price, which the app doesn't show. */
-function keepPrices(env: Env, text: string, now: number): D1PreparedStatement[] {
-  return [
-    env.DB.prepare(`DELETE FROM market_prices WHERE ${A_TABLE}`).bind(text),
-    env.DB.prepare(
-      `INSERT INTO market_prices (item_id, body)
-       SELECT json_extract(value, '$.item_id'), json_remove(value, '$.item_id', '$.by_attack', '$.typical_attack', '$.deal')
-       FROM json_each(?1) WHERE ${A_TABLE} AND json_type(value, '$.item_id') = 'integer'`,
-    ).bind(text),
-    pulled(env, "prices", text, now),
-  ];
-}
+/** What is kept of each table's row (`value`): /api/prices' figures without those by attack
+ *  roll or its deal price, which the app doesn't show, and /api/items' cheapest price for one
+ *  and its listings. */
+const KEPT: Record<Source, string> = {
+  prices: "json_remove(value, '$.item_id', '$.by_attack', '$.typical_attack', '$.deal')",
+  listed: "json_object('min_unit_price', json_extract(value, '$.min_unit_price'), 'listings', json_extract(value, '$.listings'))",
+};
 
-/** /api/items' rows in place of those kept: each item's cheapest price for one, and its
- *  listings. */
-function keepListed(env: Env, text: string, now: number): D1PreparedStatement[] {
-  return [
-    env.DB.prepare(`DELETE FROM market_listed WHERE ${A_TABLE}`).bind(text),
-    env.DB.prepare(
-      `INSERT INTO market_listed (item_id, min_unit_price, listings)
-       SELECT json_extract(value, '$.item_id'), json_extract(value, '$.min_unit_price'), json_extract(value, '$.listings')
-       FROM json_each(?1)
-       WHERE ${A_TABLE} AND json_type(value, '$.item_id') = 'integer'
-         AND json_type(value, '$.min_unit_price') IN ('integer', 'real') AND json_type(value, '$.listings') = 'integer'`,
-    ).bind(text),
-    pulled(env, "listed", text, now),
-  ];
-}
-
-/** Whether the answer bound as `?1` is a table: a list with rows in it. */
-const A_TABLE = "json_type(?1) = 'array' AND json_array_length(?1) > 0";
-
-function pulled(env: Env, source: Source, text: string, now: number): D1PreparedStatement {
-  return env.DB.prepare(`UPDATE market_pulls SET pulled_at = ?2 WHERE source = ?3 AND ${A_TABLE}`).bind(text, now, source);
-}
+/** Which of each table's rows are kept: an /api/items row only with both its figures. */
+const ROW_KEPT: Record<Source, string> = {
+  prices: "1",
+  listed: "json_type(value, '$.min_unit_price') IN ('integer', 'real') AND json_type(value, '$.listings') = 'integer'",
+};

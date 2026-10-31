@@ -70,8 +70,6 @@ beforeEach(async () => {
   market.asks = [];
   await env.DB.batch([
     env.DB.prepare("DELETE FROM market_pulls"),
-    env.DB.prepare("DELETE FROM market_prices"),
-    env.DB.prepare("DELETE FROM market_listed"),
     env.DB.prepare("DELETE FROM rate_events WHERE bucket LIKE 'market:%'"),
   ]);
   setMarket([priced(ORE, 120), priced(STAR, 410)], [listed(ORE, 95, 7), listed(STAR, 380)]);
@@ -144,6 +142,35 @@ describe("market reads", () => {
       expect(answer.prices?.items[ORE]).toBeDefined();
       expect(answer.listed?.items[ORE]).toBeDefined();
     }
+  });
+
+  it("pull each table at once when the copy kept is a row per item, from before migration 0009", async () => {
+    const now = Date.now();
+    await env.DB.batch(
+      ["prices", "listed"].map((source) =>
+        env.DB.prepare("INSERT INTO market_pulls (source, pulled_at, tried_at) VALUES (?, ?, ?)").bind(source, now - 5 * 60_000, now - 5 * 60_000),
+      ),
+    );
+
+    const answer = await readOk(String(ORE));
+
+    expect(market.asks).toHaveLength(2);
+    expect(answer.listed?.items[ORE]).toEqual({ min_unit_price: 95, listings: 7 });
+  });
+
+  it("keep a table of thousands of items, and give back each one asked about", async () => {
+    const ids = Array.from({ length: 4000 }, (_, i) => 1000000 + i);
+    setMarket(
+      ids.map((id) => priced(id, id % 1000)),
+      ids.map((id) => listed(id, id % 900, id % 7)),
+    );
+
+    const last = ids[ids.length - 1];
+    const answer = await readOk(`${ids[0]},${ids[2345]},${last},${ORE}`);
+
+    expect(Object.keys(answer.prices?.items ?? {}).sort()).toEqual([ids[0], ids[2345], last].map(String).sort());
+    expect((answer.prices?.items[ids[2345]] as { reference: { unit_price: number } }).reference.unit_price).toBe(ids[2345] % 1000);
+    expect(answer.listed?.items[last]).toEqual({ min_unit_price: last % 900, listings: last % 7 });
   });
 
   it("have nothing while neither table was ever pulled", async () => {
