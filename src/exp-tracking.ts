@@ -49,7 +49,7 @@ export type ExpTracking = {
   /** What the Pickup Log says the Session picked up. */
   loot: Loot;
   /** The EXP Split: the shares of the Session's EXP that were the player's own and Party EXP,
-   *  in hundredths of a percent, 10,000 together; none until Party EXP has come in. */
+   *  in hundredths of a percent, 10,000 together; none until the party bonus has come in. */
   expSplit: ExpSplit | null;
 };
 
