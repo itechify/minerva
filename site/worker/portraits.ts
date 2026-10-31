@@ -74,15 +74,18 @@ async function keep(env: Env, shown: Map<string, Portrait>, now: number): Promis
   );
 }
 
-/** Ask ClassicRank for `name`'s portrait as they upload, and keep it; `null` when it couldn't
- *  be had (the daily refresh asks again), or with no key. Never throws: an upload never waits
- *  on ClassicRank, nor fails for it. */
+/** Ask ClassicRank for `name`'s portrait as they upload, and keep it. When ClassicRank can't be
+ *  asked (the daily refresh asks again), it is the one kept from before, so a Discord post
+ *  doesn't show a Character with a photo as having none; `null` with none kept, or with no
+ *  key. Never throws: an upload never waits on ClassicRank, nor fails for it. */
 export async function askOnUpload(env: Env, name: string, now: number): Promise<Portrait | null> {
   const key = env.CLASSICRANK_KEY;
   if (!key) return null;
   try {
     const shown = await ask(key, [name]);
-    if (shown === null) return null;
+    if (shown === null) {
+      return await env.DB.prepare("SELECT photo, profile FROM portraits WHERE name_key = ?").bind(name.toLowerCase()).first<Portrait>();
+    }
     await keep(env, shown, now);
     return shown.get(name.toLowerCase()) ?? null;
   } catch {

@@ -35,3 +35,9 @@ declare namespace Cloudflare {
 }
 
 type Env = Cloudflare.Env;
+
+/** A PNG the Worker imports, as its bytes (the "Data" rule in site/wrangler.jsonc). */
+declare module "*.png" {
+  const bytes: ArrayBuffer;
+  export default bytes;
+}

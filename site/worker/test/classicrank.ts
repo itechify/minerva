@@ -1,11 +1,15 @@
 // A made-up ClassicRank (ADR 0029), set up before every test file (vitest.config.ts): the
 // Worker's asks of ClassicRank's API are taken off the global fetch and answered in its
-// `names=` shape from the Characters a test makes up here. It knows nobody until a test says
-// so, so an upload in any other test finds no portrait. Nothing real from ClassicRank is in
-// it, and nothing leaves the test.
+// `names=` shape from the Characters a test makes up here, and their photos' addresses give
+// their made-up pictures, where ClassicRank's lead to theirs. It knows nobody until a test
+// says so, so an upload in any other test finds no portrait. Nothing real from ClassicRank is
+// in it, and nothing leaves the test.
 
 /** ClassicRank's API, as the Worker asks it. */
 const API = "https://classicrank.com/api/v1/characters";
+
+/** Where ClassicRank's photos' addresses are. */
+const AVATARS = "https://classicrank.com/api/avatar/";
 
 /** A made-up Character on ClassicRank: their name there, and their photo and profile. */
 export interface MadeUp {
@@ -16,18 +20,19 @@ export interface MadeUp {
 }
 
 /** What the made-up ClassicRank knows and does: the Characters it knows, by name in lower
- *  case; whether it is too busy to answer (a 429); and each ask the Worker made, with the key
- *  it sent and how many names it asked about. */
+ *  case; whether it is too busy to answer (a 429), and whether its photos fail to load (a 500);
+ *  and each ask the Worker made, with the key it sent and how many names it asked about. */
 interface State {
   known: Map<string, MadeUp>;
   busy: boolean;
+  photosDown: boolean;
   asks: { names: string[]; key: string | null; fields: string | null; limit: string | null }[];
 }
 
 /** One made-up ClassicRank per isolate, however many times this file is set up. */
 const global = globalThis as typeof globalThis & { madeUpClassicRank?: State };
 
-export const classicRank: State = (global.madeUpClassicRank ??= { known: new Map(), busy: false, asks: [] });
+export const classicRank: State = (global.madeUpClassicRank ??= { known: new Map(), busy: false, photosDown: false, asks: [] });
 
 /** `name` on the made-up ClassicRank, with a made-up photo, or `photo: null` for none. */
 export function knownOnClassicRank(name: string, photo: string | null = photoOf(name), more: Partial<MadeUp> = {}): MadeUp {
@@ -39,6 +44,12 @@ export function knownOnClassicRank(name: string, photo: string | null = photoOf(
 /** A made-up photo's address for `name`, as ClassicRank gives one, `?v=` and all. */
 export function photoOf(name: string, version = "2026-10-26 07:41:13"): string {
   return `https://classicrank.com/api/avatar/${name}?v=${encodeURIComponent(version)}`;
+}
+
+/** The made-up picture of `name`'s photo: its bytes as a PNG says nothing to the Worker, which
+ *  only passes it on. */
+export function pictureBytesOf(name: string): Uint8Array {
+  return new TextEncoder().encode(`made-up photo of ${name}`);
 }
 
 export function profileOf(name: string): string {
@@ -68,12 +79,23 @@ function answer(url: URL, headers: Headers): Response {
   });
 }
 
+/** A photo address's answer: the Character's made-up picture, from an address the made-up
+ *  ClassicRank gave (the real one's redirect to the picture, which fetch follows, left out). */
+function photo(url: URL): Response {
+  const name = decodeURIComponent(url.pathname.slice(new URL(AVATARS).pathname.length));
+  const known = classicRank.known.get(name.toLowerCase());
+  if (known?.photo !== url.href) return new Response("Not found", { status: 404, headers: { "content-type": "text/html" } });
+  if (classicRank.photosDown) return new Response("Down", { status: 500, headers: { "content-type": "text/html" } });
+  return new Response(pictureBytesOf(known.name), { headers: { "content-type": "image/png" } });
+}
+
 const realFetch = globalThis.fetch;
 const wrapped = globalThis as typeof globalThis & { madeUpClassicRankFetch?: boolean };
 if (!wrapped.madeUpClassicRankFetch) {
   wrapped.madeUpClassicRankFetch = true;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.href.startsWith(AVATARS)) return Promise.resolve(photo(url));
     if (`${url.origin}${url.pathname}` !== API) return realFetch(input as RequestInfo, init);
     return Promise.resolve(answer(url, new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))));
   }) as typeof globalThis.fetch;
