@@ -36,14 +36,16 @@ export async function report(env: Env, request: Request): Promise<Answer> {
   return { status: 201, body: {} };
 }
 
-/** Every report, newest first, with the reported entry's name as it is now. */
+/** Every report, newest first, with the reported entry's name as it is now, and whether the
+ *  Worker made it (ADR 0032) or a player. */
 export async function readReports(env: Env): Promise<Answer> {
   const rows = await env.DB.prepare(
     `SELECT r.id, COALESCE(c.name, r.name_key) AS name, r.map_id AS map, r.band, r.exp_per_hour AS expPerHour,
-            r.reason, r.reported_at AS reportedAt, r.party = 1 AS party
+            r.reason, r.reported_at AS reportedAt, r.party = 1 AS party, r.automatic
      FROM reports r LEFT JOIN characters c USING (name_key) ORDER BY r.reported_at DESC, r.id DESC`,
-  ).all<{ party: number }>();
-  return { status: 200, body: { reports: rows.results.map((r) => ({ ...r, party: isParty(r.party) })) } };
+  ).all<{ party: number; automatic: number }>();
+  const reports = rows.results.map((r) => ({ ...r, party: isParty(r.party), automatic: r.automatic === 1 }));
+  return { status: 200, body: { reports } };
 }
 
 /** Delete `name`'s entry on `map` in the Level Band starting at `band`, of the `kind` asked for

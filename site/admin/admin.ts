@@ -262,11 +262,11 @@ async function drawReports(line: HTMLElement) {
   line.textContent = reports.length === 0 ? "No reports." : reports.length === 1 ? "1 report." : `${reports.length} reports.`;
   byId("report-list").replaceChildren(
     ...reports.map((report) => {
-      const { what, when } = reportLine(report, mapName(report.map));
+      const { what, when, reason } = reportLine(report, mapName(report.map));
       const item = make("li", "account-item");
       const words = make("div", "account-words");
       words.append(make("strong", "", what), make("span", "", when));
-      if (report.reason !== "") words.append(make("span", "account-reason", `“${report.reason}”`));
+      if (reason !== "") words.append(make("span", "account-reason", reason));
       const open = link("Open", linkTo({ map: report.map, band: report.band, name: report.name, kind: report.party ? "party" : "solo" }), true);
       open.title = "Its Map Leaderboard, in a new tab";
       const dismiss = button("Dismiss", "Removes the report. The entry stays on the Map Leaderboard.");

@@ -83,16 +83,38 @@ describe("the link page", () => {
 });
 
 describe("the admin page", () => {
-  it("lists a report with its entry and when it was made", () => {
-    const report = { id: 7, name: "Egbert", map: "010001010", band: 20, expPerHour: 153_216, reason: "", reportedAt: OCT_21, party: false };
+  const report = {
+    id: 7,
+    name: "Egbert",
+    map: "010001010",
+    band: 20,
+    expPerHour: 153_216,
+    reason: "",
+    reportedAt: OCT_21,
+    party: false,
+    automatic: false,
+  };
 
+  it("lists a report with its entry, when it was made, and the player's reason in quotes", () => {
     expect(reportLine(report, "Henesys Hunting Ground I")).toEqual({
       what: "Egbert on Henesys Hunting Ground I, levels 20–29: 153,216 EXP/h",
       when: "Reported 21 Oct 2026",
+      reason: "",
     });
     expect(reportLine({ ...report, party: true }, "Henesys Hunting Ground I").what).toBe(
       "Egbert on Henesys Hunting Ground I, levels 20–29: 153,216 EXP/h (Party Best)",
     );
+    expect(reportLine({ ...report, reason: "Too fast" }, "Henesys Hunting Ground I").reason).toBe("“Too fast”");
+  });
+
+  it("lists a report Minerva made as flagged by it, its reason in its own words", () => {
+    const flagged = { ...report, automatic: true, reason: "2.2× the #1 it passed: Bob's 43,536 EXP/h." };
+
+    expect(reportLine(flagged, "Henesys Hunting Ground I")).toEqual({
+      what: "Egbert on Henesys Hunting Ground I, levels 20–29: 153,216 EXP/h",
+      when: "Flagged by Minerva 21 Oct 2026",
+      reason: "2.2× the #1 it passed: Bob's 43,536 EXP/h.",
+    });
   });
 
   it("lists an entry taken down with the Visit kept off", () => {

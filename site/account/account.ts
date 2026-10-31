@@ -39,6 +39,8 @@ export interface Report {
   reportedAt: number;
   /** It is against a Party Best's entry, not a Solo Best's. */
   party: boolean;
+  /** The Worker made it at upload (ADR 0032), not a player. */
+  automatic: boolean;
 }
 
 /** An entry taken down, as GET /api/admin/removed lists it. */
@@ -196,12 +198,14 @@ export function linkQuestion(username: string, token: TokenAnswer): { ask: strin
   };
 }
 
-/** A report as the admin page lists it: what was reported, and when. */
-export function reportLine(report: Report, mapName: string): { what: string; when: string } {
+/** A report as the admin page lists it: what was reported, when and by whom, and why: a
+ *  player's words quoted, Minerva's as they are (ADR 0032); "" for no reason given. */
+export function reportLine(report: Report, mapName: string): { what: string; when: string; reason: string } {
   const [first, last] = levelsOf(report.band);
   return {
     what: `${report.name} on ${mapName}, levels ${first}–${last}: ${whole(report.expPerHour)} EXP/h${report.party ? " (Party Best)" : ""}`,
-    when: `Reported ${day(report.reportedAt)}`,
+    when: `${report.automatic ? "Flagged by Minerva" : "Reported"} ${day(report.reportedAt)}`,
+    reason: report.reason === "" || report.automatic ? report.reason : `“${report.reason}”`,
   };
 }
 

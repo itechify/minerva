@@ -10,6 +10,7 @@ import { BLOCKED, isBlocked, SHOWN } from "./blocks";
 import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
 import { ceilingsOf } from "./ceilings";
+import { flaggedOf } from "./automatic-reports";
 import { askOnUpload, forgetPortrait, PORTRAIT_COLUMNS, PORTRAIT_JOIN, type PortraitColumns, portraitIn } from "./portraits";
 
 /** How many entries a band's read lists. */
@@ -153,6 +154,13 @@ const HELD = `EXISTS (SELECT 1 FROM characters WHERE name_key = ?1 AND ${MAY_WRI
 const UNMATCHED = `NOT EXISTS (SELECT 1 FROM entries e WHERE e.name_key = taken_tops.name_key AND e.map_id = taken_tops.map_id
                    AND e.band = taken_tops.band AND e.exp_per_hour = taken_tops.exp_per_hour AND e.party = taken_tops.party)`;
 
+/** An automatic report (ADR 0032) whose entry no longer stands at the EXP/h it was made at:
+ *  replaced by a higher best (reported again or not) or a lower one, dropped, or opted out. It
+ *  stands only while the entry does, so an entry has one at most. */
+const UNMATCHED_AUTOMATIC = `automatic = 1 AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.name_key = reports.name_key
+                             AND e.map_id = reports.map_id AND e.band = reports.band
+                             AND e.exp_per_hour = reports.exp_per_hour AND e.party = reports.party)`;
+
 /** A place on the Map Leaderboards: one map's Level Band. */
 interface Place {
   map: string;
@@ -229,13 +237,15 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
     const place = `${r.map_id} ${r.band} ${r.party}`;
     held.set(place, Math.max(held.get(place) ?? 0, r.exp_per_hour));
   }
+  const raised = accepted.filter((e) => (held.get(`${e.map} ${e.band} ${sqlParty(e.party)}`) ?? 0) < e.expPerHour);
   const improved: Place[] = [];
-  for (const e of accepted) {
-    if ((held.get(`${e.map} ${e.band} ${sqlParty(e.party)}`) ?? 0) < e.expPerHour && !improved.some((p) => p.map === e.map && p.band === e.band)) {
-      improved.push({ map: e.map, band: e.band });
-    }
+  for (const e of raised) {
+    if (!improved.some((p) => p.map === e.map && p.band === e.band)) improved.push({ map: e.map, band: e.band });
   }
   const before = improved.length === 0 ? [] : await topsAt(env, improved);
+  // A raised entry is also judged against the others' (ADR 0032), so an unchanged one never
+  // is again, nor a report dismissed comes back.
+  const flagged = raised.length === 0 ? [] : await flaggedOf(env, nameKey, raised);
   await env.DB.batch([
     env.DB.prepare(`UPDATE characters SET name = ?3 WHERE name_key = ?1 AND ${MAY_WRITE}`).bind(nameKey, keyHash, name),
     env.DB.prepare(`DELETE FROM entries WHERE name_key = ?1 AND ${HELD}`).bind(nameKey, keyHash),
@@ -247,6 +257,13 @@ export async function upload(env: Env, request: Request, name: string, ctx?: Exe
     ),
     // A top spot taken stays marked only while the entry that took it stands.
     env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD} AND ${UNMATCHED}`).bind(nameKey, keyHash),
+    env.DB.prepare(`DELETE FROM reports WHERE name_key = ?1 AND ${HELD} AND ${UNMATCHED_AUTOMATIC}`).bind(nameKey, keyHash),
+    ...flagged.map((f) =>
+      env.DB.prepare(
+        `INSERT INTO reports (name_key, map_id, band, exp_per_hour, reason, reported_at, party, automatic)
+         SELECT ?1, ?3, ?4, ?5, ?6, ?7, ?8, 1 WHERE ${HELD}`,
+      ).bind(nameKey, keyHash, f.map, f.band, f.expPerHour, f.reason, now, sqlParty(f.party)),
+    ),
   ]);
   let taken: Taken[] = [];
   if (improved.length > 0) {
@@ -288,6 +305,8 @@ export async function optOut(env: Env, request: Request, name: string): Promise<
     // The spots it took go with its entries, and its name from the spots taken off it.
     env.DB.prepare(`DELETE FROM taken_tops WHERE name_key = ?1 AND ${HELD}`).bind(...at),
     env.DB.prepare(`UPDATE taken_tops SET from_name_key = NULL WHERE from_name_key = ?1 AND ${HELD}`).bind(...at),
+    // Its automatic reports go with its entries (ADR 0032).
+    env.DB.prepare(`DELETE FROM reports WHERE name_key = ?1 AND ${HELD} AND ${UNMATCHED_AUTOMATIC}`).bind(...at),
     // Their portrait goes too (ADR 0029).
     forgetPortrait(env, claimed.nameKey),
   ]);

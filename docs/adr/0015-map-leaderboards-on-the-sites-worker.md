@@ -1,5 +1,5 @@
 ---
-status: accepted, amended by ADR-0023, ADR-0024, ADR-0026, ADR-0027, ADR-0029, ADR-0031
+status: accepted, amended by ADR-0023, ADR-0024, ADR-0026, ADR-0027, ADR-0029, ADR-0031, ADR-0032
 ---
 
 # Map Leaderboards on the site's Worker
