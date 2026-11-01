@@ -1,0 +1,70 @@
+# Posts a published release to the Minerva Discord's announcements channel and pings the
+# Updates role, or the Tester role for a pre-release. The post carries the release notes up to
+# their Download section and links the release page for the files. Run it by hand to post a
+# release again: the latest release by default, or another tag.
+#
+# It needs, under the repo's Settings → Secrets and variables → Actions:
+# - the secret DISCORD_RELEASE_WEBHOOK_URL: a webhook on the announcements channel (Edit
+#   Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL). Anyone holding it can
+#   post there, so it is never committed.
+# - the variables DISCORD_UPDATES_ROLE_ID and DISCORD_TESTER_ROLE_ID: each role's ID (Discord:
+#   Settings → Advanced → Developer Mode, then Server Settings → Roles, right-click the role →
+#   Copy Role ID). They aren't secret.
+# To try it, point the secret at a webhook in a private channel and run it by hand. Hold the
+# Updates role while you do: the post pings it only if you get a notification and see the
+# mention highlighted, not just the role's name in the text.
+name: Discord release post
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to post (empty for the latest release)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          UPDATES_ROLE: ${{ vars.DISCORD_UPDATES_ROLE_ID }}
+          TESTER_ROLE: ${{ vars.DISCORD_TESTER_ROLE_ID }}
+        run: |
+          gh release view ${TAG:+"$TAG"} --repo "$GITHUB_REPOSITORY" --json tagName,name,url,body,isPrerelease > release.json
+          if [ "$(jq -r .isPrerelease release.json)" = true ]; then
+            role="$TESTER_ROLE" line="is ready to test."
+          else
+            role="$UPDATES_ROLE" line="is out."
+          fi
+          if [ -z "$WEBHOOK" ] || [ -z "$role" ]; then
+            echo "::error::Set the DISCORD_RELEASE_WEBHOOK_URL secret and the role ID variables (see this workflow's opening comment)."
+            exit 1
+          fi
+          # The notes up to their Download section, whose table Discord shows as plain text.
+          # Notes written on Windows may end their lines in CRLF.
+          jq -r .body release.json | tr -d '\r' | awk '/^## Download/ { exit } { print }' > notes.md
+          # Discord takes 4096 characters in an embed's description; long notes are cut at a
+          # word. allowed_mentions lets the post ping only the one role, whatever the notes say.
+          jq -n --rawfile notes notes.md --slurpfile r release.json --arg role "$role" --arg line "$line" '
+            $r[0] as $r
+            | (if ($r.name // "") == "" then $r.tagName else $r.name end) as $title
+            | ($notes | sub("\\s+\\z"; "")) as $n
+            | (if ($n | length) > 3800
+               then ($n[0:3800] | sub("\\S*\\z"; "")) + "…\n\nThe rest of the notes are on the release page."
+               else $n end) as $n
+            | {
+                content: "<@&\($role)> \($title) \($line)",
+                allowed_mentions: { roles: [$role] },
+                embeds: [{ title: $title, url: $r.url, description: "\($n)\n\n[Download it from the release page](\($r.url))" }]
+              }' > payload.json
+          curl --fail-with-body -sS -H "content-type: application/json" --data @payload.json "$WEBHOOK"

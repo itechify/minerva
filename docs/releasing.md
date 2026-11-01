@@ -178,7 +178,7 @@ gh release create vX.Y.Z --verify-tag --title "Minerva X.Y.Z" --notes-file "C:/U
 
 **Every release from 0.13.0 on must carry `latest.json`.** Installed copies check `releases/latest/download/latest.json`, so a Latest release without it is a failed check for every player, not "no update".
 
-The newest release becomes Latest, which the README's download link and the updater's feed point to. Publishing it runs the Site workflow (`.github/workflows/site.yml`), which builds the site from the tag and publishes it to <https://owlofminerva.app/>.
+The newest release becomes Latest, which the README's download link and the updater's feed point to. Publishing it runs the Site workflow (`.github/workflows/site.yml`), which builds the site from the tag and publishes it to <https://owlofminerva.app/>. It also runs the Discord release post workflow (`.github/workflows/discord-release.yml`), which posts the release notes to the Discord's announcements channel and pings the Updates role (the Tester role for a pre-release). Don't post an announcement by hand.
 
 Then check the release:
 - `gh release view vX.Y.Z` lists the seven files.
@@ -186,6 +186,7 @@ Then check the release:
 - The release page reads correctly.
 - Downloading the setup `.exe` from it and installing works.
 - The Site workflow passed (`gh run list --workflow site.yml --limit 1`), and the site says it describes X.Y.Z, its Download button fetching that version's setup `.exe`.
+- The Discord release post workflow passed (`gh run list --workflow discord-release.yml --limit 1`), and the announcements channel has the post. If it failed, fix the cause and post it again with `gh workflow run discord-release.yml -f tag=vX.Y.Z`.
 
 ## If a release goes wrong
 
