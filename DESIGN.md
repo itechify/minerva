@@ -1236,8 +1236,10 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   (Mob levels 120px, Players' best 256px, Entries 136px, the map the rest; under 900px 96, 240 and 104px): 13px Ink
   Steel headers (Map, Mob levels, Players' best, Entries) that stay under the window's head as a long table goes by, on
   the box's tint made solid over the lavender; each map its 19px Map Mark and name (a link to its Map Leaderboard at the
-  band) over its street, its mob levels, the band's #1 (the EXP/h bold over who and when in 13px Ink Steel) and its
-  entries. A map with no entries leaves Players' best empty. With no entries, explain once above the table and leave the
+  band) over its street, its mob levels, the band's #1 (the EXP/h bold over their name, their job and level (its icon
+  2px clear of the name), and the date, each on a line of its own in 13px Ink Steel) and its entries. A map with no
+  entries leaves Players' best empty.
+  With no entries, explain once above the table and leave the
   figures empty. A long band folds after 15 maps behind a full-width 44px Show all row in bold link words.
   The caption under it says how
   far it goes. Under 640px each map is a card, its name and street beside the #1 over
@@ -1296,7 +1298,8 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   over it the Character: their 96px Portrait and name in 15px bold Ink, alike on both Pedestals. Under each block, 8px
   below it, what they stand it for in 14px (its number in Ink, what it counts in Ink Steel: "3 podiums", "380,000
   EXP/h", the Party mark on a line of its own under it for a Party Best, that line kept empty on the other steps so
-  their lines stay level); on Highest EXP/h then, 8px apart, the map with its Map Mark and the job with its icon (at its
+  their lines stay level); on Highest EXP/h then, 8px apart, the map with its Map Mark (its name on one line, cut
+  short with an ellipsis and read whole under the pointer, so the three Marks line up) and the job with its icon (at its
   whole 26px, not reaching into the map's line as in a table's row) over the level, in 13px Ink Steel, the three steps'
   lines side by side. Every step's upper part is as tall as the
   tallest's, each set down onto its own block, so the blocks alone make the podium's outline however much a step's words

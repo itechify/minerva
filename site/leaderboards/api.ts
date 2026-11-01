@@ -380,6 +380,8 @@ function floorOf(stood: Stood, partyLine: boolean): HTMLElement {
   if (stood.map !== null) {
     const map = make("a", "lb-stand-map", stood.map.name);
     map.href = stood.map.href;
+    // Its name may be cut short on the step (site.css); the pointer reads it whole.
+    map.title = stood.map.name;
     const line = make("span", "lb-stand-where");
     if (stood.map.mark !== null) line.append(markImage(stood.map.mark, true));
     line.append(map);

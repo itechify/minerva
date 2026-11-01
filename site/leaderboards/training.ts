@@ -230,13 +230,12 @@ function drawRow(row: TrainingRow): HTMLTableRowElement {
   cell(row.mobs === null ? "lb-train-mobs lb-train-none" : "lb-train-mobs", row.mobs ?? "—");
   if (row.best === null) cell("lb-train-best lb-train-none");
   else {
-    const who = make("span", "lb-train-who");
-    // The date on a line of its own, so no line ends on a dot, and "Cleric Lv 26" never parts.
-    who.append(characterLink(row.best.name, row.best.nameHref), " · ", jobWithIcon(row.best.who, row.best.jobClass, "lb-train-job", false));
-    const date = make("span", "lb-train-date", row.best.date);
+    // The EXP/h over who, their job and level, and the date, each on a line of its own.
     const exp = make("span", "lb-train-exp", row.best.expPerHour);
     if (row.best.party) exp.append(partyMark());
-    cell("lb-train-best", exp, who, date);
+    const who = characterLink(row.best.name, row.best.nameHref, "lb-train-who");
+    const job = jobWithIcon(row.best.who, row.best.jobClass, "lb-train-job", false);
+    cell("lb-train-best", exp, who, job, make("span", "lb-train-date", row.best.date));
   }
   if (row.entries === null) cell("lb-train-entries lb-train-none");
   else cell("lb-train-entries", row.entries);
