@@ -17,7 +17,7 @@
   - Run `probe osms` when OSMS changes and before a release; it must read the live map set and item files in full. Run `probe ceilings` and commit `site/worker/osms-ceilings.json` when OSMS's set changes.
   - Use `probe update-manifest` after a signed build, following `docs/releasing.md`.
 - `.github/workflows/check.yml` runs the cargo checks and `pnpm build` on a pull request that touches code, and on `main`; `site-check.yml` the site's; `adr-check.yml` fails a pull request that gives two ADRs, or two D1 migrations, one number, or takes a number another open pull request adds.
-- `.github/workflows/site.yml` publishes the site and deploys its Worker, with migrations, only when a GitHub Release is published or when run by hand (`gh workflow run site.yml -f ref=<ref>`). Merging to `main` deploys nothing.
+- `.github/workflows/site.yml` publishes the site and deploys its Worker, with migrations, only when a GitHub Release is published or when run by hand (`gh workflow run site.yml -f ref=<ref>`). Merging to `main` deploys nothing. `discord-release.yml` posts each published release to Discord and pings the Updates role.
 
 ## Releasing
 
