@@ -2387,23 +2387,24 @@ html.lb-band .lb-train,
   display: block;
   font-weight: 700;
 }
-.lb-train-who {
-  display: block;
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--ink-2);
-}
-/* The date a #1 was set on, on a line of its own under who set it, so no line ends on a dot; it
-   never breaks across lines ("22 / Oct"), and nor does their job and level ("Cleric Lv 26"). */
+/* Under the EXP/h, each on a line of its own: who set it, their job and level, and the date.
+   The date never breaks across lines ("22 / Oct"), and nor does the job and level ("Cleric Lv
+   26"). */
+.lb-train-who,
+.lb-train-job,
 .lb-train-date {
   display: block;
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-2);
+}
+.lb-train-job,
+.lb-train-date {
   white-space: nowrap;
 }
-.lb-train-job {
-  white-space: nowrap;
+/* The job's icon keeps clear of the name over it, rather than reaching into its line. */
+.lb-train-job .lb-job-icon {
+  margin-top: 2px;
 }
 /* Latest: an entry that took a map's top spot says so under it. */
 .lb-took {
@@ -4213,10 +4214,14 @@ button.button {
   gap: 5px;
   max-width: 100%;
 }
+/* The map's name keeps to one line, cut short with an ellipsis, so the three steps' Map Marks,
+   and the jobs under them, line up however long a name is. */
 .lb-stand-map {
   min-width: 0;
+  overflow: hidden;
   color: var(--ink);
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .lb-stand-yours {
   font-size: 14px;
