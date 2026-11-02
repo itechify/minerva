@@ -4,6 +4,7 @@
 // in the test, and nothing leaves it.
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
+import { READ_KEPT } from "../market";
 import { call } from "./api";
 
 /** What the made-up maplestory.market answers each table with, and how: `status` other than
@@ -171,6 +172,21 @@ describe("market reads", () => {
     expect(Object.keys(answer.prices?.items ?? {}).sort()).toEqual([ids[0], ids[2345], last].map(String).sort());
     expect((answer.prices?.items[ids[2345]] as { reference: { unit_price: number } }).reference.unit_price).toBe(ids[2345] % 1000);
     expect(answer.listed?.items[last]).toEqual({ min_unit_price: last % 900, listings: last % 7 });
+  });
+
+  it("read a few dozen rows for 20 items, however many the tables keep", async () => {
+    const ids = Array.from({ length: 4000 }, (_, i) => 1000000 + i);
+    setMarket(
+      ids.map((id) => priced(id, id % 1000)),
+      ids.map((id) => listed(id, id % 900, id % 7)),
+    );
+    await readOk(String(ORE));
+    const asked = JSON.stringify(ids.slice(0, 20));
+
+    const kept = await env.DB.prepare(READ_KEPT).bind(asked).all();
+
+    // D1 bills each row a statement reads: stepping over every item kept was 8,000 here.
+    expect(kept.meta.rows_read).toBeLessThanOrEqual(50);
   });
 
   it("have nothing while neither table was ever pulled", async () => {
