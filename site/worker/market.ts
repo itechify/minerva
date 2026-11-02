@@ -49,21 +49,22 @@ export async function readMarket(env: Env, request: Request, url: URL, now = Dat
   const key = env.MM_API_KEY;
   if (!key) return { status: 200, body: { prices: null, listed: null } };
   await Promise.all((Object.keys(SOURCES) as Source[]).map((source) => pullIfDue(env, key, source, now)));
-  // Each table is one row (migration 0009): D1 picks the items asked about out of it.
-  const kept = await env.DB.prepare(
-    `SELECT source, pulled_at,
-       (SELECT json_group_object(item.key, json(item.value)) FROM json_each(market_pulls.items) AS item
-        WHERE item.key IN (SELECT CAST(value AS TEXT) FROM json_each(?1))) AS items
-     FROM market_pulls WHERE market_pulls.items IS NOT NULL`,
-  )
-    .bind(JSON.stringify(ids))
-    .all<{ source: Source; pulled_at: number; items: string }>();
+  const kept = await env.DB.prepare(READ_KEPT).bind(JSON.stringify(ids)).all<{ source: Source; pulled_at: number; items: string }>();
   const table = (source: Source): Table | null => {
     const row = kept.results.find((r) => r.source === source);
     return row === undefined ? null : { pulledAt: row.pulled_at, items: JSON.parse(row.items) };
   };
   return { status: 200, body: { prices: table("prices"), listed: table("listed") } };
 }
+
+/** Each table kept, with the items asked about (`?1`, their IDs as a JSON list) picked out of it.
+ *  Each table is one row (migration 0009), and D1 counts each item `json_each` steps over as a
+ *  row read, so this looks each ID up in the table rather than stepping over its thousands of
+ *  items: a read is about 40 rows, not one for each item kept. */
+export const READ_KEPT = `SELECT source, pulled_at,
+     (SELECT json_group_object(CAST(id.value AS TEXT), json(json_extract(market_pulls.items, '$."' || id.value || '"')))
+      FROM json_each(?1) AS id WHERE json_extract(market_pulls.items, '$."' || id.value || '"') IS NOT NULL) AS items
+   FROM market_pulls WHERE market_pulls.items IS NOT NULL`;
 
 /** The maintainer's Pull market prices (ADR 0031): both tables pulled at once, whatever their
  *  age. */
