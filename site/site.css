@@ -2248,6 +2248,7 @@ button.icon-button:active {
   width: 34px;
   height: 34px;
   background: no-repeat -34px 0;
+  image-rendering: pixelated;
 }
 .lb-loot-meso[hidden] {
   display: none;

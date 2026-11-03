@@ -112,8 +112,8 @@ async function showLoot(place: MapPlace) {
 /** The kind whose Map Loot the panel shows and its mesos an hour, once drawn: a switch drops the
  *  Items in only when they change, and counts the figure on from there. */
 let lootShown: { kind: Kind | null; perHour: number } | null = null;
-/** The figure's count under way, stopped by the next draw. */
-let counting = 0;
+/** How many times the panel was drawn: a drop or count from an earlier draw stops. */
+let draws = 0;
 
 /** The Map Loot of the kind the boards show, its Items dropping in when it first fills and when
  *  the kind changes. */
@@ -123,13 +123,16 @@ function drawLoot() {
   const drop = lootShown?.kind !== link.kind && panel.perHour !== null && !reducedMotion().matches;
   const from = lootShown?.perHour ?? 0;
   lootShown = { kind: link.kind, perHour: panel.perHour ?? 0 };
-  counting++;
+  draws++;
   const figure = byId("loot-mesos");
   figure.textContent = panel.figure;
   const mesos = byId("loot-mesos-row");
   mesos.classList.toggle("lb-loot-waiting", panel.waiting);
   mesos.hidden = false;
+  byId("loot-mesos-label").hidden = false;
   const meso = byId("loot-meso");
+  // The drop is the same element from draw to draw: an earlier drop's moves end with it.
+  for (const move of meso.getAnimations()) move.cancel();
   meso.hidden = panel.tier === null;
   if (panel.tier !== null) meso.style.backgroundImage = `url("${MESO_ART[panel.tier]}")`;
   const line = byId("loot-line");
@@ -192,7 +195,7 @@ const ICONS_WAIT_MS = 400;
  *  their rows, most first, as the figure counts from `from` to `to`. The Items under the
  *  list's fold are there at once. */
 async function dropIn(list: HTMLElement, meso: HTMLElement, figure: HTMLElement, from: number, to: number) {
-  const turn = counting;
+  const draw = draws;
   const box = list.parentElement!;
   const fold = box.getBoundingClientRect().top + box.clientHeight;
   const rows = [...list.children].filter((row) => row.getBoundingClientRect().top < fold);
@@ -207,11 +210,14 @@ async function dropIn(list: HTMLElement, meso: HTMLElement, figure: HTMLElement,
   figure.textContent = mesosCounted(from, to, 0);
   const icons = rows.map((row) => (row.firstElementChild as HTMLImageElement).decode().catch(() => {}));
   await Promise.race([Promise.all(icons), new Promise((done) => setTimeout(done, ICONS_WAIT_MS))]);
-  if (turn !== counting) return;
+  if (draw !== draws) {
+    for (const move of moves) move.cancel();
+    return;
+  }
   for (const move of moves) move.play();
   const start = performance.now();
   const count = (now: number) => {
-    if (turn !== counting) return;
+    if (draw !== draws) return;
     const t = (now - start) / COUNT_MS;
     figure.textContent = mesosCounted(from, to, t);
     if (t < 1) requestAnimationFrame(count);

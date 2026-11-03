@@ -41,7 +41,8 @@ describe("a map's Map Loot panel", () => {
   it("writes an Item rarer than one an hour as a decimal, to 2 significant figures", () => {
     const rates = lootPanel(answer, null, "Pig Park").items.map((item) => item.rate);
 
-    expect(rates).toEqual(["64", "1", "0.4", "0.07", "0.004", "0"]);
+    // Never "0": 2 Characters picked it up, though the Worker's 4 decimals rounded it away.
+    expect(rates).toEqual(["64", "1", "0.4", "0.07", "0.004", "<0.001"]);
     const rare = { ...answer, both: { characters: 12, mesosPerHour: 1, items: [{ id: 4000008, name: "Pig's Head", perHour: 0.0567 }] } };
     expect(lootPanel(rare, null, "Pig Park").items[0].rate).toBe("0.057");
   });
@@ -58,6 +59,9 @@ describe("a map's Map Loot panel", () => {
       "bag",
     ]);
     expect(lootPanel(answer, null, "Pig Park").tier).toBe("gold");
+    // The drop goes by the figure as the panel writes it: 9,996 reads "10,000", a gold coin's.
+    const nearly = { ...answer, both: { characters: 12, mesosPerHour: 9_996, items: [] } };
+    expect(lootPanel(nearly, null, "Pig Park")).toMatchObject({ figure: "10,000", tier: "gold" });
     expect(lootPanel(answer, "party", "Pig Park").tier).toBeNull();
   });
 

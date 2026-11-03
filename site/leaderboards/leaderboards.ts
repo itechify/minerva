@@ -547,9 +547,11 @@ export interface LootRow {
 const MARKET_REF = "76rbdbd7";
 
 /** An Item's rate: how many an hour, whole from one up, and below that a decimal to 2
- *  significant figures ("0.4", "0.057"). */
+ *  significant figures ("0.4", "0.057"), down to "<0.001": never "0", since 2 Characters
+ *  picked it up (the Worker's 4 decimals can round a rare one to 0). */
 function itemRate(perHour: number): string {
-  return perHour >= 1 ? whole(Math.round(perHour)) : String(Number(perHour.toPrecision(2)));
+  if (perHour >= 1) return whole(Math.round(perHour));
+  return perHour < 0.001 ? "<0.001" : String(Number(perHour.toPrecision(2)));
 }
 
 /** An Item's picture on OSMS, by its ID. */
@@ -558,8 +560,9 @@ const itemIcon = (id: number) => `https://osmsdataexplorer.com/data/current/imag
 /** The game's four meso drops, smallest first (site/art/mesos). */
 export type MesoTier = "bronze" | "gold" | "bills" | "bag";
 
-/** Which meso drop shows beside a map's mesos an hour: a bronze coin under 10,000, a gold one
- *  under 50,000, a stack of bills under 200,000, and a bag from there. */
+/** Which meso drop shows beside a map's mesos an hour, as the panel writes it (3 significant
+ *  figures): a bronze coin under 10,000, a gold one under 50,000, a stack of bills under
+ *  200,000, and a bag from there. */
 export function mesoTier(perHour: number): MesoTier {
   return perHour < 10_000 ? "bronze" : perHour < 50_000 ? "gold" : perHour < 200_000 ? "bills" : "bag";
 }
@@ -578,7 +581,7 @@ export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: str
     icon: itemIcon(item.id),
     href: `https://maplestory.market/items/${item.id}?ref=${MARKET_REF}`,
   }));
-  return { figure: rate(figures.mesosPerHour), perHour: figures.mesosPerHour, tier: mesoTier(figures.mesosPerHour), waiting: false, line: null, items };
+  return { figure: rate(figures.mesosPerHour), perHour: figures.mesosPerHour, tier: mesoTier(Number(figures.mesosPerHour.toPrecision(3))), waiting: false, line: null, items };
 }
 
 /** The mesos an hour as the panel counts it up while its Items drop in, `t` of the way from
