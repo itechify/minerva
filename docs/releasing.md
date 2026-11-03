@@ -133,17 +133,17 @@ git push origin vX.Y.Z
 
 ## 5. Write the release notes
 
-Write them for players, not developers, in the shape of the previous releases. A feature's "More on the site" links to its row on the home page (`#map`, `#item-card`), or to the FAQ question that answers it (`/faq/#zoom`). Write them to `C:/Users/itech/Coding/_artifacts/minerva/notes-X.Y.Z.md`, then run the `humanizer` skill on them before publishing:
+Write them for players, not developers, as a short changelog: what changed, a line or two each, with no summary sentence above it and no bold lead-ins. Everything above `## Download` is the Discord post. Split the changes into `## App` and `## Website`, leaving out a section with nothing in it, and anything players won't notice. The site's changes count since the last release, even those already deployed by hand. A feature's "More on the site" links to its row on the home page (`#map`, `#item-card`), or to the FAQ question that answers it (`/faq/#zoom`). Write them to `C:/Users/itech/Coding/_artifacts/minerva/notes-X.Y.Z.md`, then run the `humanizer` skill on them before publishing:
 
 ```markdown
-<One sentence: what this version gives the player.>
+## App
 
-> Minerva isn't made, endorsed or supported by NEXON. Using any third-party tool with MapleStory is at your own risk.
-
-## Changes
-
-- **<Feature in bold.>** <What the player sees and does, in the panel's own words.> [More on the site](https://owlofminerva.app/#<feature>)
+- <What the player sees and does, in the panel's own words.> [More on the site](https://owlofminerva.app/#<feature>)
 - <Smaller changes, one line each.>
+
+## Website
+
+- <What changed on owlofminerva.app or in the Discord's posts.>
 
 Your settings, hotkeys and Personal Bests carry over from <previous version>.
 
