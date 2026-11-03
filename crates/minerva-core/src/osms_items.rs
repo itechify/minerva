@@ -167,6 +167,13 @@ impl ItemSet {
         self.items.iter().filter(|item| item.shop != ShopPrice::Cash).map(|item| (item.id, item.name.as_str())).collect()
     }
 
+    /// The ID Map Loot sends Item `name`, as OSMS spells it, by: the lowest of the Items in
+    /// [`ItemSet::loot_names`] with that name, so one name is always one ID. `None` for a name
+    /// no such Item has.
+    pub(crate) fn loot_id(&self, name: &str) -> Option<u32> {
+        self.items.iter().filter(|item| item.shop != ShopPrice::Cash && item.name == name).map(|item| item.id).min()
+    }
+
     /// Every item, in the files' order.
     pub(crate) fn all(&self) -> impl Iterator<Item = &ItemFacts> {
         self.items.iter()

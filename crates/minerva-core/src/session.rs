@@ -71,6 +71,7 @@
 use crate::ExpBar;
 use crate::bug_report::{Level, Note};
 use crate::loot_items::{ItemTally, Named, LootItem};
+use crate::map_loot::{READABLE_GAP_MS, VisitLoot, VisitLootEnded};
 use crate::personal_best::{BestKind, Bests, SavedBests, Stamp, VisitBest};
 use crate::pickup_log::PickupLine;
 use crate::status_bar::StatusBar;
@@ -481,6 +482,13 @@ pub(crate) struct Session {
     visit: Visit,
     /// Every map's Personal Bests, which outlast Sessions too.
     bests: Bests,
+    /// The Visit under way's Loot, for Map Loot (#225): it outlasts Sessions, as the Visit does,
+    /// but not a Character switch.
+    visit_loot: VisitLoot,
+    /// The Loot of Visits that ended since this was last asked, each the Character's it was.
+    ended_loot: Vec<VisitLootEnded>,
+    /// The last Pickup Log reading's capture time, and whether the log was readable then.
+    log_read: Option<(u64, bool)>,
     /// What it made of the readings since a Bug Report last took them.
     notes: Vec<Note>,
     /// Who the Session is for, as the Status Bar names them: `None` until a name is read,
@@ -535,6 +543,9 @@ struct Undo {
     character_switched: bool,
     /// The Visit then (its id): on another map since, the share counts from arriving there.
     visit: u64,
+    /// The active time of the Session it ended that the Visit's Loot banked then, so bringing
+    /// the Session back on the same Visit doesn't count it twice.
+    banked_ms: u64,
 }
 
 /// The figures the panel shows, held for the rest of the [`REFRESH_MS`] stretch they
@@ -939,6 +950,9 @@ impl Session {
     /// Another Character, named `name` if the Status Bar showed it: a new Session, with
     /// nothing learned of the level.
     fn switch(&mut self, name: Option<String>) {
+        // The Visit goes on, but its Loot so far was the Character before's.
+        let next = self.visit_loot.after_switch();
+        self.end_visit_loot(next);
         self.reset();
         self.lost_from = None;
         self.character_switched = true;
@@ -1063,14 +1077,20 @@ impl Session {
     /// until the EXP next changes, for [`Session::undo_reset`]. Pressed again while
     /// waiting, the one set aside stays.
     pub fn reset_by_player(&mut self) {
+        // The Visit's Loot keeps the active time of the Session the reset ends.
+        let banked_ms = self.session_visit_active();
         let undo = match self.figures.take() {
-            Some(figures) => Some(Undo {
-                figures,
-                largest_gain_hundredths: self.largest_gain_hundredths,
-                level_ups: self.level_ups,
-                character_switched: self.character_switched,
-                visit: self.visit.id,
-            }),
+            Some(figures) => {
+                self.visit_loot.banked_ms += banked_ms;
+                Some(Undo {
+                    figures,
+                    largest_gain_hundredths: self.largest_gain_hundredths,
+                    level_ups: self.level_ups,
+                    character_switched: self.character_switched,
+                    visit: self.visit.id,
+                    banked_ms,
+                })
+            }
             None => self.undo.take(),
         };
         self.reset();
@@ -1086,6 +1106,9 @@ impl Session {
             // Reset on another map: the EXP hasn't changed since, so the time from then
             // to arriving here counts as it would have.
             figures.start_visit(figures.active(self.visit.at));
+        } else {
+            // The Session the Visit's Loot banked is back, to count as it goes on.
+            self.visit_loot.banked_ms = self.visit_loot.banked_ms.saturating_sub(undo.banked_ms);
         }
         self.figures = Some(figures);
         self.largest_gain_hundredths = undo.largest_gain_hundredths;
@@ -1125,10 +1148,13 @@ impl Session {
             _ => None,
         });
         if let Some(first) = mesos.next() {
-            figures.mesos = mesos.fold(figures.mesos.saturating_add(first), u64::saturating_add);
+            let picked_up = mesos.fold(first, u64::saturating_add);
+            figures.mesos = figures.mesos.saturating_add(picked_up);
+            self.visit_loot.mesos = self.visit_loot.mesos.saturating_add(picked_up);
             figures.play(at_ms);
         }
         for (named, quantity) in items {
+            self.visit_loot.add_item(&named, quantity);
             figures.items.add(named, quantity, &mut self.notes);
         }
     }
@@ -1224,6 +1250,7 @@ impl Session {
     /// The share of the map's ceiling counts only the play since.
     pub fn arrive(&mut self) {
         let now = self.now;
+        self.end_visit_loot(VisitLoot::default());
         self.notes.push(Note::Visit);
         self.visit = Visit { id: self.visit.id + 1, at: now };
         self.bests.end_visit();
@@ -1235,6 +1262,45 @@ impl Session {
     /// What it made of the readings since this was last asked, for a Bug Report.
     pub fn take_notes(&mut self) -> Vec<Note> {
         std::mem::take(&mut self.notes)
+    }
+
+    /// The active time of the Session under way since the Visit started, or since the Session
+    /// did if later.
+    fn session_visit_active(&self) -> u64 {
+        self.figures.as_ref().map_or(0, |figures| figures.active(self.now).saturating_sub(figures.visit_from))
+    }
+
+    /// The Visit's Loot ends, the Character's named now, and `next` is tallied from here.
+    fn end_visit_loot(&mut self, next: VisitLoot) {
+        let ended = self.visit_loot.ended(self.character_name(), self.session_visit_active());
+        self.ended_loot.push(ended);
+        self.visit_loot = next;
+    }
+
+    /// The Loot of the Visits that ended since this was last asked.
+    pub fn take_ended_loot(&mut self) -> Vec<VisitLootEnded> {
+        std::mem::take(&mut self.ended_loot)
+    }
+
+    /// The Visit under way's Loot, as if it ended now.
+    pub fn loot_under_way(&self) -> VisitLootEnded {
+        self.visit_loot.ended(self.character_name(), self.session_visit_active())
+    }
+
+    /// A Pickup Log capture at `at_ms` found the log `readable`: not covered, by a Mob, a skill
+    /// effect or one of our windows. The time to the next reading counts towards the Visit's
+    /// readable time while the Session runs, if it comes within [`READABLE_GAP_MS`].
+    pub fn on_pickup_log_seen(&mut self, at_ms: u64, readable: bool) {
+        self.tick(at_ms);
+        if let Some((last, true)) = self.log_read
+            && at_ms > last
+            && at_ms - last <= READABLE_GAP_MS
+            && self.figures.as_ref().is_some_and(|figures| !figures.paused(at_ms))
+        {
+            self.visit_loot.readable_ms += at_ms - last;
+        }
+        let last = self.log_read.map_or(at_ms, |(last, _)| last.max(at_ms));
+        self.log_read = Some((last, readable));
     }
 
     /// Every map's Personal Bests.
@@ -1253,6 +1319,9 @@ impl Session {
     /// amount of EXP: that comes from the EXP bar alone (ADR 0005).
     pub fn on_pickup_log(&mut self, at_ms: u64, arrived: &[PickupLine]) {
         self.tick(at_ms);
+        if arrived.iter().any(|line| matches!(line, PickupLine::PartyBonus { .. })) {
+            self.visit_loot.party = true;
+        }
         let (play, active) = match &mut self.figures {
             Some(figures) => {
                 let active = figures.active(at_ms);
@@ -1323,6 +1392,9 @@ impl Session {
     /// an event since asks for them afresh; and the bar's last reading. A best is dated
     /// by `now_unix_ms`, the wall clock, if the shell has told it.
     pub fn tracking(&mut self, ceiling: Option<u64>, map: Option<&str>, now_unix_ms: Option<u64>) -> ExpTracking {
+        if let Some(map) = map {
+            self.visit_loot.map = Some(map.to_string());
+        }
         let mut fresh = self.measure(ceiling);
         let stretch = self.now / REFRESH_MS;
         // While the bar can't be read nothing new is known: the figures shown stay as

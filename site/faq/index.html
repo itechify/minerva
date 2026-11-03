@@ -197,7 +197,9 @@
                     prices. It also sends the bests of each
                     character you share on the <a href="#leaderboard-appear">Map Leaderboards</a> (new characters are
                     shared by default): their name, job, level, EXP per hour and dates, along with your Leaderboard Key.
-                    The site keeps the key only as a hash. Turn <strong>Share</strong> off under a character's name in
+                    For each map a shared character spends 10 minutes or more on, it also sends what they picked up
+                    there: the mesos, each item and how many, and how long they played. A map's page adds these up
+                    with no names on them. <a href="#map-loot">See how</a>. The site keeps the key only as a hash. Turn <strong>Share</strong> off under a character's name in
                     your Personal Bests and nothing of theirs is sent. The site asks
                     <a href="https://classicrank.com">ClassicRank</a> for each shared character's portrait, using only
                     their name.
@@ -213,6 +215,7 @@
                     <li>
                       In the same folder: your Personal Bests (each character's best visits on each map) in
                       <code>personal-bests.json</code>, the market prices you keep in <code>market-prices.json</code>,
+                      the <a href="#map-loot">loot</a> waiting to go to the Map Leaderboards in <code>map-loot.json</code>,
                       and the 10 newest <a href="#bug-reports">Bug Reports</a> you've saved in <code>Bug Reports</code>.
                     </li>
                     <li>

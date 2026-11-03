@@ -43,6 +43,7 @@ use crate::item_lookup::ItemLookup;
 use crate::item_tooltip::{ItemCapture, ItemTooltip, ItemTooltipReading};
 use crate::discord_link::{DiscordLinkAnswer, DiscordLinkAsk, DiscordLinkRequest};
 use crate::leaderboards::{LeaderboardAnswer, RejectedReason};
+use crate::map_loot::{MapLootAnswer, SavedMapLoot};
 use crate::maplestory_market::MarketAnswer;
 use crate::map_data::MapSummary;
 use crate::map_index::{Fetched, MapDataSource, SourceError};
@@ -268,6 +269,8 @@ pub enum Event {
     /// The Personal Bests file was there but didn't read: the shell restored none.
     BestsLost {},
     RestoreMarketPrices { prices: SavedMarketPrices },
+    /// The Map Loot an earlier launch kept waiting to be sent (ADR 0033).
+    RestoreMapLoot { map_loot: SavedMapLoot },
     /// A tool of the player's own left `import` for their Market Lines (ADR 0013).
     ImportMarketPrices { import: MarketImport },
     /// The player removed the Visit whose best was `visit` from `map`'s Visit History, the
@@ -303,6 +306,8 @@ pub enum Event {
     /// The Map Leaderboards answered upload `id`, for the Character named `name` (empty for an
     /// upload no longer under way), with `answer`.
     LeaderboardAnswer { id: u64, name: String, answer: LeaderboardAnswer },
+    /// The site answered Map Loot upload `id` with `answer` (ADR 0033).
+    MapLootAnswer { id: u64, answer: MapLootAnswer },
     /// The site answered ask `id` for maplestory.market's figures (ADR 0030) with `answer`.
     MarketAnswer { id: u64, answer: MarketAnswer },
     /// The player pressed Link Discord in the Personal Bests window.
@@ -1225,6 +1230,7 @@ impl Recorder {
                 | Event::RestoreBests { .. }
                 | Event::BestsLost {}
                 | Event::RestoreMarketPrices { .. }
+                | Event::RestoreMapLoot { .. }
                 | Event::Build { .. }
         );
         if launch {
@@ -2143,6 +2149,9 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             Event::RestoreMarketPrices { prices } => {
                 minerva.restore_market_prices(prices);
             }
+            Event::RestoreMapLoot { map_loot } => {
+                minerva.restore_map_loot(map_loot);
+            }
             Event::ImportMarketPrices { import } => {
                 minerva.import_market_prices(import);
             }
@@ -2191,6 +2200,9 @@ pub fn replay_with(recording: &Recording, with: ReplayData) -> Replay {
             }
             Event::LeaderboardAnswer { id, answer, .. } => {
                 minerva.on_leaderboard_answer(id, answer);
+            }
+            Event::MapLootAnswer { id, answer } => {
+                minerva.on_map_loot_answer(id, answer);
             }
             Event::MarketAnswer { id, answer } => {
                 minerva.on_market_answer(id, answer);
@@ -2301,6 +2313,7 @@ impl Recording {
                     | Event::RestoreBests { .. }
                     | Event::BestsLost {}
                     | Event::RestoreMarketPrices { .. }
+                    | Event::RestoreMapLoot { .. }
                     | Event::ImportMarketPrices { .. }
                     | Event::RemoveVisit { .. }
                     | Event::MoveVisit { .. }
@@ -2310,6 +2323,7 @@ impl Recording {
                     | Event::ShowOnLeaderboards { .. }
                     | Event::SendToLeaderboardsAgain { .. }
                     | Event::LeaderboardAnswer { .. }
+                    | Event::MapLootAnswer { .. }
                     | Event::MarketAnswer { .. }
                     | Event::LinkDiscord {}
                     | Event::DismissLinkPrompt {}
@@ -2544,6 +2558,16 @@ impl Event {
                 let names: Vec<String> =
                     prices.lines.iter().map(|line| format!("{:?} ({} prices)", line.name, line.prices.len())).collect();
                 format!("market prices restored: {}", if names.is_empty() { "no lines".into() } else { names.join(", ") })
+            }
+            Event::RestoreMapLoot { map_loot } => format!("Map Loot restored: {} Visits waiting", map_loot.visits.len()),
+            Event::MapLootAnswer { id, answer } => {
+                let said = match answer {
+                    MapLootAnswer::Taken {} => "taken".to_string(),
+                    MapLootAnswer::Refused { why } => format!("refused ({why})"),
+                    MapLootAnswer::RateLimited { retry_after_secs } => format!("rate-limited for {retry_after_secs} s"),
+                    MapLootAnswer::Failed { why } => format!("failed ({why})"),
+                };
+                format!("Map Loot upload {id} {said}")
             }
             Event::ImportMarketPrices { import } => {
                 let names: Vec<String> =

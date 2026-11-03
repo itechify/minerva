@@ -21,6 +21,7 @@ mod leaderboards;
 mod loader;
 mod map_data;
 mod map_index;
+mod map_loot;
 mod map_mark;
 mod map_preview;
 mod maplestory_market;
@@ -68,6 +69,7 @@ pub use hotkey_settings::{KeyPress, RebindProblem, SettingsNotice};
 pub use item_card::{
     Edge, ItemCard, ItemCardChoice, ItemCardView, MarketEdit, MarketLine, NameProblem, ShopPrice, ShownItemCard,
 };
+pub use map_loot::{MAP_LOOT_VERSION, MapLootAnswer, MapLootItem, MapLootUpload, MapLootVisit, SavedMapLoot, read_map_loot_answer};
 pub use market_prices::{MARKET_PRICES_VERSION, MarketImport, MarketPrice, SavedMarketLine, SavedMarketPrices};
 pub use maplestory_market::{
     Asking, Basis, CHEAPEST_LINE, GOING_RATE_LINE, GoingRate, ItemFigures, Listed, MARKET_REF, MarketAnswer, MarketAsk, MarketRows, Priced, Sales,
@@ -340,6 +342,10 @@ pub struct PanelState {
     /// Not sent to the overlay.
     #[serde(skip_serializing)]
     pub leaderboard_uploads: Vec<LeaderboardUpload>,
+    /// The Map Loot upload under way (ADR 0033): the shell makes it once, by its id, and tells
+    /// the answer to [`Minerva::on_map_loot_answer`]. Not sent to the overlay.
+    #[serde(skip_serializing)]
+    pub map_loot_uploads: Vec<MapLootUpload>,
     /// The asks of the site for maplestory.market's figures under way (ADR 0030), for the shell
     /// to make: a few items each, a card's or a shop's. The shell makes each once, by its id,
     /// and tells the answer to [`Minerva::on_market_answer`]. Not sent to the overlay.
@@ -617,6 +623,8 @@ pub struct Minerva {
     card_capturing: bool,
     /// The market prices the player keeps, which the Item Card shows.
     market_prices: MarketPrices,
+    /// The Map Loot waiting to be sent, and the upload under way (ADR 0033).
+    map_loot: map_loot::MapLoot,
     /// maplestory.market's figures held, which the Item Card shows above the player's, and the
     /// asks for more under way (ADR 0030).
     market: Market,
@@ -704,6 +712,7 @@ impl Minerva {
             item_cards: ItemCards::default(),
             card_capturing: false,
             market_prices: MarketPrices::default(),
+            map_loot: map_loot::MapLoot::default(),
             market: Market::default(),
             deal_finder: DealFinder::default(),
             shop_reader: None,
@@ -1861,6 +1870,11 @@ impl Minerva {
         };
         self.pickup_cover.on_reading(&reading, &self.state.our_windows);
         let clear = matches!(reading.seen, PickupLogSeen::Clear { .. });
+        // Map Loot counts a Visit only if the log was readable for most of it: a capture a Mob,
+        // a skill effect or one of our windows covers isn't. One with nothing in it is: the
+        // lines fade between pickups.
+        let covered = matches!(reading.seen, PickupLogSeen::Covered { .. }) || self.pickup_cover.covered(&self.state.our_windows);
+        self.session.on_pickup_log_seen(reading.at_ms, !covered);
         // A line is read a few captures after it arrives: one that arrived before the Session
         // started, or before a reset, an undo or a Character switch, is not its own.
         let arrived_from = |from: u64| -> Vec<PickupLine> {
@@ -2109,6 +2123,36 @@ impl Minerva {
         self.market_prices.revision()
     }
 
+    /// Pick up the Map Loot an earlier launch kept waiting to be sent (ADR 0033;
+    /// [`SavedMapLoot::default`] when none was). The shell restores it at startup, and it goes
+    /// once a tick finds the item files in.
+    pub fn restore_map_loot(&mut self, map_loot: SavedMapLoot) -> &PanelState {
+        self.record(Event::RestoreMapLoot { map_loot: map_loot.clone() });
+        self.map_loot.restore(map_loot);
+        self.sync_panel()
+    }
+
+    /// The Map Loot waiting to be sent, the Visit under way's included as if it had ended, for
+    /// the shell to save: closing Minerva ends the Visit.
+    pub fn map_loot(&self) -> SavedMapLoot {
+        self.map_loot.saved()
+    }
+
+    /// Changes whenever what [`Minerva::map_loot`] holds does (the Visit under way's once a
+    /// minute), so the shell saves it only then.
+    pub fn map_loot_revision(&self) -> u64 {
+        self.map_loot.revision()
+    }
+
+    /// The shell made upload `id` of [`PanelState::map_loot_uploads`], and the site answered
+    /// `answer` ([`read_map_loot_answer`], or [`MapLootAnswer::Failed`] when it couldn't be
+    /// made). An answer to an upload no longer under way changes nothing.
+    pub fn on_map_loot_answer(&mut self, id: u64, answer: MapLootAnswer) -> &PanelState {
+        self.record(Event::MapLootAnswer { id, answer: answer.clone() });
+        self.map_loot.answer(id, answer);
+        self.sync_panel()
+    }
+
     /// The player clicked the Item Card's ×: close it.
     pub fn close_item_card(&mut self) -> &PanelState {
         self.record(Event::CloseItemCard {});
@@ -2265,6 +2309,8 @@ impl Minerva {
         self.session.tick(at_ms);
         // Uploads only on a tick: at launch the bests are back by the first.
         self.leaderboards.tick(at_ms, self.session.bests().history(), self.wall_clock);
+        let leaderboards = &self.leaderboards;
+        self.map_loot.tick(at_ms, self.items.items().ok(), |name| leaderboards.sends_for(name));
         self.discord.tick(at_ms, self.bests_window.open);
         self.updater.tick(at_ms, self.settings.check_for_updates);
         // maplestory.market's figures the card and the Deal Finder last wanted.
@@ -2393,6 +2439,21 @@ impl Minerva {
         self.recorder.close(Outcome { answers, notes, state: &self.state, bests_revision });
     }
 
+    /// The Loot of the Visits that ended since, each sent if it's worth it and its Character
+    /// is shown on the Map Leaderboards, and the Visit under way's, to save (ADR 0033).
+    fn sync_map_loot(&mut self) {
+        let leaderboards = &self.leaderboards;
+        let shown = |visit: &MapLootVisit| leaderboards.sends_for(&visit.name);
+        for ended in self.session.take_ended_loot() {
+            if let Some(visit) = ended.worth_sending().filter(shown) {
+                self.map_loot.ended(visit);
+            }
+        }
+        self.map_loot.under_way(self.session.loot_under_way().worth_sending().filter(shown));
+        self.map_loot.tick(0, self.items.items().ok(), |name| leaderboards.sends_for(name));
+        self.state.map_loot_uploads = self.map_loot.uploads();
+    }
+
     fn sync_panel(&mut self) -> &PanelState {
         // Whether titles can be snapped to real maps: by the file set held, or why none is.
         self.state.recognition = match (self.maps.held(), self.maps.failed()) {
@@ -2424,6 +2485,7 @@ impl Minerva {
         self.sync_personal_bests();
         self.sync_settings_window();
         self.state.leaderboard_uploads = self.leaderboards.uploads();
+        self.sync_map_loot();
         self.state.market_asks = self.market.asks();
         self.state.discord_link_requests = self.discord.requests();
         self.sync_owl_bubble();

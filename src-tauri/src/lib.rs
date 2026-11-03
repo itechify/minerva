@@ -21,6 +21,7 @@ mod hotkeys;
 mod http;
 mod item_card;
 mod leaderboards;
+mod map_loot;
 mod market_prices;
 mod meowdb;
 mod old_caches;
@@ -40,7 +41,7 @@ mod view;
 
 use minerva_core::{
     Action, DEAL_FINDER_CAPTURE_MS, Minerva, ExpBarReader, ExpBarReading, ExpFigures, GameWindow, ItemCapture, ItemTooltipReader,
-    ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, MarketAnswer, DiscordLinkAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
+    ItemTooltipReading, KeyPress, Layer, LeaderboardAnswer, MapLootAnswer, MarketAnswer, DiscordLinkAnswer, MIN_PANEL_WIDTH, PanelControl, PanelSizes, PlacementMode, PanelState, PlayerShopReader,
     Request, ScreenPoint, ScreenRect, ShopCapture, ShopReading, StatusBarCapture, StatusBarReader, StatusBarReading,
     TITLE_READ_MS, TITLE_SEARCH_MS, TitleCapture, TitleReader, TitleReading, UpdateAnswer, VisitBest,
     PICKUP_LOG_CAPTURE_MS, PickupLogCapture, PickupLogReader, PickupLogReading,
@@ -140,6 +141,8 @@ pub(crate) enum Command {
     OpenBestsLeaderboard { character: Option<String>, id: String },
     /// The Map Leaderboards answered the core's upload `id` (or it couldn't be made).
     LeaderboardAnswer { id: u64, answer: LeaderboardAnswer },
+    /// The site answered the core's Map Loot upload `id` (or it couldn't be made).
+    MapLootAnswer { id: u64, answer: MapLootAnswer },
     /// The site answered the core's ask `id` for maplestory.market's figures (or it couldn't be
     /// made).
     MarketAnswer { id: u64, answer: MarketAnswer },
@@ -340,6 +343,9 @@ pub fn run() {
             let (prices_file, saved_prices) =
                 market_prices::MarketPricesFile::load(market_prices::path(app.handle())?);
             minerva.restore_market_prices(saved_prices);
+            // The Map Loot waiting to be sent, the Visit under way when Minerva closed among it.
+            let (map_loot_file, saved_map_loot) = map_loot::MapLootFile::load(map_loot::path(app.handle())?);
+            minerva.restore_map_loot(saved_map_loot);
             // Whether this build can update in place, or only say a newer version is out.
             let build = updates::build();
             minerva.on_build(build);
@@ -403,7 +409,7 @@ pub fn run() {
             let updater = updates::Updater::new(app.handle().clone(), build, app.state::<Sender<Command>>().inner().clone());
             std::thread::Builder::new().name("core-loop".into()).spawn(move || {
                 let files =
-                    Files { settings: settings_path, bests: bests_file, market_prices: prices_file, market_imports };
+                    Files { settings: settings_path, bests: bests_file, market_prices: prices_file, map_loot: map_loot_file, market_imports };
                 core_loop(handle, windows, minerva, reader, commands_rx, files, Online { uploader, updater })
             })?;
             Ok(())
@@ -511,21 +517,24 @@ impl Panels {
     }
 }
 
-/// Where the core loop saves the settings, the Personal Bests and the market prices, and
-/// the folder it takes Market Imports from.
+/// Where the core loop saves the settings, the Personal Bests, the market prices and the Map
+/// Loot, and the folder it takes Market Imports from.
 struct Files {
     settings: PathBuf,
     bests: bests::BestsFile,
     market_prices: market_prices::MarketPricesFile,
+    map_loot: map_loot::MapLootFile,
     market_imports: PathBuf,
 }
 
-/// What of the settings, the Personal Bests and the market prices the core loop saved last
-/// (or restored at startup): the settings themselves, and the core's revisions of the others.
+/// What of the settings, the Personal Bests, the market prices and the Map Loot the core loop
+/// saved last (or restored at startup): the settings themselves, and the core's revisions of the
+/// others.
 struct Saved {
     settings: minerva_core::Settings,
     bests: u64,
     prices: u64,
+    map_loot: u64,
 }
 
 /// What the core loop asks over the network for the core: the uploads to the Map
@@ -536,8 +545,8 @@ struct Online {
     updater: updates::Updater,
 }
 
-/// Save whatever Quit Minerva saves to `files`: the Personal Bests, the market prices, and
-/// the settings if they changed since `saved`, which then holds them.
+/// Save whatever Quit Minerva saves to `files`: the Personal Bests, the market prices, the Map
+/// Loot, and the settings if they changed since `saved`, which then holds them.
 fn save_for_quit(minerva: &Minerva, files: &Files, saved: &mut Saved) {
     save_bests_and_prices(minerva, files, saved);
     let current = minerva.settings();
@@ -564,10 +573,11 @@ fn save_revised<T: files::JsonShape>(file: &files::GuardedJsonFile<T>, revision:
     }
 }
 
-/// Save the Personal Bests and the market prices, each if it changed since `saved`.
+/// Save the Personal Bests, the market prices and the Map Loot, each if it changed since `saved`.
 fn save_bests_and_prices(minerva: &Minerva, files: &Files, saved: &mut Saved) {
     save_revised(&files.bests, minerva.bests_revision(), &mut saved.bests, || minerva.bests());
     save_revised(&files.market_prices, minerva.market_prices_revision(), &mut saved.prices, || minerva.market_prices());
+    save_revised(&files.map_loot, minerva.map_loot_revision(), &mut saved.map_loot, || minerva.map_loot());
 }
 
 /// The wall clock, in ms since the Unix epoch.
@@ -797,7 +807,12 @@ fn core_loop(
     let Online { mut uploader, mut updater } = online;
     // Restored at startup: saved already.
     let mut saved =
-        Saved { settings: minerva.settings(), bests: minerva.bests_revision(), prices: minerva.market_prices_revision() };
+        Saved {
+            settings: minerva.settings(),
+            bests: minerva.bests_revision(),
+            prices: minerva.market_prices_revision(),
+            map_loot: minerva.map_loot_revision(),
+        };
     let Windows {
         overlay: mut window,
         setup: mut setup_windows,
@@ -886,6 +901,9 @@ fn core_loop(
             }
             Ok(Command::LeaderboardAnswer { id, answer }) => {
                 minerva.on_leaderboard_answer(id, answer);
+            }
+            Ok(Command::MapLootAnswer { id, answer }) => {
+                minerva.on_map_loot_answer(id, answer);
             }
             Ok(Command::MarketAnswer { id, answer }) => {
                 minerva.on_market_answer(id, answer);
@@ -1070,6 +1088,7 @@ fn core_loop(
         }
         // The core asks for uploads to the Map Leaderboards on a tick: each is made once.
         uploader.sync(&minerva.panel_state().leaderboard_uploads);
+        uploader.sync_map_loot(&minerva.panel_state().map_loot_uploads);
         uploader.sync_discord(&minerva.panel_state().discord_link_requests);
         uploader.sync_market(&minerva.panel_state().market_asks);
         // And for a check for a newer version, and its download: each is run once.

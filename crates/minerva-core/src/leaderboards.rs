@@ -622,6 +622,12 @@ impl Leaderboards {
         }
     }
 
+    /// Whether the Character named `name` is shown on the Map Leaderboards, and not blocked this
+    /// launch: their Map Loot goes with their entries (ADR 0033).
+    pub fn sends_for(&self, name: &str) -> bool {
+        self.standings.iter().any(|standing| standing.saved.name == name && standing.saved.shown && !standing.blocked)
+    }
+
     /// The uploads under way, for the shell to make.
     pub fn uploads(&self) -> Vec<LeaderboardUpload> {
         self.standings.iter().filter_map(|standing| standing.in_flight.clone()).collect()
@@ -702,7 +708,7 @@ pub(crate) fn map_url(map: &str, band: Option<LevelBand>, name: Option<&str>) ->
 }
 
 /// `name` for a URL: its letters and digits as they are, any other byte percent-encoded.
-fn encoded(name: &str) -> String {
+pub(crate) fn encoded(name: &str) -> String {
     let mut out = String::new();
     for byte in name.bytes() {
         if byte.is_ascii_alphanumeric() {

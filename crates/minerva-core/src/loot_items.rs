@@ -12,10 +12,10 @@
 
 use crate::bug_report::Note;
 use crate::osms_items::{InventoryTab, ItemSet};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// One Item the Session has picked up, and how many.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LootItem {
     pub name: String,

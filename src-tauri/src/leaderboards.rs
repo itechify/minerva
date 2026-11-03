@@ -16,8 +16,9 @@
 use crate::errors::error;
 use crate::{Command, http};
 use minerva_core::{
-    DiscordLinkAnswer, DiscordLinkRequest, LeaderboardAnswer, LeaderboardUpload, MarketAnswer, MarketAsk, SITE_URL, link_page,
-    read_leaderboard_answer, read_leaderboard_pull, read_link_state, read_link_token, read_market_answer,
+    DiscordLinkAnswer, DiscordLinkRequest, LeaderboardAnswer, LeaderboardUpload, MapLootAnswer, MapLootUpload, MarketAnswer, MarketAsk,
+    SITE_URL, link_page, read_leaderboard_answer, read_leaderboard_pull, read_link_state, read_link_token, read_map_loot_answer,
+    read_market_answer,
 };
 use std::fs;
 use std::io::ErrorKind;
@@ -104,14 +105,16 @@ fn make(path: &Path) -> Result<String, String> {
     Ok(key)
 }
 
-/// Makes the core's uploads, its requests about linking to Discord, and its asks for
-/// maplestory.market's figures.
+/// Makes the core's uploads, its Map Loot uploads, its requests about linking to Discord, and
+/// its asks for maplestory.market's figures.
 pub struct Uploader {
     key: KeyFile,
     /// The data source's: one HTTP client for all that Minerva fetches and sends.
     client: reqwest::Client,
     /// The id of the last upload made: the core's ids only grow.
     made: u64,
+    /// The id of the last Map Loot upload made.
+    map_loot_made: u64,
     /// The id of the last request about linking made.
     link_request_made: u64,
     /// The id of the last ask for maplestory.market's figures made.
@@ -122,7 +125,7 @@ pub struct Uploader {
 
 impl Uploader {
     pub fn new(key: KeyFile, client: reqwest::Client, commands: Sender<Command>) -> Self {
-        Self { key, client, made: 0, link_request_made: 0, market_ask_made: 0, commands }
+        Self { key, client, made: 0, map_loot_made: 0, link_request_made: 0, market_ask_made: 0, commands }
     }
 
     /// Make each of `uploads` (the core's under way, pulls among them) not made yet, in the
@@ -154,6 +157,32 @@ impl Uploader {
                     Err(why) => LeaderboardAnswer::Failed { why },
                 };
                 Command::LeaderboardAnswer { id, answer }
+            });
+        }
+    }
+
+    /// Make each of `uploads` (the core's of Map Loot) not made yet, in the background, with the
+    /// Leaderboard Key; each answer comes back to the core loop as [`Command::MapLootAnswer`].
+    pub fn sync_map_loot(&mut self, uploads: &[MapLootUpload]) {
+        let made = self.map_loot_made;
+        for upload in uploads.iter().filter(|upload| upload.id > made) {
+            self.map_loot_made = self.map_loot_made.max(upload.id);
+            let id = upload.id;
+            let key = match self.key.key() {
+                Ok(key) => key,
+                Err(why) => {
+                    error!("Map Loot: {why}");
+                    let _ = self.commands.send(Command::MapLootAnswer { id, answer: MapLootAnswer::Failed { why } });
+                    continue;
+                }
+            };
+            let (url, body, client) = (format!("{}{}", site(), upload.path()), upload.body(), self.client.clone());
+            http::answer_in_background(self.commands.clone(), async move {
+                let answer = match http::send(&client, reqwest::Method::POST, &url, &key, Some(body)).await {
+                    Ok(reply) => read_map_loot_answer(reply.status, reply.retry_after.as_deref(), &reply.body),
+                    Err(why) => MapLootAnswer::Failed { why },
+                };
+                Command::MapLootAnswer { id, answer }
             });
         }
     }
