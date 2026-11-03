@@ -548,7 +548,7 @@ struct Online {
 /// Save whatever Quit Minerva saves to `files`: the Personal Bests, the market prices, the Map
 /// Loot, and the settings if they changed since `saved`, which then holds them.
 fn save_for_quit(minerva: &Minerva, files: &Files, saved: &mut Saved) {
-    save_bests_and_prices(minerva, files, saved);
+    save_changed(minerva, files, saved);
     let current = minerva.settings();
     if current != saved.settings {
         if let Err(e) = settings::save(&files.settings, &current) {
@@ -574,7 +574,7 @@ fn save_revised<T: files::JsonShape>(file: &files::GuardedJsonFile<T>, revision:
 }
 
 /// Save the Personal Bests, the market prices and the Map Loot, each if it changed since `saved`.
-fn save_bests_and_prices(minerva: &Minerva, files: &Files, saved: &mut Saved) {
+fn save_changed(minerva: &Minerva, files: &Files, saved: &mut Saved) {
     save_revised(&files.bests, minerva.bests_revision(), &mut saved.bests, || minerva.bests());
     save_revised(&files.market_prices, minerva.market_prices_revision(), &mut saved.prices, || minerva.market_prices());
     save_revised(&files.map_loot, minerva.map_loot_revision(), &mut saved.map_loot, || minerva.map_loot());
@@ -1194,7 +1194,7 @@ fn core_loop(
             }
             saved.settings = pending.0.clone();
         }
-        save_bests_and_prices(&minerva, &files, &mut saved);
+        save_changed(&minerva, &files, &mut saved);
     }
 }
 

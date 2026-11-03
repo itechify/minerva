@@ -156,7 +156,7 @@ function figuresOf(env: Env, characters: Sums[]): LootFigures {
     if (name === undefined || pickedUpBy < LEAST_PICKED_UP_BY) continue;
     // Each Character's own rate, averaged over them all: one who picked none up adds a 0.
     const total = characters.reduce((sum, c) => sum + (c.items.get(id) ?? 0) / hours(c), 0);
-    items.push({ id: Number(id), name, perHour: Math.round((total / characters.length) * 100) / 100 });
+    items.push({ id: Number(id), name, perHour: Math.round((total / characters.length) * 10_000) / 10_000 });
   }
   items.sort((a, b) => b.perHour - a.perHour || a.name.localeCompare(b.name));
   return { characters: characters.length, mesosPerHour, items };

@@ -2222,6 +2222,9 @@ button.icon-button:active {
   line-height: 30px;
   font-variant-numeric: tabular-nums;
 }
+.lb-loot-mesos.lb-loot-waiting {
+  color: var(--ink-2);
+}
 .lb-loot-line,
 .lb-loot-daily {
   margin: 0;

@@ -12,7 +12,7 @@ use common::items::{ItemWorld, equip, etc, item_world, scroll, setup, use_item, 
 use common::{FakeSource, S, tracking_with};
 use minerva_core::{Action, Minerva, PanelControl, LootItem, PickupLine, PickupLogSeen};
 
-use common::{LOG, picked_up, read};
+use common::{LOG, item, picked_up, read};
 
 /// Made-up item data: a few items of each tab.
 fn world() -> ItemWorld {
@@ -44,11 +44,6 @@ fn started(world: ItemWorld) -> Minerva {
     minerva.tick(0);
     common::start_session(&mut minerva, 0, 10 * S);
     minerva
-}
-
-/// An Item line as the reader gives it.
-fn item(name: &str, quantity: u32, tab: &str) -> PickupLine {
-    PickupLine::Item { name: name.into(), quantity, tab: tab.into(), cut_short: false }
 }
 
 /// An Item line whose name the game cut short: `name` is without the "...".

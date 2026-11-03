@@ -2450,6 +2450,7 @@ impl Minerva {
             }
         }
         self.map_loot.under_way(self.session.loot_under_way().worth_sending().filter(shown));
+        // No time passes here (0 never moves the clock on): a Visit that just ended goes at once.
         self.map_loot.tick(0, self.items.items().ok(), |name| leaderboards.sends_for(name));
         self.state.map_loot_uploads = self.map_loot.uploads();
     }

@@ -520,9 +520,10 @@ export function mapPicture(manifest: unknown, map: string): string | null {
 
 /** A map's Map Loot panel (ADR 0033), beside its picture. */
 export interface LootPanel {
-  /** The middle Character's mesos an hour, as the Grind Tracker writes a rate; `null` until 3
-   *  Characters gave the map Visits of the kind shown. */
-  mesos: string | null;
+  /** The middle Character's mesos an hour, as the Grind Tracker writes a rate, or "Not yet"
+   *  until 3 Characters gave the map Visits of the kind shown (`waiting`). */
+  figure: string;
+  waiting: boolean;
   /** Under it: whose figure it is, or what the panel waits for. */
   line: string;
   /** The Items 2 or more Characters picked up there, most first. */
@@ -542,10 +543,11 @@ export interface LootRow {
 const MARKET_REF = "76rbdbd7";
 
 /** An Item's rate: how many an hour from one up, and below that how many hours one takes, to
- *  the half hour under ten ("1 every 2½ h"). */
+ *  the half hour under ten ("1 every 2½ h"), and no finer than "1 every 100+ h". */
 function itemRate(perHour: number): string {
   if (perHour >= 1) return whole(Math.round(perHour));
   const hours = 1 / perHour;
+  if (!(hours < 100)) return "1 every 100+ h";
   if (hours >= 10) return `1 every ${Math.round(hours)} h`;
   const halves = Math.round(hours * 2);
   return `1 every ${Math.floor(halves / 2)}${halves % 2 === 1 ? "½" : ""} h`;
@@ -556,7 +558,8 @@ export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: str
   const figures = answer[kind ?? "both"];
   if (figures.mesosPerHour === undefined) {
     const how = kind === "solo" ? " solo" : kind === "party" ? " in a party" : "";
-    return { mesos: null, line: `Mesos and items show here once 3 characters have played ${mapName}${how} for 10 minutes with Minerva.`, items: [] };
+    const line = `Mesos and items show here once 3 characters have played ${mapName}${how} for 10 minutes with Minerva.`;
+    return { figure: "Not yet", waiting: true, line, items: [] };
   }
   const items = (figures.items ?? []).map((item) => ({
     name: item.name,
@@ -564,7 +567,7 @@ export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: str
     icon: `https://osmsdataexplorer.com/data/current/images/items/${String(item.id).padStart(8, "0")}.png`,
     href: `https://maplestory.market/items/${item.id}?ref=${MARKET_REF}`,
   }));
-  return { mesos: rate(figures.mesosPerHour), line: `The middle of ${figures.characters} characters`, items };
+  return { figure: rate(figures.mesosPerHour), waiting: false, line: `The middle of ${figures.characters} characters`, items };
 }
 
 /** The Map Leaderboards page as its address names it:

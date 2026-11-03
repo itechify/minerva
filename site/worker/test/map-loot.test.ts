@@ -69,7 +69,7 @@ describe("Map Loot", () => {
     expect(figures.builtAt).not.toBeNull();
     // 30,000, 25,000 and 10,000 an hour: the middle one. Made-up Shell is 60, 10 and 0 an hour,
     // averaged; the others only one Character picked up, so they're left out.
-    expect(figures.solo).toEqual({ characters: 3, mesosPerHour: 25_000, items: [{ id: 4000000, name: "Made-up Shell", perHour: 23.33 }] });
+    expect(figures.solo).toEqual({ characters: 3, mesosPerHour: 25_000, items: [{ id: 4000000, name: "Made-up Shell", perHour: 23.3333 }] });
     expect(figures.both).toEqual(figures.solo);
     expect(figures.party).toEqual({ characters: 0 });
   });

@@ -45,7 +45,7 @@ export default defineConfig(async () => {
               },
               marks: { MadeUpTown: { name: "Made-up Town", picture: "https://osms.invalid/images/map_marks/MadeUpTown.png" } },
             },
-            // A made-up Item names table, in place of osms-items.json: test/map-loot.test.ts's Items.
+            // A made-up Item names table, in place of osms-item-names.json: test/map-loot.test.ts's Items.
             TEST_ITEMS: {
               items: {
                 "1002000": "Made-up Hat",

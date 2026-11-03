@@ -1,7 +1,7 @@
-// The Item names table (osms-items.json), which `probe ceilings` writes from OSMS's live item
+// The Item names table (osms-item-names.json), which `probe ceilings` writes from OSMS's live item
 // files beside the ceilings table: every Item but the Cash Shop's, its name by its ID. Map Loot
 // takes only Items it holds, and names each one from it (ADR 0033).
-import table from "./osms-items.json";
+import table from "./osms-item-names.json";
 
 /** The whole table: each Item's name by its ID, written without leading zeros. */
 export interface ItemsTable {

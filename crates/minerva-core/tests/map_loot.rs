@@ -11,7 +11,10 @@ mod common;
 
 use common::items::{ItemWorld, etc, item_world, use_item};
 use common::player::Player;
-use common::{CONSTRUCTION_SAMPLE, CONSTRUCTION_SITE_ID, FakeSource, LOG, MIN, S, SUNSET_SAMPLE, SUNSET_SKY_ID, pickup_reading, tracking_with};
+use common::{
+    CONSTRUCTION_SAMPLE, CONSTRUCTION_SITE_ID, FakeSource, LOG, MIN, S, SUNSET_SAMPLE, SUNSET_SKY_ID, item, mesos, pickup_reading,
+    tracking_with,
+};
 use minerva_core::{Action, MapLootAnswer, MapLootItem, MapLootUpload, PickupLine, PickupLogSeen};
 
 /// Made-up item files: two Items that share a name, as some of the game's do, and two whose
@@ -37,14 +40,6 @@ fn egbert() -> Player {
     player.minerva.show_on_leaderboards("Egbert", true);
     player.hunt(30 * S, 10);
     player
-}
-
-fn mesos(amount: u64) -> PickupLine {
-    PickupLine::Mesos { amount }
-}
-
-fn item(name: &str, quantity: u32, tab: &str) -> PickupLine {
-    PickupLine::Item { name: name.into(), quantity, tab: tab.into(), cut_short: false }
 }
 
 /// Hunt for `ms`, the Pickup Log read as `seen` every second, and `lines` picked up at the end of

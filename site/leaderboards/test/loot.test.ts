@@ -14,6 +14,8 @@ const answer: MapLootAnswer = {
       { id: 2000000, name: "Red Potion", perHour: 1.2 },
       { id: 4000010, name: "Pig's Ribbon", perHour: 0.4 },
       { id: 1002100, name: "Ribboned Pig Headband", perHour: 0.07 },
+      { id: 4031000, name: "Pig's Crown", perHour: 0.004 },
+      { id: 4031001, name: "Pig's Sceptre", perHour: 0 },
     ],
   },
   solo: { characters: 9, mesosPerHour: 38_000, items: [] },
@@ -24,7 +26,8 @@ describe("a map's Map Loot panel", () => {
   it("shows the middle Character's mesos an hour, and each Item an hour, with its icon and market page", () => {
     const panel = lootPanel(answer, null, "Pig Park");
 
-    expect(panel.mesos).toBe("41,200");
+    expect(panel.figure).toBe("41,200");
+    expect(panel.waiting).toBe(false);
     expect(panel.line).toBe("The middle of 12 characters");
     expect(panel.items[0]).toEqual({
       name: "Pig's Head",
@@ -34,19 +37,20 @@ describe("a map's Map Loot panel", () => {
     });
   });
 
-  it("writes an Item rarer than one an hour as how many hours one takes, to the half hour", () => {
+  it("writes an Item rarer than one an hour as how many hours one takes, to the half hour, up to 100", () => {
     const rates = lootPanel(answer, null, "Pig Park").items.map((item) => item.rate);
 
-    expect(rates).toEqual(["64", "1", "1 every 2½ h", "1 every 14 h"]);
+    expect(rates).toEqual(["64", "1", "1 every 2½ h", "1 every 14 h", "1 every 100+ h", "1 every 100+ h"]);
   });
 
   it("follows the kind the boards show", () => {
-    expect(lootPanel(answer, "solo", "Pig Park")).toMatchObject({ mesos: "38,000", line: "The middle of 9 characters", items: [] });
+    expect(lootPanel(answer, "solo", "Pig Park")).toMatchObject({ figure: "38,000", line: "The middle of 9 characters", items: [] });
   });
 
-  it("says what it waits for until 3 Characters gave the map Visits of the kind", () => {
+  it("says Not yet, and what it waits for, until 3 Characters gave the map Visits of the kind", () => {
     const party = lootPanel(answer, "party", "Pig Park");
-    expect(party.mesos).toBeNull();
+    expect(party.figure).toBe("Not yet");
+    expect(party.waiting).toBe(true);
     expect(party.items).toEqual([]);
     expect(party.line).toBe("Mesos and items show here once 3 characters have played Pig Park in a party for 10 minutes with Minerva.");
 

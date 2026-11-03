@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended by ADR-0033
 ---
 
 # The Pickup Log is counted by its stack's shift

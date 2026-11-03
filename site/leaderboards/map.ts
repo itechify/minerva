@@ -111,11 +111,12 @@ async function showLoot(place: MapPlace) {
 function drawLoot() {
   if (loot === null || place === null) return;
   const panel = lootPanel(loot, link.kind, place.name);
-  const mesos = byId("loot-mesos");
-  mesos.textContent = panel.mesos ?? "";
-  mesos.hidden = panel.mesos === null;
+  const figure = byId("loot-mesos");
+  figure.textContent = panel.figure;
+  figure.classList.toggle("lb-loot-waiting", panel.waiting);
+  figure.hidden = false;
   byId("loot-line").textContent = panel.line;
-  byId("loot-daily").hidden = panel.mesos === null;
+  byId("loot-daily").hidden = false;
   byId("loot-items").hidden = panel.items.length === 0;
   byId("loot-list").replaceChildren(
     ...panel.items.map((item) => {

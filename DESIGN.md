@@ -1260,8 +1260,8 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   (a link to its maplestory.market page, Portal Blue and underlined under the pointer) and its rate in bold tabular
   figures at the right ("64", "1 every 2½ h"), scrolling inside the box (156px of them on a phone); "Updated daily" in
   13px Ink Steel at its foot. It follows Both, Solo and Party. Until 3 Characters gave the map Visits of the kind
-  shown, the figure and the Items go and the line says what it waits for. With no picture, it keeps the picture's
-  height on its own. Its Level Bands, when it has more than one (with one, the
+  shown, the figure reads "Not yet" in Ink Steel, the Items go, and the line says what it waits for. With no picture,
+  it keeps the picture's height on its own. Its Level Bands, when it has more than one (with one, the
   band's heading names it), are light steel buttons in a wrapping row, 6px apart, each its levels ("Lv 20–29", 14px
   bold) over its count (12px); the band shown is Selection Periwinkle, ringed in Selection Edge. A band's table is the
   hotkey table's inset box, up to 60em: 13px Ink Steel headers (Rank, Character, Job, Level, EXP/h, Date), rows 8px 12px

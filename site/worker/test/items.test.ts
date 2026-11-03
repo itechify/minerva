@@ -2,7 +2,7 @@
 // item files. The other tests use a made-up one (vitest.config.ts); this checks only its shape.
 import { describe, expect, it } from "vitest";
 import type { ItemsTable } from "../items";
-import table from "../osms-items.json";
+import table from "../osms-item-names.json";
 
 describe("the Item names table", () => {
   it("names Items by their IDs, without leading zeros", () => {

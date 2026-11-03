@@ -40,7 +40,7 @@
 //! Map Mark, by its 9-digit ID, and each Map Mark's area and picture, to `out.json`: the
 //! table the site's Worker loads (`site/worker/osms-ceilings.json`), for the cap and for
 //! Where to train (ADR 0024). A map with no Map Summary, or a ceiling of 0, is left out. Then
-//! fetch OSMS's live item files and write the Item names table beside it (`osms-items.json`):
+//! fetch OSMS's live item files and write the Item names table beside it (`osms-item-names.json`):
 //! every Item but the Cash Shop's, by ID, which the Worker checks Map Loot's Items against
 //! (ADR 0033). No game window is needed.
 //!
@@ -232,7 +232,7 @@ fn osms() -> Result<(), String> {
 /// of the middle half of its spawns and its Map Mark, by its 9-digit ID, one map to a line
 /// (`"010001010": { "ceiling": 153216, "mobs": [3, 8], "mark": "Henesys" }`), then each
 /// Map Mark's area and picture (`"Rith": { "name": "Lith Harbor", "picture": "https://..." }`);
-/// and beside it `osms-items.json`, each Item's name by its ID (`"4000008": "Pig's Head"`).
+/// and beside it `osms-item-names.json`, each Item's name by its ID (`"4000008": "Pig's Head"`).
 fn ceilings(args: &[String]) -> Result<(), String> {
     let mut rest = args.iter();
     let out = rest.next().ok_or("no file to write")?;
@@ -275,7 +275,7 @@ fn ceilings(args: &[String]) -> Result<(), String> {
     let items = minerva_core::osms_items::read(&item_files).map_err(|e| format!("OSMS's item files don't read: {e}"))?;
     let names = items.loot_names();
     let lines: Vec<String> = names.iter().map(|(id, name)| format!("    \"{id}\": {}", text(name))).collect();
-    let items_out = std::path::Path::new(out).with_file_name("osms-items.json");
+    let items_out = std::path::Path::new(out).with_file_name("osms-item-names.json");
     std::fs::write(&items_out, format!("{{
   \"items\": {{
 {}

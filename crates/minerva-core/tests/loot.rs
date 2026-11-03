@@ -13,11 +13,7 @@ use minerva_core::{
     StatusBar, StatusBarReading, TrackingState,
 };
 
-use common::{LOG, picked_up, pickup_reading as arrived};
-
-fn mesos(amount: u64) -> PickupLine {
-    PickupLine::Mesos { amount }
-}
+use common::{LOG, mesos, picked_up, pickup_reading as arrived};
 
 /// A Session a minute in: started at 10 s, 69 EXP gained by 70 s.
 fn a_minute_in() -> Minerva {
