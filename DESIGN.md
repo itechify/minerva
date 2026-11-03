@@ -1252,7 +1252,16 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   date, so the figures read down as a column. A new #1 gets a quiet third line. Reserve ten rows while loading, feedback
   in the first.
   A map's page titles the map as the panel does, its street (and region) in 15px bold Ink Steel over its name in Site
-  Title in plain ink when no map is known. Its Level Bands, when it has more than one (with one, the
+  Title in plain ink when no map is known. Beside its picture, as tall as the picture's box and never taller, its **Map
+  Loot** (ADR 0033) in the band table's inset box, 272px wide, the picture narrowing to make room (under 640px, under
+  it at the full width): "Mesos an hour" in 14px bold Ink over the figure in 23px bold tabular figures, written as the
+  Grind Tracker writes a rate, over "The middle of 12 characters" in 13px Ink Steel; then "Items picked up" and "an
+  hour" in 13px Ink Steel over a Window Rule, and the Items, most first, each its 24px OSMS icon, its name in 15px Ink
+  (a link to its maplestory.market page, Portal Blue and underlined under the pointer) and its rate in bold tabular
+  figures at the right ("64", "1 every 2½ h"), scrolling inside the box (156px of them on a phone); "Updated daily" in
+  13px Ink Steel at its foot. It follows Both, Solo and Party. Until 3 Characters gave the map Visits of the kind
+  shown, the figure and the Items go and the line says what it waits for. With no picture, it keeps the picture's
+  height on its own. Its Level Bands, when it has more than one (with one, the
   band's heading names it), are light steel buttons in a wrapping row, 6px apart, each its levels ("Lv 20–29", 14px
   bold) over its count (12px); the band shown is Selection Periwinkle, ringed in Selection Edge. A band's table is the
   hotkey table's inset box, up to 60em: 13px Ink Steel headers (Rank, Character, Job, Level, EXP/h, Date), rows 8px 12px

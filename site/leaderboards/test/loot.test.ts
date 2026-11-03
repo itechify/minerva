@@ -1,0 +1,57 @@
+import { describe, expect, it } from "vitest";
+import type { MapLootAnswer } from "../../entries.ts";
+import { lootPanel } from "../leaderboards.ts";
+
+/** A map's Map Loot: 12 Characters on Both, 9 solo, 2 in a party. */
+const answer: MapLootAnswer = {
+  map: "100000000",
+  builtAt: 1_760_000_000_000,
+  both: {
+    characters: 12,
+    mesosPerHour: 41_234,
+    items: [
+      { id: 4000008, name: "Pig's Head", perHour: 64.4 },
+      { id: 2000000, name: "Red Potion", perHour: 1.2 },
+      { id: 4000010, name: "Pig's Ribbon", perHour: 0.4 },
+      { id: 1002100, name: "Ribboned Pig Headband", perHour: 0.07 },
+    ],
+  },
+  solo: { characters: 9, mesosPerHour: 38_000, items: [] },
+  party: { characters: 2 },
+};
+
+describe("a map's Map Loot panel", () => {
+  it("shows the middle Character's mesos an hour, and each Item an hour, with its icon and market page", () => {
+    const panel = lootPanel(answer, null, "Pig Park");
+
+    expect(panel.mesos).toBe("41,200");
+    expect(panel.line).toBe("The middle of 12 characters");
+    expect(panel.items[0]).toEqual({
+      name: "Pig's Head",
+      rate: "64",
+      icon: "https://osmsdataexplorer.com/data/current/images/items/04000008.png",
+      href: "https://maplestory.market/items/4000008?ref=76rbdbd7",
+    });
+  });
+
+  it("writes an Item rarer than one an hour as how many hours one takes, to the half hour", () => {
+    const rates = lootPanel(answer, null, "Pig Park").items.map((item) => item.rate);
+
+    expect(rates).toEqual(["64", "1", "1 every 2½ h", "1 every 14 h"]);
+  });
+
+  it("follows the kind the boards show", () => {
+    expect(lootPanel(answer, "solo", "Pig Park")).toMatchObject({ mesos: "38,000", line: "The middle of 9 characters", items: [] });
+  });
+
+  it("says what it waits for until 3 Characters gave the map Visits of the kind", () => {
+    const party = lootPanel(answer, "party", "Pig Park");
+    expect(party.mesos).toBeNull();
+    expect(party.items).toEqual([]);
+    expect(party.line).toBe("Mesos and items show here once 3 characters have played Pig Park in a party for 10 minutes with Minerva.");
+
+    const none: MapLootAnswer = { map: "100000000", builtAt: null, both: { characters: 0 }, solo: { characters: 0 }, party: { characters: 0 } };
+    expect(lootPanel(none, null, "Pig Park").line).toBe("Mesos and items show here once 3 characters have played Pig Park for 10 minutes with Minerva.");
+    expect(lootPanel(none, "solo", "Pig Park").line).toBe("Mesos and items show here once 3 characters have played Pig Park solo for 10 minutes with Minerva.");
+  });
+});

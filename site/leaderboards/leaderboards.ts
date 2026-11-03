@@ -14,6 +14,7 @@ import {
   isName,
   type Kind,
   type LatestAnswer,
+  type MapLootAnswer,
   type MapMark,
   type PedestalsAnswer,
   type PortraitAnswer,
@@ -515,6 +516,55 @@ export function mapPicture(manifest: unknown, map: string): string | null {
   if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) return null;
   const hash = (manifest as Record<string, unknown>)[map];
   return typeof hash === "string" && /^[a-f0-9]{32}$/i.test(hash) ? `https://osmsdataexplorer.com/data/maps/${hash}.webp` : null;
+}
+
+/** A map's Map Loot panel (ADR 0033), beside its picture. */
+export interface LootPanel {
+  /** The middle Character's mesos an hour, as the Grind Tracker writes a rate; `null` until 3
+   *  Characters gave the map Visits of the kind shown. */
+  mesos: string | null;
+  /** Under it: whose figure it is, or what the panel waits for. */
+  line: string;
+  /** The Items 2 or more Characters picked up there, most first. */
+  items: LootRow[];
+}
+
+/** An Item in the panel: its name, how many an hour, its picture on OSMS, and its
+ *  maplestory.market page, as the Item Card links it. */
+export interface LootRow {
+  name: string;
+  rate: string;
+  icon: string;
+  href: string;
+}
+
+/** The referral code the app's Item Card adds to a maplestory.market link (ADR 0030). */
+const MARKET_REF = "76rbdbd7";
+
+/** An Item's rate: how many an hour from one up, and below that how many hours one takes, to
+ *  the half hour under ten ("1 every 2½ h"). */
+function itemRate(perHour: number): string {
+  if (perHour >= 1) return whole(Math.round(perHour));
+  const hours = 1 / perHour;
+  if (hours >= 10) return `1 every ${Math.round(hours)} h`;
+  const halves = Math.round(hours * 2);
+  return `1 every ${Math.floor(halves / 2)}${halves % 2 === 1 ? "½" : ""} h`;
+}
+
+/** The panel for the kind the boards show (`null`: both), on the map named `mapName`. */
+export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: string): LootPanel {
+  const figures = answer[kind ?? "both"];
+  if (figures.mesosPerHour === undefined) {
+    const how = kind === "solo" ? " solo" : kind === "party" ? " in a party" : "";
+    return { mesos: null, line: `Mesos and items show here once 3 characters have played ${mapName}${how} for 10 minutes with Minerva.`, items: [] };
+  }
+  const items = (figures.items ?? []).map((item) => ({
+    name: item.name,
+    rate: itemRate(item.perHour),
+    icon: `https://osmsdataexplorer.com/data/current/images/items/${String(item.id).padStart(8, "0")}.png`,
+    href: `https://maplestory.market/items/${item.id}?ref=${MARKET_REF}`,
+  }));
+  return { mesos: rate(figures.mesosPerHour), line: `The middle of ${figures.characters} characters`, items };
 }
 
 /** The Map Leaderboards page as its address names it:

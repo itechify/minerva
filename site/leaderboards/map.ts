@@ -1,9 +1,10 @@
-// A map's page (leaderboards/map/index.html): its Level Bands, one band's top 50, each
-// entry's EXP/h on its lane, the linked Character's entry marked with the You Yellow star
-// and its rank, and a report link on each other entry. A click on a Level Band switches the
+// A map's page (leaderboards/map/index.html): its Map Loot beside its picture, its Level Bands,
+// one band's top 50, each entry's EXP/h on its lane, the linked Character's entry marked with
+// the You Yellow star and its rank, and a report link on each other entry. A click on a Level Band switches the
 // page to it in place, the Characters in both bands sliding to their new rank. Where it
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
+import type { MapLootAnswer } from "../entries.ts";
 import { STAR } from "../star.ts";
 import { BAND_PORTRAIT, byId, characterLink, crown, drawKindLinks, jobWithIcon, names, partyMark, portraitImage, read, said as saidWith, unreachable } from "./api.ts";
 import {
@@ -13,6 +14,7 @@ import {
   type Kind,
   type Link,
   linkTo,
+  lootPanel,
   type MapAnswer,
   type MapPlace,
   mapPage,
@@ -39,6 +41,8 @@ let mapAnswer: MapAnswer | null = null;
 let shown: Row[] = [];
 /** The band the page shows, or is switching to. */
 let wanted: number | null = null;
+/** The map's Map Loot, once read. */
+let loot: MapLootAnswer | null = null;
 
 /** What the page says in place of the leaderboard: why there isn't one, or what's loading. */
 function say(text: Said | string) {
@@ -89,6 +93,46 @@ function drawHead(place: MapPlace) {
   document.title = `${place.name} · Map Leaderboard · Minerva`;
   // Pictures load independently: a missing picture never holds up the rankings.
   showPicture(place);
+  showLoot(place);
+}
+
+/** The map's Map Loot beside its picture, its room kept while it's read. */
+async function showLoot(place: MapPlace) {
+  byId("loot").hidden = false;
+  loot = await read<MapLootAnswer>(`/api/maps/${place.id}/loot`);
+  if (loot === null) {
+    byId("loot-line").textContent = "Can't load the loot right now.";
+    return;
+  }
+  drawLoot();
+}
+
+/** The Map Loot of the kind the boards show. */
+function drawLoot() {
+  if (loot === null || place === null) return;
+  const panel = lootPanel(loot, link.kind, place.name);
+  const mesos = byId("loot-mesos");
+  mesos.textContent = panel.mesos ?? "";
+  mesos.hidden = panel.mesos === null;
+  byId("loot-line").textContent = panel.line;
+  byId("loot-daily").hidden = panel.mesos === null;
+  byId("loot-items").hidden = panel.items.length === 0;
+  byId("loot-list").replaceChildren(
+    ...panel.items.map((item) => {
+      const row = make("li");
+      const icon = make("img");
+      icon.src = item.icon;
+      icon.alt = "";
+      icon.loading = "lazy";
+      icon.decoding = "async";
+      icon.referrerPolicy = "no-referrer";
+      const name = make("a", "", item.name);
+      name.href = item.href;
+      name.title = `${item.name} on maplestory.market`;
+      row.append(icon, name, make("b", "", item.rate));
+      return row;
+    }),
+  );
 }
 
 /** There's no map to show: the page's title alone, the owl lost, and why, with the way to
@@ -96,6 +140,7 @@ function drawHead(place: MapPlace) {
 function noMap(why: Said) {
   byId("map-street").hidden = true;
   byId("map-picture").hidden = true;
+  byId("loot").hidden = true;
   byId("lost").hidden = false;
   say(why);
 }
@@ -288,6 +333,7 @@ async function switchTo(to: Link, href: string | null, animate: boolean) {
     link = to;
     drawBands(page.bands);
     drawKinds();
+    drawLoot();
     shown = [];
     byId("table").hidden = true;
     byId("band-title").hidden = true;
@@ -313,6 +359,7 @@ async function switchTo(to: Link, href: string | null, animate: boolean) {
     link = to;
     drawBands(mapPage(link, names, mapAnswer!).bands);
     drawKinds();
+    drawLoot();
     drawBand(band, morph, grow);
     byId("switched").textContent = byId("caption").textContent || said.textContent || "";
   };

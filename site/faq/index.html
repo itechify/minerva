@@ -215,7 +215,7 @@
                     <li>
                       In the same folder: your Personal Bests (each character's best visits on each map) in
                       <code>personal-bests.json</code>, the market prices you keep in <code>market-prices.json</code>,
-                      the <a href="#map-loot">loot</a> waiting to go to the Map Leaderboards in <code>map-loot.json</code>,
+                      the <a href="#map-loot">loot</a> waiting to be sent to the Map Leaderboards in <code>map-loot.json</code>,
                       and the 10 newest <a href="#bug-reports">Bug Reports</a> you've saved in <code>Bug Reports</code>.
                     </li>
                     <li>
@@ -891,8 +891,8 @@
                     clearly nearer that item than any other, Minerva counts it as that item. Now and then this puts a
                     line under the wrong one of two items with similar names, so one item's count may be a little high,
                     though the total never is. Minerva only counts real items. A name that matches nothing in the item
-                    list isn't counted, so a misreading never shows up as an item. A new item the list doesn't have yet
-                    is counted once the list adds it.
+                    list isn't counted. That way a misreading never shows up as an item. A new item the list doesn't
+                    have yet isn't counted either, until the list adds it.
                   </p>
                   <p>
                     The figures can be low, never high. Minerva doesn't count a line it isn't sure of, such as one a
@@ -1164,6 +1164,28 @@
                     that much.
                   </p>
                 </details>
+                <details class="qa" id="map-loot">
+                  <summary>Where do the mesos and items an hour on a map's page come from?</summary>
+                  <p>
+                    From players' <a href="#loot">Loot</a> on that map. When a character you share on the Map Leaderboards
+                    leaves a map after 10 minutes of play or more, Minerva sends what the Grind Tracker counted there: the
+                    mesos, each item and how many, and how long you played. A visit with no mesos isn't sent. Neither is
+                    one where Minerva couldn't read the Pickup Log for more than a tenth of it, say because one of its
+                    windows sat over the log.
+                  </p>
+                  <p>
+                    Each character counts once, however long they played there. The mesos an hour is the middle
+                    character's: half got more, half got less. An item's figure is the average of what each character
+                    picked up an hour, so one lucky drop doesn't make it look common. The mesos show once 3 characters
+                    have played the map, and an item once 2 of them have picked it up. Both, Solo and Party switch them
+                    as they switch the boards. The site works them out again once a day.
+                  </p>
+                  <p>
+                    No names are shown. Like the Grind Tracker's Loot, the figures can be low but never high. Turn off
+                    <strong>Share</strong> for a character and nothing more of theirs is sent. What they sent before
+                    comes off too.
+                  </p>
+                </details>
                 <details class="qa" id="leaderboard-appear">
                   <summary>How do I put my character on the Map Leaderboards?</summary>
                   <p>
@@ -1185,8 +1207,9 @@
                   <summary>What does the site show of me?</summary>
                   <p>
                     For each entry, everyone can see your character's name and job, the exact level they set it at, the
-                    EXP per hour, the date, and whether it's a Party Best. Nothing else about you or your PC goes to the
-                    site, and you don't need an account.
+                    EXP per hour, the date, and whether it's a Party Best. Minerva also sends what your character picks
+                    up on each map. The site shows that only in the map's <a href="#map-loot">totals</a>, with no
+                    names. Nothing else about you or your PC goes to the site, and you don't need an account.
                   </p>
                   <p>
                     Instead, Minerva makes a secret <strong>Leaderboard Key</strong> on your PC the first time it

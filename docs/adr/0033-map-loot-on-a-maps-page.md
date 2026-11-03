@@ -12,6 +12,7 @@ The Grind Tracker counts a Session's Loot from the Pickup Log (ADR 0026), but no
 - **Items by ID, real ones only.** The app sends each Item's count by its OSMS ID; a name that matches no Item is no longer tallied at all (amending ADR 0026), and a name cut short that starts several Items' names is tallied by the Grind Tracker but never sent. The Worker takes only IDs in the Item names table `probe ceilings` writes beside the ceilings (`site/worker/osms-items.json`), and leaves the others out of a Visit it takes.
 - **Kept as running sums**: one row per Character, map and kind, of their active time, mesos and each Item's count. Each map's figures are worked out from them once a day, in the cron run that refreshes portraits (ADR 0029), for the maps sent Visits since, into one row the page reads: the page says they're updated daily.
 - **Every Character counts once.** A map's mesos an hour is the median over Characters of each one's own total mesos ÷ total hours there, so one long grinder or a made-up Visit can't move it. An Item's rate is the average of the Characters' own rates (one who picked none up adds a 0). A kind's figures show once 3 Characters gave the map Visits of it, an Item once 2 of them picked it up; Both is each Character's solo and party Visits together. Level Bands aren't split: the samples would be too thin for a long time.
+- **Each Item links to its maplestory.market page**, by its game ID with the Item Card's referral code (ADR 0030), beside its OSMS icon.
 - **No names.** The figures are anonymous totals. An opt-out, a takedown of all a Character's entries, or a Block removes their rows at once, and the map's figures at the next daily run; none of it comes back if the entry is restored or the Block lifted.
 - **What waits is kept.** Closing Minerva ends a Visit (GLOSSARY), the most common way a grind ends, so the app saves what is waiting to be sent, and the Visit under way as if it had ended, beside the settings (`map-loot.json`), and sends it at the next launch. The Visit under way is saved afresh once a minute of its active time, not with every line.
 
@@ -30,6 +31,7 @@ Beside ADR 0015's:
 - **Rebuilding a map's figures as each Visit comes in.** Fresh, but each upload would read every Character's row of the map; D1's reads were just cut down (#221).
 - **Items valued in mesos** (an NPC's price or the Going rate). A figure the Grind Tracker doesn't show; the site shows what players see in their own app.
 - **Sending names, trusted.** IDs are exact, and the icons need them anyway.
+- **Linking each Item to MeowDB**, as the app's Item Card names it. MeowDB's pages go by its own IDs, not the game's, which the app finds through MeowDB's search (ADR 0007), and its Item database takes no search in its address; having the Worker search MeowDB for each Item would be a new outside request.
 
 ## Consequences
 
