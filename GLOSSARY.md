@@ -298,6 +298,11 @@ Pickup Log, it may be less than was picked up, never more (ADR 0026). The Grind 
 section.
 _Avoid_: pickups, drops, haul
 
+**Map Loot**:
+A map's mesos an hour and Items an hour on its page on the site, worked out from the Loot of Visits players shown on the
+Map Leaderboards sent from there: the middle Character's mesos an hour, and each Item's average an hour (ADR 0033).
+_Avoid_: map drops, loot rates
+
 ### Items
 
 **Item**:

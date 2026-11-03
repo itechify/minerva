@@ -184,3 +184,22 @@ export interface CharacterAnswer {
   entries: CharacterEntry[];
   portrait?: PortraitAnswer;
 }
+
+/** One kind's Map Loot on a map (ADR 0033): how many Characters gave it Visits of that kind, and,
+ *  once 3 have, the middle one's mesos an hour and the Items 2 or more picked up there, each at
+ *  their average an hour, most first. */
+export interface LootFigures {
+  characters: number;
+  mesosPerHour?: number;
+  items?: { id: number; name: string; perHour: number }[];
+}
+
+/** GET /api/maps/<map>/loot: each kind's Map Loot, Both being each Character's solo and party
+ *  Visits together, as the daily run last worked it out (`builtAt`; `null`: never). */
+export interface MapLootAnswer {
+  map: string;
+  builtAt: number | null;
+  solo: LootFigures;
+  party: LootFigures;
+  both: LootFigures;
+}

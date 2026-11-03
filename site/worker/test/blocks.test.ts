@@ -85,7 +85,7 @@ describe("a Block", () => {
     // Every public GET, by the PUBLIC_READS prefix it's cached under. A read added under a new
     // prefix fails the first expect until it's listed here.
     const reads: Record<string, string[]> = {
-      "/api/maps": ["/api/maps", `/api/maps/${map}`, `/api/maps/${map}/bands/30`, `/api/maps/${map}/bands/30?kind=party`],
+      "/api/maps": ["/api/maps", `/api/maps/${map}`, `/api/maps/${map}/bands/30`, `/api/maps/${map}/bands/30?kind=party`, `/api/maps/${map}/loot`],
       "/api/bands": ["/api/bands", "/api/bands/30", "/api/bands/30?kind=party"],
       "/api/latest": ["/api/latest", "/api/latest?kind=party"],
       "/api/pedestals": ["/api/pedestals"],
@@ -104,8 +104,10 @@ describe("a Block", () => {
 
     await block("Vex");
 
-    // Every read names them before the Block, but the lists of maps and of bands, which name nobody.
-    expect(before).toEqual(Object.values(reads).flat().filter((path) => !["/api/maps", `/api/maps/${map}`, "/api/bands"].includes(path)));
+    // Every read names them before the Block, but the lists of maps and of bands, and a map's
+    // Map Loot, which name nobody.
+    const nameless = ["/api/maps", `/api/maps/${map}`, `/api/maps/${map}/loot`, "/api/bands"];
+    expect(before).toEqual(Object.values(reads).flat().filter((path) => !nameless.includes(path)));
     expect(await showing()).toEqual([]);
   });
 
