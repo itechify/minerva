@@ -1266,8 +1266,8 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   Loot** (ADR 0033) in the band table's inset box, 272px wide, the picture narrowing to make room (under 640px, under
   it at the full width): "Hourly Loot (Estimate)" in 14px bold Ink; then "Mesos" in 13px Ink Steel over the figure in
   23px
-  bold tabular figures, written as the Grind Tracker writes a rate, beside the game's meso drop for it, the figure
-  standing on the drop's foot (site/art/mesos,
+  bold tabular figures, written as the Grind Tracker writes a rate, beside the game's meso drop for it, the two centred
+  on each other (site/art/mesos,
   pixel for pixel: a bronze coin under 10,000, a gold one under 50,000, bills under 200,000, a bag from there), which
   turns under the pointer as the game turns it; then "Items" in 13px Ink Steel over a Window Rule, and the Items, most
   first, each its 24px OSMS icon, its name in 15px Ink (a link to its maplestory.market page, Portal Blue and

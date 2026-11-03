@@ -57,7 +57,7 @@ Beside each job the site writes (`site/jobs.ts` gives a job's class, `site/leade
 
 ## The meso drops
 
-Beside a map's mesos an hour on its page (ADR 0033, `site/leaderboards/map.ts` draws it): the game's four meso drops, from a sprite sheet supplied by the owner (November 2026). Each is kept as a strip of its four frames, each frame in a 34px square, its magenta ground made transparent, the frame centred across its square and standing 1px off its foot, and nothing else changed. They show pixel for pixel; at rest the second frame shows, and the frames turn as the drop falls in, as the game turns them. Which one shows goes by the figure (`mesoTier` in `site/leaderboards/leaderboards.ts`). Decoration: "Mesos" over the figure says what it is.
+Beside a map's mesos an hour on its page (ADR 0033, `site/leaderboards/map.ts` draws it): the game's four meso drops, from a sprite sheet supplied by the owner (November 2026). Each is kept as a strip of its four frames, each frame in a 34px square, its magenta ground made transparent, the frames centred in their squares together, so a turning drop doesn't bob, and nothing else changed. They show pixel for pixel; at rest the second frame shows, and the frames turn as the drop falls in, as the game turns them. Which one shows goes by the figure (`mesoTier` in `site/leaderboards/leaderboards.ts`). Decoration: "Mesos" over the figure says what it is.
 
 | File | Shows for | What it shows | Size |
 | --- | --- | --- | --- |
