@@ -523,6 +523,8 @@ export interface LootPanel {
   /** The middle Character's mesos an hour, as the Grind Tracker writes a rate, or "Not yet"
    *  until 3 Characters gave the map Visits of the kind shown (`waiting`). */
   figure: string;
+  /** The figure as a number, to count up to; `null` while `waiting`. */
+  perHour: number | null;
   waiting: boolean;
   /** Under it: whose figure it is, or what the panel waits for. */
   line: string;
@@ -559,7 +561,7 @@ export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: str
   if (figures.mesosPerHour === undefined) {
     const how = kind === "solo" ? " solo" : kind === "party" ? " in a party" : "";
     const line = `Mesos and items show here once 3 characters have played ${mapName}${how} for 10 minutes with Minerva.`;
-    return { figure: "Not yet", waiting: true, line, items: [] };
+    return { figure: "Not yet", perHour: null, waiting: true, line, items: [] };
   }
   const items = (figures.items ?? []).map((item) => ({
     name: item.name,
@@ -567,7 +569,15 @@ export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: str
     icon: `https://osmsdataexplorer.com/data/current/images/items/${String(item.id).padStart(8, "0")}.png`,
     href: `https://maplestory.market/items/${item.id}?ref=${MARKET_REF}`,
   }));
-  return { figure: rate(figures.mesosPerHour), waiting: false, line: `The middle of ${figures.characters} characters`, items };
+  return { figure: rate(figures.mesosPerHour), perHour: figures.mesosPerHour, waiting: false, line: `The middle of ${figures.characters} characters`, items };
+}
+
+/** The mesos an hour as the panel counts it up while its Items drop in, `t` of the way from
+ *  `from` (0 on the panel's first fill, or the kind shown before a switch) to `to`: on the
+ *  site's exponential ease-out (DESIGN.md, Motion), landing exactly on the panel's figure. */
+export function mesosCounted(from: number, to: number, t: number): string {
+  const along = t <= 0 ? 0 : t >= 1 ? 1 : (1 - 2 ** (-10 * t)) / (1 - 2 ** -10);
+  return rate(along === 1 ? to : from + (to - from) * along);
 }
 
 /** The Map Leaderboards page as its address names it:

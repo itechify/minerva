@@ -19,6 +19,7 @@ import {
   type MapPlace,
   mapPage,
   mapPicture,
+  mesosCounted,
   morphNames,
   NO_MAP,
   placeOf,
@@ -107,10 +108,21 @@ async function showLoot(place: MapPlace) {
   drawLoot();
 }
 
-/** The Map Loot of the kind the boards show. */
+/** The kind whose Map Loot the panel shows and its mesos an hour, once drawn: a switch drops the
+ *  Items in only when they change, and counts the figure on from there. */
+let lootShown: { kind: Kind | null; perHour: number } | null = null;
+/** The figure's count under way, stopped by the next draw. */
+let counting = 0;
+
+/** The Map Loot of the kind the boards show, its Items dropping in when it first fills and when
+ *  the kind changes. */
 function drawLoot() {
   if (loot === null || place === null) return;
   const panel = lootPanel(loot, link.kind, place.name);
+  const drop = lootShown?.kind !== link.kind && panel.perHour !== null && !reducedMotion().matches;
+  const from = lootShown?.perHour ?? 0;
+  lootShown = { kind: link.kind, perHour: panel.perHour ?? 0 };
+  counting++;
   const figure = byId("loot-mesos");
   figure.textContent = panel.figure;
   figure.classList.toggle("lb-loot-waiting", panel.waiting);
@@ -118,7 +130,8 @@ function drawLoot() {
   byId("loot-line").textContent = panel.line;
   byId("loot-daily").hidden = false;
   byId("loot-items").hidden = panel.items.length === 0;
-  byId("loot-list").replaceChildren(
+  const list = byId("loot-list");
+  list.replaceChildren(
     ...panel.items.map((item) => {
       const row = make("li");
       const icon = make("img");
@@ -134,6 +147,55 @@ function drawLoot() {
       return row;
     }),
   );
+  if (drop) dropIn(list, figure, from, panel.perHour!);
+}
+
+/** How an Item drops into its row (DESIGN.md, Motion, Loot drop): as a drop does in the game,
+ *  popped up from where it's let go, falling onto its row, one small bounce, and still. Each
+ *  stretch has its own easing: slowing as it rises, speeding as it falls. */
+const DROP: Keyframe[] = [
+  { transform: "translateY(-12px)", opacity: 0, easing: "cubic-bezier(0.25, 0.6, 0.4, 1)" },
+  { offset: 0.3, transform: "translateY(-24px)", opacity: 1, easing: "cubic-bezier(0.6, 0, 0.85, 0.5)" },
+  { offset: 0.72, transform: "none", easing: "cubic-bezier(0.25, 0.6, 0.4, 1)" },
+  { offset: 0.86, transform: "translateY(-4px)", easing: "cubic-bezier(0.6, 0, 0.85, 0.5)" },
+  { transform: "none", opacity: 1 },
+];
+/** An Item's name and rate, there as its icon lands. */
+const LANDED: Keyframe[] = [{ opacity: 0 }, { offset: 0.66, opacity: 0 }, { offset: 0.8, opacity: 1 }, { opacity: 1 }];
+const DROP_MS = 560;
+/** Between one Item's drop and the next's, most first. */
+const DROP_STAGGER_MS = 70;
+/** How long the figure counts. */
+const COUNT_MS = 700;
+/** How long the drop waits for the icons it drops, so none falls empty. */
+const ICONS_WAIT_MS = 400;
+
+/** Drop the Items the list shows into their rows, most first, as the figure counts from
+ *  `from` to `to`. The Items under the list's fold are there at once. */
+async function dropIn(list: HTMLElement, figure: HTMLElement, from: number, to: number) {
+  const turn = counting;
+  const box = list.parentElement!;
+  const fold = box.getBoundingClientRect().top + box.clientHeight;
+  const falling = [...list.children].filter((row) => row.getBoundingClientRect().top < fold) as HTMLElement[];
+  const moves = falling.flatMap((row, i) => {
+    const timing: KeyframeAnimationOptions = { duration: DROP_MS, delay: i * DROP_STAGGER_MS, fill: "backwards" };
+    const [icon, ...words] = row.children;
+    return [icon.animate(DROP, timing), ...words.map((word) => word.animate(LANDED, timing))];
+  });
+  for (const move of moves) move.pause();
+  figure.textContent = mesosCounted(from, to, 0);
+  const icons = falling.map((row) => (row.firstElementChild as HTMLImageElement).decode().catch(() => {}));
+  await Promise.race([Promise.all(icons), new Promise((done) => setTimeout(done, ICONS_WAIT_MS))]);
+  if (turn !== counting) return;
+  for (const move of moves) move.play();
+  const start = performance.now();
+  const count = (now: number) => {
+    if (turn !== counting) return;
+    const t = (now - start) / COUNT_MS;
+    figure.textContent = mesosCounted(from, to, t);
+    if (t < 1) requestAnimationFrame(count);
+  };
+  requestAnimationFrame(count);
 }
 
 /** There's no map to show: the page's title alone, the owl lost, and why, with the way to

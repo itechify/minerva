@@ -717,7 +717,8 @@ changes in place, at once or with a cross-fade of at most 150ms. EXP gauge, Pace
 
 Use one authored motion per window, 150–400ms on exponential ease-out: `1 − 2^(−10t)` scaled to land exactly in script,
 `cubic-bezier(0.16, 1, 0.3, 1)` in CSS. First frames are readable. Zoom interpolates in log scale while content keeps
-its size. No loops, pulses, shimmer, timers, bounce or overshoot; doubt chip and alert dot hold still. With
+its size. No loops, pulses, shimmer, timers, bounce or overshoot (the Loot drop's one bounce aside); doubt chip and
+alert dot hold still. With
 `prefers-reduced-motion: reduce`, show the final state immediately. Mark Card's dive and Deal Badges' unfold are
 specified with those components; the site's hero and minimap follow scroll, as do Pedestals' rising blocks.
 
@@ -735,6 +736,13 @@ specified with those components; the site's hero and minimap follow scroll, as d
   page cross-fades in 200ms and the sticky head settles. Cross-document View Transition (`site/seams.html`), transform
   and opacity only; heading width fits its words while scaling. Only pre-paint content participates, never API-filled
   content. Other links, Back/Forward, unsupported browsers and reduced motion use plain navigation.
+- **Loot drop (the one exception, the user's choice, Nov 2026):** a map's Map Loot panel drops its Items in when it
+  first fills and when Both, Solo or Party changes it, so it alone moves on arrival and bounces. Each Item the list
+  shows hops up and falls onto its row in 560ms, bouncing once by 4px, 70ms after the one above it, most first, over
+  the Items' head; its name and rate appear as it lands. The figure counts from 0, or from the kind shown before, in
+  700ms on the exponential ease-out. It waits up to 400ms for the icons, so none falls empty. Web Animations, transform
+  and opacity only; during a band switch the panel sits out the cross-fade. A band switch that keeps the kind leaves
+  it still; reduced motion shows the final state at once.
 
 ## Elevation & Depth
 
@@ -1258,7 +1266,8 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   Grind Tracker writes a rate, over "The middle of 12 characters" in 13px Ink Steel; then "Items picked up" and "an
   hour" in 13px Ink Steel over a Window Rule, and the Items, most first, each its 24px OSMS icon, its name in 15px Ink
   (a link to its maplestory.market page, Portal Blue and underlined under the pointer) and its rate in bold tabular
-  figures at the right ("64", "1 every 2½ h"), scrolling inside the box (156px of them on a phone); "Updated daily" in
+  figures at the right ("64", "1 every 2½ h"), scrolling inside the box under their head, which stays put (156px of
+  them on a phone), and dropping in as Layout's Loot drop says; "Updated daily" in
   13px Ink Steel at its foot. It follows Both, Solo and Party. Until 3 Characters gave the map Visits of the kind
   shown, the figure reads "Not yet" in Ink Steel, the Items go, and the line says what it waits for. With no picture,
   it keeps the picture's height on its own. Its Level Bands, when it has more than one (with one, the
@@ -1708,6 +1717,7 @@ Guide.
   the field or figure it names.
 - **Don't** let a click on the overlay take the keyboard from the game outside the search view, nor one on the Settings
   window outside a Change and the Deal Margin field.
-- **Don't** animate arrivals or decorate changing game readings with motion; follow Layout's motion rules.
+- **Don't** animate arrivals (the Loot drop aside) or decorate changing game readings with motion; follow Layout's
+  motion rules.
 - **Don't** float any window on a blurred drop shadow; depth is highlights, bevels and hairlines.
 - **Don't** introduce a second typeface or icon fonts.

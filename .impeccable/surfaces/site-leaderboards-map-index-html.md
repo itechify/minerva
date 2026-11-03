@@ -26,3 +26,14 @@ Chosen by the user. The critique of 15 Oct found the board generic ("could be an
 ## Map picture (15 Oct 2026)
 
 Under the map's name, before the Level Bands, show the whole OSMS map picture fitted on Minimap Paper in a shallow inset. Read the content hash from OSMS's live map manifest and load the picture independently of the rankings. Neither file is bundled. Keep the frame's height through loading, missing and failed pictures, and explain each state in plain Ink Steel.
+
+## Loot drop (overdrive, 3 Nov 2026)
+
+Chosen by the user over a morph on switch and a sped-up pickup log, knowing it breaks DESIGN.md's "arrivals open still" and "no bounce"; recorded there as the one exception (Motion, Loot drop).
+
+- **The drop.** When the Map Loot panel first fills, and when Both, Solo or Party changes it, each Item the list shows drops into its row as a drop does in the game: up from where it's let go, down onto its row, one 4px bounce, still. 560ms each, 70ms apart, most first; the name and rate appear as the icon lands. Items under the list's fold are there at once.
+- **The figure** counts from 0 (first fill) or the kind shown before, in 700ms on the exponential ease-out, landing exactly on the panel's figure (`mesosCounted` in leaderboards.ts, tested in site/leaderboards/test/loot.test.ts).
+- **Room to fly.** The Items' box is the scroller and its "Items picked up / an hour" head sticks to its top, so a flying icon passes over the head (a transformed element paints over it) and scrolled rows go under it.
+- **With the band morph.** The panel has its own view-transition name during a switch, its old snapshot hidden and its new one shown live, so the drop isn't cross-faded.
+- **Fallbacks.** Reduced motion, a "Not yet" panel, and a band switch that keeps the kind: no drop. The drop waits up to 400ms for the icons it drops, so none falls empty.
+- **Checked** in headless Chrome at 1280px, frames 0–900ms of a Both → Solo switch and of the first fill, and at 390px at rest, on the made-up Pig Park loot (`_scratch/seed-loot.mjs`).

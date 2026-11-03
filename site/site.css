@@ -2236,33 +2236,34 @@ button.icon-button:active {
   margin-top: auto;
   padding-top: 6px;
 }
+/* The Items scroll under their head, which stays put. An Item dropping in (map.ts) flies over
+   the head, as a drop pops up over the game's own windows. */
 .lb-loot-items {
-  display: flex;
   flex: 1 1 0;
-  flex-direction: column;
   min-height: 0;
   margin-top: 8px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .lb-loot-items[hidden] {
   display: none;
 }
 .lb-loot-head {
+  position: sticky;
+  top: 0;
   display: flex;
   justify-content: space-between;
   margin: 0;
-  padding-bottom: 3px;
+  padding: 0 6px 3px 0;
   border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, #fff 55%, var(--body-solid));
   color: var(--ink-2);
   font-size: 13px;
   line-height: 19px;
 }
 .lb-loot-items ul {
-  flex: 1 1 0;
-  min-height: 0;
   margin: 0;
   padding: 2px 0 0;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
   list-style: none;
 }
 .lb-loot-items li {
@@ -2309,10 +2310,7 @@ button.icon-button:active {
   }
   .lb-loot-items {
     flex: none;
-  }
-  .lb-loot-items ul {
-    flex: none;
-    max-height: 156px;
+    max-height: 180px;
   }
 }
 /* The Level Bands, light steel buttons each with its levels over its count; the band shown
@@ -2874,6 +2872,17 @@ html.lb-morph .window-head {
 }
 html.lb-morph::view-transition-group(lb-head) {
   z-index: 1;
+}
+/* The Map Loot panel stays out of the cross-fade: its Items drop in on their own (map.ts), and
+   the panel switches at once under them. */
+html.lb-morph .lb-loot {
+  view-transition-name: lb-loot;
+}
+html.lb-morph::view-transition-old(lb-loot) {
+  display: none;
+}
+html.lb-morph::view-transition-new(lb-loot) {
+  animation: none;
 }
 /* With reduced motion the switch is at once: script doesn't start it, and nothing here
    would move if it did. */

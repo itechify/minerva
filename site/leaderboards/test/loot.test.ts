@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MapLootAnswer } from "../../entries.ts";
-import { lootPanel } from "../leaderboards.ts";
+import { lootPanel, mesosCounted } from "../leaderboards.ts";
 
 /** A map's Map Loot: 12 Characters on Both, 9 solo, 2 in a party. */
 const answer: MapLootAnswer = {
@@ -27,6 +27,7 @@ describe("a map's Map Loot panel", () => {
     const panel = lootPanel(answer, null, "Pig Park");
 
     expect(panel.figure).toBe("41,200");
+    expect(panel.perHour).toBe(41_234);
     expect(panel.waiting).toBe(false);
     expect(panel.line).toBe("The middle of 12 characters");
     expect(panel.items[0]).toEqual({
@@ -51,11 +52,30 @@ describe("a map's Map Loot panel", () => {
     const party = lootPanel(answer, "party", "Pig Park");
     expect(party.figure).toBe("Not yet");
     expect(party.waiting).toBe(true);
+    expect(party.perHour).toBeNull();
     expect(party.items).toEqual([]);
     expect(party.line).toBe("Mesos and items show here once 3 characters have played Pig Park in a party for 10 minutes with Minerva.");
 
     const none: MapLootAnswer = { map: "100000000", builtAt: null, both: { characters: 0 }, solo: { characters: 0 }, party: { characters: 0 } };
     expect(lootPanel(none, null, "Pig Park").line).toBe("Mesos and items show here once 3 characters have played Pig Park for 10 minutes with Minerva.");
     expect(lootPanel(none, "solo", "Pig Park").line).toBe("Mesos and items show here once 3 characters have played Pig Park solo for 10 minutes with Minerva.");
+  });
+
+  it("counts the figure up as the Items drop in, on the site's ease-out, landing on the figure the panel shows", () => {
+    const frames = Array.from({ length: 31 }, (_, i) => mesosCounted(0, 41_234, i / 30));
+
+    expect(frames[0]).toBe("0");
+    expect(frames.at(-1)).toBe(lootPanel(answer, null, "Pig Park").figure);
+    const counted = frames.map((frame) => Number(frame.replaceAll(",", "")));
+    expect(counted).toEqual([...counted].sort((a, b) => a - b));
+    // Most of the way there in the first third: the count slows as it lands.
+    expect(counted[10]).toBeGreaterThan(41_234 * 0.85);
+  });
+
+  it("counts from the kind shown before to the one switched to, down as well as up, never past either", () => {
+    expect(mesosCounted(41_234, 38_000, 0)).toBe("41,200");
+    expect(mesosCounted(41_234, 38_000, 1)).toBe("38,000");
+    expect(mesosCounted(41_234, 38_000, 2)).toBe("38,000");
+    expect(mesosCounted(41_234, 38_000, -1)).toBe("41,200");
   });
 });
