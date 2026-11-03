@@ -54,3 +54,14 @@ Beside each job the site writes (`site/jobs.ts` gives a job's class, `site/leade
 | `jobs/magician.png` | Magician | A figure casting, in white on blue | 26×26 |
 | `jobs/bowman.png` | Bowman | A figure drawing a bow, in white on green | 26×26 |
 | `jobs/thief.png` | Thief | A figure throwing, in white on brown to cream | 27×27 |
+
+## The meso drops
+
+Beside a map's mesos an hour on its page (ADR 0033, `site/leaderboards/map.ts` draws it): the game's four meso drops, from a sprite sheet supplied by the owner (November 2026). Each is kept as a strip of its four frames, each frame in a 34px square, its magenta ground made transparent, the frame centred across its square and standing 1px off its foot, and nothing else changed. They show pixel for pixel; at rest the second frame shows, and the frames turn as the drop falls in, as the game turns them. Which one shows goes by the figure (`mesoTier` in `site/leaderboards/leaderboards.ts`). Decoration: "Mesos" over the figure says what it is.
+
+| File | Shows for | What it shows | Size |
+| --- | --- | --- | --- |
+| `mesos/bronze.png` | Under 10,000 mesos an hour | A bronze coin with a maple leaf, turning to its edge | 136×34 |
+| `mesos/gold.png` | 10,000 to 49,999 | A gold coin with a maple leaf, turning to its edge | 136×34 |
+| `mesos/bills.png` | 50,000 to 199,999 | A stack of bills in a gold band, catching the light | 136×34 |
+| `mesos/bag.png` | 200,000 and up | A sack of mesos tied with rope, gold glinting at its mouth | 136×34 |

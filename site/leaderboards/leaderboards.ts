@@ -525,6 +525,8 @@ export interface LootPanel {
   figure: string;
   /** The figure as a number, to count up to; `null` while `waiting`. */
   perHour: number | null;
+  /** The meso drop beside it; `null` while `waiting`. */
+  tier: MesoTier | null;
   waiting: boolean;
   /** Under it, while `waiting`: what the panel waits for. */
   line: string | null;
@@ -553,8 +555,14 @@ function itemRate(perHour: number): string {
 /** An Item's picture on OSMS, by its ID. */
 const itemIcon = (id: number) => `https://osmsdataexplorer.com/data/current/images/items/${String(id).padStart(8, "0")}.png`;
 
-/** The picture beside the mesos: the Mysterious Meso Pouch's. */
-export const MESO_POUCH = itemIcon(2028000);
+/** The game's four meso drops, smallest first (site/art/mesos). */
+export type MesoTier = "bronze" | "gold" | "bills" | "bag";
+
+/** Which meso drop shows beside a map's mesos an hour: a bronze coin under 10,000, a gold one
+ *  under 50,000, a stack of bills under 200,000, and a bag from there. */
+export function mesoTier(perHour: number): MesoTier {
+  return perHour < 10_000 ? "bronze" : perHour < 50_000 ? "gold" : perHour < 200_000 ? "bills" : "bag";
+}
 
 /** The panel for the kind the boards show (`null`: both), on the map named `mapName`. */
 export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: string): LootPanel {
@@ -562,7 +570,7 @@ export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: str
   if (figures.mesosPerHour === undefined) {
     const how = kind === "solo" ? " solo" : kind === "party" ? " in a party" : "";
     const line = `Mesos and items show here once 3 characters have played ${mapName}${how} for 10 minutes with Minerva.`;
-    return { figure: "Not yet", perHour: null, waiting: true, line, items: [] };
+    return { figure: "Not yet", perHour: null, tier: null, waiting: true, line, items: [] };
   }
   const items = (figures.items ?? []).map((item) => ({
     name: item.name,
@@ -570,7 +578,7 @@ export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: str
     icon: itemIcon(item.id),
     href: `https://maplestory.market/items/${item.id}?ref=${MARKET_REF}`,
   }));
-  return { figure: rate(figures.mesosPerHour), perHour: figures.mesosPerHour, waiting: false, line: null, items };
+  return { figure: rate(figures.mesosPerHour), perHour: figures.mesosPerHour, tier: mesoTier(figures.mesosPerHour), waiting: false, line: null, items };
 }
 
 /** The mesos an hour as the panel counts it up while its Items drop in, `t` of the way from

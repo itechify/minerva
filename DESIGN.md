@@ -737,13 +737,14 @@ specified with those components; the site's hero and minimap follow scroll, as d
   and opacity only; heading width fits its words while scaling. Only pre-paint content participates, never API-filled
   content. Other links, Back/Forward, unsupported browsers and reduced motion use plain navigation.
 - **Loot drop (the one exception, the user's choice, Nov 2026):** a map's Map Loot panel drops its Items in when it
-  first fills and when Both, Solo or Party changes it, so it alone moves on arrival and bounces. Each Item the list
-  shows, after the meso pouch beside the figure, hops up and falls onto its row in 560ms, bouncing once by 4px, 70ms
-  after the one above it, most first, over
+  first fills and when Both, Solo or Party changes it, so it alone moves on arrival, bounces and loops. The meso drop
+  beside the figure falls first, turning through its four frames (120ms each) as it falls; then each Item the list
+  shows hops up and falls onto its row in 560ms, bouncing once by 4px, 70ms after the one above it, most first, over
   the Items' head; its name and rate appear as it lands. The figure counts from 0, or from the kind shown before, in
-  700ms on the exponential ease-out. It waits up to 400ms for the icons, so none falls empty. Web Animations, transform
-  and opacity only; during a band switch the panel sits out the cross-fade. A band switch that keeps the kind leaves
-  it still; reduced motion shows the final state at once.
+  700ms on the exponential ease-out. It waits up to 400ms for the icons, so none falls empty. Under the pointer, the
+  meso drop turns for as long as the pointer stays, as the game's do on the ground. Web Animations, transform, opacity
+  and the frame's position only; during a band switch the panel sits out the cross-fade. A band switch that keeps the
+  kind leaves it still; reduced motion shows the final state at once and keeps the meso drop still.
 
 ## Elevation & Depth
 
@@ -1263,14 +1264,17 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   A map's page titles the map as the panel does, its street (and region) in 15px bold Ink Steel over its name in Site
   Title in plain ink when no map is known. Beside its picture, as tall as the picture's box and never taller, its **Map
   Loot** (ADR 0033) in the band table's inset box, 272px wide, the picture narrowing to make room (under 640px, under
-  it at the full width): "Mesos/hr" in 14px bold Ink over the figure in 23px bold tabular figures, written as the Grind
-  Tracker writes a rate, beside the Mysterious Meso Pouch's 32px OSMS icon; then "Items/hr" in 13px Ink Steel over a
-  Window Rule, and the Items, most first, each its 24px OSMS icon, its name in 15px Ink (a link to its
-  maplestory.market page, Portal Blue and underlined under the pointer) and its rate in bold tabular figures at the
-  right, whole from 1 up and a decimal to 2 significant figures below ("64", "0.4", "0.057"), scrolling inside the box
-  under their head, which stays put (156px of them on a phone), and dropping in, the pouch first, as Layout's Loot
-  drop says; "Updated daily · Estimates based on player data" in 13px Ink Steel at its foot, breaking at the dot when
-  narrow. It follows Both, Solo and Party. Until 3 Characters gave the map Visits of the kind shown, the figure reads
+  it at the full width): "Estimated Hourly Loot" in 14px bold Ink; then "Mesos" in 13px Ink Steel over the figure in
+  23px
+  bold tabular figures, written as the Grind Tracker writes a rate, beside the game's meso drop for it (site/art/mesos,
+  pixel for pixel: a bronze coin under 10,000, a gold one under 50,000, bills under 200,000, a bag from there), which
+  turns under the pointer as the game turns it; then "Items" in 13px Ink Steel over a Window Rule, and the Items, most
+  first, each its 24px OSMS icon, its name in 15px Ink (a link to its maplestory.market page, Portal Blue and
+  underlined under the pointer) and its rate in bold tabular figures at the right, whole from 1 up and a decimal to 2
+  significant figures below ("64", "0.4", "0.057"), scrolling inside the box under their head, which stays put (156px
+  of them on a phone), and dropping in, the mesos first, as Layout's Loot drop says; "Updated daily based on player
+  data" in 13px Ink Steel at its foot. It follows Both, Solo and Party. Until 3 Characters gave the map Visits of the
+  kind shown, the figure reads
   "Not yet" in Ink Steel, the Items go, and the line says what it waits for. With no picture,
   it keeps the picture's height on its own. Its Level Bands, when it has more than one (with one, the
   band's heading names it), are light steel buttons in a wrapping row, 6px apart, each its levels ("Lv 20–29", 14px
@@ -1710,7 +1714,8 @@ Guide.
 - **Do** pair colour states with a shape and words, and give controls hover, pressed and keyboard-focus states.
 - **Do** keep figures right-aligned, notes wrapping and single-line facts truncating.
 - **Do** honour reduced motion and keep a motion's first frame readable.
-- **Do** draw minimap glyphs and line controls in CSS or inline SVG; use the game's art for Map Marks and job icons,
+- **Do** draw minimap glyphs and line controls in CSS or inline SVG; use the game's art for Map Marks, job icons and
+  meso drops,
   pixel art for the owl and site illustrations. Keep screenshots as figures, not icons.
 
 ### Don't:

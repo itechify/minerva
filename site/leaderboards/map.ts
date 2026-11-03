@@ -19,7 +19,7 @@ import {
   type MapPlace,
   mapPage,
   mapPicture,
-  MESO_POUCH,
+  type MesoTier,
   mesosCounted,
   morphNames,
   NO_MAP,
@@ -129,9 +129,9 @@ function drawLoot() {
   const mesos = byId("loot-mesos-row");
   mesos.classList.toggle("lb-loot-waiting", panel.waiting);
   mesos.hidden = false;
-  const pouch = byId<HTMLImageElement>("loot-pouch");
-  pouch.hidden = panel.waiting;
-  if (!pouch.src) pouch.src = MESO_POUCH;
+  const meso = byId("loot-meso");
+  meso.hidden = panel.tier === null;
+  if (panel.tier !== null) meso.style.backgroundImage = `url("${MESO_ART[panel.tier]}")`;
   const line = byId("loot-line");
   line.textContent = panel.line ?? "";
   line.hidden = panel.line === null;
@@ -154,8 +154,19 @@ function drawLoot() {
       return row;
     }),
   );
-  if (drop) dropIn(list, pouch, figure, from, panel.perHour!);
+  if (drop) dropIn(list, meso, figure, from, panel.perHour!);
 }
+
+/** The game's meso drops, each four frames of 34px (site/art/mesos). */
+const MESO_ART: Record<MesoTier, string> = {
+  bronze: new URL("../art/mesos/bronze.png", import.meta.url).href,
+  gold: new URL("../art/mesos/gold.png", import.meta.url).href,
+  bills: new URL("../art/mesos/bills.png", import.meta.url).href,
+  bag: new URL("../art/mesos/bag.png", import.meta.url).href,
+};
+/** A meso drop's frames, turning as it falls, as the game turns it; at rest, the second. */
+const MESO_TURN: Keyframe[] = [{ backgroundPositionX: "0px" }, { backgroundPositionX: "-136px" }];
+const MESO_TURN_TIMING: KeyframeAnimationOptions = { duration: 480, easing: "steps(4)", iterations: 560 / 480 };
 
 /** How an Item drops into its row (DESIGN.md, Motion, Loot drop): as a drop does in the game,
  *  popped up from where it's let go, falling onto its row, one small bounce, and still. Each
@@ -177,23 +188,24 @@ const COUNT_MS = 700;
 /** How long the drop waits for the icons it drops, so none falls empty. */
 const ICONS_WAIT_MS = 400;
 
-/** Drop the meso pouch beside the figure, then the Items the list shows into their rows, most
- *  first, as the figure counts from `from` to `to`. The Items under the list's fold are there
- *  at once. */
-async function dropIn(list: HTMLElement, pouch: HTMLImageElement, figure: HTMLElement, from: number, to: number) {
+/** Drop the mesos beside the figure, turning as they fall, then the Items the list shows into
+ *  their rows, most first, as the figure counts from `from` to `to`. The Items under the
+ *  list's fold are there at once. */
+async function dropIn(list: HTMLElement, meso: HTMLElement, figure: HTMLElement, from: number, to: number) {
   const turn = counting;
   const box = list.parentElement!;
   const fold = box.getBoundingClientRect().top + box.clientHeight;
   const rows = [...list.children].filter((row) => row.getBoundingClientRect().top < fold);
-  // The pouch drops alone; each Item with its name and rate.
-  const falling: Element[][] = [[pouch], ...rows.map((row) => [...row.children])];
+  // The mesos drop alone; each Item with its name and rate.
+  const falling: Element[][] = [[meso], ...rows.map((row) => [...row.children])];
   const moves = falling.flatMap(([icon, ...words], i) => {
     const timing: KeyframeAnimationOptions = { duration: DROP_MS, delay: i * DROP_STAGGER_MS, fill: "backwards" };
     return [icon.animate(DROP, timing), ...words.map((word) => word.animate(LANDED, timing))];
   });
+  moves.push(meso.animate(MESO_TURN, MESO_TURN_TIMING));
   for (const move of moves) move.pause();
   figure.textContent = mesosCounted(from, to, 0);
-  const icons = falling.map(([icon]) => (icon as HTMLImageElement).decode().catch(() => {}));
+  const icons = rows.map((row) => (row.firstElementChild as HTMLImageElement).decode().catch(() => {}));
   await Promise.race([Promise.all(icons), new Promise((done) => setTimeout(done, ICONS_WAIT_MS))]);
   if (turn !== counting) return;
   for (const move of moves) move.play();

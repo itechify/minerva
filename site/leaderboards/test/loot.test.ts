@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MapLootAnswer } from "../../entries.ts";
-import { lootPanel, MESO_POUCH, mesosCounted } from "../leaderboards.ts";
+import { lootPanel, mesoTier, mesosCounted } from "../leaderboards.ts";
 
 /** A map's Map Loot: 12 Characters on Both, 9 solo, 2 in a party. */
 const answer: MapLootAnswer = {
@@ -46,8 +46,19 @@ describe("a map's Map Loot panel", () => {
     expect(lootPanel(rare, null, "Pig Park").items[0].rate).toBe("0.057");
   });
 
-  it("shows the mesos by the Mysterious Meso Pouch's icon", () => {
-    expect(MESO_POUCH).toBe("https://osmsdataexplorer.com/data/current/images/items/02028000.png");
+  it("shows the mesos as the game drops them, a bigger drop for a richer map", () => {
+    expect([0, 9_999, 10_000, 49_999, 50_000, 199_999, 200_000, 5_000_000].map(mesoTier)).toEqual([
+      "bronze",
+      "bronze",
+      "gold",
+      "gold",
+      "bills",
+      "bills",
+      "bag",
+      "bag",
+    ]);
+    expect(lootPanel(answer, null, "Pig Park").tier).toBe("gold");
+    expect(lootPanel(answer, "party", "Pig Park").tier).toBeNull();
   });
 
   it("follows the kind the boards show", () => {

@@ -61,14 +61,15 @@
                 <p id="map-picture-status" role="status">Loading map…</p>
               </figure>
               <section class="lb-loot" id="loot" aria-labelledby="loot-title" hidden>
-                <h2 class="lb-loot-title" id="loot-title" aria-label="Mesos per hour">Mesos/hr</h2>
-                <p class="lb-loot-mesos" id="loot-mesos-row" hidden><img class="lb-loot-pouch" id="loot-pouch" alt="" width="32" height="32" decoding="async" referrerpolicy="no-referrer" /><span id="loot-mesos"></span></p>
+                <h2 class="lb-loot-title" id="loot-title">Estimated Hourly Loot</h2>
+                <p class="lb-loot-label">Mesos</p>
+                <p class="lb-loot-mesos" id="loot-mesos-row" hidden><span class="lb-loot-meso" id="loot-meso" aria-hidden="true"></span><span id="loot-mesos"></span></p>
                 <p class="lb-loot-line" id="loot-line">Loading…</p>
                 <div class="lb-loot-items" id="loot-items" hidden>
-                  <p class="lb-loot-head" aria-hidden="true">Items/hr</p>
-                  <ul id="loot-list" aria-label="Items per hour"></ul>
+                  <p class="lb-loot-head" aria-hidden="true">Items</p>
+                  <ul id="loot-list" aria-label="Items"></ul>
                 </div>
-                <p class="lb-loot-daily" id="loot-daily" hidden><span>Updated daily ·</span> <span>Estimates based on player data</span></p>
+                <p class="lb-loot-daily" id="loot-daily" hidden>Updated daily based on player data</p>
               </section>
             </div>
             <nav class="lb-bands" id="bands" aria-label="Level Bands" hidden></nav>
