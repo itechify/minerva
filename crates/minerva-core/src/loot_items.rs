@@ -6,8 +6,7 @@
 //! as OSMS spells it. A name the game cut short (`Arrows for Cros...`) is matched by what it
 //! starts with, its tab narrowing the choice; if it still starts more than one Item's name it
 //! is tallied as the game shows it. A name that matches no Item (a misread, or an Item newer
-//! than OSMS's files) is tallied as read, but only once the same text has been read on two
-//! lines, so a single misread never makes an Item of its own. A name the whole set can't place
+//! than OSMS's files) is never tallied: Loot holds only real Items (#223). A name the whole set can't place
 //! is matched within its tab by the recogniser's usual slips on this font ([`crate::pickup_slips`]),
 //! so a single Item's count may now and then be a little high, the total never.
 
@@ -97,14 +96,11 @@ fn in_its_tab<'a>(items: &'a ItemSet, read: &str, tab: Option<InventoryTab>) -> 
     (exact || filed).then_some(item.name.as_str())
 }
 
-/// A name that matched no Item, with the lines it was read on.
+/// A name that matched no Item, and on how many lines it has been read, for the Bug Report.
 #[derive(Debug, Clone)]
 struct Unmatched {
     text: String,
-    /// On how many lines it has been read.
     lines: u32,
-    /// The quantities of those lines not yet tallied: all of them until the second line.
-    waiting: u64,
 }
 
 /// The Items picked up in a Session.
@@ -129,18 +125,13 @@ impl ItemTally {
                 let at = match self.unmatched.iter().position(|seen| seen.text == text) {
                     Some(at) => at,
                     None => {
-                        self.unmatched.push(Unmatched { text: text.clone(), lines: 0, waiting: 0 });
+                        self.unmatched.push(Unmatched { text, lines: 0 });
                         self.unmatched.len() - 1
                     }
                 };
                 let seen = &mut self.unmatched[at];
                 seen.lines += 1;
-                seen.waiting += quantity;
-                notes.push(Note::ItemUnmatched { name: text.clone(), lines: seen.lines });
-                if seen.lines >= 2 {
-                    let waiting = std::mem::take(&mut seen.waiting);
-                    self.count(text, waiting);
-                }
+                notes.push(Note::ItemUnmatched { name: seen.text.clone(), lines: seen.lines });
             }
         }
     }

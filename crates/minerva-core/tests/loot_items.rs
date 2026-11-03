@@ -99,12 +99,11 @@ fn a_name_read_several_glyphs_wrong_is_the_one_item_of_its_tab_it_is_clearly_clo
 fn a_misread_name_is_never_a_guess_between_two_items_of_its_tab() {
     let mut minerva = started(world());
 
-    // One glyph from Red Slime Orb and from Red Slime Orc: tallied as read, once read twice.
-    let state = picked_up(&mut minerva, 11 * S, vec![item("Red Slime Orr", 1, "Etc")]);
-    assert!(state.exp_tracking.loot.items.is_empty());
+    // One glyph from Red Slime Orb and from Red Slime Orc: no Item, however often it's read.
+    picked_up(&mut minerva, 11 * S, vec![item("Red Slime Orr", 1, "Etc")]);
     let state = picked_up(&mut minerva, 12 * S, vec![item("Red Slime Orr", 1, "Etc")]);
 
-    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Slime Orr", 2)]);
+    assert!(state.exp_tracking.loot.items.is_empty());
 }
 
 #[test]
@@ -183,48 +182,34 @@ fn a_name_cut_short_in_a_tab_nothing_starting_so_is_filed_under_matches_no_item(
     let mut minerva = started(world());
 
     // Arrows are Use items: the tab read says Etc, so it is a misread or something newer.
-    let state = picked_up(&mut minerva, 11 * S, vec![cut("Arrows for Cros", 21, "Etc")]);
-    assert!(state.exp_tracking.loot.items.is_empty());
-
+    picked_up(&mut minerva, 11 * S, vec![cut("Arrows for Cros", 21, "Etc")]);
     let state = picked_up(&mut minerva, 12 * S, vec![cut("Arrows for Cros", 21, "Etc")]);
-    assert_eq!(state.exp_tracking.loot.items, vec![tally("Arrows for Cros...", 42)]);
+
+    assert!(state.exp_tracking.loot.items.is_empty());
 }
 
 #[test]
-fn a_name_matching_no_item_is_tallied_as_read_once_it_has_been_read_on_two_lines() {
+fn a_name_matching_no_item_is_never_tallied_however_often_it_is_read() {
     let mut minerva = started(world());
 
-    let state = picked_up(&mut minerva, 11 * S, vec![item("Zorg Dung", 3, "Etc")]);
-    assert!(state.exp_tracking.loot.items.is_empty(), "a single misread makes no Item of its own");
-    let state = picked_up(&mut minerva, 12 * S, vec![item("Zorb Dung", 1, "Etc")]);
-    assert!(state.exp_tracking.loot.items.is_empty(), "another text is another misread");
+    // A misread, or an Item newer than OSMS's files: Loot counts only real Items.
+    picked_up(&mut minerva, 11 * S, vec![item("Zorg Dung", 3, "Etc"), item("Zorg Dung", 1, "Etc")]);
+    let state = picked_up(&mut minerva, 12 * S, vec![item("Zorg Dung", 2, "Etc"), item("Red Potion", 1, "Use")]);
 
-    // The second line of the same text tallies both, the quantity of the first not lost.
-    let state = picked_up(&mut minerva, 13 * S, vec![item("Zorg Dung", 2, "Etc")]);
-    assert_eq!(state.exp_tracking.loot.items, vec![tally("Zorg Dung", 5)]);
-
-    let state = picked_up(&mut minerva, 14 * S, vec![item("Zorg Dung", 1, "Etc")]);
-    assert_eq!(state.exp_tracking.loot.items, vec![tally("Zorg Dung", 6)]);
+    let loot = state.exp_tracking.loot;
+    assert_eq!(loot.items, vec![tally("Red Potion", 1)]);
+    assert_eq!(loot.items_total, 1);
 }
 
 #[test]
-fn two_lines_of_one_unmatched_name_in_one_reading_are_two_lines() {
-    let mut minerva = started(world());
-
-    let state = picked_up(&mut minerva, 11 * S, vec![item("Zorg Dung", 3, "Etc"), item("Zorg Dung", 1, "Etc")]);
-
-    assert_eq!(state.exp_tracking.loot.items, vec![tally("Zorg Dung", 4)]);
-}
-
-#[test]
-fn without_item_files_a_name_is_tallied_once_read_on_two_lines() {
+fn without_item_files_no_name_is_tallied() {
     let mut minerva = tracking_with(FakeSource::osms_offline());
     common::start_session(&mut minerva, 0, 10 * S);
 
     picked_up(&mut minerva, 11 * S, vec![item("Red Potion", 1, "Use")]);
     let state = picked_up(&mut minerva, 12 * S, vec![item("Red Potion", 1, "Use")]);
 
-    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Potion", 2)]);
+    assert!(state.exp_tracking.loot.items.is_empty());
 }
 
 #[test]
@@ -255,10 +240,6 @@ fn a_reset_clears_the_items_with_the_mesos_and_its_undo_brings_them_back() {
 
     let state = minerva.act(Action::UndoReset).clone();
     assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Potion", 4)]);
-
-    // The misread seen once came back with the Session: a second line tallies it.
-    let state = picked_up(&mut minerva, 12 * S, vec![item("Zorg Dung", 1, "Etc")]);
-    assert_eq!(state.exp_tracking.loot.items, vec![tally("Red Potion", 4), tally("Zorg Dung", 2)]);
 }
 
 #[test]
@@ -334,15 +315,14 @@ fn an_exact_name_is_its_item_whatever_the_slips_would_make_of_it() {
 }
 
 #[test]
-fn a_read_equally_close_to_two_items_stays_as_read() {
+fn a_read_equally_close_to_two_items_is_neither() {
     let mut minerva = started(branches());
 
     // A "?" is any one letter: P or F.
-    let state = picked_up(&mut minerva, 11 * S, vec![item("?ine Cone", 1, "Etc")]);
-    assert!(state.exp_tracking.loot.items.is_empty());
+    picked_up(&mut minerva, 11 * S, vec![item("?ine Cone", 1, "Etc")]);
     let state = picked_up(&mut minerva, 12 * S, vec![item("?ine Cone", 1, "Etc")]);
 
-    assert_eq!(state.exp_tracking.loot.items, vec![tally("?ine Cone", 2)]);
+    assert!(state.exp_tracking.loot.items.is_empty());
 }
 
 #[test]
@@ -356,7 +336,7 @@ fn a_misread_is_never_the_name_of_an_item_of_another_tab() {
 }
 
 #[test]
-fn a_read_too_far_from_every_item_for_its_slips_to_explain_stays_as_read() {
+fn a_read_too_far_from_every_item_for_its_slips_to_explain_is_no_item() {
     let mut minerva = started(branches());
 
     let state = picked_up(&mut minerva, 11 * S, vec![item("Cran Brach", 1, "Etc")]);
@@ -365,7 +345,7 @@ fn a_read_too_far_from_every_item_for_its_slips_to_explain_stays_as_read() {
 }
 
 /// What one Etc line `read` is tallied as on its first line, in a Session with `names` in the Etc
-/// tab: an Item's name, or nothing yet (a name that matches no Item waits for a second line).
+/// tab: an Item's name, or nothing (a name that matches no Item is never tallied).
 fn tallied_first(names: &[&str], read: &str) -> Vec<LootItem> {
     let items = names.iter().enumerate().map(|(i, name)| etc(4_100_000 + i as u64, name).sells_for(1)).collect();
     let mut minerva = started(item_world(items));
@@ -382,7 +362,7 @@ fn a_misread_a_whole_edit_nearer_an_item_than_the_next_is_that_item() {
 }
 
 #[test]
-fn a_misread_less_than_a_whole_edit_nearer_an_item_than_the_next_stays_as_read() {
+fn a_misread_less_than_a_whole_edit_nearer_an_item_than_the_next_is_no_item() {
     // The B read as "A" is a slip; the other name is one plain edit from the read (0.6 further).
     let names = ["Very Dry Branch", "Very Dry Oranch"];
 
@@ -449,10 +429,10 @@ fn a_name_cut_short_and_misread_is_the_item_whose_start_it_is_clearly_closest_to
 }
 
 #[test]
-fn a_name_cut_short_and_misread_as_near_two_items_starts_stays_as_read() {
+fn a_name_cut_short_and_misread_as_near_two_items_starts_is_no_item() {
     let mut minerva = started(candies());
 
-    // As near the start of Red Slime Orb as of Red Slime Orc: no Item until read twice.
+    // As near the start of Red Slime Orb as of Red Slime Orc: no Item.
     let state = picked_up(&mut minerva, 11 * S, vec![cut("Red Sxime Or", 1, "Etc")]);
 
     assert!(state.exp_tracking.loot.items.is_empty());
