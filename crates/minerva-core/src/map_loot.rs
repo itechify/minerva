@@ -279,7 +279,7 @@ impl MapLoot {
         self.revision
     }
 
-    /// A Visit ended, worth sending.
+    /// A Visit ended, worth sending if its Character is shown by the next tick.
     pub fn ended(&mut self, visit: MapLootVisit) {
         if self.waiting.len() >= MOST_WAITING && self.in_flight.is_none() {
             self.waiting.remove(0);
@@ -297,12 +297,11 @@ impl MapLoot {
         self.under_way = visit;
     }
 
-    /// Time passed, to `at_ms`: ask for the next upload, if one is due, naming its Items from
-    /// `items` (none until they are in), for a Character `sends` says is still shown.
-    pub fn tick(&mut self, at_ms: u64, items: Option<&ItemSet>, sends: impl Fn(&str) -> bool) {
-        self.now_ms = self.now_ms.max(at_ms);
+    /// Drop what waits of each Character `sends` says isn't shown: turned off since, or never
+    /// shown. Only on a tick, after the Map Leaderboards have shown each Character met for the
+    /// first time, so the Visit that met them goes.
+    pub fn drop_unshown(&mut self, sends: impl Fn(&str) -> bool) {
         let before = self.waiting.len();
-        // A Character turned off since has theirs dropped, never sent.
         let in_flight = self.in_flight.is_some();
         let mut first = true;
         self.waiting.retain(|visit| {
@@ -313,10 +312,19 @@ impl MapLoot {
         if self.waiting.len() != before {
             self.revision += 1;
         }
+    }
+
+    /// Time passed, to `at_ms`: ask for the next upload, if one is due, naming its Items from
+    /// `items` (none until they are in), for a Character `sends` says is shown.
+    pub fn ask(&mut self, at_ms: u64, items: Option<&ItemSet>, sends: impl Fn(&str) -> bool) {
+        self.now_ms = self.now_ms.max(at_ms);
         if self.in_flight.is_some() || self.wait_until_ms.is_some_and(|until| self.now_ms < until) {
             return;
         }
         let (Some(visit), Some(items)) = (self.waiting.first(), items) else { return };
+        if !sends(&visit.name) {
+            return;
+        }
         self.last_id += 1;
         let named = visit.items.iter().filter_map(|item| Some(MapLootItem { id: items.loot_id(&item.name)?, count: item.count }));
         self.in_flight = Some(MapLootUpload {

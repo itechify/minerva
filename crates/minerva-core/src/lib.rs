@@ -2310,7 +2310,8 @@ impl Minerva {
         // Uploads only on a tick: at launch the bests are back by the first.
         self.leaderboards.tick(at_ms, self.session.bests().history(), self.wall_clock);
         let leaderboards = &self.leaderboards;
-        self.map_loot.tick(at_ms, self.items.items().ok(), |name| leaderboards.sends_for(name));
+        self.map_loot.drop_unshown(|name| leaderboards.sends_for(name));
+        self.map_loot.ask(at_ms, self.items.items().ok(), |name| leaderboards.sends_for(name));
         self.discord.tick(at_ms, self.bests_window.open);
         self.updater.tick(at_ms, self.settings.check_for_updates);
         // maplestory.market's figures the card and the Deal Finder last wanted.
@@ -2439,19 +2440,21 @@ impl Minerva {
         self.recorder.close(Outcome { answers, notes, state: &self.state, bests_revision });
     }
 
-    /// The Loot of the Visits that ended since, each sent if it's worth it and its Character
-    /// is shown on the Map Leaderboards, and the Visit under way's, to save (ADR 0033).
+    /// The Loot of the Visits that ended since, each kept if it's worth sending, and the Visit
+    /// under way's, to save, if its Character is shown on the Map Leaderboards (ADR 0033). An
+    /// ended Visit's Character may be one met for the first time, whom the next tick shows: the
+    /// tick drops it if not.
     fn sync_map_loot(&mut self) {
-        let leaderboards = &self.leaderboards;
-        let shown = |visit: &MapLootVisit| leaderboards.sends_for(&visit.name);
         for ended in self.session.take_ended_loot() {
-            if let Some(visit) = ended.worth_sending().filter(shown) {
+            if let Some(visit) = ended.worth_sending() {
                 self.map_loot.ended(visit);
             }
         }
+        let leaderboards = &self.leaderboards;
+        let shown = |visit: &MapLootVisit| leaderboards.sends_for(&visit.name);
         self.map_loot.under_way(self.session.loot_under_way().worth_sending().filter(shown));
         // No time passes here (0 never moves the clock on): a Visit that just ended goes at once.
-        self.map_loot.tick(0, self.items.items().ok(), |name| leaderboards.sends_for(name));
+        self.map_loot.ask(0, self.items.items().ok(), |name| leaderboards.sends_for(name));
         self.state.map_loot_uploads = self.map_loot.uploads();
     }
 

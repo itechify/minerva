@@ -192,6 +192,24 @@ fn another_character_named_ends_the_loot_of_the_one_before() {
 }
 
 #[test]
+fn a_character_met_for_the_first_time_sends_the_loot_of_the_visit_that_put_them_on_the_map_leaderboards() {
+    let mut minerva = tracking_with(FakeSource::osms().with_items(world()));
+    minerva.tick(0);
+    let mut player = Player::clocked(minerva);
+    player.status(Some("Nova"), 23);
+    player.hunt(30 * S, 10);
+    player.arrive(SUNSET_SAMPLE);
+    hunt_looting(&mut player, 10 * MIN, &[mesos(50)]);
+
+    // The Visit ending gives Nova her first entry; the next tick shows her, met for the first
+    // time, and her Visit's Loot goes with it.
+    player.arrive(CONSTRUCTION_SAMPLE);
+    player.minerva.tick(player.at + S);
+
+    assert_eq!(upload(&player).map(|upload| (upload.name, upload.mesos)), Some(("Nova".into(), 60 * 50)));
+}
+
+#[test]
 fn a_character_not_shown_on_the_map_leaderboards_sends_nothing() {
     let mut player = egbert();
     player.minerva.show_on_leaderboards("Egbert", false);
