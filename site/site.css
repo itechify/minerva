@@ -2222,10 +2222,11 @@ button.icon-button:active {
   line-height: 19px;
 }
 /* The figure beside its meso drop. */
+/* The figure stands on the drop's foot: an empty box's baseline is its bottom edge. */
 .lb-loot-mesos {
   display: flex;
   gap: 4px;
-  align-items: center;
+  align-items: baseline;
   min-height: 34px;
   margin: 0;
   color: var(--ink);
@@ -2240,6 +2241,10 @@ button.icon-button:active {
 /* The game's meso drop for the figure (site/art/mesos), pixel for pixel: four 34px frames, the
    second at rest. Under the pointer it turns as the game turns it. */
 .lb-loot-meso {
+  /* Its frames stand 1px off their box's foot, and the digits' ink reaches 1px under their
+     baseline: down by both, the drop stands on the digits' line. */
+  position: relative;
+  top: 2px;
   flex: none;
   width: 34px;
   height: 34px;
