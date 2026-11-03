@@ -46,6 +46,15 @@
         ],
         "createdAt": "2026-11-03T07:57:23.428Z",
         "reason": "agent: #map-image's src is set by map.ts from OSMS's manifest at runtime; the tag predates this change"
+      },
+      {
+        "rule": "buried-raster",
+        "value": "*",
+        "files": [
+          "site/leaderboards/map/index.html"
+        ],
+        "createdAt": "2026-11-03T08:28:47.665Z",
+        "reason": "agent: #map-image sits at opacity 0 only until it loads (.lb-picture:not(.lb-in) img), then fades in; predates Map Loot"
       }
     ]
   }
