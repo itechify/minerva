@@ -38,7 +38,7 @@ pnpm site:build                                 # the site, into site/dist (fail
 pnpm site:test                                  # the site's Worker (the Map Leaderboards API, against a local D1) and what its pages show
 pnpm site:local [--seed] [--key] [--build]      # the built site and its API on a free port, with a local D1 in _scratch/; prints the port
 pnpm site:local stop                            # stop the one this worktree started
-cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json  # no game: the Map Leaderboards' cap and Where to train, from OSMS
+cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json  # no game: the Map Leaderboards' cap and Where to train, and the Item names table beside it, from OSMS
 ```
 
 All probe modes and options, including `record`, `item`, `loot` and `update-manifest`, are documented in the opening comment of [src-tauri/examples/probe/main.rs](src-tauri/examples/probe/main.rs). See [AGENTS.md](AGENTS.md) for fixture rules and when to check live data.

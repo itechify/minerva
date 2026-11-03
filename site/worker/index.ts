@@ -1,7 +1,8 @@
 // The minerva-site Worker: the site's build, and the API under /api/: the Map Leaderboards
 // (ADR 0015, where its routes and their answers are written down), a Character's page
-// (ADR 0027), Accounts (ADR 0023) and maplestory.market's prices for the app (ADR 0030); and
-// once a day, Characters' portraits from ClassicRank (ADR 0029).
+// (ADR 0027), Accounts (ADR 0023), maplestory.market's prices for the app (ADR 0030) and Map
+// Loot (ADR 0033); and once a day, Characters' portraits from ClassicRank (ADR 0029) and each
+// map's Map Loot figures.
 import { readCharacterPage } from "./character-page";
 import {
   confirmLinkToken,
@@ -24,6 +25,7 @@ import { isMaintainerToken } from "./keys";
 import { pullNow, readMarket } from "./market";
 import { withKind } from "./kinds";
 import { readLatest } from "./latest";
+import { readMapLoot, sendMapLoot, workOutMapLoot } from "./map-loot";
 import { optOut, pull, readBand, readMap, readMaps, upload } from "./leaderboards";
 import {
   deleteAllEntries,
@@ -65,9 +67,10 @@ export default {
     return json(answer, isPublicRead ? "public, max-age=60" : "no-store");
   },
   // The daily cron trigger (site/wrangler.jsonc): every Character's portrait, asked for again
-  // (ADR 0029).
+  // (ADR 0029), and the Map Loot figures of each map sent Visits since (ADR 0033).
   async scheduled(controller, env, ctx): Promise<void> {
     ctx.waitUntil(refreshPortraits(env, controller.scheduledTime));
+    ctx.waitUntil(workOutMapLoot(env, controller.scheduledTime));
   },
 } satisfies ExportedHandler<Env>;
 
@@ -104,10 +107,14 @@ async function route(request: Request, url: URL, env: Env, ctx: ExecutionContext
       return upload(env, request, path[1], ctx);
     case path.length === 3 && path[0] === "characters" && path[2] === "entries" && method === "DELETE":
       return optOut(env, request, path[1]);
+    case path.length === 3 && path[0] === "characters" && path[2] === "map-loot" && method === "POST":
+      return sendMapLoot(env, request, path[1]);
     case path.length === 1 && path[0] === "maps" && method === "GET":
       return readMaps(env);
     case path.length === 2 && path[0] === "maps" && method === "GET":
       return readMap(env, path[1]);
+    case path.length === 3 && path[0] === "maps" && path[2] === "loot" && method === "GET":
+      return readMapLoot(env, path[1]);
     case path.length === 4 && path[0] === "maps" && path[2] === "bands" && method === "GET": {
       return withKind(url, (kind) => readBand(env, path[1], path[3], url.searchParams.get("name"), kind));
     }

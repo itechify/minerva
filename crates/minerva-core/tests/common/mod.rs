@@ -608,6 +608,16 @@ pub fn clean_pickup_reading(at_ms: u64, lines: Vec<minerva_core::PickupLine>) ->
     pickup_reading(at_ms, minerva_core::PickupLogSeen::Clear { area: LOG }, lines)
 }
 
+/// A Pickup Log line of `amount` mesos.
+pub fn mesos(amount: u64) -> minerva_core::PickupLine {
+    minerva_core::PickupLine::Mesos { amount }
+}
+
+/// An Item Pickup Log line as the reader gives it, its name whole.
+pub fn item(name: &str, quantity: u32, tab: &str) -> minerva_core::PickupLine {
+    minerva_core::PickupLine::Item { name: name.into(), quantity, tab: tab.into(), cut_short: false }
+}
+
 pub fn picked_up(minerva: &mut Minerva, at_ms: u64, lines: Vec<minerva_core::PickupLine>) -> PanelState {
     minerva.on_pickup_log_reading(clean_pickup_reading(at_ms, lines)).clone()
 }

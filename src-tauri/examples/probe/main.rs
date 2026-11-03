@@ -39,8 +39,10 @@
 //! write each map's solo EXP/h ceiling, the levels of the middle half of its spawns and its
 //! Map Mark, by its 9-digit ID, and each Map Mark's area and picture, to `out.json`: the
 //! table the site's Worker loads (`site/worker/osms-ceilings.json`), for the cap and for
-//! Where to train (ADR 0024). A map with no Map Summary, or a ceiling of 0, is left out. No
-//! game window is needed.
+//! Where to train (ADR 0024). A map with no Map Summary, or a ceiling of 0, is left out. Then
+//! fetch OSMS's live item files and write the Item names table beside it (`osms-item-names.json`):
+//! every Item but the Cash Shop's, by ID, which the Worker checks Map Loot's Items against
+//! (ADR 0033). No game window is needed.
 //!
 //! `cargo run -p minerva --example probe replay <report.zip> [--all] [--stats] [--from-ms <ms>] [--to-ms <ms>] [--osms <osms-set.json>] [--items <osms-items.json>]`
 //! Replay mode, for a Bug Report (ADR 0009): print what it holds and its timeline (from 10
@@ -229,7 +231,8 @@ fn osms() -> Result<(), String> {
 /// `<out.json> [--osms <osms-set.json>]`: write each map's solo EXP/h ceiling, the levels
 /// of the middle half of its spawns and its Map Mark, by its 9-digit ID, one map to a line
 /// (`"010001010": { "ceiling": 153216, "mobs": [3, 8], "mark": "Henesys" }`), then each
-/// Map Mark's area and picture (`"Rith": { "name": "Lith Harbor", "picture": "https://..." }`).
+/// Map Mark's area and picture (`"Rith": { "name": "Lith Harbor", "picture": "https://..." }`);
+/// and beside it `osms-item-names.json`, each Item's name by its ID (`"4000008": "Pig's Head"`).
 fn ceilings(args: &[String]) -> Result<(), String> {
     let mut rest = args.iter();
     let out = rest.next().ok_or("no file to write")?;
@@ -266,6 +269,22 @@ fn ceilings(args: &[String]) -> Result<(), String> {
     let table = format!("{{\n  \"maps\": {{\n{}\n  }},\n  \"marks\": {{\n{}\n  }}\n}}\n", maps.join(",\n"), marks.join(",\n"));
     std::fs::write(out, table).map_err(|e| format!("{out}: {e}"))?;
     println!("Wrote the solo ceilings of {} maps (of {} in the map list) to {out}", ceilings.len(), set.maps().count());
+
+    // The Item names table beside it, for Map Loot (ADR 0033): every Item but the Cash Shop's.
+    let item_files = minerva_lib::osms::fetch_live::<minerva_core::osms_items::ItemFiles>()?;
+    let items = minerva_core::osms_items::read(&item_files).map_err(|e| format!("OSMS's item files don't read: {e}"))?;
+    let names = items.loot_names();
+    let lines: Vec<String> = names.iter().map(|(id, name)| format!("    \"{id}\": {}", text(name))).collect();
+    let items_out = std::path::Path::new(out).with_file_name("osms-item-names.json");
+    std::fs::write(&items_out, format!("{{
+  \"items\": {{
+{}
+  }}
+}}
+", lines.join(",
+")))
+        .map_err(|e| format!("{}: {e}", items_out.display()))?;
+    println!("Wrote the names of {} Items to {}", names.len(), items_out.display());
     Ok(())
 }
 

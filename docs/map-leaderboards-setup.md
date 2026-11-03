@@ -89,7 +89,7 @@ Never publish from a ref missing API behavior the released app needs: the workfl
 ## Afterwards
 
 - **A new migration** goes in `site/migrations` as the next `NNNN_<what>.sql` (`pnpm exec wrangler d1 migrations create minerva-leaderboards <what> --config site/wrangler.jsonc`). The Site workflow applies it before the deploy that needs it. Try it locally first: `pnpm site:local` applies it to its local D1 when it starts (after `pnpm site:local stop`, if one is running).
-- **The ceilings table** (`site/worker/osms-ceilings.json`) is written again when OSMS's set changes, as `probe osms` is run: `cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json`.
+- **The ceilings table** (`site/worker/osms-ceilings.json`) is written again when OSMS's set changes, as `probe osms` is run: `cargo run -p minerva --example probe ceilings site/worker/osms-ceilings.json`. It writes the Item names table beside it (`site/worker/osms-item-names.json`), which Map Loot takes Items from (ADR 0033).
 - **A lost Leaderboard Key.** The player says on Discord that their Character's name is "claimed". If they have an Account, ask for its Discord username and that they link their new PC to it; at `/admin/`, under **Characters**, look the name up and **Reassign** it to their Account. Otherwise, ask them to try again from Minerva (toggling the upload off and on), then **Reassign to refused key** there, or with the maintainer's token:
 
   ```bash

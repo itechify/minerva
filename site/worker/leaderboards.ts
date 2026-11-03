@@ -11,6 +11,7 @@ import { bearer, hash } from "./keys";
 import { WRITES, limit } from "./rate-limits";
 import { ceilingsOf } from "./ceilings";
 import { flaggedOf } from "./automatic-reports";
+import { forgetMapLoot } from "./map-loot";
 import { askOnUpload, forgetPortrait, PORTRAIT_COLUMNS, PORTRAIT_JOIN, type PortraitColumns, portraitIn } from "./portraits";
 
 /** How many entries a band's read lists. */
@@ -103,7 +104,7 @@ interface Claim {
  *  Account. An upload a Block reaches is refused as "blocked" before it claims anything (ADR
  *  0031). With `unclaimed: "leave"` (taking entries down, which a Block never stops), a name
  *  no key holds is left so, and the answer is `null`. */
-async function claim(
+export async function claim(
   env: Env,
   request: Request,
   name: string,
@@ -307,8 +308,9 @@ export async function optOut(env: Env, request: Request, name: string): Promise<
     env.DB.prepare(`UPDATE taken_tops SET from_name_key = NULL WHERE from_name_key = ?1 AND ${HELD}`).bind(...at),
     // Its automatic reports go with its entries (ADR 0032).
     env.DB.prepare(`DELETE FROM reports WHERE name_key = ?1 AND ${HELD} AND ${UNMATCHED_AUTOMATIC}`).bind(...at),
-    // Their portrait goes too (ADR 0029).
+    // Their portrait goes too (ADR 0029), and their Map Loot (ADR 0033).
     forgetPortrait(env, claimed.nameKey),
+    ...forgetMapLoot(env, claimed.nameKey),
   ]);
   return { status: 204 };
 }

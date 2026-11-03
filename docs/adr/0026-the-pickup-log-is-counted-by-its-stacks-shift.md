@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended by ADR-0033
 ---
 
 # The Pickup Log is counted by its stack's shift
@@ -28,7 +28,7 @@ Match Item names against OSMS's item files (ADR 0010). An exact name may stand d
 
 The tab-local comparison in `pickup_slips.rs` charges 0.4 edits for known recurring OCR slips or an unknown glyph. A name must be at least 75% similar, a whole edit nearer than the runner-up, and the runner-up at least 1.5 times as far away. Plain edits may settle a read only when they choose that same closest Item, at 75% similarity and a two-edit lead. Equal neighbours stay as read. The whole-set matcher uses its stricter 85% threshold before the tab-local fallback.
 
-A name no Item matches is tallied as read only after that same text arrives on two lines; the waiting quantity is then included. This admits new Items without making a separate Item from every single misread. Name correction can occasionally put one Item's quantity under another, so an individual Item count may be high; the total is still limited by counted arrivals. `probe loot` compares this naming with plain edits and reports changed names from a Bug Report. Timestamped replay tallies are diagnostic evidence, not part of the rule.
+A name no Item matches is never tallied, however many lines it arrives on: Loot holds only real Items, so Map Loot (ADR 0033) can send them by Item ID. A misread is lost rather than kept under a name of its own, and an Item newer than OSMS's files counts once they list it. This amends the rule this ADR first took, which tallied such a name as read once the same text arrived on two lines (#223). A name cut short that starts more than one Item's name is still tallied as the game shows it; it is a real Item, but not one Map Loot can name, so it is never sent. Name correction can occasionally put one Item's quantity under another, so an individual Item count may be high; the total is still limited by counted arrivals. `probe loot` compares this naming with plain edits and reports changed names from a Bug Report. Timestamped replay tallies are diagnostic evidence, not part of the rule.
 
 ## Consequences and alternatives
 

@@ -2175,6 +2175,189 @@ button.icon-button:active {
   border: 0;
   background: none;
 }
+/* The picture and the map's Map Loot beside it (ADR 0033): the panel is as tall as the
+   picture's box, never taller, its Items scrolling inside; the picture narrows to make room.
+   With no picture, the panel keeps that height on its own. */
+.lb-picture-row {
+  --high: clamp(160px, 24vw, 240px);
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  margin-top: 20px;
+}
+.lb-picture-row > .lb-picture {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-top: 0;
+}
+.lb-picture-row > .lb-picture.lb-none {
+  flex: 1 1 auto;
+  margin-top: 8px;
+}
+.lb-loot {
+  display: flex;
+  flex: 0 0 272px;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: calc(var(--high) + 26px);
+  padding: 10px 14px;
+  border: 1px solid var(--inset-edge);
+  border-radius: 4px;
+  background: var(--inset-bg);
+}
+.lb-loot[hidden] {
+  display: none;
+}
+.lb-loot-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 20px;
+}
+/* "Mesos" over the figure, as "Items" heads the list. */
+.lb-loot-label {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 19px;
+}
+/* The figure beside its meso drop, the two centred on each other. */
+.lb-loot-mesos {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 34px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.lb-loot-mesos[hidden] {
+  display: none;
+}
+/* The game's meso drop for the figure (site/art/mesos), pixel for pixel: four 34px frames, the
+   second at rest. Under the pointer it turns as the game turns it. */
+.lb-loot-meso {
+  /* Each frame is centred in its square, and the digits' ink sits 1px over their line's
+     middle: up by that, the drop's middle is the digits'. */
+  position: relative;
+  top: -1px;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  background: no-repeat -34px 0;
+  image-rendering: pixelated;
+}
+.lb-loot-meso[hidden] {
+  display: none;
+}
+.lb-loot-meso:hover {
+  animation: lb-meso-turn 480ms steps(4) infinite;
+}
+@keyframes lb-meso-turn {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: -136px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-loot-meso:hover {
+    animation: none;
+  }
+}
+.lb-loot-mesos.lb-loot-waiting {
+  color: var(--ink-2);
+}
+.lb-loot-line,
+.lb-loot-daily {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 19px;
+}
+.lb-loot-daily {
+  margin-top: auto;
+  padding-top: 6px;
+}
+/* The Items scroll under their head, which stays put. An Item dropping in (map.ts) flies over
+   the head, as a drop pops up over the game's own windows. */
+.lb-loot-items {
+  flex: 1 1 0;
+  min-height: 0;
+  margin-top: 8px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.lb-loot-items[hidden] {
+  display: none;
+}
+.lb-loot-head {
+  position: sticky;
+  top: 0;
+  margin: 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, #fff 55%, var(--body-solid));
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 19px;
+}
+.lb-loot-items ul {
+  margin: 0;
+  padding: 2px 0 0;
+  list-style: none;
+}
+.lb-loot-items li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  /* Clear of a scrollbar drawn over the list, as a phone's is. */
+  padding-right: 6px;
+  font-size: 15px;
+  line-height: 22px;
+}
+.lb-loot-items li img {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.lb-loot-items li a {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-loot-items li a:hover,
+.lb-loot-items li a:focus-visible {
+  color: var(--portal);
+  text-decoration: underline;
+}
+.lb-loot-items li b {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+/* On a phone the panel goes under the picture, the full width, its list a few rows tall. */
+@media (max-width: 640px) {
+  .lb-picture-row {
+    flex-direction: column;
+  }
+  .lb-loot {
+    flex: none;
+    min-height: 0;
+  }
+  .lb-loot-items {
+    flex: none;
+    max-height: 180px;
+  }
+}
 /* The Level Bands, light steel buttons each with its levels over its count; the band shown
    is the selected one, in Selection Periwinkle. */
 .lb-bands {
@@ -2734,6 +2917,17 @@ html.lb-morph .window-head {
 }
 html.lb-morph::view-transition-group(lb-head) {
   z-index: 1;
+}
+/* The Map Loot panel stays out of the cross-fade: its Items drop in on their own (map.ts), and
+   the panel switches at once under them. */
+html.lb-morph .lb-loot {
+  view-transition-name: lb-loot;
+}
+html.lb-morph::view-transition-old(lb-loot) {
+  display: none;
+}
+html.lb-morph::view-transition-new(lb-loot) {
+  animation: none;
 }
 /* With reduced motion the switch is at once: script doesn't start it, and nothing here
    would move if it did. */

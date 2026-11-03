@@ -7,6 +7,7 @@ import { linesOf } from "./admin-log";
 import { blockReaching } from "./blocks";
 import { type Answer, badRequest, body } from "./http";
 import { hash } from "./keys";
+import { forgetMapLoot } from "./map-loot";
 import { isParty, kindCondition, sqlKind, sqlParty } from "./kinds";
 import { REPORTS, limit } from "./rate-limits";
 
@@ -80,6 +81,8 @@ export async function deleteAllEntries(env: Env, name: string): Promise<Answer> 
     env.DB.prepare("DELETE FROM entries WHERE name_key = ?").bind(nameKey),
     env.DB.prepare("DELETE FROM reports WHERE name_key = ?").bind(nameKey),
     env.DB.prepare("DELETE FROM taken_tops WHERE name_key = ?").bind(nameKey),
+    // Their Map Loot goes for good (ADR 0033): restoring an entry brings none of it back.
+    ...forgetMapLoot(env, nameKey),
   ]);
   const entries = removed.meta.changes;
   if (entries === 0) return { status: 404, body: { error: "no-entry" } };

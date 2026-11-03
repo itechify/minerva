@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-24T04:57:33.000Z",
+  "generatedAt": "2026-11-03T14:51:51.000Z",
   "title": "Design System: Minerva",
   "extensions": {
     "colorMeta": {
@@ -589,6 +589,36 @@
           "oklch(95% 0.06 28.9)"
         ]
       },
+      "npc": {
+        "role": "tertiary",
+        "displayName": "NPC Green",
+        "canonical": "oklch(72.2% 0.210 142.5)",
+        "tonalRamp": [
+          "oklch(15% 0.210 142.5)",
+          "oklch(25% 0.210 142.5)",
+          "oklch(36% 0.210 142.5)",
+          "oklch(47% 0.210 142.5)",
+          "oklch(58% 0.210 142.5)",
+          "oklch(70% 0.210 142.5)",
+          "oklch(82% 0.210 142.5)",
+          "oklch(95% 0.084 142.5)"
+        ]
+      },
+      "npc-edge": {
+        "role": "tertiary",
+        "displayName": "NPC Green Edge",
+        "canonical": "oklch(46.4% 0.137 142.5)",
+        "tonalRamp": [
+          "oklch(15% 0.137 142.5)",
+          "oklch(25% 0.137 142.5)",
+          "oklch(36% 0.137 142.5)",
+          "oklch(47% 0.137 142.5)",
+          "oklch(58% 0.137 142.5)",
+          "oklch(70% 0.137 142.5)",
+          "oklch(82% 0.137 142.5)",
+          "oklch(95% 0.055 142.5)"
+        ]
+      },
       "you": {
         "role": "tertiary",
         "displayName": "You Yellow",
@@ -632,6 +662,126 @@
           "oklch(70% 0.1 84.4)",
           "oklch(82% 0.1 84.4)",
           "oklch(95% 0.04 84.4)"
+        ]
+      },
+      "party": {
+        "role": "tertiary",
+        "displayName": "Party Gold",
+        "canonical": "oklch(60.6% 0.126 80.0)",
+        "tonalRamp": [
+          "oklch(15% 0.126 80.0)",
+          "oklch(25% 0.126 80.0)",
+          "oklch(36% 0.126 80.0)",
+          "oklch(47% 0.126 80.0)",
+          "oklch(58% 0.126 80.0)",
+          "oklch(70% 0.126 80.0)",
+          "oklch(82% 0.126 80.0)",
+          "oklch(95% 0.050 80.0)"
+        ]
+      },
+      "party-ink": {
+        "role": "tertiary",
+        "displayName": "Party Ink",
+        "canonical": "oklch(48.8% 0.100 84.4)",
+        "tonalRamp": [
+          "oklch(15% 0.100 84.4)",
+          "oklch(25% 0.100 84.4)",
+          "oklch(36% 0.100 84.4)",
+          "oklch(47% 0.100 84.4)",
+          "oklch(58% 0.100 84.4)",
+          "oklch(70% 0.100 84.4)",
+          "oklch(82% 0.100 84.4)",
+          "oklch(95% 0.040 84.4)"
+        ]
+      },
+      "crown-gold": {
+        "role": "tertiary",
+        "displayName": "Crown Gold",
+        "canonical": "oklch(84.2% 0.155 86.6)",
+        "tonalRamp": [
+          "oklch(15% 0.155 86.6)",
+          "oklch(25% 0.155 86.6)",
+          "oklch(36% 0.155 86.6)",
+          "oklch(47% 0.155 86.6)",
+          "oklch(58% 0.155 86.6)",
+          "oklch(70% 0.155 86.6)",
+          "oklch(82% 0.155 86.6)",
+          "oklch(95% 0.062 86.6)"
+        ]
+      },
+      "crown-edge": {
+        "role": "tertiary",
+        "displayName": "Crown Gold Edge",
+        "canonical": "oklch(43.8% 0.092 76.9)",
+        "tonalRamp": [
+          "oklch(15% 0.092 76.9)",
+          "oklch(25% 0.092 76.9)",
+          "oklch(36% 0.092 76.9)",
+          "oklch(47% 0.092 76.9)",
+          "oklch(58% 0.092 76.9)",
+          "oklch(70% 0.092 76.9)",
+          "oklch(82% 0.092 76.9)",
+          "oklch(95% 0.037 76.9)"
+        ]
+      },
+      "crown-silver": {
+        "role": "tertiary",
+        "displayName": "Crown Silver",
+        "canonical": "oklch(80.8% 0.019 258.4)",
+        "tonalRamp": [
+          "oklch(15% 0.019 258.4)",
+          "oklch(25% 0.019 258.4)",
+          "oklch(36% 0.019 258.4)",
+          "oklch(47% 0.019 258.4)",
+          "oklch(58% 0.019 258.4)",
+          "oklch(70% 0.019 258.4)",
+          "oklch(82% 0.019 258.4)",
+          "oklch(95% 0.008 258.4)"
+        ]
+      },
+      "crown-silver-edge": {
+        "role": "tertiary",
+        "displayName": "Crown Silver Edge",
+        "canonical": "oklch(38.2% 0.028 263.0)",
+        "tonalRamp": [
+          "oklch(15% 0.028 263.0)",
+          "oklch(25% 0.028 263.0)",
+          "oklch(36% 0.028 263.0)",
+          "oklch(47% 0.028 263.0)",
+          "oklch(58% 0.028 263.0)",
+          "oklch(70% 0.028 263.0)",
+          "oklch(82% 0.028 263.0)",
+          "oklch(95% 0.011 263.0)"
+        ]
+      },
+      "crown-bronze": {
+        "role": "tertiary",
+        "displayName": "Crown Bronze",
+        "canonical": "oklch(71.8% 0.111 58.4)",
+        "tonalRamp": [
+          "oklch(15% 0.111 58.4)",
+          "oklch(25% 0.111 58.4)",
+          "oklch(36% 0.111 58.4)",
+          "oklch(47% 0.111 58.4)",
+          "oklch(58% 0.111 58.4)",
+          "oklch(70% 0.111 58.4)",
+          "oklch(82% 0.111 58.4)",
+          "oklch(95% 0.045 58.4)"
+        ]
+      },
+      "crown-bronze-edge": {
+        "role": "tertiary",
+        "displayName": "Crown Bronze Edge",
+        "canonical": "oklch(35.5% 0.076 52.9)",
+        "tonalRamp": [
+          "oklch(15% 0.076 52.9)",
+          "oklch(25% 0.076 52.9)",
+          "oklch(36% 0.076 52.9)",
+          "oklch(47% 0.076 52.9)",
+          "oklch(58% 0.076 52.9)",
+          "oklch(70% 0.076 52.9)",
+          "oklch(82% 0.076 52.9)",
+          "oklch(95% 0.030 52.9)"
         ]
       },
       "select": {
@@ -1144,10 +1294,10 @@
           "oklch(95% 0 0)"
         ]
       },
-      "exp-track-base": {
+      "exp-track": {
         "role": "tertiary",
-        "displayName": "EXP Track, Base",
-        "canonical": "oklch(79.5% 0 0)",
+        "displayName": "EXP Track",
+        "canonical": "oklch(85.5% 0 0)",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(25% 0 0)",
@@ -1159,10 +1309,10 @@
           "oklch(95% 0 0)"
         ]
       },
-      "exp-track": {
+      "exp-track-base": {
         "role": "tertiary",
-        "displayName": "EXP Track",
-        "canonical": "oklch(85.5% 0 0)",
+        "displayName": "EXP Track, Base",
+        "canonical": "oklch(79.5% 0 0)",
         "tonalRamp": [
           "oklch(15% 0 0)",
           "oklch(25% 0 0)",
@@ -1894,7 +2044,7 @@
       "name": "Personal Bests Window",
       "kind": "custom",
       "refersTo": "bests-window",
-      "description": "Every map's Personal Best over the game, to compare maps: the panel's window opened wide (920px, or the game's client width) on its see-through glass, the table set in on near-opaque Window Lavender. Map (bold, a link to its MeowDB page, its street and region under it), Mob levels, Best EXP/h (bold), its lane, % of solo EXP/h with the ceiling under it, Date set, and each map's count of Visits, which opens its Visit History under the row. The lanes are the window's signature: every best drawn as the EXP gauge draws the bar, lime in its grey frame, on one scale from 0 to the best of all maps under a ruler of round steps, so reading down the window is reading a chart; a notch in a bar is another Visit, the Visit under way is the player's 8px dot, stepping with the EXP, and an opened history draws each Visit's own 6px bar. The window's one emphasis is the You Yellow star before the best of all maps; the map the player is on has only the You Yellow dot in the name's gutter. Every header is a sort button that keeps its room. A Visit's × arms to \"Remove?\" before it removes. Under 840px each bar goes under its figure; under 540px rows become cards.",
+      "description": "Every map's Personal Best over the game, to compare maps: the panel's window opened wide (920px, or the game's client width) on its see-through glass, the table set in on near-opaque Window Lavender. Map (bold, a link to its MeowDB page, its street and region under it), Mob levels, Best EXP/h (bold), its lane, % of solo EXP/h with the ceiling under it, Date set, and each map's count of Visits, which opens its Visit History under the row. The lanes are the window's signature: every best drawn as the EXP gauge draws the bar, lime in its grey frame, on one scale from 0 to the best of all maps under a ruler of round steps, so reading down the window is reading a chart; a notch in a bar is another Visit, the Visit under way is the player's 8px dot, stepping with the EXP, and an opened history draws each Visit's own 6px bar. The window's one emphasis is the You Yellow star before the best of all maps; the map the player is on has only the You Yellow dot in the name's gutter. Every header is a sort button that keeps its room. Beside a Character's Share, where they stand reads in plain words when that isn't a problem; an upload problem names its remedy button in bold. A Visit's × arms to \"Remove?\" before it removes. Under 840px each bar goes under its figure; under 540px rows become cards.",
       "html": "<div class=\"ds-win ds-bests\"><div class=\"ds-bar\"><img class=\"ds-icon\" src=\"data:image/png;base64,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\" width=\"16\" height=\"16\" alt=\"\"><p class=\"ds-name\">Personal Bests</p><button type=\"button\" class=\"ds-ib\" aria-label=\"Close your Personal Bests\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M4 4l8 8M12 4l-8 8\"/></svg></button></div><div class=\"ds-body\"><p class=\"ds-count ds-steel\">3 maps · shared by all your characters</p><div class=\"ds-box\"><table class=\"ds-btable\"><caption class=\"ds-sr\">Your Personal Best on each map</caption><thead><tr><th class=\"ds-text\"><button type=\"button\" class=\"ds-sort\">Map</button></th><th><button type=\"button\" class=\"ds-sort\">Mob levels</button></th><th aria-sort=\"descending\"><button type=\"button\" class=\"ds-sort\">Best EXP/h</button></th><th class=\"ds-lanecell\"><span class=\"ds-scale\" aria-hidden=\"true\"><span class=\"ds-step ds-zero\" style=\"--at: 0\">0</span><span class=\"ds-step\" style=\"--at: 0.237\">20k</span><span class=\"ds-step\" style=\"--at: 0.474\">40k</span><span class=\"ds-step\" style=\"--at: 0.712\">60k</span><span class=\"ds-step\" style=\"--at: 0.949\">80k</span></span></th><th><button type=\"button\" class=\"ds-sort\">% of solo EXP/h</button></th><th><button type=\"button\" class=\"ds-sort\">Date set</button></th><th class=\"ds-controls\"></th></tr></thead><tbody><tr><td class=\"ds-text\"><button type=\"button\" class=\"ds-map\">Another Entrance</button><div class=\"ds-street\">Sleepywood · Victoria Island</div></td><td>Lv 24–32</td><td class=\"ds-bexp\"><svg class=\"ds-bstar\" viewBox=\"0 0 16 16\" role=\"img\" aria-label=\"Your best of all maps\"><path d=\"M8 1.5L9.76 6.07L14.66 6.34L10.85 9.43L12.11 14.16L8 11.5L3.89 14.16L5.15 9.43L1.34 6.34L6.24 6.07Z\"/><ellipse class=\"ds-lit\" cx=\"7.1\" cy=\"6.9\" rx=\"1.5\" ry=\"1.1\"/></svg>84,300</td><td class=\"ds-lanecell\"><span class=\"ds-grid\" style=\"--at: 0.237\"></span><span class=\"ds-grid\" style=\"--at: 0.474\"></span><span class=\"ds-grid\" style=\"--at: 0.712\"></span><span class=\"ds-grid\" style=\"--at: 0.949\"></span><div class=\"ds-lane\"><span class=\"ds-fill\" style=\"--at: 1\"></span><span class=\"ds-lnotch\" style=\"--at: 0.938\"></span><span class=\"ds-lnotch\" style=\"--at: 0.845\"></span><span class=\"ds-lnotch\" style=\"--at: 0.626\"></span><span class=\"ds-lnotch\" style=\"--at: 0.368\"></span></div></td><td>20%<span class=\"ds-ceiling\">of 412,000</span></td><td>3 Oct</td><td class=\"ds-controls\"><button type=\"button\" class=\"ds-visits\" aria-expanded=\"false\">5 visits<svg class=\"ds-chev\" viewBox=\"0 0 8 8\" aria-hidden=\"true\"><path d=\"M3 1.5L5.5 4L3 6.5\"/></svg></button></td></tr><tr><td class=\"ds-text\"><span class=\"ds-here\" role=\"img\" aria-label=\"You're here\"></span><button type=\"button\" class=\"ds-map\">Construction Site North of Kerning City</button><div class=\"ds-street\">Victoria Road · Victoria Island</div></td><td>Lv 11–19</td><td class=\"ds-bexp\">48,900</td><td class=\"ds-lanecell\"><span class=\"ds-grid\" style=\"--at: 0.237\"></span><span class=\"ds-grid\" style=\"--at: 0.474\"></span><span class=\"ds-grid\" style=\"--at: 0.712\"></span><span class=\"ds-grid\" style=\"--at: 0.949\"></span><div class=\"ds-lane\"><span class=\"ds-fill\" style=\"--at: 0.58\"></span><span class=\"ds-lnotch\" style=\"--at: 0.261\"></span><span class=\"ds-ldot\" style=\"--at: 0.476\"></span></div></td><td>34%<span class=\"ds-ceiling\">of 143,800</span></td><td>9 Oct</td><td class=\"ds-controls\"><button type=\"button\" class=\"ds-visits\" aria-expanded=\"true\">3 visits<svg class=\"ds-chev\" viewBox=\"0 0 8 8\" aria-hidden=\"true\"><path d=\"M3 1.5L5.5 4L3 6.5\"/></svg></button></td></tr><tr class=\"ds-visit\"><td></td><td></td><td>48,900</td><td class=\"ds-lanecell\"><span class=\"ds-grid\" style=\"--at: 0.237\"></span><span class=\"ds-grid\" style=\"--at: 0.474\"></span><span class=\"ds-grid\" style=\"--at: 0.712\"></span><span class=\"ds-grid\" style=\"--at: 0.949\"></span><div class=\"ds-lane ds-small\"><span class=\"ds-fill\" style=\"--at: 0.58\"></span></div></td><td class=\"ds-steel\">34%</td><td class=\"ds-steel\">9 Oct</td><td class=\"ds-controls\"><button type=\"button\" class=\"ds-lb\" aria-label=\"Remove this visit from your history\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M4 4l8 8M12 4l-8 8\"/></svg></button></td></tr><tr class=\"ds-visit\"><td></td><td></td><td>40,100</td><td class=\"ds-lanecell\"><span class=\"ds-grid\" style=\"--at: 0.237\"></span><span class=\"ds-grid\" style=\"--at: 0.474\"></span><span class=\"ds-grid\" style=\"--at: 0.712\"></span><span class=\"ds-grid\" style=\"--at: 0.949\"></span><div class=\"ds-lane ds-small\"><span class=\"ds-fill\" style=\"--at: 0.476\"></span><span class=\"ds-ldot\" style=\"--at: 0.476\"></span></div></td><td class=\"ds-steel\">28%</td><td class=\"ds-steel\">12 Oct</td><td class=\"ds-controls\"><span class=\"ds-tag\">This visit</span></td></tr><tr class=\"ds-visit ds-last\"><td></td><td></td><td>22,000</td><td class=\"ds-lanecell\"><span class=\"ds-grid\" style=\"--at: 0.237\"></span><span class=\"ds-grid\" style=\"--at: 0.474\"></span><span class=\"ds-grid\" style=\"--at: 0.712\"></span><span class=\"ds-grid\" style=\"--at: 0.949\"></span><div class=\"ds-lane ds-small\"><span class=\"ds-fill\" style=\"--at: 0.261\"></span></div></td><td class=\"ds-steel\">15%</td><td class=\"ds-steel\">2 Oct</td><td class=\"ds-controls\"><button type=\"button\" class=\"ds-tb\">Remove?</button></td></tr><tr><td class=\"ds-text\"><button type=\"button\" class=\"ds-map\">Map 999999999</button><div class=\"ds-street ds-unknown\">Not in the map list</div></td><td class=\"ds-none\">—</td><td class=\"ds-bexp\">21,700</td><td class=\"ds-lanecell\"><span class=\"ds-grid\" style=\"--at: 0.237\"></span><span class=\"ds-grid\" style=\"--at: 0.474\"></span><span class=\"ds-grid\" style=\"--at: 0.712\"></span><span class=\"ds-grid\" style=\"--at: 0.949\"></span><div class=\"ds-lane\"><span class=\"ds-fill\" style=\"--at: 0.257\"></span></div></td><td class=\"ds-none\">—</td><td class=\"ds-none\">—</td><td class=\"ds-controls\"><button type=\"button\" class=\"ds-visits\" aria-expanded=\"false\">1 visit<svg class=\"ds-chev\" viewBox=\"0 0 8 8\" aria-hidden=\"true\"><path d=\"M3 1.5L5.5 4L3 6.5\"/></svg></button></td></tr></tbody></table></div><ul class=\"ds-notes ds-steel\"><li>The bars put every map's best on one scale. A notch in a bar is another of your visits there, and the dot the visit you're on.</li><li>Solo EXP/h is the map's ceiling, worked out as NiaMeowDB does.</li></ul></div></div>",
       "css": ".ds-win { font-family: var(--font, \"Maplestory\", Arial, \"Segoe UI\", system-ui, sans-serif); font-variant-numeric: tabular-nums; box-sizing: border-box; border: 1px solid var(--window-edge, #6f95ba); border-radius: 4px; background: var(--glass, rgba(178, 194, 232, 0.62)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); color: #16191f; font-size: 13px; line-height: 17px; overflow: hidden; } .ds-bar { display: flex; align-items: center; gap: 5px; min-height: 22px; padding: 2px 3px 2px 5px; background: var(--window-bar, linear-gradient(180deg, #ececec 0%, #dfdfdf 55%, #d6d6d6 100%)); border-bottom: 1px solid var(--window-edge, #6f95ba); } .ds-bar .ds-name { flex: 1; min-width: 0; margin: 0; font-size: 12px; font-weight: 700; line-height: 16px; color: var(--window-bar-ink, #3d4048); } .ds-icon { flex: none; width: 16px; height: 16px; } .ds-body { display: flex; flex-direction: column; gap: 9px; padding: 11px 11px 10px; text-shadow: 0 0 2px rgba(238, 242, 255, 0.85), 0 0 4px rgba(238, 242, 255, 0.6); } .ds-box { border: 1px solid var(--inset-edge, rgba(30, 45, 90, 0.3)); border-radius: 4px; background: var(--body, rgba(234, 232, 245, 0.95)); text-shadow: none; } .ds-steel { color: #222938; } .ds-ib { display: grid; place-items: center; box-sizing: border-box; width: 19px; height: 19px; padding: 0; border: 1px solid var(--game-button-edge, #2f7595); border-radius: 2px; background: var(--game-button, linear-gradient(180deg, #27b5fe 0%, #44c4ff 55%, #66d4ff 100%)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -1px 0 rgba(0, 60, 110, 0.25); color: #fff; } .ds-ib svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 0 rgba(0, 50, 90, 0.45)); } .ds-ib .ds-dot { fill: currentColor; stroke: none; } .ds-ib:hover { background: var(--game-button-hover, linear-gradient(180deg, #45c2ff 0%, #66d0ff 55%, #8ae0ff 100%)); } .ds-ib:active, .ds-ib[aria-pressed=\"true\"] { background: var(--game-button-pressed, linear-gradient(180deg, #1c9be0 0%, #2eb1f2 100%)); box-shadow: inset 0 1px 2px rgba(0, 40, 80, 0.5); } .ds-ib:focus-visible { outline: 2px solid var(--edit, #2f63c8); outline-offset: 2px; } .ds-lb { display: grid; place-items: center; box-sizing: border-box; width: 19px; height: 19px; padding: 0; border: 1px solid var(--window-edge, #6f95ba); border-radius: 2px; background: var(--button-light, linear-gradient(180deg, #f8fafe 0%, #d5dff0 100%)); box-shadow: inset 0 1px 0 #fff; color: #16191f; } .ds-lb svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; } .ds-lb:hover { background: var(--button-light-hover, linear-gradient(180deg, #ffffff 0%, #dfe7f6 100%)); } .ds-lb:active { box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25); } .ds-lb:focus-visible { outline: 2px solid var(--edit, #2f63c8); outline-offset: 2px; } .ds-tb { flex: none; box-sizing: border-box; height: 19px; padding: 0 7px; border: 1px solid var(--window-edge, #6f95ba); border-radius: 2px; background: var(--button-light, linear-gradient(180deg, #f8fafe 0%, #d5dff0 100%)); box-shadow: inset 0 1px 0 #fff; color: #16191f; font: 700 12px/17px var(--font, \"Maplestory\", Arial, \"Segoe UI\", system-ui, sans-serif); text-shadow: none; } .ds-tb:hover { background: var(--button-light-hover, linear-gradient(180deg, #ffffff 0%, #dfe7f6 100%)); } .ds-tb:active { background: var(--button-light, linear-gradient(180deg, #f8fafe 0%, #d5dff0 100%)); box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25); } .ds-tb:focus-visible { outline: 2px solid var(--edit, #2f63c8); outline-offset: 2px; } .ds-tb:disabled { border-color: var(--disabled-edge, #aeb8cc); background: var(--disabled-bg, #d3d9e5); box-shadow: none; color: var(--disabled-ink, #6b7591); } .ds-bests { width: 900px; } .ds-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .ds-count { margin: 0; font-size: 12px; line-height: 16px; } .ds-btable { width: 100%; border-collapse: separate; border-spacing: 0; } .ds-btable th, .ds-btable td { padding: 5px 0 5px 14px; text-align: right; white-space: nowrap; vertical-align: top; } .ds-btable th:first-child, .ds-btable td:first-child { position: relative; width: 28%; padding-left: 24px; text-align: left; white-space: normal; } .ds-btable th:last-child, .ds-btable td:last-child { padding-right: 10px; } .ds-btable thead th { padding-top: 4px; padding-bottom: 4px; background: var(--tag-bg, #dae3f3); border-bottom: 1px solid var(--inset-edge, rgba(30, 45, 90, 0.3)); font-size: 12px; font-weight: 400; color: #222938; } .ds-sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; } .ds-btable th:not(.ds-text) .ds-sort { flex-direction: row-reverse; } .ds-sort::after { content: \"\"; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid transparent; } .ds-sort:hover { color: #16191f; } th[aria-sort] .ds-sort { font-weight: 700; color: #16191f; } th[aria-sort] .ds-sort::after { border-top-color: currentColor; } .ds-sort:focus-visible, .ds-map:focus-visible, .ds-visits:focus-visible { outline: 2px solid var(--edit, #2f63c8); outline-offset: 2px; } .ds-btable tbody tr + tr:not(.ds-visit) td { border-top: 1px solid rgba(30, 45, 90, 0.25); } .ds-btable tbody tr:hover td { background: rgba(47, 99, 200, 0.08); } .ds-map { all: unset; cursor: pointer; font-weight: 700; } .ds-map:hover, .ds-visits:hover { color: var(--portal, #1f63d6); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; } .ds-map:active, .ds-visits:active { color: var(--frame, #3e527c); } .ds-here { position: absolute; top: 9px; left: 8px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--you-light, #fff6c2) 0 18%, var(--you, #ffd21f) 45%); box-shadow: 0 0 0 1px var(--you-edge, #7a5a00); } .ds-street { font-size: 12px; line-height: 16px; color: #222938; } .ds-street.ds-unknown, .ds-none { color: #343d51; } .ds-bexp { font-weight: 700; } .ds-bstar { width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px; fill: var(--you, #ffd21f); stroke: var(--you-edge, #7a5a00); stroke-width: 1.3; stroke-linejoin: round; } .ds-bstar .ds-lit { fill: var(--you-light, #fff6c2); stroke: none; } .ds-ceiling { display: block; font-size: 12px; line-height: 16px; color: #222938; } .ds-controls { width: 72px; } .ds-visits { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 17px; color: #222938; } .ds-chev { width: 8px; height: 8px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; } .ds-visits[aria-expanded=\"true\"] .ds-chev { transform: rotate(90deg); } .ds-btable tr.ds-visit td { padding-top: 0; padding-bottom: 2px; font-size: 12px; line-height: 19px; vertical-align: middle; } .ds-btable tr.ds-visit.ds-last td { padding-bottom: 6px; } .ds-tag { padding: 0 5px; border: 1px solid var(--tag-edge, #a3b6d8); border-radius: 3px; background: var(--tag-bg, #dae3f3); color: var(--tag-ink, #284a86); font-size: 11px; font-weight: 700; line-height: 15px; } .ds-controls .ds-lb { display: inline-grid; vertical-align: middle; } .ds-lanecell { width: 23%; } .ds-btable td.ds-lanecell, .ds-btable th.ds-lanecell { padding-right: 14px; } .ds-btable td.ds-lanecell { position: relative; } .ds-grid { position: absolute; top: 0; bottom: 0; left: calc(14px + var(--at) * (100% - 28px)); width: 1px; background: rgba(30, 45, 90, 0.09); } .ds-lane { position: relative; height: 10px; margin-top: 4px; } .ds-lane.ds-small { height: 6px; margin-top: 0; } .ds-fill { position: absolute; top: 0; left: 0; box-sizing: border-box; width: calc(var(--at) * 100%); min-width: 3px; height: 100%; border: 1px solid var(--exp-frame, #676d70); border-radius: 2px; background: var(--exp-fill, linear-gradient(180deg, #effb76 0%, #e5f916 28%, #dcf200 55%, #cfe400 100%)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); } .ds-lnotch { position: absolute; top: 1px; bottom: 1px; left: calc(var(--at) * 100%); width: 1px; margin-left: -1px; background: rgba(103, 109, 112, 0.7); } .ds-ldot { position: absolute; top: 1px; left: calc(var(--at) * 100%); width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--you-light, #fff6c2) 0 18%, var(--you, #ffd21f) 45%); box-shadow: 0 0 0 1px var(--you-edge, #7a5a00); } .ds-small .ds-ldot { top: -1px; } .ds-scale { position: relative; display: block; height: 21px; margin-bottom: -4px; } .ds-step { position: absolute; top: 1px; left: calc(var(--at) * 100%); transform: translateX(-50%); font-size: 11px; line-height: 15px; } .ds-step.ds-zero { transform: none; } .ds-step::after { content: \"\"; position: absolute; top: 17px; left: 50%; width: 1px; height: 3px; background: var(--exp-frame, #676d70); } .ds-step.ds-zero::after { left: 0; } .ds-notes { margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 16px; } .ds-notes li + li { margin-top: 4px; }"
     },
@@ -1910,7 +2060,7 @@
       "name": "Site",
       "kind": "custom",
       "refersTo": "site-window",
-      "description": "The Minerva site at owlofminerva.app has three main tabs: Home, Map Leaderboards and FAQ. The home page shows what Minerva does a feature at a time; the FAQ holds the details as the questions players ask. Each is one of the game's windows opened wide in the browser (up to 1200px, 28px down) on Quest Helper Glass over white, in setup's opaque language and the site's own reading scale (16px/26px body). Its sticky head is setup's window bar (32px owl, name, version, steel Download) over the tab band (the lavender mixed 12% toward Frame Navy) holding one raised Light Steel tab per page; the page you're on is the open tab, 4px taller and joined to the lavender (aria-current=\"page\"). A feature row is its shot on a 440px stage and its words: a Site Opener heading led by the panel's legend mark, a sentence or two, then its most-asked questions. Each question is a native details row in an inset box, folded to its question with the panel's 19px fold button at its right; a question is written once, on the FAQ. The owl speaks twice, as the game's NPCs do; the hero films how Minerva reads a map, moved only by the scroll; from 1440px a Mini Map docks beside the window.",
+      "description": "The Minerva site at owlofminerva.app has three main tabs: Home, Map Leaderboards and FAQ. The home page shows what Minerva does a feature at a time; the FAQ holds the details as the questions players ask. Each is one of the game's windows opened wide in the browser (up to 1200px, 28px down) on Quest Helper Glass over white, in setup's opaque language and the site's own reading scale (16px/26px body). Its sticky head is setup's window bar (32px owl, name, version, steel Download) over the tab band (the lavender mixed 12% toward Frame Navy) holding one raised Light Steel tab per page; the page you're on is the open tab, 4px taller and joined to the lavender (aria-current=\"page\"). A feature row is its shot on a 440px stage and its words: a Site Opener heading led by the panel's legend mark, a sentence or two, then its most-asked questions. Each question is a native details row in an inset box, folded to its question with the panel's 19px fold button at its right; a question is written once, on the FAQ. A map's page sets its Map Loot beside the map's picture, in the band table's inset box, \"Hourly Loot (Estimate)\": the mesos beside the game's meso drop for them, over the Items, each with its icon and rate. The owl speaks twice, as the game's NPCs do; the hero films how Minerva reads a map, moved only by the scroll; from 1440px a Mini Map docks beside the window.",
       "html": "<div class=\"ds-sground\"><div class=\"ds-swin\"><div class=\"ds-shead\"><header class=\"ds-sbar\"><img class=\"ds-sowl\" src=\"data:image/png;base64,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\" width=\"32\" height=\"32\" alt=\"\"><p class=\"ds-sname\">Minerva</p><p class=\"ds-sver\">0.9.0 · Windows 10 and 11</p><a class=\"ds-sdl\" href=\"#\">Download</a></header><nav class=\"ds-tabs\" aria-label=\"Pages\"><a class=\"ds-tab\" href=\"#\" aria-current=\"page\">Home</a><a class=\"ds-tab\" href=\"#\">Map Leaderboards</a><a class=\"ds-tab\" href=\"#\">FAQ</a></nav></div><div class=\"ds-sbody\"><h2 class=\"ds-sopener\"><span class=\"ds-ring\" aria-hidden=\"true\"></span>Every portal, even the hidden ones</h2><p class=\"ds-slede\">The panel shows the map you're on with every portal ringed, and lists its <strong>Hidden Portals</strong>, the ones the game doesn't show.</p><div class=\"ds-qa-list\"><details class=\"ds-qa\"><summary><span>What's a Hidden Portal?</span><span class=\"ds-fold\" aria-hidden=\"true\"><svg viewBox=\"0 0 16 16\"><path d=\"M3.5 8h9\"/><path class=\"ds-post\" d=\"M8 3.5v9\"/></svg></span></summary><div class=\"ds-qa-answer\"><p>A portal the game doesn't mark on the map, so you only find it by walking over it.</p><p class=\"ds-qa-link\"><a href=\"#\">Link to this answer</a></p></div></details><details class=\"ds-qa\" open><summary><span>Why does the panel say \"Not sure\"?</span><span class=\"ds-fold\" aria-hidden=\"true\"><svg viewBox=\"0 0 16 16\"><path d=\"M3.5 8h9\"/><path class=\"ds-post\" d=\"M8 3.5v9\"/></svg></span></summary><div class=\"ds-qa-answer\"><p>Minerva read the minimap's title but can't be certain which map it is.</p><p class=\"ds-qa-link\"><a href=\"#\">Link to this answer</a></p></div></details></div><p class=\"ds-qa-more\"><a href=\"#\">All 21 questions about the panel and the map</a></p></div></div></div>",
       "css": ".ds-sground { padding: 20px; background: linear-gradient(var(--glass, rgba(178, 194, 232, 0.62)), var(--glass, rgba(178, 194, 232, 0.62))), #fff; } .ds-swin { font: 16px/26px var(--font, \"Maplestory\", Arial, \"Segoe UI\", system-ui, sans-serif); max-width: 640px; border: 1px solid var(--window-edge, #6f95ba); border-radius: 4px; background: var(--body-solid, #eae8f5); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); color: var(--ink, #1b2648); overflow: hidden; } .ds-sbar { display: flex; align-items: center; gap: 10px; padding: 8px 18px 9px; background: var(--window-bar, linear-gradient(180deg, #ececec 0%, #dfdfdf 55%, #d6d6d6 100%)); border-bottom: 1px solid var(--window-edge, #6f95ba); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9); } .ds-sowl { flex: none; width: 32px; height: 32px; image-rendering: pixelated; } .ds-sname { margin: 0; font-size: 15px; font-weight: 700; line-height: 20px; color: var(--window-bar-ink, #3d4048); } .ds-sver { margin: 0 0 0 auto; font-size: 12px; font-weight: 700; line-height: 16px; color: var(--window-bar-ink, #3d4048); white-space: nowrap; } .ds-sdl { padding: 5px 14px 6px; border: 1px solid var(--button-edge, #1c3672); border-radius: 4px; background: var(--button, linear-gradient(180deg, #4673c6 0%, #2a52a6 100%)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3); color: #fff; font-size: 13px; font-weight: 700; line-height: 18px; text-decoration: none; text-shadow: 0 1px 0 var(--button-edge, #1c3672); } .ds-sdl:hover { background: var(--button-hover, linear-gradient(180deg, #3d69bb 0%, #234897 100%)); } .ds-sdl:active { box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.45); } .ds-tabs { display: flex; align-items: flex-end; gap: 3px; padding: 8px 18px 0; border-bottom: 1px solid var(--window-edge, #6f95ba); background: color-mix(in srgb, var(--body-solid, #eae8f5) 88%, var(--frame, #3e527c)); } .ds-tab { position: relative; margin-bottom: -1px; padding: 5px 16px; border: 1px solid var(--select-edge, #98afda); border-bottom-color: var(--window-edge, #6f95ba); border-radius: 4px 4px 0 0; background: var(--button-light, linear-gradient(180deg, #f8fafe 0%, #d5dff0 100%)); box-shadow: inset 0 1px 0 #fff; color: var(--ink-2, #44527a); font-size: 14px; font-weight: 700; line-height: 20px; text-decoration: none; } .ds-tab:hover { background: var(--button-light-hover, linear-gradient(180deg, #ffffff 0%, #dfe7f6 100%)); color: var(--ink, #1b2648); } .ds-tab:active { box-shadow: inset 0 1px 3px rgba(10, 20, 50, 0.25); } .ds-tab[aria-current=\"page\"] { padding-top: 9px; border-color: var(--window-edge, #6f95ba); border-bottom-color: var(--body-solid, #eae8f5); background: var(--body-solid, #eae8f5); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9); color: var(--ink, #1b2648); } .ds-tab:focus-visible { outline: 2px solid var(--edit, #2f63c8); outline-offset: -4px; } .ds-sbody { padding: 28px 40px 32px; } .ds-sopener { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; font-size: 30px; font-weight: 700; line-height: 36px; } .ds-ring { flex: none; box-sizing: border-box; width: 14px; height: 14px; border: 3px solid var(--portal, #1f63d6); border-radius: 50%; background: var(--portal-fill, #eef5ff); } .ds-slede { margin: 0 0 24px; font-size: 17px; line-height: 28px; } .ds-qa-list { overflow: hidden; border: 1px solid var(--inset-edge, rgba(62, 82, 124, 0.3)); border-radius: 4px; background: var(--inset-bg, rgba(255, 255, 255, 0.55)); } .ds-qa + .ds-qa { border-top: 1px solid var(--rule, rgba(62, 82, 124, 0.2)); } .ds-qa > summary { display: flex; align-items: flex-start; gap: 14px; padding: 10px 12px 10px 16px; font-size: 15px; font-weight: 700; line-height: 22px; list-style: none; cursor: pointer; } .ds-qa > summary::-webkit-details-marker { display: none; } .ds-qa > summary > span:first-child { flex: 1; } .ds-qa > summary:hover { background: rgba(47, 99, 200, 0.08); } .ds-qa > summary:focus-visible { outline: 2px solid var(--edit, #2f63c8); outline-offset: -2px; } .ds-fold { flex: none; display: grid; place-items: center; box-sizing: border-box; width: 19px; height: 19px; margin-top: 1.5px; border: 1px solid var(--window-edge, #6f95ba); border-radius: 2px; background: var(--button-light, linear-gradient(180deg, #f8fafe 0%, #d5dff0 100%)); box-shadow: inset 0 1px 0 #fff; color: var(--ink, #1b2648); } .ds-fold svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; } .ds-qa[open] .ds-fold .ds-post { display: none; } .ds-qa > summary:hover .ds-fold { background: var(--button-light-hover, linear-gradient(180deg, #ffffff 0%, #dfe7f6 100%)); } .ds-qa-answer { padding: 0 16px 14px; font-size: 15px; line-height: 23px; } .ds-qa-answer p { margin: 0 0 12px; } .ds-qa-link { font-size: 13px; line-height: 18px; } .ds-qa-link a { color: var(--ink-2, #44527a); } .ds-qa-more { margin: 12px 0 0; font-size: 14px; font-weight: 700; line-height: 22px; } .ds-swin a:not(.ds-tab):not(.ds-sdl) { color: var(--ink, #1b2648); text-decoration: underline; text-decoration-color: var(--select-edge, #98afda); text-decoration-thickness: 1px; text-underline-offset: 3px; } .ds-swin a:not(.ds-tab):not(.ds-sdl):hover { color: var(--portal, #1f63d6); text-decoration-color: currentColor; } .ds-swin a:not(.ds-tab):not(.ds-sdl):active { color: var(--frame, #3e527c); }"
     },

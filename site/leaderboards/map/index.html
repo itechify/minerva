@@ -53,10 +53,25 @@
             <p class="lb-back"><a href="/leaderboards/">All Map Leaderboards</a></p>
             <p class="lb-street" id="map-street"></p>
             <h1 id="map-name">Map Leaderboard</h1>
-            <figure class="lb-picture" id="map-picture" aria-label="Map picture">
-              <img id="map-image" alt="" loading="lazy" fetchpriority="low" decoding="async" referrerpolicy="no-referrer" />
-              <p id="map-picture-status" role="status">Loading map…</p>
-            </figure>
+            <!-- The picture, and beside it (under it on a phone) the map's Map Loot (ADR 0033), as
+                 tall as the picture, its Items scrolling inside. -->
+            <div class="lb-picture-row">
+              <figure class="lb-picture" id="map-picture" aria-label="Map picture">
+                <img id="map-image" alt="" loading="lazy" fetchpriority="low" decoding="async" referrerpolicy="no-referrer" />
+                <p id="map-picture-status" role="status">Loading map…</p>
+              </figure>
+              <section class="lb-loot" id="loot" aria-labelledby="loot-title" hidden>
+                <h2 class="lb-loot-title" id="loot-title">Hourly Loot (Estimate)</h2>
+                <p class="lb-loot-label" id="loot-mesos-label" hidden>Mesos</p>
+                <p class="lb-loot-mesos" id="loot-mesos-row" hidden><span class="lb-loot-meso" id="loot-meso" aria-hidden="true"></span><span id="loot-mesos"></span></p>
+                <p class="lb-loot-line" id="loot-line">Loading…</p>
+                <div class="lb-loot-items" id="loot-items" hidden>
+                  <p class="lb-loot-head" aria-hidden="true">Items</p>
+                  <ul id="loot-list" aria-label="Items"></ul>
+                </div>
+                <p class="lb-loot-daily" id="loot-daily" hidden>Updated daily based on player data</p>
+              </section>
+            </div>
             <nav class="lb-bands" id="bands" aria-label="Level Bands" hidden></nav>
             <nav class="lb-kinds" id="kinds" aria-label="Solo or party entries" hidden></nav>
           </header>
@@ -106,7 +121,7 @@
 
           <section class="lb-questions stop" id="questions" data-mini="Questions" aria-labelledby="questions-title">
             <h2 id="questions-title">How they work</h2>
-            <div class="qa-list" data-qa="leaderboard-link level-bands leaderboard-exp report-entry" data-group="leaderboards"></div>
+            <div class="qa-list" data-qa="leaderboard-link level-bands leaderboard-exp map-loot report-entry" data-group="leaderboards"></div>
           </section>
         </div>
       </main>

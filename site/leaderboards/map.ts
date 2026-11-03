@@ -1,9 +1,10 @@
-// A map's page (leaderboards/map/index.html): its Level Bands, one band's top 50, each
-// entry's EXP/h on its lane, the linked Character's entry marked with the You Yellow star
-// and its rank, and a report link on each other entry. A click on a Level Band switches the
+// A map's page (leaderboards/map/index.html): its Map Loot beside its picture, its Level Bands,
+// one band's top 50, each entry's EXP/h on its lane, the linked Character's entry marked with
+// the You Yellow star and its rank, and a report link on each other entry. A click on a Level Band switches the
 // page to it in place, the Characters in both bands sliding to their new rank. Where it
 // opens and what it shows are worked out in leaderboards.ts.
 import { make, reducedMotion, svgEl } from "../../src/dom.ts";
+import type { MapLootAnswer } from "../entries.ts";
 import { STAR } from "../star.ts";
 import { BAND_PORTRAIT, byId, characterLink, crown, drawKindLinks, jobWithIcon, names, partyMark, portraitImage, read, said as saidWith, unreachable } from "./api.ts";
 import {
@@ -13,10 +14,13 @@ import {
   type Kind,
   type Link,
   linkTo,
+  lootPanel,
   type MapAnswer,
   type MapPlace,
   mapPage,
   mapPicture,
+  type MesoTier,
+  mesosCounted,
   morphNames,
   NO_MAP,
   placeOf,
@@ -39,6 +43,8 @@ let mapAnswer: MapAnswer | null = null;
 let shown: Row[] = [];
 /** The band the page shows, or is switching to. */
 let wanted: number | null = null;
+/** The map's Map Loot, once read. */
+let loot: MapLootAnswer | null = null;
 
 /** What the page says in place of the leaderboard: why there isn't one, or what's loading. */
 function say(text: Said | string) {
@@ -89,6 +95,134 @@ function drawHead(place: MapPlace) {
   document.title = `${place.name} · Map Leaderboard · Minerva`;
   // Pictures load independently: a missing picture never holds up the rankings.
   showPicture(place);
+  showLoot(place);
+}
+
+/** The map's Map Loot beside its picture, its room kept while it's read. */
+async function showLoot(place: MapPlace) {
+  byId("loot").hidden = false;
+  loot = await read<MapLootAnswer>(`/api/maps/${place.id}/loot`);
+  if (loot === null) {
+    byId("loot-line").textContent = "Can't load the loot right now.";
+    return;
+  }
+  drawLoot();
+}
+
+/** The kind whose Map Loot the panel shows and its mesos an hour, once drawn: a switch drops the
+ *  Items in only when they change, and counts the figure on from there. */
+let lootShown: { kind: Kind | null; perHour: number } | null = null;
+/** How many times the panel was drawn: a drop or count from an earlier draw stops. */
+let draws = 0;
+
+/** The Map Loot of the kind the boards show, its Items dropping in when it first fills and when
+ *  the kind changes. */
+function drawLoot() {
+  if (loot === null || place === null) return;
+  const panel = lootPanel(loot, link.kind, place.name);
+  const drop = lootShown?.kind !== link.kind && panel.perHour !== null && !reducedMotion().matches;
+  const from = lootShown?.perHour ?? 0;
+  lootShown = { kind: link.kind, perHour: panel.perHour ?? 0 };
+  draws++;
+  const figure = byId("loot-mesos");
+  figure.textContent = panel.figure;
+  const mesos = byId("loot-mesos-row");
+  mesos.classList.toggle("lb-loot-waiting", panel.waiting);
+  mesos.hidden = false;
+  byId("loot-mesos-label").hidden = false;
+  const meso = byId("loot-meso");
+  // The drop is the same element from draw to draw: an earlier drop's moves end with it.
+  for (const move of meso.getAnimations()) move.cancel();
+  meso.hidden = panel.tier === null;
+  if (panel.tier !== null) meso.style.backgroundImage = `url("${MESO_ART[panel.tier]}")`;
+  const line = byId("loot-line");
+  line.textContent = panel.line ?? "";
+  line.hidden = panel.line === null;
+  byId("loot-daily").hidden = false;
+  byId("loot-items").hidden = panel.items.length === 0;
+  const list = byId("loot-list");
+  list.replaceChildren(
+    ...panel.items.map((item) => {
+      const row = make("li");
+      const icon = make("img");
+      icon.src = item.icon;
+      icon.alt = "";
+      icon.loading = "lazy";
+      icon.decoding = "async";
+      icon.referrerPolicy = "no-referrer";
+      const name = make("a", "", item.name);
+      name.href = item.href;
+      name.title = `${item.name} on maplestory.market`;
+      row.append(icon, name, make("b", "", item.rate));
+      return row;
+    }),
+  );
+  if (drop) dropIn(list, meso, figure, from, panel.perHour!);
+}
+
+/** The game's meso drops, each four frames of 34px (site/art/mesos). */
+const MESO_ART: Record<MesoTier, string> = {
+  bronze: new URL("../art/mesos/bronze.png", import.meta.url).href,
+  gold: new URL("../art/mesos/gold.png", import.meta.url).href,
+  bills: new URL("../art/mesos/bills.png", import.meta.url).href,
+  bag: new URL("../art/mesos/bag.png", import.meta.url).href,
+};
+/** A meso drop's frames, turning as it falls, as the game turns it; at rest, the second. */
+const MESO_TURN: Keyframe[] = [{ backgroundPositionX: "0px" }, { backgroundPositionX: "-136px" }];
+const MESO_TURN_TIMING: KeyframeAnimationOptions = { duration: 480, easing: "steps(4)", iterations: 560 / 480 };
+
+/** How an Item drops into its row (DESIGN.md, Motion, Loot drop): as a drop does in the game,
+ *  popped up from where it's let go, falling onto its row, one small bounce, and still. Each
+ *  stretch has its own easing: slowing as it rises, speeding as it falls. */
+const DROP: Keyframe[] = [
+  { transform: "translateY(-12px)", opacity: 0, easing: "cubic-bezier(0.25, 0.6, 0.4, 1)" },
+  { offset: 0.3, transform: "translateY(-24px)", opacity: 1, easing: "cubic-bezier(0.6, 0, 0.85, 0.5)" },
+  { offset: 0.72, transform: "none", easing: "cubic-bezier(0.25, 0.6, 0.4, 1)" },
+  { offset: 0.86, transform: "translateY(-4px)", easing: "cubic-bezier(0.6, 0, 0.85, 0.5)" },
+  { transform: "none", opacity: 1 },
+];
+/** An Item's name and rate, there as its icon lands. */
+const LANDED: Keyframe[] = [{ opacity: 0 }, { offset: 0.66, opacity: 0 }, { offset: 0.8, opacity: 1 }, { opacity: 1 }];
+const DROP_MS = 560;
+/** Between one Item's drop and the next's, most first. */
+const DROP_STAGGER_MS = 70;
+/** How long the figure counts. */
+const COUNT_MS = 700;
+/** How long the drop waits for the icons it drops, so none falls empty. */
+const ICONS_WAIT_MS = 400;
+
+/** Drop the mesos beside the figure, turning as they fall, then the Items the list shows into
+ *  their rows, most first, as the figure counts from `from` to `to`. The Items under the
+ *  list's fold are there at once. */
+async function dropIn(list: HTMLElement, meso: HTMLElement, figure: HTMLElement, from: number, to: number) {
+  const draw = draws;
+  const box = list.parentElement!;
+  const fold = box.getBoundingClientRect().top + box.clientHeight;
+  const rows = [...list.children].filter((row) => row.getBoundingClientRect().top < fold);
+  // The mesos drop alone; each Item with its name and rate.
+  const falling: Element[][] = [[meso], ...rows.map((row) => [...row.children])];
+  const moves = falling.flatMap(([icon, ...words], i) => {
+    const timing: KeyframeAnimationOptions = { duration: DROP_MS, delay: i * DROP_STAGGER_MS, fill: "backwards" };
+    return [icon.animate(DROP, timing), ...words.map((word) => word.animate(LANDED, timing))];
+  });
+  moves.push(meso.animate(MESO_TURN, MESO_TURN_TIMING));
+  for (const move of moves) move.pause();
+  figure.textContent = mesosCounted(from, to, 0);
+  const icons = rows.map((row) => (row.firstElementChild as HTMLImageElement).decode().catch(() => {}));
+  await Promise.race([Promise.all(icons), new Promise((done) => setTimeout(done, ICONS_WAIT_MS))]);
+  if (draw !== draws) {
+    for (const move of moves) move.cancel();
+    return;
+  }
+  for (const move of moves) move.play();
+  const start = performance.now();
+  const count = (now: number) => {
+    if (draw !== draws) return;
+    const t = (now - start) / COUNT_MS;
+    figure.textContent = mesosCounted(from, to, t);
+    if (t < 1) requestAnimationFrame(count);
+  };
+  requestAnimationFrame(count);
 }
 
 /** There's no map to show: the page's title alone, the owl lost, and why, with the way to
@@ -96,6 +230,7 @@ function drawHead(place: MapPlace) {
 function noMap(why: Said) {
   byId("map-street").hidden = true;
   byId("map-picture").hidden = true;
+  byId("loot").hidden = true;
   byId("lost").hidden = false;
   say(why);
 }
@@ -288,6 +423,7 @@ async function switchTo(to: Link, href: string | null, animate: boolean) {
     link = to;
     drawBands(page.bands);
     drawKinds();
+    drawLoot();
     shown = [];
     byId("table").hidden = true;
     byId("band-title").hidden = true;
@@ -313,6 +449,7 @@ async function switchTo(to: Link, href: string | null, animate: boolean) {
     link = to;
     drawBands(mapPage(link, names, mapAnswer!).bands);
     drawKinds();
+    drawLoot();
     drawBand(band, morph, grow);
     byId("switched").textContent = byId("caption").textContent || said.textContent || "";
   };

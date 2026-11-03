@@ -14,6 +14,7 @@ import {
   isName,
   type Kind,
   type LatestAnswer,
+  type MapLootAnswer,
   type MapMark,
   type PedestalsAnswer,
   type PortraitAnswer,
@@ -515,6 +516,80 @@ export function mapPicture(manifest: unknown, map: string): string | null {
   if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) return null;
   const hash = (manifest as Record<string, unknown>)[map];
   return typeof hash === "string" && /^[a-f0-9]{32}$/i.test(hash) ? `https://osmsdataexplorer.com/data/maps/${hash}.webp` : null;
+}
+
+/** A map's Map Loot panel (ADR 0033), beside its picture. */
+export interface LootPanel {
+  /** The middle Character's mesos an hour, as the Grind Tracker writes a rate, or "Not yet"
+   *  until 3 Characters gave the map Visits of the kind shown (`waiting`). */
+  figure: string;
+  /** The figure as a number, to count up to; `null` while `waiting`. */
+  perHour: number | null;
+  /** The meso drop beside it; `null` while `waiting`. */
+  tier: MesoTier | null;
+  waiting: boolean;
+  /** Under it, while `waiting`: what the panel waits for. */
+  line: string | null;
+  /** The Items 2 or more Characters picked up there, most first. */
+  items: LootRow[];
+}
+
+/** An Item in the panel: its name, how many an hour, its picture on OSMS, and its
+ *  maplestory.market page, as the Item Card links it. */
+export interface LootRow {
+  name: string;
+  rate: string;
+  icon: string;
+  href: string;
+}
+
+/** The referral code the app's Item Card adds to a maplestory.market link (ADR 0030). */
+const MARKET_REF = "76rbdbd7";
+
+/** An Item's rate: how many an hour, whole from one up, and below that a decimal to 2
+ *  significant figures ("0.4", "0.057"), down to "<0.001": never "0", since 2 Characters
+ *  picked it up (the Worker's 4 decimals can round a rare one to 0). */
+function itemRate(perHour: number): string {
+  if (perHour >= 1) return whole(Math.round(perHour));
+  return perHour < 0.001 ? "<0.001" : String(Number(perHour.toPrecision(2)));
+}
+
+/** An Item's picture on OSMS, by its ID. */
+const itemIcon = (id: number) => `https://osmsdataexplorer.com/data/current/images/items/${String(id).padStart(8, "0")}.png`;
+
+/** The game's four meso drops, smallest first (site/art/mesos). */
+export type MesoTier = "bronze" | "gold" | "bills" | "bag";
+
+/** Which meso drop shows beside a map's mesos an hour, as the panel writes it (3 significant
+ *  figures): a bronze coin under 10,000, a gold one under 50,000, a stack of bills under
+ *  200,000, and a bag from there. */
+export function mesoTier(perHour: number): MesoTier {
+  return perHour < 10_000 ? "bronze" : perHour < 50_000 ? "gold" : perHour < 200_000 ? "bills" : "bag";
+}
+
+/** The panel for the kind the boards show (`null`: both), on the map named `mapName`. */
+export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: string): LootPanel {
+  const figures = answer[kind ?? "both"];
+  if (figures.mesosPerHour === undefined) {
+    const how = kind === "solo" ? " solo" : kind === "party" ? " in a party" : "";
+    const line = `Mesos and items show here once 3 characters have played ${mapName}${how} for 10 minutes with Minerva.`;
+    return { figure: "Not yet", perHour: null, tier: null, waiting: true, line, items: [] };
+  }
+  const items = (figures.items ?? []).map((item) => ({
+    name: item.name,
+    rate: itemRate(item.perHour),
+    icon: itemIcon(item.id),
+    href: `https://maplestory.market/items/${item.id}?ref=${MARKET_REF}`,
+  }));
+  return { figure: rate(figures.mesosPerHour), perHour: figures.mesosPerHour, tier: mesoTier(Number(figures.mesosPerHour.toPrecision(3))), waiting: false, line: null, items };
+}
+
+/** The mesos an hour as the panel counts it up while its Items drop in, `t` of the way from
+ *  `from` (0 on the panel's first fill, or the kind shown before a switch) to `to`: on the
+ *  site's exponential ease-out (DESIGN.md, Motion), landing exactly on the panel's figure. */
+export function mesosCounted(from: number, to: number, t: number): string {
+  const along = t <= 0 ? 0 : t >= 1 ? 1 : (1 - 2 ** (-10 * t)) / (1 - 2 ** -10);
+  return rate(along === 1 ? to : from + (to - from) * along);
 }
 
 /** The Map Leaderboards page as its address names it:

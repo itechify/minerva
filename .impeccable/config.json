@@ -37,6 +37,33 @@
         ],
         "createdAt": "2026-10-25T22:30:22.666Z",
         "reason": "Claude: the clip-path is the speech bubble's tail as 3px pixel stairs (geometry, matching the pixel-art owl and the game's bubbles), not an organic contour"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "site/leaderboards/map/index.html"
+        ],
+        "createdAt": "2026-11-03T07:57:23.428Z",
+        "reason": "agent: #map-image's src is set by map.ts from OSMS's manifest at runtime; the tag predates this change"
+      },
+      {
+        "rule": "buried-raster",
+        "value": "*",
+        "files": [
+          "site/leaderboards/map/index.html"
+        ],
+        "createdAt": "2026-11-03T08:28:47.665Z",
+        "reason": "agent: #map-image sits at opacity 0 only until it loads (.lb-picture:not(.lb-in) img), then fades in; predates Map Loot"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "site/leaderboards/map/index.html"
+        ],
+        "createdAt": "2026-11-03T15:07:19.299Z",
+        "reason": "agent: both hits are flush by design. .lb-loot-head's background is the Map Loot box's tint made solid so Items scrolled under the sticky head hide; it draws no edge, and the box's 14px padding insets its text. .lb-dialog's title bar and body each carry their own padding. The rule offers no narrower value."
       }
     ]
   }

@@ -3,6 +3,7 @@
 // maintainer asks, the name itself. Uploads it reaches are refused, and every Character it
 // reaches is left out of the public reads, its entries kept for when it's lifted.
 import { type Answer, badRequest, body } from "./http";
+import { forgetBlockedMapLoot } from "./map-loot";
 
 /** Whether Block `b` reaches the Character `c` (`characters` rows, by those aliases): by its
  *  name, its Account, or the key that holds it. */
@@ -85,6 +86,8 @@ export async function block(env: Env, request: Request, name: string): Promise<A
       character.account_id,
     ),
     env.DB.prepare(`DELETE FROM reports WHERE name_key IN (${HIDDEN})`),
+    // The Map Loot of every Character it reaches goes for good (ADR 0033).
+    ...forgetBlockedMapLoot(env),
   ]);
   const reports = dismissed.meta.changes;
   const detail = [asked.name === true ? "the name too" : "", reports > 0 ? `${reports} report${reports === 1 ? "" : "s"} dismissed` : "", note]

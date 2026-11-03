@@ -717,9 +717,10 @@ changes in place, at once or with a cross-fade of at most 150ms. EXP gauge, Pace
 
 Use one authored motion per window, 150–400ms on exponential ease-out: `1 − 2^(−10t)` scaled to land exactly in script,
 `cubic-bezier(0.16, 1, 0.3, 1)` in CSS. First frames are readable. Zoom interpolates in log scale while content keeps
-its size. No loops, pulses, shimmer, timers, bounce or overshoot; doubt chip and alert dot hold still. With
-`prefers-reduced-motion: reduce`, show the final state immediately. Mark Card's dive and Deal Badges' unfold are
-specified with those components; the site's hero and minimap follow scroll, as do Pedestals' rising blocks.
+its size. No loops, pulses, shimmer, timers, bounce or overshoot (the Loot drop's one bounce aside); doubt chip and
+alert dot hold still. With `prefers-reduced-motion: reduce`, show the final state immediately. Mark Card's dive and Deal
+Badges' unfold are specified with those components; the site's hero and minimap follow scroll, as do Pedestals' rising
+blocks.
 
 - **Band morph:** same-document View Transition, 300ms. Shared Characters slide between ranks (the linked Character
   below the top 50 too); other rows cross-fade and lanes regrow from the left. Animate only transform and opacity,
@@ -735,6 +736,15 @@ specified with those components; the site's hero and minimap follow scroll, as d
   page cross-fades in 200ms and the sticky head settles. Cross-document View Transition (`site/seams.html`), transform
   and opacity only; heading width fits its words while scaling. Only pre-paint content participates, never API-filled
   content. Other links, Back/Forward, unsupported browsers and reduced motion use plain navigation.
+- **Loot drop (the one exception, the user's choice, Nov 2026):** a map's Map Loot panel drops its Items in when it
+  first fills and when Both, Solo or Party changes it, so it alone moves on arrival, bounces and loops. The meso drop
+  beside the figure falls first, turning through its four frames (120ms each) as it falls; then each Item the list
+  shows hops up and falls onto its row in 560ms, bouncing once by 4px, 70ms after the one above it, most first, over
+  the Items' head; its name and rate appear as it lands. The figure counts from 0, or from the kind shown before, in
+  700ms on the exponential ease-out. It waits up to 400ms for the icons, so none falls empty. Under the pointer, the
+  meso drop turns for as long as the pointer stays, as the game's do on the ground. Web Animations, transform, opacity
+  and the frame's position only; during a band switch the panel sits out the cross-fade. A band switch that keeps the
+  kind leaves it still; reduced motion shows the final state at once and keeps the meso drop still.
 
 ## Elevation & Depth
 
@@ -1229,70 +1239,75 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   (where the ceilings table gives it one; a map without one keeps the mark's room, so the names line up) and Map Name in
   Site Question over its street in 13px Ink Steel, how many entries it has at the right in 13px Ink Steel ("15 entries";
   in search, a quiet no-entries state), rows parted by Window Rules, the Edit Blue tint at 8% under the pointer and the
-  name Portal Blue and
-  underlined. The map Enter opens, the first found, is Selection Periwinkle with its inset Selection Edge ring, as the
-  panel marks the match Enter picks. **Where to train** is a table in the
-  band table's box, its columns set by their headers so they never move as Show all, a band or an area changes the rows
-  (Mob levels 120px, Players' best 256px, Entries 136px, the map the rest; under 900px 96, 240 and 104px): 13px Ink
-  Steel headers (Map, Mob levels, Players' best, Entries) that stay under the window's head as a long table goes by, on
-  the box's tint made solid over the lavender; each map its 19px Map Mark and name (a link to its Map Leaderboard at the
-  band) over its street, its mob levels, the band's #1 (the EXP/h bold over their name, their job and level (its icon
-  2px clear of the name), and the date, each on a line of its own in 13px Ink Steel) and its entries. A map with no
-  entries leaves Players' best empty.
-  With no entries, explain once above the table and leave the
-  figures empty. A long band folds after 15 maps behind a full-width 44px Show all row in bold link words.
-  The caption under it says how
-  far it goes. Under 640px each map is a card, its name and street beside the #1 over
-  "Mobs at Lv 22–27" and its entries, the whole card its map's link. On a touch screen the area chips are 44px
-  tall. **Latest** lists the ten newest entries in a list's inset box, each row a link to the entry on its map's page:
-  the Character's name in Site Question and their job (beside its class's icon) and level in 13px Ink Steel, over the
-  map's 19px Map Mark, its name in 13px Ink and its band; from 641px the rows share their columns (a subgrid of the
-  list), the names taking the longest one's room, so every icon and job starts at one edge down the list and a long job
-  wraps past its icon; at the right the EXP/h in 15px bold tabular figures with "EXP/h" in 13px Ink Steel, over the
-  date, so the figures read down as a column. A new #1 gets a quiet third line. Reserve ten rows while loading, feedback
-  in the first.
-  A map's page titles the map as the panel does, its street (and region) in 15px bold Ink Steel over its name in Site
-  Title in plain ink when no map is known. Its Level Bands, when it has more than one (with one, the
-  band's heading names it), are light steel buttons in a wrapping row, 6px apart, each its levels ("Lv 20–29", 14px
-  bold) over its count (12px); the band shown is Selection Periwinkle, ringed in Selection Edge. A band's table is the
-  hotkey table's inset box, up to 60em: 13px Ink Steel headers (Rank, Character, Job, Level, EXP/h, Date), rows 8px 12px
-  in 15px/22px parted by Window Rules; rank, job and date in Ink Steel, the name and EXP/h bold; the top 3's ranks
-  crowned in Crown Gold, Silver and Bronze, the figures right-aligned and written as the Grind Tracker writes them,
-  dates never wrapping; under the box a 13px Ink Steel caption saying where it stops ("Top 50 of 63 at Lv 20–29", or "12
-  entries at Lv 20–29"). **Lanes (signature of a map's page):** after EXP/h, each entry's lane, the Personal Bests
-  window's: its EXP/h drawn as the game's EXP gauge draws the bar, 10px of EXP Lime in its 1px frame grey with a white
-  inset top line and 2px corners, on one linear scale from 0 to the band's #1, whose lane runs full, so read down the
-  page the table is a chart. The column takes 24% of the table, inset 14px from the figure and 20px from the date. Over
-  it the header is a ruler at round steps (the smallest of 1, 2, 2.5 and 5 to a power of ten leaving at most five
-  under #1, so three to five past 0), each 12px figure over a frame-grey notch hanging to the
-  rows, a figure that would crowd its neighbours keeping its notch alone; the steps run down every lane as navy
-  hairlines at 9% (`rgba(30, 45, 90, 0.09)`), as the Personal Bests window's do. The lanes draw the figure again, so
-  assistive tech skips them, header and cells. The linked character's lane is on the same scale as everyone's, under the
-  "more entries" row when they're outside the top 50. From 641px to 899px, too narrow for the column, each lane goes
-  under its figure, 6px tall and the figure's width, without the ruler. Report is at each row's end, quiet: a 16px flag
-  drawn in two 1.5px strokes, as the game's small buttons draw their icons, in Ink Steel at 55% that comes up to Ink
-  Steel while its row is under the pointer and to Portal Blue while it is, named "Report Egbert's entry" with "Report"
-  as its tooltip, on a touch screen a 44px tap past its edge. With a mouse, the Date column goes from sight (its cells
-  still read by assistive tech) and each row's date is its tooltip, so a job keeps its line; a touch
-  screen, which can't point, keeps the column; the table's Reports are one Tab stop, the arrow keys moving between them,
-  and while one has the keyboard's focus the caption adds "· ↑ and ↓ move between Reports". The linked character's row
-  is Selection Periwinkle, with the You Yellow star (13px, you-edge ring) before the name, no Report (the player takes
-  their own entries off from Minerva); a bold line above the table says its rank.
-  Outside the top 50, a row saying how many entries are between ("6 more entries", 13px Ink Steel, centred) then their
-  row close the table, and the page is scrolled to it. Empty, missing and unavailable states use plain Ink Steel; an API
-  failure is said once per page with a
-  bold Try again link-style button. Empty lists link to the relevant FAQ answer. Under 640px, without portraits, each
-  row is a card, as the Personal
-  Bests window's: the rank beside the name, Report's flag (a 44px tap) and the EXP/h, over the job, which has its line
-  to itself, and under them the lane, 6px tall, the figures standing down the card's right edge, the EXP/h over "Lv 23"
-  over the date at the lane's end (with a mouse, no date, and the lane across the card's whole width); the caption
-  inside the box under a Window Rule; the table keeps its roles. With portraits, the phone band stays a table: Rank,
-  96px portrait, Character over Job (13px Ink Steel,
-  4px gap, icon kept with the first job word and level whole), EXP/h and Report. Hide lanes and dates; cells 4px apart,
-  horizontal scrolling inside the box when too narrow. A Level Band switch follows Layout, Motion. Keep focus on the
-  chosen band and announce its caption. Report opens a small
-  window on Navy Veil: setup's bar, entry, optional reason field, Cancel and Send at the right. Focus starts in the
-  reason field, on touch Cancel; after sending it moves to Close. Report semantics: ADR 0015.
+  name Portal Blue and underlined. The map Enter opens, the first found, is Selection Periwinkle with its inset
+  Selection Edge ring, as the panel marks the match Enter picks. **Where to train** is a table in the band table's box,
+  its columns set by their headers so they never move as Show all, a band or an area changes the rows (Mob levels 120px,
+  Players' best 256px, Entries 136px, the map the rest; under 900px 96, 240 and 104px): 13px Ink Steel headers (Map, Mob
+  levels, Players' best, Entries) that stay under the window's head as a long table goes by, on the box's tint made
+  solid over the lavender; each map its 19px Map Mark and name (a link to its Map Leaderboard at the band) over its
+  street, its mob levels, the band's #1 (the EXP/h bold over their name, their job and level (its icon 2px clear of the
+  name), and the date, each on a line of its own in 13px Ink Steel) and its entries. A map with no entries leaves
+  Players' best empty. With no entries, explain once above the table and leave the figures empty. A long band folds
+  after 15 maps behind a full-width 44px Show all row in bold link words. The caption under it says how far it goes.
+  Under 640px each map is a card, its name and street beside the #1 over "Mobs at Lv 22–27" and its entries, the whole
+  card its map's link. On a touch screen the area chips are 44px tall. **Latest** lists the ten newest entries in a
+  list's inset box, each row a link to the entry on its map's page: the Character's name in Site Question and their job
+  (beside its class's icon) and level in 13px Ink Steel, over the map's 19px Map Mark, its name in 13px Ink and its
+  band; from 641px the rows share their columns (a subgrid of the list), the names taking the longest one's room, so
+  every icon and job starts at one edge down the list and a long job wraps past its icon; at the right the EXP/h in 15px
+  bold tabular figures with "EXP/h" in 13px Ink Steel, over the date, so the figures read down as a column. A new #1
+  gets a quiet third line. Reserve ten rows while loading, feedback in the first. A map's page titles the map as the
+  panel does, its street (and region) in 15px bold Ink Steel over its name in Site Title in plain ink when no map is
+  known. Beside its picture, as tall as the picture's box and never taller, its **Map Loot** (ADR 0033) in the band
+  table's inset box, 272px wide, the picture narrowing to make room (under 640px, under it at the full width): "Hourly
+  Loot (Estimate)" in 14px bold Ink; then "Mesos" in 13px Ink Steel over the figure in 23px bold tabular figures,
+  written as the Grind Tracker writes a rate, beside the game's meso drop for it, the two centred on each other
+  (site/art/mesos, pixel for pixel: a bronze coin under 10,000, a gold one under 50,000, bills under 200,000, a bag from
+  there), which turns under the pointer as the game turns it; then "Items" in 13px Ink Steel over a Window Rule, and the
+  Items, most first, each its 24px OSMS icon, its name in 15px Ink (a link to its maplestory.market page, Portal Blue
+  and underlined under the pointer) and its rate in bold tabular figures at the right, whole from 1 up and a decimal to
+  2 significant figures below ("64", "0.4", "0.057"), scrolling inside the box under their head, which stays put (156px
+  of them on a phone), and dropping in, the mesos first, as Layout's Loot drop says; "Updated daily based on player
+  data" in 13px Ink Steel at its foot. It follows Both, Solo and Party. Until 3 Characters gave the map Visits of the
+  kind shown, the figure reads "Not yet" in Ink Steel, the Items go, and the line says what it waits for. With no
+  picture, it keeps the picture's height on its own. Its Level Bands, when it has more than one (with one, the band's
+  heading names it), are light steel buttons in a wrapping row, 6px apart, each its levels ("Lv 20–29", 14px bold) over
+  its count (12px); the band shown is Selection Periwinkle, ringed in Selection Edge. A band's table is the hotkey
+  table's inset box, up to 60em: 13px Ink Steel headers (Rank, Character, Job, Level, EXP/h, Date), rows 8px 12px in
+  15px/22px parted by Window Rules; rank, job and date in Ink Steel, the name and EXP/h bold; the top 3's ranks crowned
+  in Crown Gold, Silver and Bronze, the figures right-aligned and written as the Grind Tracker writes them, dates never
+  wrapping; under the box a 13px Ink Steel caption saying where it stops ("Top 50 of 63 at Lv 20–29", or "12 entries at
+  Lv 20–29"). **Lanes (signature of a map's page):** after EXP/h, each entry's lane, the Personal Bests window's: its
+  EXP/h drawn as the game's EXP gauge draws the bar, 10px of EXP Lime in its 1px frame grey with a white inset top line
+  and 2px corners, on one linear scale from 0 to the band's #1, whose lane runs full, so read down the page the table is
+  a chart. The column takes 24% of the table, inset 14px from the figure and 20px from the date. Over it the header is a
+  ruler at round steps (the smallest of 1, 2, 2.5 and 5 to a power of ten leaving at most five under #1, so three to
+  five past 0), each 12px figure over a frame-grey notch hanging to the rows, a figure that would crowd its neighbours
+  keeping its notch alone; the steps run down every lane as navy hairlines at 9% (`rgba(30, 45, 90, 0.09)`), as the
+  Personal Bests window's do. The lanes draw the figure again, so assistive tech skips them, header and cells. The
+  linked character's lane is on the same scale as everyone's, under the "more entries" row when they're outside the
+  top 50. From 641px to 899px, too narrow for the column, each lane goes under its figure, 6px tall and the figure's
+  width, without the ruler. Report is at each row's end, quiet: a 16px flag drawn in two 1.5px strokes, as the game's
+  small buttons draw their icons, in Ink Steel at 55% that comes up to Ink Steel while its row is under the pointer and
+  to Portal Blue while it is, named "Report Egbert's entry" with "Report" as its tooltip, on a touch screen a 44px tap
+  past its edge. With a mouse, the Date column goes from sight (its cells still read by assistive tech) and each row's
+  date is its tooltip, so a job keeps its line; a touch screen, which can't point, keeps the column; the table's Reports
+  are one Tab stop, the arrow keys moving between them, and while one has the keyboard's focus the caption adds "· ↑ and
+  ↓ move between Reports". The linked character's row is Selection Periwinkle, with the You Yellow star (13px, you-edge
+  ring) before the name, no Report (the player takes their own entries off from Minerva); a bold line above the table
+  says its rank. Outside the top 50, a row saying how many entries are between ("6 more entries", 13px Ink Steel,
+  centred) then their row close the table, and the page is scrolled to it. Empty, missing and unavailable states use
+  plain Ink Steel; an API failure is said once per page with a bold Try again link-style button. Empty lists link to the
+  relevant FAQ answer. Under 640px, without portraits, each row is a card, as the Personal Bests window's: the rank
+  beside the name, Report's flag (a 44px tap) and the EXP/h, over the job, which has its line to itself, and under them
+  the lane, 6px tall, the figures standing down the card's right edge, the EXP/h over "Lv 23" over the date at the
+  lane's end (with a mouse, no date, and the lane across the card's whole width); the caption inside the box under a
+  Window Rule; the table keeps its roles. With portraits, the phone band stays a table: Rank, 96px portrait, Character
+  over Job (13px Ink Steel, 4px gap, icon kept with the first job word and level whole), EXP/h and Report. Hide lanes
+  and dates; cells 4px apart, horizontal scrolling inside the box when too narrow. A Level Band switch follows Layout,
+  Motion. Keep focus on the chosen band and announce its caption. Report opens a small window on Navy Veil: setup's bar,
+  entry, optional reason field, Cancel and Send at the right. Focus starts in the reason field, on touch Cancel; after
+  sending it moves to Close. Report semantics: ADR 0015.
 - **Pedestals** (ADR 0024, amended): three Characters on steps, 2nd, 1st and 3rd from the left, each step a block in
   Inset (Inset Edge, 4px top corners) 72, 52 and 38px tall with its 14px crown and "1st" in 15px bold Ink on it, and
   over it the Character: their 96px Portrait and name in 15px bold Ink, alike on both Pedestals. Under each block, 8px
@@ -1690,8 +1705,8 @@ Guide.
 - **Do** pair colour states with a shape and words, and give controls hover, pressed and keyboard-focus states.
 - **Do** keep figures right-aligned, notes wrapping and single-line facts truncating.
 - **Do** honour reduced motion and keep a motion's first frame readable.
-- **Do** draw minimap glyphs and line controls in CSS or inline SVG; use the game's art for Map Marks and job icons,
-  pixel art for the owl and site illustrations. Keep screenshots as figures, not icons.
+- **Do** draw minimap glyphs and line controls in CSS or inline SVG; use the game's art for Map Marks, job icons and
+  meso drops, pixel art for the owl and site illustrations. Keep screenshots as figures, not icons.
 
 ### Don't:
 - **Don't** use orange, or the outlined title lettering, for anything other than their single roles.
@@ -1699,6 +1714,7 @@ Guide.
   the field or figure it names.
 - **Don't** let a click on the overlay take the keyboard from the game outside the search view, nor one on the Settings
   window outside a Change and the Deal Margin field.
-- **Don't** animate arrivals or decorate changing game readings with motion; follow Layout's motion rules.
+- **Don't** animate arrivals (the Loot drop aside) or decorate changing game readings with motion; follow Layout's
+  motion rules.
 - **Don't** float any window on a blurred drop shadow; depth is highlights, bevels and hairlines.
 - **Don't** introduce a second typeface or icon fonts.

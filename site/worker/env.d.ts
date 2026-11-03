@@ -28,6 +28,8 @@ declare namespace Cloudflare {
     MM_API_KEY?: string;
     /** The tests' made-up ceilings table, in place of osms-ceilings.json. */
     TEST_CEILINGS?: import("./ceilings").CeilingsTable;
+    /** The tests' made-up Item names table, in place of osms-item-names.json. */
+    TEST_ITEMS?: import("./items").ItemsTable;
   }
   interface GlobalProps {
     mainModule: typeof import("./index");
