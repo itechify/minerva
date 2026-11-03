@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MapLootAnswer } from "../../entries.ts";
-import { lootPanel, mesosCounted } from "../leaderboards.ts";
+import { lootPanel, MESO_POUCH, mesosCounted } from "../leaderboards.ts";
 
 /** A map's Map Loot: 12 Characters on Both, 9 solo, 2 in a party. */
 const answer: MapLootAnswer = {
@@ -29,7 +29,7 @@ describe("a map's Map Loot panel", () => {
     expect(panel.figure).toBe("41,200");
     expect(panel.perHour).toBe(41_234);
     expect(panel.waiting).toBe(false);
-    expect(panel.line).toBe("The middle of 12 characters");
+    expect(panel.line).toBeNull();
     expect(panel.items[0]).toEqual({
       name: "Pig's Head",
       rate: "64",
@@ -38,14 +38,20 @@ describe("a map's Map Loot panel", () => {
     });
   });
 
-  it("writes an Item rarer than one an hour as how many hours one takes, to the half hour, up to 100", () => {
+  it("writes an Item rarer than one an hour as a decimal, to 2 significant figures", () => {
     const rates = lootPanel(answer, null, "Pig Park").items.map((item) => item.rate);
 
-    expect(rates).toEqual(["64", "1", "1 every 2½ h", "1 every 14 h", "1 every 100+ h", "1 every 100+ h"]);
+    expect(rates).toEqual(["64", "1", "0.4", "0.07", "0.004", "0"]);
+    const rare = { ...answer, both: { characters: 12, mesosPerHour: 1, items: [{ id: 4000008, name: "Pig's Head", perHour: 0.0567 }] } };
+    expect(lootPanel(rare, null, "Pig Park").items[0].rate).toBe("0.057");
+  });
+
+  it("shows the mesos by the Mysterious Meso Pouch's icon", () => {
+    expect(MESO_POUCH).toBe("https://osmsdataexplorer.com/data/current/images/items/02028000.png");
   });
 
   it("follows the kind the boards show", () => {
-    expect(lootPanel(answer, "solo", "Pig Park")).toMatchObject({ figure: "38,000", line: "The middle of 9 characters", items: [] });
+    expect(lootPanel(answer, "solo", "Pig Park")).toMatchObject({ figure: "38,000", line: null, items: [] });
   });
 
   it("says Not yet, and what it waits for, until 3 Characters gave the map Visits of the kind", () => {

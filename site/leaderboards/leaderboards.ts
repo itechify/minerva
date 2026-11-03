@@ -526,8 +526,8 @@ export interface LootPanel {
   /** The figure as a number, to count up to; `null` while `waiting`. */
   perHour: number | null;
   waiting: boolean;
-  /** Under it: whose figure it is, or what the panel waits for. */
-  line: string;
+  /** Under it, while `waiting`: what the panel waits for. */
+  line: string | null;
   /** The Items 2 or more Characters picked up there, most first. */
   items: LootRow[];
 }
@@ -544,16 +544,17 @@ export interface LootRow {
 /** The referral code the app's Item Card adds to a maplestory.market link (ADR 0030). */
 const MARKET_REF = "76rbdbd7";
 
-/** An Item's rate: how many an hour from one up, and below that how many hours one takes, to
- *  the half hour under ten ("1 every 2½ h"), and no finer than "1 every 100+ h". */
+/** An Item's rate: how many an hour, whole from one up, and below that a decimal to 2
+ *  significant figures ("0.4", "0.057"). */
 function itemRate(perHour: number): string {
-  if (perHour >= 1) return whole(Math.round(perHour));
-  const hours = 1 / perHour;
-  if (!(hours < 100)) return "1 every 100+ h";
-  if (hours >= 10) return `1 every ${Math.round(hours)} h`;
-  const halves = Math.round(hours * 2);
-  return `1 every ${Math.floor(halves / 2)}${halves % 2 === 1 ? "½" : ""} h`;
+  return perHour >= 1 ? whole(Math.round(perHour)) : String(Number(perHour.toPrecision(2)));
 }
+
+/** An Item's picture on OSMS, by its ID. */
+const itemIcon = (id: number) => `https://osmsdataexplorer.com/data/current/images/items/${String(id).padStart(8, "0")}.png`;
+
+/** The picture beside the mesos: the Mysterious Meso Pouch's. */
+export const MESO_POUCH = itemIcon(2028000);
 
 /** The panel for the kind the boards show (`null`: both), on the map named `mapName`. */
 export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: string): LootPanel {
@@ -566,10 +567,10 @@ export function lootPanel(answer: MapLootAnswer, kind: Kind | null, mapName: str
   const items = (figures.items ?? []).map((item) => ({
     name: item.name,
     rate: itemRate(item.perHour),
-    icon: `https://osmsdataexplorer.com/data/current/images/items/${String(item.id).padStart(8, "0")}.png`,
+    icon: itemIcon(item.id),
     href: `https://maplestory.market/items/${item.id}?ref=${MARKET_REF}`,
   }));
-  return { figure: rate(figures.mesosPerHour), perHour: figures.mesosPerHour, waiting: false, line: `The middle of ${figures.characters} characters`, items };
+  return { figure: rate(figures.mesosPerHour), perHour: figures.mesosPerHour, waiting: false, line: null, items };
 }
 
 /** The mesos an hour as the panel counts it up while its Items drop in, `t` of the way from

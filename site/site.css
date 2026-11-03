@@ -2214,13 +2214,26 @@ button.icon-button:active {
   font-size: 14px;
   line-height: 20px;
 }
+/* The figure beside the Mysterious Meso Pouch, its OSMS icon pixel for pixel. */
 .lb-loot-mesos {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 32px;
   margin: 0;
   color: var(--ink);
   font-size: 23px;
   font-weight: 700;
   line-height: 30px;
   font-variant-numeric: tabular-nums;
+}
+.lb-loot-mesos[hidden] {
+  display: none;
+}
+.lb-loot-pouch {
+  flex: none;
+  width: 32px;
+  height: 32px;
 }
 .lb-loot-mesos.lb-loot-waiting {
   color: var(--ink-2);
@@ -2235,6 +2248,10 @@ button.icon-button:active {
 .lb-loot-daily {
   margin-top: auto;
   padding-top: 6px;
+}
+/* Its two halves each whole: narrow, it breaks at the dot. */
+.lb-loot-daily span {
+  white-space: nowrap;
 }
 /* The Items scroll under their head, which stays put. An Item dropping in (map.ts) flies over
    the head, as a drop pops up over the game's own windows. */
@@ -2251,10 +2268,8 @@ button.icon-button:active {
 .lb-loot-head {
   position: sticky;
   top: 0;
-  display: flex;
-  justify-content: space-between;
   margin: 0;
-  padding: 0 6px 3px 0;
+  padding-bottom: 3px;
   border-bottom: 1px solid var(--rule);
   background: color-mix(in srgb, #fff 55%, var(--body-solid));
   color: var(--ink-2);
