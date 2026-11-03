@@ -10,7 +10,7 @@ use crate::loader::Saved;
 use crate::map_index::SourceError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// OSMS's item files as fetched: each file's text, unread. Saved and swapped whole.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,6 +158,13 @@ impl ItemSet {
             scrolls: count(|item| item.kind == "Scroll"),
             scrolls_without_tier: count(|item| item.kind == "Scroll" && item.tier.is_none()),
         }
+    }
+
+    /// The Items Map Loot can send (ADR 0033), by ID with its name: every one but the Cash
+    /// Shop's. `probe ceilings` writes it as the site's Item names table, which the Worker
+    /// checks a sent ID against.
+    pub fn loot_names(&self) -> BTreeMap<u32, &str> {
+        self.items.iter().filter(|item| item.shop != ShopPrice::Cash).map(|item| (item.id, item.name.as_str())).collect()
     }
 
     /// Every item, in the files' order.
