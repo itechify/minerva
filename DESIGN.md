@@ -1264,7 +1264,7 @@ The site's shared window, composition and breakpoints are in Layout; reading rol
   A map's page titles the map as the panel does, its street (and region) in 15px bold Ink Steel over its name in Site
   Title in plain ink when no map is known. Beside its picture, as tall as the picture's box and never taller, its **Map
   Loot** (ADR 0033) in the band table's inset box, 272px wide, the picture narrowing to make room (under 640px, under
-  it at the full width): "Estimated Hourly Loot" in 14px bold Ink; then "Mesos" in 13px Ink Steel over the figure in
+  it at the full width): "Hourly Loot (Estimate)" in 14px bold Ink; then "Mesos" in 13px Ink Steel over the figure in
   23px
   bold tabular figures, written as the Grind Tracker writes a rate, beside the game's meso drop for it (site/art/mesos,
   pixel for pixel: a bronze coin under 10,000, a gold one under 50,000, bills under 200,000, a bag from there), which
