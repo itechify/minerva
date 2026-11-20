@@ -32,6 +32,15 @@
             <button type="button" class="text-button" id="hotkeys-reset" data-focus="reset">Restore defaults</button>
           </div>
           <div class="settings-head">
+            <h3 class="settings-heading" id="opacity-heading">Opacity</h3>
+            <p class="settings-intro" id="opacity-intro">Sets how solid the panel and the Grind Tracker look over the game. Lower it to see more of the game through them. Each one turns solid again while your pointer is over it.</p>
+          </div>
+          <div class="window-opacity" role="group" aria-labelledby="opacity-heading" aria-describedby="opacity-intro">
+            <label class="action" for="window-opacity">Opacity</label>
+            <input type="range" id="window-opacity" min="30" max="100" step="5" data-focus="window-opacity" />
+            <output class="window-opacity-value" id="window-opacity-value" for="window-opacity"></output>
+          </div>
+          <div class="settings-head">
             <h3 class="settings-heading">Market Prices</h3>
             <p class="settings-intro" id="market-intro">Shows the Going rate and Cheapest now from maplestory.market on each Item Card, and lets the Deal Finder compare shop prices with them. Minerva asks owlofminerva.app for the prices of the items you look at, and only sends their item numbers. Turn this off and it stops asking.</p>
           </div>

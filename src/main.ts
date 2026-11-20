@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { dayText } from "./dates";
-import { byId, cardTop, span } from "./dom";
+import { byId, cardTop, setWindowOpacity, span } from "./dom";
 import { LOADING_MAP_LIST, TITLE_LOST, recognitionProblem, type Recognition } from "./recognition";
 import type { ExpTracking } from "./exp-tracking";
 import { levels, whole } from "./figures";
@@ -125,6 +125,8 @@ type PanelState = {
   expanded: boolean;
   /** Mirror of `minerva_core::CollapsedSections`: the sections collapsed to their heading. */
   collapsedSections: Record<Section, boolean>;
+  /** How solid the panel is drawn, in percent (Settings' Opacity), but under the pointer. */
+  windowOpacityPercent: number;
   gameFound: boolean;
   placementMode: PlacementMode;
   layer: "onTop" | "hidden";
@@ -1040,6 +1042,7 @@ function render(panel: PanelState) {
   document.body.classList.toggle("hidden", panel.layer === "hidden");
   document.body.classList.toggle("collapsed", !panel.expanded);
   document.body.classList.toggle("draggable", panel.draggable);
+  setWindowOpacity(panel.windowOpacityPercent);
   document.body.classList.toggle("unreadable", !current);
   // Not sure of the map, or of which map sharing its title: the facts shown are a guess.
   const doubtful = !!current && (notSure || (!!panel.candidates && !panel.candidates.chosen));

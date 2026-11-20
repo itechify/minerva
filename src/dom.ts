@@ -27,6 +27,12 @@ export function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Recor
   return el;
 }
 
+/** Draw this window `percent` solid (Settings' Opacity), but while the pointer is over it:
+ *  styles.css fades the whole body by it. */
+export function setWindowOpacity(percent: number) {
+  document.documentElement.style.setProperty("--window-opacity", String(percent / 100));
+}
+
 let motion: MediaQueryList | undefined;
 /** Whether the player asks for reduced motion, as one query to read or to watch. */
 export const reducedMotion = () => (motion ??= matchMedia("(prefers-reduced-motion: reduce)"));

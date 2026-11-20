@@ -21,6 +21,20 @@ body {
   font-family: var(--font);
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+  /* Settings' Opacity: the panel and the Grind Tracker set it (from 0.3), and every other
+     window keeps it at 1. The whole window fades, and is solid again under the pointer. */
+  opacity: var(--window-opacity, 1);
+  transition: opacity 120ms ease-out;
+}
+
+body:hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
 }
 
 [hidden] {

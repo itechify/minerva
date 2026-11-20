@@ -94,6 +94,9 @@ pub struct Settings {
     /// Going rate and Cheapest now, and the Deal Finder may judge against them. Off, Minerva
     /// asks for none. Files from before it have it on.
     pub market_prices: bool,
+    /// How solid the panel and the Grind Tracker are drawn over the game, in percent (Settings'
+    /// Opacity slider, 30 to 100). Files from before it have them fully solid.
+    pub window_opacity_percent: u32,
 }
 
 impl Default for Settings {
@@ -122,6 +125,7 @@ impl Default for Settings {
             link_prompt_dismissed: false,
             loot_open: false,
             market_prices: true,
+            window_opacity_percent: 100,
         }
     }
 }

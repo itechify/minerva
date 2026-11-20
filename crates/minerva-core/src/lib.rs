@@ -265,6 +265,10 @@ pub struct PanelState {
     pub expanded: bool,
     /// The sections the player collapsed to their headings.
     pub collapsed_sections: CollapsedSections,
+    /// How solid the panel and the Grind Tracker are drawn over the game, in percent (Settings'
+    /// Opacity slider, 30 to 100). Their pages fade the whole window by it, and show it solid
+    /// while the pointer is over it.
+    pub window_opacity_percent: u32,
     /// A visible game window was found (not minimised).
     pub game_found: bool,
     /// Where the player wants the panel: inside, docked or detached.
@@ -531,6 +535,10 @@ pub enum PanelControl {
 
 /// The most the Deal Margin can be, in percent.
 const MAX_DEAL_MARGIN: u32 = 99;
+
+/// How solid Settings' Opacity slider can draw the panel and the Grind Tracker, in percent:
+/// no fainter than this, so they are never lost over the game, and at most fully solid.
+const WINDOW_OPACITY: std::ops::RangeInclusive<u32> = 30..=100;
 
 /// The region on screen a capture of `frame` from `origin` (its top-left pixel) was of.
 /// How many of the captures where the Pickup Log's stack shifted lines in are held (10 captures a
@@ -1274,6 +1282,9 @@ impl Minerva {
             Action::ToggleDealFinder => self.deal_finder.toggle(),
             Action::SetDealMargin { percent } => self.settings.deal_margin_percent = percent.min(MAX_DEAL_MARGIN),
             Action::SetGrindTracker { on } => self.settings.grind_tracker_on = on,
+            Action::SetWindowOpacity { percent } => {
+                self.settings.window_opacity_percent = percent.clamp(*WINDOW_OPACITY.start(), *WINDOW_OPACITY.end());
+            }
             Action::OpenDealItem { row } => self.open_deal_item(row),
         }
         self.sync_panel()
@@ -2213,6 +2224,7 @@ impl Minerva {
             _ => {}
         }
         settings.deal_margin_percent = settings.deal_margin_percent.min(MAX_DEAL_MARGIN);
+        settings.window_opacity_percent = settings.window_opacity_percent.clamp(*WINDOW_OPACITY.start(), *WINDOW_OPACITY.end());
         settings.version = settings::VERSION;
         self.panel.expanded = settings.expanded;
         self.panel.inside_offset = settings.inside_offset;
@@ -2479,6 +2491,7 @@ impl Minerva {
         self.panel.avoid = [self.title_area(), status_bar, exp_figures].into_iter().flatten().collect();
         self.state.expanded = self.panel.expanded;
         self.state.collapsed_sections = self.settings.collapsed_sections;
+        self.state.window_opacity_percent = self.settings.window_opacity_percent;
         self.state.game_found = self.panel.game.is_some();
         self.state.placement_mode = self.panel.mode;
         self.state.panel_width = self.panel.width;

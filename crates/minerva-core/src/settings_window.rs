@@ -1,5 +1,5 @@
-//! The Settings window (GLOSSARY): the hotkeys, the Deal Margin, the Grind Tracker's switch,
-//! Game Data and Updates, in a window of its own over the game. The gear at the top of the
+//! The Settings window (GLOSSARY): the hotkeys, Opacity, the Deal Margin, the Grind Tracker's
+//! switch, Game Data and Updates, in a window of its own over the game. The gear at the top of the
 //! panel opens it and closes it again, as its own × does, and setup's Change hotkeys opens
 //! it. Each launch starts with it closed.
 //!

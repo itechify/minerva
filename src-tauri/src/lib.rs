@@ -1427,6 +1427,7 @@ mod tests {
             (r#"{"openDealItem":{"row":2}}"#, Action::OpenDealItem { row: 2 }),
             (r#"{"setDealMargin":{"percent":15}}"#, Action::SetDealMargin { percent: 15 }),
             (r#"{"setGrindTracker":{"on":false}}"#, Action::SetGrindTracker { on: false }),
+            (r#"{"setWindowOpacity":{"percent":60}}"#, Action::SetWindowOpacity { percent: 60 }),
             (r#""checkForUpdates""#, Action::CheckForUpdates),
             (r#""updateNow""#, Action::UpdateNow),
             (r#""updateWhenIQuit""#, Action::UpdateWhenIQuit),

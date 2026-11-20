@@ -31,6 +31,7 @@ export const page = (window: Window, more: Partial<SettingsPage> = {}) =>
     invalidHotkeys: [],
     marginPercent: 10,
     grindTrackerOn: true,
+    windowOpacityPercent: 100,
     checksOn: true,
     marketPrices: true,
     dealLines: [
