@@ -35,8 +35,15 @@ describe("a map's name", () => {
       region: "",
       known: false,
     });
-    // The fixture has a map with no name or street.
-    expect(placeOf(names, "010006121").known).toBe(false);
+  });
+
+  it("leaves out a map with no name or street, as the panel does", () => {
+    const madeUp = mapNames([
+      { id: 100000000, street_name: "Made-up Street", name: "", region: "Other" },
+      { id: 100000001, street_name: " ", name: "Made-up Field", region: "Other" },
+    ]);
+    expect(placeOf(madeUp, "100000000").known).toBe(false);
+    expect(placeOf(madeUp, "100000001").known).toBe(false);
   });
 });
 
@@ -68,6 +75,9 @@ describe("map search", () => {
       "Ant Tunnel II (010005061)",
       "Ant Tunnel III (010005062)",
       "Ant Tunnel IV (010005063)",
+      "Decayed Tunnel I (010006120)",
+      "Decayed Tunnel II (010006130)",
+      "Decayed Tunnel III (010006140)",
       "Deep Ant Tunnel I (010005066)",
       "Deep Ant Tunnel II (010005067)",
     ]);
