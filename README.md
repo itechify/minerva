@@ -45,7 +45,7 @@ All probe modes and options, including `record`, `item`, `loot` and `update-mani
 
 Run the game windowed or borderless, with the minimap open.
 
-When play shows a portal the Map Preview's rule gets wrong, add it to the override list in `crates/minerva-core/src/portal_overrides.rs`, by map ID and the portal's name in OSMS's `portals.json`.
+When play shows a portal the Map Preview's rule gets wrong, add it to the override list in `crates/minerva-core/src/portal_overrides.rs`, by map ID and the portal's name in OSMS's `portals.json`. A portal OSMS gives the dead end (`999999999`), though it leads somewhere, as a script portal does, gets its destination in the same file's `PORTAL_DESTINATIONS`.
 
 ## Credits
 
