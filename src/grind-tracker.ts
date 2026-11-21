@@ -1,5 +1,5 @@
 import "./errors";
-import { byId, span } from "./dom";
+import { byId, setWindowOpacity, span } from "./dom";
 import type { Character, ExpRate, ExpTracking, Loot, PacePoint, PaceTrace } from "./exp-tracking";
 import { percent, rate, whole } from "./figures";
 import { dragByHandles, followView, heightReporter, pressControls } from "./shell";
@@ -17,6 +17,8 @@ export type TrackerView = {
   pickupLogCovered: boolean;
   /** The Loot section is open, as the player left it. */
   lootOpen: boolean;
+  /** How solid the window is drawn, in percent (Settings' Opacity), but under the pointer. */
+  windowOpacityPercent: number;
 };
 
 
@@ -137,6 +139,7 @@ function render(view: TrackerView) {
   const { tracking: t, personalBests, personalBestsOpen } = view;
   // Not showing, the window draws nothing (the shell lets clicks through it).
   document.body.classList.toggle("hidden", !view.shown);
+  setWindowOpacity(view.windowOpacityPercent);
   // Hidden, not greyed, while no map has a best to show; pressed while their window is open.
   openBests.hidden = !personalBests;
   openBests.setAttribute("aria-pressed", String(personalBestsOpen));

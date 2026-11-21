@@ -1,5 +1,5 @@
-//! The Settings window, beside the panel: the hotkeys, the Deal Margin, the Grind Tracker's
-//! switch, Game Data and Updates. Clickable while it shows, and dragged by its bar. One of
+//! The Settings window, beside the panel: the hotkeys, Opacity, the Deal Margin, the Grind
+//! Tracker's switch, Game Data and Updates. Clickable while it shows, and dragged by its bar. One of
 //! our windows over the game ([`crate::panel_window`]); this says what its page renders,
 //! and relays the key presses and the keyboard leaving it.
 //!
@@ -54,6 +54,8 @@ struct SettingsPage<'a> {
     checks_on: bool,
     /// "Prices from maplestory.market".
     market_prices: bool,
+    /// The Opacity slider: how solid the panel and the Grind Tracker are drawn, in percent.
+    window_opacity_percent: u32,
     /// What the Deal Line may be, the chosen one marked.
     deal_lines: &'a [DealLineChoice],
     game_data: &'a GameData,
@@ -73,6 +75,7 @@ pub fn sync(window: &mut PanelWindow, state: &PanelState) {
         grind_tracker_on: state.grind_tracker.on,
         checks_on: state.updates.checks_on,
         market_prices: state.deal_finder.market_prices,
+        window_opacity_percent: state.window_opacity_percent,
         deal_lines: &state.deal_finder.choices,
         game_data: &state.game_data,
     };

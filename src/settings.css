@@ -53,6 +53,7 @@
    or how a Refresh is going, and Refresh), each laid out as a hotkey's row is. */
 .deal-margin,
 .grind-switch,
+.window-opacity,
 .game-data,
 .hotkey-rows {
   border: 1px solid var(--inset-edge);
@@ -63,6 +64,7 @@
 
 .deal-margin,
 .grind-switch,
+.window-opacity,
 .game-data {
   display: flex;
   align-items: center;
@@ -74,9 +76,34 @@
 }
 
 .deal-margin .action,
-.grind-switch .action {
+.grind-switch .action,
+.window-opacity .action {
   line-height: 16px;
   color: var(--ink-2);
+}
+
+/* Opacity: its name, a slider taking the room between, and the figure, right-aligned in a
+   fixed width so the slider doesn't shift as it changes. */
+.window-opacity input {
+  flex: 1;
+  min-width: 0;
+  height: 21px;
+  margin: 0;
+  accent-color: var(--edit);
+  cursor: pointer;
+}
+
+.window-opacity input:focus-visible {
+  outline: 2px solid var(--edit);
+  outline-offset: 1px;
+}
+
+.window-opacity-value {
+  width: 4ch;
+  padding-right: 2px;
+  text-align: right;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .deal-margin-field {

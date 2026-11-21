@@ -36,6 +36,8 @@ export type SettingsPage = {
   marginPercent: number;
   /** The Grind Tracker's switch: the EXP figures are read. */
   grindTrackerOn: boolean;
+  /** Opacity: how solid the panel and the Grind Tracker are drawn, in percent (30 to 100). */
+  windowOpacityPercent: number;
   /** "Check for updates". */
   checksOn: boolean;
   /** "Prices from maplestory.market". */
@@ -59,6 +61,8 @@ const hotkeysUndo = byId("hotkeys-undo") as HTMLButtonElement;
 const hotkeysReset = byId("hotkeys-reset") as HTMLButtonElement;
 const dealMargin = byId("deal-margin") as HTMLInputElement;
 const grindTrackerOn = byId("grind-tracker-on") as HTMLInputElement;
+const windowOpacity = byId("window-opacity") as HTMLInputElement;
+const windowOpacityValue = byId("window-opacity-value");
 const checkForUpdatesOn = byId("check-for-updates-on") as HTMLInputElement;
 const marketPricesOn = byId("market-prices-on") as HTMLInputElement;
 const dealLineChoices = byId("deal-line-choices");
@@ -253,7 +257,7 @@ function takeKeys(view: SettingsWindow) {
  * Changing one, its row waits for the new keys, which the keys pressed now are (see the
  * keydown handler below), with its instruction, or why the keys pressed were refused, under
  * it. Every change is saved at once, and the line by Restore defaults says so. The rows are
- * drawn anew on every change, so the focus is put back where it was. Then maplestory.market's
+ * drawn anew on every change, so the focus is put back where it was. Then Opacity, maplestory.market's
  * switch, the Deal Line and the Deal Margin, the Grind Tracker's switch, Game Data and Updates.
  */
 function render(page: SettingsPage) {
@@ -275,6 +279,8 @@ function render(page: SettingsPage) {
   // The Deal Margin as saved, unless the player is typing one.
   if (document.activeElement !== dealMargin) dealMargin.value = String(page.marginPercent);
   grindTrackerOn.checked = page.grindTrackerOn;
+  // Opacity as saved, unless the player is dragging the slider.
+  if (!draggingOpacity) showOpacity(page.windowOpacityPercent);
   checkForUpdatesOn.checked = page.checksOn;
   marketPricesOn.checked = page.marketPrices;
   const linesRedrawn = changed("deal-lines", page.dealLines);
@@ -362,6 +368,25 @@ dealMargin.addEventListener("keydown", (e) => {
   }
 });
 grindTrackerOn.addEventListener("change", () => invoke("act", { action: { setGrindTracker: { on: grindTrackerOn.checked } } }));
+
+/** The slider is held: the page doesn't move it back to the figure saved a step behind. */
+let draggingOpacity = false;
+
+/** The Opacity slider and its figure at `percent`. */
+function showOpacity(percent: number) {
+  windowOpacity.value = String(percent);
+  windowOpacityValue.textContent = `${percent}%`;
+}
+
+windowOpacity.addEventListener("pointerdown", () => (draggingOpacity = true));
+window.addEventListener("pointerup", () => (draggingOpacity = false));
+window.addEventListener("pointercancel", () => (draggingOpacity = false));
+// Each step is saved as the slider moves, so the panel and the Grind Tracker follow it live.
+windowOpacity.addEventListener("input", () => {
+  const percent = Number(windowOpacity.value);
+  windowOpacityValue.textContent = `${percent}%`;
+  invoke("act", { action: { setWindowOpacity: { percent } } });
+});
 /** One thing the Deal Line may be: a radio and its name, choosing it with a click. */
 function dealLineChoice(choice: DealLineChoice): HTMLLabelElement {
   const label = document.createElement("label");

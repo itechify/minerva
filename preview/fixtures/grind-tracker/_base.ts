@@ -55,5 +55,6 @@ export const view = (tracking: Tracking, more: Partial<TrackerView> = {}) =>
     personalBestsOpen: false,
     pickupLogCovered: false,
     lootOpen: false,
+    windowOpacityPercent: 100,
     ...more,
   }) satisfies TrackerView;

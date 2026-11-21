@@ -564,6 +564,9 @@ everyone else's; their star identifies them.
 (ADR 0014). Gold has dark ink and a bright top shine; the doubt chip has amber and white lettering.
 
 **The Over the Game, See-Through Rule.** Windows over the game use glass; desktop windows use opaque lavender.
+The player's Opacity (Settings) fades the panel and the Grind Tracker as whole windows, ink and pictures with the
+glass, down to 30%; under the pointer each is solid again (a 120ms fade, none with reduced motion). The reading
+windows (Item Card, Owl Bubble, Deal Badges, Settings, Personal Bests) stay as drawn.
 
 **The Two Inks Rule.** Glass uses near-black Panel Ink, lavender navy Ink. Set the panel's own colour explicitly so
 figures cannot inherit the body's navy.
@@ -1659,7 +1662,11 @@ player guidance in the FAQ's Setup & hotkeys answers.
 - **Actions:** the last change in 12px Panel Ink Steel , then Undo while Restore
   defaults can be undone, then Restore defaults, right-aligned; the line takes a row of its own above them when it would
   be squeezed.
-- **Market Prices and the Deal Line:** under the hotkeys, "Market Prices" over one line on what it does and sends, and a
+- **Opacity:** under the hotkeys' actions, "Opacity" over one line on what it fades, then an inset box as the
+  switches': "Opacity" in 13px Panel Ink Steel, an Edit Blue range slider (30 to 100%, steps of 5) taking the room
+  between, and the figure in bold Panel Ink, right-aligned in 4ch so the slider holds still. Each step applies as the
+  slider moves, so the panel and the Grind Tracker beside it show the change live.
+- **Market Prices and the Deal Line:** under Opacity, "Market Prices" over one line on what it does and sends, and a
   switch row as the Grind Tracker's: "Prices from maplestory.market". Then the Deal Finder's heading and line, and in an
   inset box as the switches', "Deal Line" in 13px Panel Ink Steel over a radio per choice, 19px rows of 13px Panel Ink
   with an Edit Blue radio: the Going rate and Cheapest now while they're on, then the player's lines. A click chooses at

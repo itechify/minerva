@@ -225,6 +225,9 @@ pub enum Action {
     /// The Settings window's Deal Margin: how far below the Deal Line, in percent, a price must
     /// be to be a deal; at most 99.
     SetDealMargin { percent: u32 },
+    /// The Settings window's Opacity slider: how solid the panel and the Grind Tracker are drawn
+    /// over the game, in percent; from 30 to 100.
+    SetWindowOpacity { percent: u32 },
     /// The Settings window's Grind Tracker switch: on, the EXP figures are read from the Status
     /// Bar and the Session runs; off, neither, and the Grind Tracker doesn't show.
     SetGrindTracker { on: bool },

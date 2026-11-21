@@ -38,6 +38,8 @@ struct TrackerView<'a> {
     pickup_log_covered: bool,
     /// The Loot section is open, showing the mesos and Items picked up.
     loot_open: bool,
+    /// How solid the window is drawn, in percent, but while the pointer is over it.
+    window_opacity_percent: u32,
 }
 
 /// Show the window where the core says, or nothing; and send its page the Grind Tracker's
@@ -52,6 +54,7 @@ pub fn sync(window: &mut PanelWindow, state: &PanelState) {
         personal_bests_open: state.personal_bests.open,
         pickup_log_covered: state.pickup_log_covered,
         loot_open: state.grind_tracker.loot_open,
+        window_opacity_percent: state.window_opacity_percent,
     };
     window.sync(&view, Shows { placement, clickable: placement.is_some(), takes_keyboard: false });
 }
